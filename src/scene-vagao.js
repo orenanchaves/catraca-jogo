@@ -1,13 +1,41 @@
 /* global Phaser */
 /* Catraca — dentro do vagão: banco, equilíbrio, eventos e o dilema do lugar */
 
-/* Baias de banco: três de cada lado, alternadas, como no vagão de verdade.
-   x é a quina da baia na parede; quem senta fica no meio dela. */
+/* O comprimento do vagão é uma alternância: porta, baia, porta, baia.
+   Antes não era — as portas e as baias da direita moravam na mesma
+   faixa de parede e se sobrepunham 40px cada, três vezes. O banco
+   ficava bem no meio do vão da porta, e como o corredor parava em
+   x=250 dava pra encostar no banco mas nunca na porta. O vagão virava
+   uma gaiola com saída pintada na parede.
+
+   Agora cada coisa tem a sua faixa, e as duas paredes usam as mesmas:
+   baia de frente pra baia, porta de frente pra janela. */
+var PORTA_ALT = 60;
+var PORTAS_Y = [96, 268, 440];         // faixas de porta, na parede direita
 var BAIA_FUNDO = 22, BAIA_COMP = 58;   // raso na parede, comprido ao longo dela
+var BAIAS_Y = [168, 340, 508];         // faixas de baia, nos vãos entre as portas
 var BAIAS = [
-  { x: 28, y: 80, dir: 1 }, { x: 28, y: 240, dir: 1 }, { x: 28, y: 400, dir: 1 },
-  { x: 270, y: 160, dir: -1 }, { x: 270, y: 320, dir: -1 }, { x: 270, y: 480, dir: -1 }
+  { x: 28, y: BAIAS_Y[0], dir: 1 }, { x: 28, y: BAIAS_Y[1], dir: 1 }, { x: 28, y: BAIAS_Y[2], dir: 1 },
+  { x: 270, y: BAIAS_Y[0], dir: -1 }, { x: 270, y: BAIAS_Y[1], dir: -1 }, { x: 270, y: BAIAS_Y[2], dir: -1 }
 ];
+
+/* Uma janela: caixilho escuro, vidro, e o brilho de cima onde o túnel
+   passa. Serve nas duas paredes. */
+function janelaVagao(g, x, y, alt) {
+  g.fillStyle(0x0d1119, 1).fillRect(x, y, 22, alt);
+  g.fillStyle(0x161d2b, 1).fillRect(x + 2, y + 2, 18, alt - 4);
+  g.fillStyle(0xffffff, 0.07).fillRect(x + 2, y + 2, 18, 14);
+}
+
+/* está na altura de alguma porta? é o que abre o vestíbulo e o que
+   corta a barra de apoio */
+function naPorta(y, folga) {
+  folga = folga || 0;
+  for (var i = 0; i < PORTAS_Y.length; i++) {
+    if (y > PORTAS_Y[i] - folga && y < PORTAS_Y[i] + PORTA_ALT + folga) return true;
+  }
+  return false;
+}
 
 /* guarda onde a pessoa está e com que fase ela balança, pra cada uma
    respirar no seu tempo em vez de o vagão inteiro pulsar junto */
@@ -39,9 +67,26 @@ var VERSO_DO_JOGADOR = {
   ambulante: 'ESSE AÍ É DA ÁREA,\nRESPEITO ENTRE COLEGA'
 };
 
-/* o corredor do vagão, entre os bancos */
+/* O corredor tem a largura do vão entre as baias e abre até a parede na
+   altura de cada porta. É esse vestíbulo que faz descer virar um
+   movimento: sem ele dá pra encostar na baia e nunca na porta.
+
+   A abertura não é um degrau, é uma rampa: com corte seco, quem saísse
+   da faixa da porta encostado na parede era arrancado 30px de uma vez,
+   e parecia teleporte. Assim a pessoa escorrega pra dentro e pra fora
+   da boca do vestíbulo. */
+var CORREDOR_DIR = 250, VESTIBULO_DIR = 280, RAMPA_VESTIBULO = 20;
+function bordaVagao(y) {
+  var meia = PORTA_ALT / 2, perto = 9999;
+  for (var i = 0; i < PORTAS_Y.length; i++) {
+    perto = Math.min(perto, Math.abs(y - (PORTAS_Y[i] + meia)));
+  }
+  if (perto <= meia) return VESTIBULO_DIR;
+  if (perto >= meia + RAMPA_VESTIBULO) return CORREDOR_DIR;
+  return VESTIBULO_DIR - (VESTIBULO_DIR - CORREDOR_DIR) * (perto - meia) / RAMPA_VESTIBULO;
+}
 function limitaVagao(sp) {
-  sp.x = Phaser.Math.Clamp(sp.x, 70, 250);
+  sp.x = Phaser.Math.Clamp(sp.x, 70, bordaVagao(sp.y));
   sp.y = Phaser.Math.Clamp(sp.y, 84, 556);
 }
 
@@ -62,7 +107,7 @@ var VagaoScene = new Phaser.Class({
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
     this.gente = [];
-    this.portas = [140, 300, 460];
+    this.portas = PORTAS_Y;
     this.npcExtra = [];
 
     this.desenhaCenario();
@@ -116,19 +161,38 @@ var VagaoScene = new Phaser.Class({
     g.fillStyle(l.num, 1).fillRect(0, HUD_H, 5, GH - HUD_H);
     g.fillStyle(l.num, 1).fillRect(315, HUD_H, 5, GH - HUD_H);
 
-    // janelas da parede esquerda, com o túnel passando
-    for (var wy = 80; wy < GH - 60; wy += 92) {
-      g.fillStyle(0x0d1119, 1).fillRect(4, wy, 22, 60);
-      g.fillStyle(0x161d2b, 1).fillRect(6, wy + 2, 18, 56);
-      g.fillStyle(0xffffff, 0.07).fillRect(6, wy + 2, 18, 14);
+    /* Janelas nas duas faixas: a parede esquerda não tem porta nenhuma,
+       então é janela de ponta a ponta; a direita só tem janela onde não
+       tem porta, porque lá o vidro é a própria folha da porta. */
+    var d, w;
+    for (d = 0; d < PORTAS_Y.length; d++) janelaVagao(g, 4, PORTAS_Y[d], PORTA_ALT);
+    for (w = 0; w < BAIAS_Y.length; w++) {
+      janelaVagao(g, 4, BAIAS_Y[w], BAIA_COMP);
+      janelaVagao(g, 294, BAIAS_Y[w], BAIA_COMP);
     }
 
     // painel claro da parede, atrás e acima dos bancos
-    for (var s = 0; s < 2; s++) {
-      var px = s ? 270 : 28;
-      g.fillStyle(0x767f96, 1).fillRect(px, HUD_H, 22, GH - HUD_H);
-      g.fillStyle(0x868fa6, 1).fillRect(px, HUD_H, 22, 2);
-      g.fillStyle(0x4e5468, 1).fillRect(px + (s ? 0 : 20), HUD_H, 2, GH - HUD_H);
+    g.fillStyle(0x767f96, 1).fillRect(28, HUD_H, 22, GH - HUD_H);
+    g.fillStyle(0x868fa6, 1).fillRect(28, HUD_H, 22, 2);
+    g.fillStyle(0x4e5468, 1).fillRect(48, HUD_H, 2, GH - HUD_H);
+    // do lado direito o painel abre em cada porta, senão tapa o vestíbulo
+    for (w = 0; w < BAIAS_Y.length; w++) {
+      g.fillStyle(0x767f96, 1).fillRect(270, BAIAS_Y[w] - 8, 22, BAIA_COMP + 16);
+      g.fillStyle(0x868fa6, 1).fillRect(270, BAIAS_Y[w] - 8, 22, 2);
+      g.fillStyle(0x4e5468, 1).fillRect(270, BAIAS_Y[w] - 8, 2, BAIA_COMP + 16);
+    }
+
+    /* Vestíbulo: o pedaço de piso na frente de cada porta. É ele que
+       diz, sem texto, onde se desce — e é o único lugar do vagão onde
+       dá pra chegar até a parede. */
+    for (d = 0; d < PORTAS_Y.length; d++) {
+      var dy = PORTAS_Y[d];
+      g.fillStyle(0x3a485f, 1).fillRect(250, dy - 6, 42, PORTA_ALT + 12);
+      g.fillStyle(0x2b3648, 1).fillRect(250, dy - 6, 2, PORTA_ALT + 12);
+      g.fillStyle(0x46566f, 1).fillRect(252, dy - 6, 40, 2);
+      g.fillStyle(0x2b3648, 1).fillRect(252, dy + PORTA_ALT + 4, 40, 2);
+      // faixa tátil rente à porta
+      g.fillStyle(num(PAL.amarelo), 0.4).fillRect(285, dy + 3, 4, PORTA_ALT - 6);
     }
 
     /* baias de banco: encosto colado na parede, assento pra fora, e o
@@ -157,15 +221,21 @@ var VagaoScene = new Phaser.Class({
     this.gPortas = this.add.graphics().setDepth(2);
     this.pintaPortas(false);
 
-    // barras de apoio do corredor
+    /* Barras de apoio. A da direita é cortada na altura de cada porta:
+       barra atravessando a saída é o que mais fazia o vagão parecer
+       trancado, e no vagão de verdade ela também não passa ali. */
     for (var i = 0; i < 2; i++) {
       var px = i ? 226 : 90;
-      g.fillStyle(num(PAL.metalSom), 1).fillRect(px, HUD_H, 8, GH - HUD_H);
-      g.fillStyle(num(PAL.metal), 1).fillRect(px, HUD_H, 5, GH - HUD_H);
-      g.fillStyle(num(PAL.metalLuz), 1).fillRect(px + 1, HUD_H, 2, GH - HUD_H);
+      for (var by = HUD_H; by < GH; by++) {
+        if (i && naPorta(by, 8)) continue;
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(px, by, 8, 1);
+        g.fillStyle(num(PAL.metal), 1).fillRect(px, by, 5, 1);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(px + 1, by, 2, 1);
+      }
       // alças penduradas
       g.fillStyle(num(PAL.metalSom), 1);
       for (var ay = 96; ay < GH - 40; ay += 64) {
+        if (i && naPorta(ay, 8)) continue;
         g.fillRect(px + (i ? -12 : 8), ay, 12, 3);
         g.fillRect(px + (i ? -12 : 18), ay, 3, 14);
       }
@@ -174,19 +244,26 @@ var VagaoScene = new Phaser.Class({
 
   pintaPortas: function (aberto) {
     var g = this.gPortas; g.clear();
+    var meia = PORTA_ALT / 2;
     for (var i = 0; i < this.portas.length; i++) {
       var y = this.portas[i];
       if (aberto) {
-        g.fillStyle(0x07070c, 1).fillRect(292, y, 28, 60);
-        g.fillStyle(0x3f3f52, 1).fillRect(296, y + 4, 20, 52);
-        g.fillStyle(0x00e676, 1).fillRect(288, y, 4, 60);
-        g.fillStyle(0x00e676, 0.22).fillRect(258, y, 34, 60);
+        // o vão, a plataforma lá fora, e a luz caindo no vestíbulo
+        g.fillStyle(0x07070c, 1).fillRect(292, y, 28, PORTA_ALT);
+        g.fillStyle(0x3f3f52, 1).fillRect(296, y + 4, 20, PORTA_ALT - 8);
+        g.fillStyle(0x00e676, 1).fillRect(289, y, 3, PORTA_ALT);
+        g.fillStyle(0x00e676, 0.16).fillRect(250, y, 42, PORTA_ALT);
       } else {
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(292, y, 28, 60);
-        g.fillStyle(0x767c92, 1).fillRect(292, y + 2, 26, 56);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(292, y + 2, 26, 2);
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(292, y + 28, 28, 3);
-        g.fillStyle(num(PAL.amarelo), 1).fillRect(288, y, 3, 60);
+        // duas folhas encostadas, cada uma com o seu vidro
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(292, y, 28, PORTA_ALT);
+        for (var f = 0; f < 2; f++) {
+          var fy = y + 1 + f * meia;
+          g.fillStyle(0x767c92, 1).fillRect(293, fy, 26, meia - 2);
+          g.fillStyle(num(PAL.metalLuz), 1).fillRect(293, fy, 26, 2);
+          g.fillStyle(0x101725, 1).fillRect(297, fy + 6, 18, meia - 14);
+          g.fillStyle(0xffffff, 0.06).fillRect(297, fy + 6, 18, 5);
+        }
+        g.fillStyle(num(PAL.amarelo), 1).fillRect(289, y, 3, PORTA_ALT);
       }
     }
   },
@@ -717,8 +794,9 @@ var VagaoScene = new Phaser.Class({
       var mv = (dx !== 0 || dy !== 0);
       if (mv) {
         var n = Math.sqrt(dx * dx + dy * dy);
-        this.pl.sp.x = Phaser.Math.Clamp(this.pl.sp.x + (dx / n) * vel * dt / 1000, 70, 250);
-        this.pl.sp.y = Phaser.Math.Clamp(this.pl.sp.y + (dy / n) * vel * dt / 1000, 84, 556);
+        this.pl.sp.x += (dx / n) * vel * dt / 1000;
+        this.pl.sp.y += (dy / n) * vel * dt / 1000;
+        limitaVagao(this.pl.sp);        // o corredor abre na frente das portas
         this.pl.setDir(dx, dy);
       }
       this.pl.anima(dt, mv);
@@ -735,9 +813,10 @@ var VagaoScene = new Phaser.Class({
   contexto: function () {
     var dica = '';
     if (this.estado === 'parado') {
+      // descer é chegar no vestíbulo, não só estar na altura da porta
       var perto = false;
       for (var i = 0; i < this.portas.length; i++) {
-        if (this.pl.sp.x > 200 && Math.abs(this.pl.sp.y - (this.portas[i] + 30)) < 42) perto = true;
+        if (this.pl.sp.x > 258 && Math.abs(this.pl.sp.y - (this.portas[i] + PORTA_ALT / 2)) < 34) perto = true;
       }
       dica = perto ? nomeAgir() + ': descer' : 'vá até uma porta ►';
       if (perto && Ctrl.actJust) { this.desce(); return; }
