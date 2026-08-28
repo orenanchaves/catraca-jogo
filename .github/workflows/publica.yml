@@ -1,4 +1,9 @@
-# Publica o jogo no GitHub Pages a cada push na main.
+# Publica o jogo a cada push na main.
+#
+# O GitHub Pages deste repositório serve a branch gh-pages, então publicar é
+# reescrever essa branch com o que o navegador precisa. Usa só git e o token
+# que o próprio Actions já dá — sem senha, sem app, sem API de Pages (que este
+# token não tem permissão de chamar).
 name: Publica
 
 on:
@@ -7,38 +12,33 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: publica
   cancel-in-progress: true
 
 jobs:
   publica:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      # só o jogo vai pro ar: nem o README, nem o workflow
-      - name: Separa o que vai pro ar
+      - name: Monta o que vai pro ar
         run: |
           mkdir -p _site
           cp index.html _site/
           cp -r src _site/
+          touch _site/.nojekyll      # sem isso o GitHub tenta processar como Jekyll
           find _site -type f | sort
 
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - name: Reescreve a gh-pages
+        run: |
+          cd _site
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publica ${GITHUB_SHA:0:7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
+          echo "no ar em https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
