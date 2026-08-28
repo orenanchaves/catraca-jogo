@@ -281,7 +281,36 @@ var CORPO_BASE = {
     '.....okkkkko....', '......kkkk......', '.....jjjjjj.....', '....ojjjjjjjo...',
     '....ojjjjjjjo...', '....ojjjjjjjo...', '....ojjjjjjjko..', '....ojjjjjjjko..',
     '....ojjjjjjjo...', '.....ojjjjjo....', '.....pppppp.....', '.....pppppp.....',
-    '.....ppppp......', '.....pppp.......', '.....ppp........', '.....sss........']
+    '.....ppppp......', '.....pppp.......', '.....ppp........', '.....sss........'],
+
+  /* ---------- as duas vistas de três quartos ----------
+     Com WASD e com o manche dá pra andar em oito direções, mas o
+     boneco só tinha três vistas: andando na diagonal ele ia de lado
+     olhando pra frente.
+
+     O giro é desenhado no mínimo de linhas de propósito. A silhueta
+     da cabeça e do tronco fica igual à da frente, e só mudam a
+     têmpora, os olhos, o pescoço e a linha do ombro. É isso que faz
+     os sete cabelos, a saia, a bengala, a mochila, a bolsa, o colo e
+     a barriga valerem na diagonal sem uma linha nova de desenho: o
+     que eles trocam continua caindo no mesmo lugar.
+
+     Estas são as versões viradas pra direita. A esquerda é a mesma
+     coisa espelhada. */
+  diagDown: [
+    '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '...oaakkkkkao...', '...okkkkkkkko...', '...okkkokkoko...',
+    '...okkkkkkkko...', '....okkkkkko....', '.......kkkk.....', '...ojjjjjjjjo...',
+    '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..okjjjjjjjjko..',
+    '..okjjjjjjjjko..', '...ojjjjjjjjo...', '...oppppppppo...', '....pppppppp....',
+    '....ppp..ppp....', '....ppp..ppp....', '....ppp..ppp....', '....sss..sss....'],
+  diagUp: [
+    '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '....oaaaaaao....', '.......kkkk.....', '...ojjjjjjjjo...',
+    '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..okjjjjjjjjko..',
+    '..okjjjjjjjjko..', '...ojjjjjjjjo...', '...oppppppppo...', '....pppppppp....',
+    '....ppp..ppp....', '....ppp..ppp....', '....ppp..ppp....', '....sss..sss....']
 };
 
 /* pernas: os quadros de caminhada trocam as últimas linhas do corpo */
@@ -315,7 +344,13 @@ var CABELO_LONGO = {
     2: '...oaaaaaaaao...', 3: '...oaaaaaaaao...', 4: '...oaaaaakkko...',
     5: '...oaaaakkkko...', 6: '...oaakokkkko...', 7: '...oaakkkkkko...',
     8: '...oaaakkkko....', 9: '...oaaakkko.....', 10: '....oaajjjjjo...'
-  }
+  },
+  /* de três quartos só muda o rosto virado e o ombro estreito; o resto
+     do cabelo comprido vem da vista de frente */
+  diagDown: {
+    7: '..oaakkokkoaao..', 11: '...oajjjjjjao...', 12: '..ojajjjjjjajo..'
+  },
+  diagUp: { 11: '...oajjjjjjao...', 12: '..ojajjjjjjajo..' }
 };
 
 /* ---------- saia ---------- */
@@ -354,6 +389,10 @@ var MOD_COLO = {
   side: {
     12: '....ojjjjowwo...', 13: '....ojjjowkwo...', 14: '....ojjjowwwo...',
     15: '....ojjjjowwo...', 16: '....ojjjjjjko...'
+  },
+  diagDown: {
+    12: '..ojjowwwwojjo..', 13: '..ojowwkkwwojo..', 14: '..okowwkkwwoko..',
+    15: '..okowwwwwwoko..', 16: '..ojjowwwwojjo..'
   }
 };
 
@@ -365,6 +404,9 @@ var MOD_BARRIGA = {
   side: {
     12: '....ojjjjjjjjo..', 13: '....ojjjjjjjjjo.', 14: '....ojjjjjjjjjo.',
     15: '....okjjjjjjjjo.', 16: '....ojjjjjjjjo..', 17: '.....ojjjjjjo...'
+  },
+  diagDown: {
+    15: '..ojowwwwwwojo..', 16: '..okowwwwwwoko..', 17: '...ojowwwwojo...'
   }
 };
 
@@ -386,6 +428,13 @@ var MOD_BENGALA = {
     19: '.....pppppp...w.', 20: '.....ppppp....w.', 21: '.....pppp.....w.',
     22: '.....ppp......w.', 23: '.....sss......w.'
   },
+  /* o tronco estreita até a linha da mão e para ali: a bengala é uma
+     coluna fixa na beirada, e mão que recua solta a bengala no ar.
+     Uma linha de ombro a mais no três-quartos lê como cotovelo. */
+  diagDown: {
+    10: '......okkkko....', 13: '..ojjjjjjjjjjo..', 14: '..ojjjjjjjjjjo..'
+  },
+  diagUp: { 10: '......okkkko....' },
   pernas: {
     inicio: 20,
     frente: [
@@ -463,6 +512,11 @@ var CABELO_RABO = {
     10: '......aaaa......', 11: '..ojjjaaaajjjo..', 12: '.ojjjjaaaajjjjo.',
     13: '.ojjjjaaaajjjjo.', 14: '.ojjjjjaajjjjjo.'
   },
+  diagDown: { 7: '...okkkokkokoaa.' },
+  diagUp: {
+    11: '...ojjaaaajjo...', 12: '..ojjjaaaajjjo..',
+    13: '..ojjjaaaajjjo..', 14: '..ojjjjaajjjjo..'
+  },
   side: {
     4: '..aaoaaaakkko...', 5: '..aaoaaakkkko...', 6: '..aaoakokkkko...',
     7: '..aaokkkkkkko...', 8: '..aa.okkkkko....', 9: '..aa..kkkk......'
@@ -499,6 +553,13 @@ var MOD_MOCHILA = {
   side: {
     11: '..wwojjjjjjjo...', 12: '..wwojjjjjjjo...', 13: '..wwojjjjjjjo...',
     14: '..wwojjjjjjjko..', 15: '...wojjjjjjjko..'
+  },
+  diagDown: {
+    13: '..ojwjjjjjjwjo..', 14: '..ojwjjjjjjwjo..', 15: '..okwjjjjjjwko..'
+  },
+  diagUp: {
+    12: '..ojwwwwwwwwjo..', 13: '..ojwwwwwwwwjo..', 14: '..ojwwwwwwwwjo..',
+    15: '..okwwwwwwwwko..'
   }
 };
 
@@ -514,12 +575,21 @@ var MOD_BOLSA = {
   side: {
     13: '....ojjjjjjjo...', 14: '....ojjjjjwwwo..', 15: '....ojjjjjwwwo..',
     16: '....ojjjjjwwwo..'
+  },
+  diagDown: {
+    12: '..ojwjjjjjjjjo..', 13: '..ojjwjjjjjjjo..', 14: '..ojjjwjjjjjjo..',
+    15: '..okjjjwjwwwko..', 16: '..okjjjjjwwwko..', 17: '...ojjjjjwwwo...'
+  },
+  diagUp: {
+    12: '..ojjjjjjjjwjo..', 13: '..ojjjjjjjwjjo..', 14: '..ojjjjjjwjjjo..',
+    15: '..okwwwjjjjjko..', 16: '..okwwwjjjjjko..', 17: '...owwwjjjjjo...'
   }
 };
 
 var MOD_CELULAR = {
   down: { 15: '.ojjjjkwwkjjjjo.', 16: '.ojjjjkwwkjjjjo.' },
-  side: { 14: '....ojjjjjkwo...', 15: '....ojjjjjkwo...' }
+  side: { 14: '....ojjjjjkwo...', 15: '....ojjjjjkwo...' },
+  diagDown: { 15: '..ojjjkwwkjjjo..', 16: '..ojjjkwwkjjjo..' }
 };
 
 /* ---------- pedinte encostado na parede (pose única) ---------- */
@@ -564,13 +634,24 @@ var CORPOS = {
   pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE }
 };
 
+var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp'];
+/* A diagonal parte do que a camada faz de frente (ou de costas) e leva
+   por cima só o que é diferente nela. Sem isso, toda camada teria que
+   redesenhar as linhas inteiras pra existir na diagonal, e um cabelo
+   comprido que só precisa mexer no olho perderia o resto. */
+var DIR_HERDA = { diagDown: 'down', diagUp: 'up' };
+
+function aplicaDir(alvo, nome, linhas) {
+  if (!linhas) return;
+  if (Array.isArray(linhas)) alvo[nome] = linhas.slice(0);   // pose inteira
+  else for (var k in linhas) alvo[nome][k | 0] = linhas[k];  // só as linhas trocadas
+}
+
 function aplicaCamada(alvo, camada) {
-  var dirs = ['down', 'up', 'side'];
-  for (var d = 0; d < dirs.length; d++) {
-    var linhas = camada[dirs[d]];
-    if (!linhas) continue;
-    if (Array.isArray(linhas)) alvo[dirs[d]] = linhas.slice(0);   // pose inteira
-    else for (var k in linhas) alvo[dirs[d]][k | 0] = linhas[k];  // só as linhas trocadas
+  for (var d = 0; d < DIRS.length; d++) {
+    var nome = DIRS[d];
+    aplicaDir(alvo, nome, camada[DIR_HERDA[nome]]);
+    aplicaDir(alvo, nome, camada[nome]);
   }
   if (camada.pernas) alvo.pernas = camada.pernas;
   if (camada.poseUnica) alvo.poseUnica = true;
@@ -582,10 +663,8 @@ function resolveCorpo(key) {
   if (c.herda) {
     alvo = resolveCorpo(c.herda);
   } else {
-    alvo = {
-      down: CORPO_BASE.down.slice(0), up: CORPO_BASE.up.slice(0),
-      side: CORPO_BASE.side.slice(0), pernas: PERNAS_PADRAO, poseUnica: false
-    };
+    alvo = { pernas: PERNAS_PADRAO, poseUnica: false };
+    for (var d = 0; d < DIRS.length; d++) alvo[DIRS[d]] = CORPO_BASE[DIRS[d]].slice(0);
   }
   aplicaCamada(alvo, c);
   var mods = c.mods || [];
@@ -598,10 +677,9 @@ function quadrosDoCorpo(key) {
   key = key || 'padrao';
   if (CACHE_CORPOS[key]) return CACHE_CORPOS[key];
   var r = resolveCorpo(key);
-  var dirs = ['down', 'up', 'side'];
   var out = {};
-  for (var d = 0; d < dirs.length; d++) {
-    var nome = dirs[d], parado = r[nome];
+  for (var d = 0; d < DIRS.length; d++) {
+    var nome = DIRS[d], parado = r[nome];
     var passos = (nome === 'side') ? r.pernas.lado : r.pernas.frente;
     out[nome] = [parado, null, null];
     for (var q = 0; q < 2; q++) {
@@ -722,15 +800,17 @@ function desenhaQuadro(c2d, art, pal, ox, oy) {
 
 function geraSheet(scene, key, pal, corpo) {
   if (scene.textures.exists(key)) return;
-  var tex = scene.textures.createCanvas(key, 96, 144);
+  var tex = scene.textures.createCanvas(key, 96, 48 * DIRS.length);
   var c2d = tex.getContext();
   var q = quadrosDoCorpo(corpo);
-  var linhas = [q.down, q.up, q.side];
-  for (var l = 0; l < 3; l++) {
-    for (var c = 0; c < 3; c++) desenhaQuadro(c2d, linhas[l][c], pal, c * 32, l * 48);
+  for (var l = 0; l < DIRS.length; l++) {
+    var linha = q[DIRS[l]];
+    for (var c = 0; c < 3; c++) desenhaQuadro(c2d, linha[c], pal, c * 32, l * 48);
   }
   tex.refresh();
-  for (var i = 0; i < 9; i++) tex.add(i, 0, (i % 3) * 32, Math.floor(i / 3) * 48, 32, 48);
+  for (var i = 0; i < DIRS.length * 3; i++) {
+    tex.add(i, 0, (i % 3) * 32, Math.floor(i / 3) * 48, 32, 48);
+  }
 }
 
 /* =========================================================
@@ -808,17 +888,35 @@ function Ator(scene, x, y, key) {
   this.t = 0;
   this.andando = false;
 }
+/* em que fileira da folha cada direção mora, e quem sai espelhado.
+   'left' e 'right' continuam existindo porque meia dúzia de lugares
+   posicionam gente parada escrevendo o nome do lado direto. */
+var FILEIRA_DIR = {
+  down: 0, up: 3, left: 6, right: 6,
+  diagDownL: 9, diagDownR: 9, diagUpL: 12, diagUpR: 12
+};
+var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1 };
+var DIAGONAL_MIN = 0.42;   // o eixo fraco precisa disso do forte pra virar diagonal
+
 Ator.prototype.setDir = function (dx, dy) {
-  if (Math.abs(dx) > Math.abs(dy)) this.dir = dx < 0 ? 'left' : 'right';
-  else if (dy !== 0) this.dir = dy < 0 ? 'up' : 'down';
+  var ax = Math.abs(dx), ay = Math.abs(dy);
+  if (!ax && !ay) return;
+  if (ax >= ay * DIAGONAL_MIN && ay >= ax * DIAGONAL_MIN) {
+    this.dir = (dy < 0 ? 'diagUp' : 'diagDown') + (dx < 0 ? 'L' : 'R');
+  } else if (ax > ay) {
+    this.dir = dx < 0 ? 'left' : 'right';
+  } else {
+    this.dir = dy < 0 ? 'up' : 'down';
+  }
 };
 Ator.prototype.anima = function (dt, andando) {
   this.andando = andando;
   if (andando) this.t += dt; else this.t = 0;
-  var base = (this.dir === 'up') ? 3 : (this.dir === 'down' ? 0 : 6);
+  var base = FILEIRA_DIR[this.dir];
+  if (base === undefined) base = 0;
   var passo = andando ? (1 + (Math.floor(this.t / 130) % 2)) : 0;
   this.sp.setFrame(base + passo);
-  this.sp.setFlipX(this.dir === 'left');
+  this.sp.setFlipX(!!ESPELHA_DIR[this.dir]);
 };
 Ator.prototype.pos = function (x, y) { this.sp.x = x; this.sp.y = y; };
 Ator.prototype.destroy = function () { this.sp.destroy(); };
