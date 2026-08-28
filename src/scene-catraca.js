@@ -395,6 +395,12 @@ var CatracaScene = new Phaser.Class({
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.fim) return;
 
+    /* A catraca é a primeira cena de cada perna, e é aqui que chega quem
+       acabou de ser mandado embora ou de dormir no ponto. Sem esta
+       checagem dava pra jogar uma cena inteira já demitido. */
+    var morte = GameState.derrota();
+    if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); this.scene.start('Fim'); return; }
+
     this.tarja.atualiza();
     this.atualizaGuarda(dt);
 

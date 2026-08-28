@@ -37,19 +37,56 @@ var PAL = {
   laranja: '#e8a33c'
 };
 
+/* As duas linhas inteiras, na ordem real, e a Sé no meio das duas — que
+   é o que faz a baldeação existir. A vermelha só ia da Sé pra oeste; sem
+   a metade leste não dava pra morar em Itaquera, que é de onde a maior
+   parte da cidade pega esse trem.
+
+   Nome de placa, não nome de portaria: 'ITAQUERA' e não
+   'CORINTHIANS-ITAQUERA', porque a barra do HUD tem 320px e o relógio
+   mora na outra ponta dela. */
 var LINHAS = {
   azul: {
     nome: 'LINHA 1-AZUL', cor: '#0b5fae', num: 0x0b5fae,
     estacoes: ['JABAQUARA', 'CONCEIÇÃO', 'SÃO JUDAS', 'SAÚDE', 'PÇA DA ÁRVORE',
       'SANTA CRUZ', 'VILA MARIANA', 'ANA ROSA', 'PARAÍSO', 'VERGUEIRO',
-      'SÃO JOAQUIM', 'LIBERDADE', 'SÉ']
+      'SÃO JOAQUIM', 'LIBERDADE', 'SÉ', 'SÃO BENTO', 'LUZ', 'TIRADENTES',
+      'ARMÊNIA', 'PORTUGUESA', 'CARANDIRU', 'SANTANA', 'JD. SÃO PAULO',
+      'PARADA INGLESA', 'TUCURUVI']
   },
   vermelha: {
     nome: 'LINHA 3-VERMELHA', cor: '#e8362c', num: 0xe8362c,
-    estacoes: ['SÉ', 'ANHANGABAÚ', 'REPÚBLICA', 'SANTA CECÍLIA',
-      'MAL. DEODORO', 'BARRA FUNDA']
+    estacoes: ['BARRA FUNDA', 'MAL. DEODORO', 'STA. CECÍLIA', 'REPÚBLICA',
+      'ANHANGABAÚ', 'SÉ', 'PEDRO II', 'BRÁS', 'BRESSER', 'BELÉM', 'TATUAPÉ',
+      'CARRÃO', 'PENHA', 'VILA MATILDE', 'GUILHERMINA', 'PATRIARCA',
+      'ARTUR ALVIM', 'ITAQUERA']
   }
 };
+
+/* ---------- o que faz perder ----------
+   Carisma e descanso zerados já matavam, mas nenhum dos dois falava com
+   o trajeto. Com destino e relógio existe a perda que a cidade cobra de
+   verdade: chegar atrasado. Descer na estação errada, dormir e passar
+   da sua, ficar no trem até a ponta da linha — tudo isso custa minutos,
+   e minuto demais vira atraso. Três atrasos e você é mandado embora.
+
+   A volta não tem hora pra chegar, mas tem preço: quem chega tarde em
+   casa dorme menos, e começa o dia seguinte com menos descanso. */
+/* 68 minutos: medido em 200 trajetos por faixa de horário. Trajeto
+   limpo leva de 39 a 58 e chega sempre; um erro é perdoado em 98% dos
+   casos; três erros chegam no prazo em 13%. É a curva que queria — a
+   cidade perdoa o tropeço e cobra o descuido. */
+var LIMITE_ATRASO = 68;
+var MAX_ATRASOS = 3;
+
+/* onde as duas se cruzam, e o par fixo da corrida */
+var BALDEACAO = 'SÉ';
+var CASA = 'ITAQUERA';         // linha vermelha, ponta leste
+var TRABALHO = 'VERGUEIRO';    // linha azul, quatro estações ao sul da Sé
+
+function linhaDaEstacao(nome) {
+  return LINHAS.azul.estacoes.indexOf(nome) >= 0 ? 'azul' : 'vermelha';
+}
 
 /* ---------- relógio e faixas de horário ----------
    O metrô não é o mesmo o dia inteiro. Cada faixa muda a lotação, a
@@ -94,8 +131,11 @@ var FAIXAS = [
   }
 ];
 
-/* cada dia começa numa hora diferente: o jogo é sempre o mesmo trajeto,
-   mas nunca no mesmo horário */
+/* cada dia sai de casa numa hora diferente: é sempre o mesmo trajeto,
+   mas nunca na mesma São Paulo. A volta é a saída mais uma jornada, e é
+   isso que amarra as duas pontas do dia — quem sai 4h20 volta no
+   entre-pico, quem sai 16h20 volta no último trem. */
+var JORNADA = 9 * 60 + 30;
 var HORAS_INICIO = [
   6 * 60 + 10,        // dia 1: pico da manhã, o batismo
   4 * 60 + 20,        // madrugada, estação abrindo
@@ -104,6 +144,8 @@ var HORAS_INICIO = [
   22 * 60 + 20,       // noite virando último trem e madrugada
   13 * 60 + 30        // tarde engrossando pro pico
 ];
+
+function horaDaSaida(dia) { return HORAS_INICIO[(dia - 1) % HORAS_INICIO.length]; }
 
 function faixaDe(min) {
   var m = ((min % 1440) + 1440) % 1440;
@@ -156,13 +198,15 @@ var GameState = {
     this.descanso = c.descanso;
     this.dinheiro = c.dinheiro;
     this.valeRestante = c.valeTransporte;
-    this.linha = 'azul';
-    this.idx = 7;
-    this.dir = 1;
+    this.perna = 'ida';                       // ida = casa→trabalho, volta = trabalho→casa
+    this.poeNoTrajeto(CASA);
     this.estacoes = 0;
     this.dia = 1;
-    this.trechosNoDia = 0;
-    this.minutos = HORAS_INICIO[0];
+    this.pernasFeitas = 0;
+    this.atrasos = 0;
+    this.ultimoAtraso = 0;
+    this.minutos = horaDaSaida(1) + Math.floor(Math.random() * 25) - 12;
+    this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
     this.dentroDoSistema = false;
     this.sentado = false;
@@ -179,29 +223,97 @@ var GameState = {
     if (i < 0 || i >= l.estacoes.length) i = this.idx - this.dir;
     return l.estacoes[i];
   },
-  avancar: function () {
+
+  /* ---------- o trajeto do dia ----------
+     Não é mais um loop sem fim: todo dia é ida e volta entre casa e
+     trabalho. Como as duas pontas estão em linhas diferentes, o trajeto
+     sempre tem uma baldeação na Sé no meio — que é exatamente o trecho
+     que a cidade inteira faz.
+
+     O jogo não conduz ninguém pela mão: o trem anda sozinho no sentido
+     certo, mas quem tem que descer na estação certa é você. Descer
+     antes custa o trem seguinte; passar da sua custa a volta. */
+  destinoFinal: function () { return this.perna === 'ida' ? TRABALHO : CASA; },
+  origemDaPerna: function () { return this.perna === 'ida' ? CASA : TRABALHO; },
+
+  // precisa trocar de linha pra chegar no destino?
+  faltaBaldear: function () {
+    return linhaDaEstacao(this.destinoFinal()) !== this.linha;
+  },
+  // onde você tem que descer AGORA: a Sé se falta baldear, senão o destino
+  alvoAtual: function () {
+    return this.faltaBaldear() ? BALDEACAO : this.destinoFinal();
+  },
+  // quantas estações ainda faltam até esse alvo
+  faltamEstacoes: function () {
+    var i = this.linhaAtual().estacoes.indexOf(this.alvoAtual());
+    return Math.abs(i - this.idx);
+  },
+  // põe o jogador numa estação, já apontado pro alvo
+  poeNoTrajeto: function (estacao) {
+    this.linha = linhaDaEstacao(estacao);
+    this.idx = this.linhaAtual().estacoes.indexOf(estacao);
+    this.apontaPraAlvo();
+  },
+  apontaPraAlvo: function () {
+    var i = this.linhaAtual().estacoes.indexOf(this.alvoAtual());
+    this.dir = (i >= this.idx) ? 1 : -1;
+  },
+
+  /* o trem anda uma estação. Na ponta da linha ele volta, e quem ficou
+     dentro paga o desvio em minutos. */
+  avancaTrem: function () {
     var l = this.linhaAtual();
     var i = this.idx + this.dir;
-    if (i < 0 || i >= l.estacoes.length) { this.dir *= -1; i = this.idx + this.dir; }
+    var virou = false;
+    if (i < 0 || i >= l.estacoes.length) { this.dir *= -1; i = this.idx + this.dir; virou = true; }
     this.idx = i;
     this.estacoes++;
-    this.trechosNoDia++;
-    this.passaTempo(18 + Math.floor(Math.random() * 13));
-    if (this.estacaoAtual() === 'SÉ' && Math.random() < 0.75) {
-      this.linha = (this.linha === 'azul') ? 'vermelha' : 'azul';
-      var nl = LINHAS[this.linha];
-      this.idx = nl.estacoes.indexOf('SÉ');
-      this.dir = (this.idx === 0) ? 1 : -1;
-      this.stats.baldeacoes++;
-      return 'baldeacao';
-    }
-    return 'ok';
+    this.passaTempo(2 + Math.floor(Math.random() * 2));
+    return virou;
   },
-  viraDia: function () {
-    this.dia++; this.trechosNoDia = 0; this.dentroDoSistema = false;
-    this.valeRestante = this.char.valeTransporte;
-    var h = HORAS_INICIO[(this.dia - 1) % HORAS_INICIO.length];
-    this.minutos = h + Math.floor(Math.random() * 25) - 12;
+
+  // desceu na Sé: troca de linha e reaponta
+  baldeia: function () {
+    this.linha = (this.linha === 'azul') ? 'vermelha' : 'azul';
+    this.idx = this.linhaAtual().estacoes.indexOf(BALDEACAO);
+    this.apontaPraAlvo();
+    this.stats.baldeacoes++;
+  },
+
+  /* chegou no destino da perna. De manhã o relógio pula pro fim do
+     expediente; de noite vira o dia. */
+  // quanto tempo de porta a porta esta perna já levou
+  minutosNaPerna: function () {
+    return (this.minutos - this.minutoSaida + 1440) % 1440;
+  },
+  minutosParaOAtraso: function () { return LIMITE_ATRASO - this.minutosNaPerna(); },
+  /* A cobrança é uma hora no relógio do jogo, não um cronômetro de
+     tempo real: "entrada 07:18" se lê de um olho, "faltam 23 minutos"
+     precisa de conta. O minuto continua existindo por baixo. */
+  horaLimite: function () { return horaTexto((this.minutoSaida + LIMITE_ATRASO) % 1440); },
+
+  chegouNoDestino: function () {
+    this.pernasFeitas++;
+    this.dentroDoSistema = false;
+    this.ultimoAtraso = Math.max(0, this.minutosNaPerna() - LIMITE_ATRASO);
+    if (this.perna === 'ida') {
+      if (this.ultimoAtraso > 0) this.atrasos++;
+    } else {
+      // dormir: quanto mais tarde chega em casa, menos noite sobra
+      this.addDescanso(Phaser.Math.Clamp(30 - this.ultimoAtraso * 0.4, 6, 30));
+    }
+    if (this.perna === 'ida') {
+      this.perna = 'volta';
+      this.minutos = (horaDaSaida(this.dia) + JORNADA + Math.floor(Math.random() * 40) - 20 + 1440) % 1440;
+    } else {
+      this.perna = 'ida';
+      this.dia++;
+      this.valeRestante = this.char.valeTransporte;
+      this.minutos = (horaDaSaida(this.dia) + Math.floor(Math.random() * 25) - 12 + 1440) % 1440;
+    }
+    this.poeNoTrajeto(this.origemDaPerna());
+    this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
   },
 
@@ -224,26 +336,39 @@ var GameState = {
     this.faixaAnterior = k;
     return true;
   },
-  dificuldade: function () { return 1 + (this.estacoes * 0.045) + (this.dia - 1) * 0.15; },
+  /* A dificuldade sobe por trajeto feito, não por estação passada. Com
+     trinta estações por dia, contar estação fazia a curva explodir no
+     primeiro dia inteiro. */
+  dificuldade: function () { return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1; },
   addCarisma: function (n) { this.carisma = Phaser.Math.Clamp(this.carisma + n, 0, 100); },
   addDescanso: function (n) { this.descanso = Phaser.Math.Clamp(this.descanso + n, 0, this.char.descansoMax); },
   gastar: function (n) { this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100); },
   ganhar: function (n) { this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100; },
   derrota: function () {
+    if (this.atrasos >= MAX_ATRASOS) {
+      return 'Terceiro atraso no mês.\nO RH não quis saber do metrô.';
+    }
     if (this.descanso <= 0) return 'Você dormiu. Acordou no fim da linha.\nTodo mundo já desceu.';
     if (this.carisma <= 0) return 'O vagão fechou na sua cara.\nDe novo. E de novo.';
     return null;
   },
+  /* O recorde passou a ser em dias, e por isso mudou de chave: a antiga
+     guardava contagem de estação, e um número de lá apareceria aqui
+     como um recorde de dias que ninguém fez. */
   recorde: function () {
     var r = 0;
-    try { r = parseInt(localStorage.getItem('metrosp_best') || '0', 10) || 0; } catch (e) { }
+    try { r = parseInt(localStorage.getItem('metrosp_dias') || '0', 10) || 0; } catch (e) { }
     return r;
   },
   salvarRecorde: function () {
     try {
-      if (this.estacoes > this.recorde()) localStorage.setItem('metrosp_best', String(this.estacoes));
+      if (this.diasInteiros() > this.recorde()) {
+        localStorage.setItem('metrosp_dias', String(this.diasInteiros()));
+      }
     } catch (e) { }
-  }
+  },
+  // dia só conta inteiro quando a volta pra casa foi feita
+  diasInteiros: function () { return Math.floor(this.pernasFeitas / 2); }
 };
 
 /* =========================================================

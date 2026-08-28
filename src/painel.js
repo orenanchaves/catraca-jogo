@@ -64,6 +64,10 @@
     el.linha = montaLinha(b1, 'LINHA');
     el.estacao = montaLinha(b1, 'ESTAÇÃO');
     el.proxima = montaLinha(b1, 'PRÓXIMA');
+    el.destino = montaLinha(b1, 'DESCER EM');
+    el.perna = montaLinha(b1, 'INDO PRA');
+    el.folga = montaLinha(b1, 'ENTRADA');
+    el.atrasos = montaLinha(b1, 'ATRASOS');
 
     var b2 = document.createElement('div');
     b2.className = 'bloco';
@@ -164,6 +168,20 @@
       el.linha.style.color = l.cor;
       el.estacao.textContent = GameState.estacaoAtual();
       el.proxima.textContent = GameState.proximaEstacaoNome();
+      var falta = GameState.faltamEstacoes();
+      el.destino.textContent = GameState.alvoAtual() + (falta > 0 ? ' (' + falta + ')' : '');
+      el.destino.style.color = falta <= 1 ? '#00e676' : '#f2f0ff';
+      el.perna.textContent = GameState.perna === 'ida' ? 'TRABALHO' : 'CASA';
+      if (GameState.perna === 'ida') {
+        var fg = GameState.minutosParaOAtraso();
+        el.folga.textContent = GameState.horaLimite() + (fg > 0 ? ' (' + fg + ')' : ' ATRASADO');
+        el.folga.style.color = fg <= 12 ? '#e8362c' : '#f2f0ff';
+      } else {
+        el.folga.textContent = 'SEM HORA';
+        el.folga.style.color = '#6a6f84';
+      }
+      el.atrasos.textContent = GameState.atrasos + ' de ' + MAX_ATRASOS;
+      el.atrasos.style.color = GameState.atrasos >= MAX_ATRASOS - 1 ? '#e8362c' : '#f2f0ff';
       el.dia.textContent = String(GameState.dia);
       el.estacoes.textContent = String(GameState.estacoes);
       el.recorde.textContent = String(GameState.recorde());
@@ -171,6 +189,10 @@
       el.linha.textContent = '—';
       el.estacao.textContent = 'ESCOLHENDO';
       el.proxima.textContent = '—';
+      el.destino.textContent = '—';
+      el.perna.textContent = '—';
+      el.folga.textContent = '—';
+      el.atrasos.textContent = '—';
       el.hora.textContent = '—';
       el.faixa.textContent = '—';
       el.frase.textContent = '';

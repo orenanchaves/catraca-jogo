@@ -10,6 +10,13 @@
 
    Agora cada coisa tem a sua faixa, e as duas paredes usam as mesmas:
    baia de frente pra baia, porta de frente pra janela. */
+/* Ritmo da viagem. Antes uma cena de vagão era uma estação e durava
+   17s; agora ela é a perna inteira, quinze estações de Itaquera até a
+   Sé, então cada trecho precisa ser curto o bastante pra a perna não
+   virar uma novela. */
+var TEMPO_ENTRE_ESTACOES = 8200;
+var TEMPO_PARADO = 4200;
+
 var PORTA_ALT = 60;
 var PORTAS_Y = [96, 268, 440];         // faixas de porta, na parede direita
 var BAIA_FUNDO = 22, BAIA_COMP = 58;   // raso na parede, comprido ao longo dela
@@ -100,9 +107,10 @@ var VagaoScene = new Phaser.Class({
     this.dialog = null;
     this.estado = 'andando';
     this.t = 0;
-    this.duracao = 17000;
-    this.eventoFeito = false;
-    this.dilemaFeito = false;
+    this.duracao = TEMPO_ENTRE_ESTACOES;
+    this.eventoPendente = false;
+    this.dilemaPendente = false;
+    this.tEvento = 0; this.tDilema = 0;
     this.sentadoEm = null;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
@@ -126,10 +134,13 @@ var VagaoScene = new Phaser.Class({
     this.encena = false;
 
     this.gUI = this.add.graphics().setDepth(500);
-    this.rima = new Plaqueta(this, GW / 2, 104, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
+    this.rota = new Plaqueta(this, GW / 2, 80, { cor: PAL.amarelo, depth: 505 });
+    this.rima = new Plaqueta(this, GW / 2, 112, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
+
+    this.sorteiaRitmo();
 
     var self = this;
     fala(this, GameState.hora() + '. Próxima:\n' + GameState.proximaEstacaoNome(), []);
@@ -602,10 +613,73 @@ var VagaoScene = new Phaser.Class({
     baralho[Math.floor(Math.random() * baralho.length)]();
   },
 
+  /* Em cada parada o vagão troca de gente. Sem isso a perna inteira —
+     quinze estações — seria a mesma multidão congelada, e o vagão
+     viraria um cenário pintado. Quem está em pé desce e sobe conforme a
+     lotação da hora; banco que vaga pode ser ocupado, e é assim que
+     aparece a chance de sentar no meio do caminho. */
+  trocaPassageiros: function () {
+    var lot = GameState.lotacao(), i, a;
+
+    // desce quem estava em pé
+    var saem = Math.min(this.npcExtra.length, Math.floor(Math.random() * 3));
+    for (i = 0; i < saem; i++) {
+      a = this.npcExtra.pop();
+      var k = this.gente.indexOf(a);
+      if (k >= 0) this.gente.splice(k, 1);
+      a.destroy();
+    }
+    // e alguns sentados também descem
+    for (i = 0; i < this.bancos.length; i++) {
+      var b = this.bancos[i];
+      if (!b.npc || b.npc === 'player' || Math.random() > 0.18) continue;
+      var j = this.gente.indexOf(b.npc);
+      if (j >= 0) this.gente.splice(j, 1);
+      b.npc.destroy();
+      b.npc = null;
+    }
+
+    // sobe gente nova, na medida da hora
+    var querEmPe = Phaser.Math.Clamp(Math.round(8 * lot), 0, 8);
+    var entram = Math.min(3, Math.max(0, querEmPe - this.npcExtra.length));
+    for (i = 0; i < entram; i++) {
+      var p = new Ator(this, 82 + Math.random() * 156, 120 + Math.random() * 400, sorteiaPax());
+      p.dir = Math.random() < 0.5 ? 'left' : 'right';
+      p.anima(0, false); p.sp.setDepth(35);
+      sentaAnimado(p);
+      this.npcExtra.push(p);
+      this.gente.push(p);
+    }
+    // e quem entra no pico não fica de pé se tem banco vago
+    for (i = 0; i < this.bancos.length; i++) {
+      var v = this.bancos[i];
+      if (v.npc || Math.random() > lot * 0.7) continue;
+      var n = new Ator(this, v.x, v.y + 24, sorteiaPax());
+      n.dir = v.x < 160 ? 'right' : 'left';
+      n.anima(0, false); n.sp.setDepth(30); n.fixo = true;
+      sentaAnimado(n);
+      v.npc = n;
+      this.gente.push(n);
+    }
+  },
+
+  /* Antes uma cena de vagão era uma estação, e cabia certinho um evento
+     e um dilema por cena. Agora a cena é a perna inteira, quinze
+     estações: com a mesma regra sairia um ambulante por estação e o
+     vagão viraria um circo. Cada trecho sorteia se tem alguma coisa — e
+     o dilema do lugar, que é o coração do jogo, pesa muito mais quando
+     você está sentado, porque é aí que ele dói. */
+  sorteiaRitmo: function () {
+    this.eventoPendente = Math.random() < 0.28;
+    this.dilemaPendente = Math.random() < (this.sentadoEm ? 0.45 : 0.10);
+    this.tEvento = 2200 + Math.random() * 1400;
+    this.tDilema = 4600 + Math.random() * 1400;
+  },
+
   /* ---------- o dilema do lugar ---------- */
   dilemaDoLugar: function () {
     var self = this;
-    this.dilemaFeito = true;
+    this.dilemaPendente = false;
     var quem = ['um senhor de bengala', 'uma gestante', 'uma mãe com bebê no colo'][Math.floor(Math.random() * 3)];
 
     if (GameState.charKey === 'senhor' && !this.sentadoEm) {
@@ -726,27 +800,59 @@ var VagaoScene = new Phaser.Class({
   },
 
   /* ---------- chegada ---------- */
+  /* O trem para. Antes cada parada era o fim da cena e descer era
+     obrigatório; agora a parada é só uma parada — quem tem destino fica
+     dentro até a estação certa. Sentado ninguém é levantado à força. */
   chega: function () {
     this.estado = 'parado';
     this.t = 0;
     this.pintaPortas(true);
     sfx('porta');
     if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
-    if (this.sentadoEm) this.levanta();
-    if (GameState.virouFaixa()) {
-      var f = GameState.faixa();
-      this.flash(GameState.hora() + ' ' + f.nome);
+
+    var virou = GameState.avancaTrem();
+    var aqui = GameState.estacaoAtual();
+    this.trocaPassageiros();
+    if (virou) {
+      // ficou no trem até a ponta da linha: ele volta, e o desvio custa
+      GameState.passaTempo(4);
+      GameState.addDescanso(-5);
+      sfx('nao');
+      this.flash('FIM DA LINHA. O TREM VOLTOU');
+    } else if (aqui === GameState.alvoAtual()) {
+      sfx('apito');
+      this.flash(GameState.faltaBaldear() ? 'SÉ: DESÇA PRA BALDEAR' : 'SUA ESTAÇÃO: ' + aqui);
+    } else if (GameState.virouFaixa()) {
+      this.flash(GameState.hora() + ' ' + GameState.faixa().nome);
     } else {
-      this.flash('CHEGOU: ' + GameState.proximaEstacaoNome());
+      this.flash(aqui);
     }
   },
 
+  /* Descer. Se é a sua estação, a perna anda; se não é, você pagou por
+     um trem a mais e vai esperar o próximo na plataforma errada. */
   desce: function () {
-    var r = GameState.avancar();
     GameState.sentado = false;
-    var viraDia = GameState.trechosNoDia >= 6;
-    if (viraDia) GameState.viraDia();
-    this.scene.start(viraDia ? 'Catraca' : (r === 'baldeacao' ? 'Catraca' : 'Plataforma'));
+    var aqui = GameState.estacaoAtual();
+    if (aqui !== GameState.alvoAtual()) {
+      GameState.addDescanso(-6);
+      GameState.passaTempo(4);
+      sfx('nao');
+      this.scene.start('Plataforma');
+      return;
+    }
+    if (GameState.faltaBaldear()) {
+      GameState.baldeia();
+      sfx('ok');
+      this.scene.start('Plataforma');       // baldeação não passa por catraca
+      return;
+    }
+    var atrasado = GameState.minutosNaPerna() > LIMITE_ATRASO && GameState.perna === 'ida';
+    GameState.chegouNoDestino();
+    var morte = GameState.derrota();
+    if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
+    sfx(atrasado ? 'erro' : 'vitoria');
+    this.scene.start('Catraca');            // nova perna: entra no sistema de novo
   },
 
   fimDeJogo: function () {
@@ -772,19 +878,27 @@ var VagaoScene = new Phaser.Class({
 
     if (this.estado === 'andando') {
       this.atualizaSolavanco(dt);
-      if (!this.eventoFeito && this.t > 3800) { this.eventoFeito = true; this.sorteiaEvento(); this.pintaUI(); return; }
-      if (!this.dilemaFeito && !this.encena && this.t > 9000) { this.dilemaDoLugar(); this.pintaUI(); return; }
+      if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
+      if (this.dilemaPendente && !this.encena && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
-      if (this.t > 6500) {
+      if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
-        this.eventoFeito = false; this.dilemaFeito = false;
+        this.sorteiaRitmo();
         this.pintaPortas(false);
-        GameState.addDescanso(-6);
-        sfx('nao');
-        this.flash('PASSOU DA ESTAÇÃO');
+        sfx('porta');
+        // deixar a sua estação passar é o erro caro: agora tem que voltar
+        if (this.eraSuaEstacao) {
+          GameState.addDescanso(-8);
+          GameState.addCarisma(-2);
+          GameState.apontaPraAlvo();
+          sfx('erro');
+          this.flash('PASSOU DA SUA ESTAÇÃO');
+        }
       }
     }
+    this.eraSuaEstacao = (this.estado === 'parado')
+      && GameState.estacaoAtual() === GameState.alvoAtual();
 
     if (!this.sentadoEm) {
       var vel = GameState.char.velocidade * (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
@@ -803,6 +917,9 @@ var VagaoScene = new Phaser.Class({
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
+    // o relógio anda 2 a 3 minutos por estação, e a viagem inteira mora
+    // numa cena só: sem isto a tarja congelava na hora do embarque
+    this.tarja.atualiza();
     this.animaGente(dt);
     this.animaRimador(dt);
     this.pintaCaixinha();
@@ -818,22 +935,57 @@ var VagaoScene = new Phaser.Class({
       for (var i = 0; i < this.portas.length; i++) {
         if (this.pl.sp.x > 258 && Math.abs(this.pl.sp.y - (this.portas[i] + PORTA_ALT / 2)) < 34) perto = true;
       }
-      dica = perto ? nomeAgir() + ': descer' : 'vá até uma porta ►';
-      if (perto && Ctrl.actJust) { this.desce(); return; }
-    } else if (this.sentadoEm) {
-      // no celular não existe tecla X: agir de novo levanta
-      dica = nomeAgir() + ' pra levantar';
-      if (Ctrl.backJust || Ctrl.actJust) this.levanta();
-    } else {
-      var b = this.bancoLivrePerto();
-      if (b) {
-        dica = nomeAgir() + ': sentar';
-        if (Ctrl.actJust) this.senta(b);
+      var minha = (GameState.estacaoAtual() === GameState.alvoAtual());
+      /* Descer é a ação da parada, mas só engole o comando quando você
+         está no vestíbulo. Fora dele a viagem continua normal — sentar
+         em banco que vagou na parada é metade da graça de parar. */
+      if (perto) {
+        dica = nomeAgir() + (minha ? ': DESCER' : ': descer (não é a sua)');
+        if (Ctrl.actJust) { this.desce(); return; }
+      } else if (minha) {
+        dica = 'DESÇA AQUI ►';
+      }
+    }
+    if (!dica) {
+      if (this.sentadoEm) {
+        // no celular não existe tecla X: agir de novo levanta
+        dica = nomeAgir() + ' pra levantar';
+        if (Ctrl.backJust || Ctrl.actJust) this.levanta();
       } else {
-        dica = 'SEGURE PRA NÃO CAIR';
+        var b = this.bancoLivrePerto();
+        if (b) {
+          dica = nomeAgir() + ': sentar';
+          if (Ctrl.actJust) this.senta(b);
+        } else {
+          dica = 'SEGURE PRA NÃO CAIR';
+        }
       }
     }
     this.dica.setText(dica);
+    this.pintaRota();
+  },
+
+  /* Onde descer não cabe na barra de baixo: lá moram as ações, e a
+     viagem passa por doze estações que não são a sua. A rota mora numa
+     placa própria, debaixo do HUD, e vira verde quando a próxima é a
+     sua. */
+  pintaRota: function () {
+    var falta = GameState.faltamEstacoes(), alvo = GameState.alvoAtual();
+    var txto, cor;
+    if (falta <= 0) { txto = 'DESÇA NA ' + alvo; cor = PAL.verde; }
+    else if (falta === 1) { txto = 'PRÓXIMA É A SUA: ' + alvo; cor = PAL.verde; }
+    else { txto = alvo + ' EM ' + falta + ' ESTAÇÕES'; cor = PAL.amarelo; }
+
+    /* Na ida existe hora de entrada, e atraso que a pessoa não vê
+       chegando é injusto: a hora aparece junto com a rota, com os
+       minutos que sobram, e fica vermelha quando aperta. */
+    if (GameState.perna === 'ida') {
+      var folga = GameState.minutosParaOAtraso();
+      txto += '\nENTRADA ' + GameState.horaLimite() +
+        (folga > 0 ? ' (' + folga + ' MIN)' : ' — ATRASADO');
+      if (folga <= 12) cor = PAL.vermelho;
+    }
+    this.rota.setCor(cor).setText(txto);
   },
 
   pintaUI: function () {

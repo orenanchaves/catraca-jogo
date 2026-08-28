@@ -25,15 +25,17 @@ var FimScene = new Phaser.Class({
     var m = txtC(this, GW / 2, 134, GameState.motivoFim || 'A cidade venceu hoje.', PAL.cinza, 8);
     m.setWordWrapWidth(GW - 48).setAlign('center');
 
-    txtC(this, GW / 2, 212, 'VOCÊ AGUENTOU', PAL.cinzaEsc, 8);
-    txtC(this, GW / 2, 230, String(GameState.estacoes), PAL.branco, 32);
-    txtC(this, GW / 2, 312, 'ESTAÇÕES', PAL.cinza, 8);
+    /* O placar é em dias inteiros — ida e volta feitas. Estação virou
+       coisa de trajeto, não de placar: são trinta por dia. */
+    txtC(this, GW / 2, 212, 'VOCÊ FEZ O TRAJETO', PAL.cinzaEsc, 8);
+    txtC(this, GW / 2, 230, String(GameState.diasInteiros()), PAL.branco, 32);
+    txtC(this, GW / 2, 312, GameState.diasInteiros() === 1 ? 'DIA INTEIRO' : 'DIAS INTEIROS', PAL.cinza, 8);
 
     var linhas = [
-      ['DIAS', String(GameState.dia)],
+      ['PAROU EM', GameState.estacaoAtual()],
+      ['INDO PRA', GameState.perna === 'ida' ? 'O TRABALHO' : 'CASA'],
       ['PAROU ÀS', GameState.hora()],
-      ['BALDEAÇÕES', String(s.baldeacoes)],
-      ['CAUSOS', String(s.causos)],
+      ['ATRASOS', GameState.atrasos + ' de ' + MAX_ATRASOS],
       ['LUGARES DADOS', String(s.cedidos)],
       ['DISFARCES OK', s.disfarcesOk + '/' + s.disfarces],
       ['CATRACAS PULADAS', String(s.catracasPuladas)],
@@ -56,7 +58,8 @@ var FimScene = new Phaser.Class({
   },
 
   titulo: function (s) {
-    if (GameState.estacoes >= 25) return '"PASSE LIVRE VITALÍCIO"';
+    if (GameState.diasInteiros() >= 5) return '"PASSE LIVRE VITALÍCIO"';
+    if (GameState.diasInteiros() === 0) return '"NEM O PRIMEIRO DIA"';
     if (s.catracasPuladas > s.catracasPagas && s.catracasPuladas > 1) return '"BILHETE ÚNICO: O CORPO"';
     if (s.cedidos >= 4 && s.cedidos > s.recusas) return '"O SANTO DO VAGÃO"';
     if (s.disfarcesOk >= 3) return '"MESTRE DO CELULAR"';
