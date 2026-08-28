@@ -605,6 +605,72 @@ function geraSheet(scene, key, pal, corpo) {
   for (var i = 0; i < 9; i++) tex.add(i, 0, (i % 3) * 32, Math.floor(i / 3) * 48, 32, 48);
 }
 
+/* =========================================================
+   GENTE OCUPA ESPAÇO
+
+   Cada pessoa é um corpo elíptico rente ao chão — só os pés, não
+   o sprite inteiro, que é alto. O jogador não atravessa ninguém.
+
+   E não trava também: ele empurra, devagar. Travar seria pior que
+   atravessar, porque bastaria alguém parar bem na porta do trem
+   pra corrida acabar ali. Empurrar resolve os dois — a multidão
+   pesa, mas sempre cede se você insistir. É como se anda em vagão
+   cheio de verdade.
+   ========================================================= */
+var CORPO_RX = 9, CORPO_RY = 6;      // meios-eixos do corpo, em pixels
+var ACHATA = CORPO_RX / CORPO_RY;    // leva a elipse pra um círculo e volta
+
+/* separa dois corpos sobrepostos. peso 1 = anda tudo, 0 = fica no lugar */
+function separaCorpos(a, b, pesoA, pesoB) {
+  var dx = a.x - b.x;
+  var dy = (a.y - b.y) * ACHATA;
+  var d2 = dx * dx + dy * dy;
+  var r = CORPO_RX * 2;
+  if (d2 > r * r) return false;
+  var d = Math.sqrt(d2);
+  if (d < 0.5) {                     // exatamente em cima: desempata pro lado
+    a.x += pesoA > 0 ? 1 : 0;
+    b.x -= pesoB > 0 ? 1 : 0;
+    return true;
+  }
+  var sobra = (r - d) / d;
+  a.x += dx * sobra * pesoA;
+  a.y += dy * sobra * pesoA / ACHATA;
+  b.x -= dx * sobra * pesoB;
+  b.y -= dy * sobra * pesoB / ACHATA;
+  return true;
+}
+
+/* Resolve o jogador contra a gente em volta, e a gente entre si.
+   `gente` são Atores; quem tem .fixo (sentado, encostado, o guardinha)
+   não sai do lugar. `limita` é a regra de parede de cada cena, que é
+   diferente em cada uma — sem ela um empurrão poderia jogar alguém
+   pra dentro do trilho. */
+function resolveCorpos(pl, gente, limitaPl, limitaNpc) {
+  var i, j, o;
+  for (i = 0; i < gente.length; i++) {
+    o = gente[i];
+    if (!o || !o.sp || !o.sp.active) continue;
+    var peso = o.fixo ? 0 : 0.4;
+    if (separaCorpos(pl.sp, o.sp, 1 - peso, peso)) {
+      if (limitaPl) limitaPl(pl.sp);
+      if (!o.fixo && limitaNpc) limitaNpc(o.sp);
+    }
+  }
+  // a multidão também não se atravessa, mas com muito menos empenho
+  for (i = 0; i < gente.length; i++) {
+    if (!gente[i] || !gente[i].sp || gente[i].fixo) continue;
+    for (j = i + 1; j < gente.length; j++) {
+      if (!gente[j] || !gente[j].sp) continue;
+      var pj = gente[j].fixo ? 0 : 0.5;
+      if (separaCorpos(gente[i].sp, gente[j].sp, 1 - pj, pj) && limitaNpc) {
+        limitaNpc(gente[i].sp);
+        if (!gente[j].fixo) limitaNpc(gente[j].sp);
+      }
+    }
+  }
+}
+
 /* ---------- ator ---------- */
 function Ator(scene, x, y, key) {
   this.sp = scene.add.sprite(x, y, key, 0);

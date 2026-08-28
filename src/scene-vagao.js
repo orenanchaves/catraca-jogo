@@ -1,6 +1,30 @@
 /* global Phaser */
 /* Catraca — dentro do vagão: banco, equilíbrio, eventos e o dilema do lugar */
 
+/* Baias de banco: três de cada lado, alternadas, como no vagão de verdade.
+   x é a quina da baia na parede; quem senta fica no meio dela. */
+var BAIA_FUNDO = 22, BAIA_COMP = 58;   // raso na parede, comprido ao longo dela
+var BAIAS = [
+  { x: 28, y: 80, dir: 1 }, { x: 28, y: 240, dir: 1 }, { x: 28, y: 400, dir: 1 },
+  { x: 270, y: 160, dir: -1 }, { x: 270, y: 320, dir: -1 }, { x: 270, y: 480, dir: -1 }
+];
+
+/* guarda onde a pessoa está e com que fase ela balança, pra cada uma
+   respirar no seu tempo em vez de o vagão inteiro pulsar junto */
+function sentaAnimado(a) {
+  a.bx = a.sp.x;
+  a.by = a.sp.y;
+  a.fase = Math.random() * Math.PI * 2;
+  a.olhaT = Math.random() * 2000;
+  a.proxOlhada = 2200 + Math.random() * 4500;
+}
+
+/* o corredor do vagão, entre os bancos */
+function limitaVagao(sp) {
+  sp.x = Phaser.Math.Clamp(sp.x, 70, 250);
+  sp.y = Phaser.Math.Clamp(sp.y, 84, 556);
+}
+
 var VagaoScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function VagaoScene() { Phaser.Scene.call(this, { key: 'Vagao' }); },
@@ -17,6 +41,7 @@ var VagaoScene = new Phaser.Class({
     this.sentadoEm = null;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
+    this.gente = [];
     this.portas = [140, 300, 460];
     this.npcExtra = [];
 
@@ -45,11 +70,16 @@ var VagaoScene = new Phaser.Class({
     var l = GameState.linhaAtual();
     g.fillStyle(num(PAL.bg), 1).fillRect(0, 0, GW, GH);
 
-    // piso de borracha canelada
-    g.fillStyle(0x30303e, 1).fillRect(28, HUD_H, 264, GH - HUD_H);
-    g.fillStyle(0x373747, 1);
-    for (var y = HUD_H; y < GH; y += 8) g.fillRect(72, y, 176, 4);
-    pontilhado(g, 72, HUD_H, 176, GH, 0x000000, 0.1, 6);
+    /* O vagão de verdade é quase todo espaço em pé: os bancos são baias
+       curtas e azuis, encostadas na parede, com vão grande entre uma e
+       outra. Piso azul de borracha canelada, painel claro na parede na
+       altura do ombro e poste vertical na ponta de cada baia. */
+
+    // piso
+    g.fillStyle(0x2b3648, 1).fillRect(28, HUD_H, 264, GH - HUD_H);
+    g.fillStyle(0x33405a, 1);
+    for (var y = HUD_H; y < GH; y += 8) g.fillRect(66, y, 188, 4);
+    pontilhado(g, 66, HUD_H, 188, GH, 0x000000, 0.1, 6);
 
     // paredes laterais com volume
     g.fillStyle(num(PAL.metalSom), 1).fillRect(0, HUD_H, 28, GH - HUD_H);
@@ -66,17 +96,34 @@ var VagaoScene = new Phaser.Class({
       g.fillStyle(0xffffff, 0.07).fillRect(6, wy + 2, 18, 14);
     }
 
-    // bancos estofados dos dois lados
+    // painel claro da parede, atrás e acima dos bancos
     for (var s = 0; s < 2; s++) {
-      var bx = s ? 248 : 28;
-      g.fillStyle(0x1e2740, 1).fillRect(bx, HUD_H, 44, GH - HUD_H);
-      for (var by = HUD_H + 8; by < GH - 16; by += 72) {
-        g.fillStyle(0x2a3550, 1).fillRect(bx + 2, by, 40, 62);
-        g.fillStyle(0x3b4a70, 1).fillRect(bx + 2, by, 40, 6);
-        g.fillStyle(0x141a2c, 1).fillRect(bx + 2, by + 58, 40, 4);
-        // textura do estofado
-        g.fillStyle(0x46578a, 0.35);
-        for (var d = 0; d < 3; d++) g.fillRect(bx + 8 + d * 12, by + 12, 4, 40);
+      var px = s ? 270 : 28;
+      g.fillStyle(0x767f96, 1).fillRect(px, HUD_H, 22, GH - HUD_H);
+      g.fillStyle(0x868fa6, 1).fillRect(px, HUD_H, 22, 2);
+      g.fillStyle(0x4e5468, 1).fillRect(px + (s ? 0 : 20), HUD_H, 2, GH - HUD_H);
+    }
+
+    /* baias de banco: encosto colado na parede, assento pra fora, e o
+       vão entre uma e outra sendo maior que a própria baia */
+    for (var b = 0; b < BAIAS.length; b++) {
+      var bx = BAIAS[b].x, by = BAIAS[b].y, ld = BAIAS[b].dir;
+      var enc = ld > 0 ? bx : bx + BAIA_FUNDO - 6;          // encosto, na parede
+      var ass = ld > 0 ? bx + 6 : bx;                        // assento, pro corredor
+      g.fillStyle(0x000000, 0.3).fillRect(bx, by + BAIA_COMP, BAIA_FUNDO, 3);
+      g.fillStyle(0x1c5288, 1).fillRect(enc, by - 3, 6, BAIA_COMP + 3);
+      g.fillStyle(0x2f7fc4, 1).fillRect(ass, by, BAIA_FUNDO - 6, BAIA_COMP);
+      g.fillStyle(0x63aee8, 1).fillRect(ass, by, BAIA_FUNDO - 6, 3);
+      g.fillStyle(0x123a63, 1).fillRect(ass, by + BAIA_COMP - 3, BAIA_FUNDO - 6, 3);
+      g.fillStyle(0x1c5288, 0.5);                            // três lugares por baia
+      g.fillRect(ass, by + Math.round(BAIA_COMP / 3), BAIA_FUNDO - 6, 1);
+      g.fillRect(ass, by + Math.round(BAIA_COMP * 2 / 3), BAIA_FUNDO - 6, 1);
+      // poste vertical em cada ponta
+      for (var e = 0; e < 2; e++) {
+        var ex = ld > 0 ? bx + BAIA_FUNDO - 4 : bx;
+        var ey = e ? by + BAIA_COMP - 4 : by - 4;
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(ex, ey, 4, 8);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(ex, ey, 2, 8);
       }
     }
 
@@ -120,11 +167,10 @@ var VagaoScene = new Phaser.Class({
   /* ---------- bancos ---------- */
   montaBancos: function () {
     var dif = GameState.dificuldade();
-    this.bancos = [
-      { x: 50, y: 136, npc: null }, { x: 50, y: 208, npc: null },
-      { x: 50, y: 280, npc: null }, { x: 50, y: 352, npc: null },
-      { x: 270, y: 220, npc: null }, { x: 270, y: 380, npc: null }
-    ];
+    this.bancos = [];
+    for (var k = 0; k < BAIAS.length; k++) {
+      this.bancos.push({ x: BAIAS[k].x + BAIA_FUNDO / 2, y: BAIAS[k].y + 4, npc: null });
+    }
     // de madrugada o vagão está vazio e sentar é fácil; no pico, esquece
     var lot = GameState.lotacao();
     var livres = Phaser.Math.Clamp(Math.round(6 - 5.2 * lot - (dif - 1) * 0.6), 0, 5);
@@ -135,15 +181,20 @@ var VagaoScene = new Phaser.Class({
       a.dir = b.x < 160 ? 'right' : 'left';
       a.anima(0, false);
       a.sp.setDepth(30);
+      a.fixo = true;                  // sentado não é empurrado
+      sentaAnimado(a);
       b.npc = a;
+      this.gente.push(a);
     }
     var emPe = Phaser.Math.Clamp(Math.round(8 * lot), 0, 8);
     for (var j = 0; j < emPe; j++) {
-      var p = new Ator(this, 116 + Math.random() * 88,
+      var p = new Ator(this, 82 + Math.random() * 156,
         120 + Math.random() * 400, sorteiaPax());
       p.dir = Math.random() < 0.5 ? 'left' : 'right';
       p.anima(0, false); p.sp.setDepth(35);
+      sentaAnimado(p);                // em pé também olha em volta
       this.npcExtra.push(p);
+      this.gente.push(p);
     }
   },
 
@@ -160,6 +211,7 @@ var VagaoScene = new Phaser.Class({
     this.sentadoEm = b;
     b.npc = 'player';
     this.pl.pos(b.x, b.y + 24);
+    sentaAnimado(this.pl);
     this.pl.dir = b.x < 160 ? 'right' : 'left';
     this.pl.anima(0, false);
     GameState.sentado = true;
@@ -169,7 +221,7 @@ var VagaoScene = new Phaser.Class({
   levanta: function () {
     if (!this.sentadoEm) return;
     this.sentadoEm.npc = null;
-    this.pl.pos(this.sentadoEm.x < 160 ? 116 : 204, this.sentadoEm.y + 24);
+    this.pl.pos(this.sentadoEm.x < 160 ? 84 : 236, this.sentadoEm.y + 24);
     this.sentadoEm = null;
     GameState.sentado = false;
   },
@@ -201,6 +253,46 @@ var VagaoScene = new Phaser.Class({
         }
       }
     }
+  },
+
+  /* Vagão andando não tem ninguém parado de verdade: quem está sentado
+     balança junto com o trem e olha em volta de vez em quando. Sem isso
+     o banco vira um móvel com gente pintada em cima.
+
+     Só quem está sentado balança de posição — quem está em pé é
+     empurrado pelos outros, e mexer no x deles brigaria com a física. */
+  animaGente: function (dt) {
+    this.tBalanco = (this.tBalanco || 0) + dt;
+    var andando = (this.estado === 'andando');
+    var amp = andando ? 1.2 : 0.35;
+    var i, a;
+
+    for (i = 0; i < this.bancos.length; i++) {
+      a = this.bancos[i].npc;
+      if (!a || a === 'player' || !a.sp || !a.sp.active) continue;
+      a.sp.x = a.bx + Math.sin(this.tBalanco / 520 + a.fase) * amp;
+      a.sp.y = a.by + Math.sin(this.tBalanco / 880 + a.fase * 1.7) * amp * 0.5;
+      this.olhaEmVolta(a, dt);
+    }
+    for (i = 0; i < this.npcExtra.length; i++) this.olhaEmVolta(this.npcExtra[i], dt);
+
+    // o jogador sentado balança junto
+    if (this.sentadoEm && this.pl.bx !== undefined) {
+      this.pl.sp.x = this.pl.bx + Math.sin(this.tBalanco / 520 + this.pl.fase) * amp;
+      this.pl.sp.y = this.pl.by + Math.sin(this.tBalanco / 880 + this.pl.fase * 1.7) * amp * 0.5;
+    }
+  },
+
+  olhaEmVolta: function (a, dt) {
+    if (!a || !a.sp || !a.sp.active) return;
+    a.olhaT += dt;
+    if (a.olhaT > a.proxOlhada) {
+      a.olhaT = 0;
+      a.proxOlhada = 2200 + Math.random() * 4500;
+      var lados = (a.sp.x < 160) ? ['right', 'down', 'up'] : ['left', 'down', 'up'];
+      a.dir = lados[Math.floor(Math.random() * lados.length)];
+    }
+    a.anima(dt, false);
   },
 
   flash: function (msg) {
@@ -310,10 +402,12 @@ var VagaoScene = new Phaser.Class({
 
     if (!this.sentadoEm) return;
 
-    this.idoso = new Ator(this, this.sentadoEm.x < 160 ? 112 : 208, this.sentadoEm.y + 24, 'np_idoso');
+    this.idoso = new Ator(this, this.sentadoEm.x < 160 ? 80 : 240, this.sentadoEm.y + 24, 'np_idoso');
     this.idoso.dir = this.sentadoEm.x < 160 ? 'left' : 'right';
     this.idoso.anima(0, false);
     this.idoso.sp.setDepth(55);
+    this.idoso.fixo = true;
+    this.gente.push(this.idoso);
     sfx('porta');
 
     fala(this, 'Entra ' + quem + '\ne para bem na sua frente.', [
@@ -469,13 +563,15 @@ var VagaoScene = new Phaser.Class({
       var mv = (dx !== 0 || dy !== 0);
       if (mv) {
         var n = Math.sqrt(dx * dx + dy * dy);
-        this.pl.sp.x = Phaser.Math.Clamp(this.pl.sp.x + (dx / n) * vel * dt / 1000, 84, 236);
+        this.pl.sp.x = Phaser.Math.Clamp(this.pl.sp.x + (dx / n) * vel * dt / 1000, 70, 250);
         this.pl.sp.y = Phaser.Math.Clamp(this.pl.sp.y + (dy / n) * vel * dt / 1000, 84, 556);
         this.pl.setDir(dx, dy);
       }
       this.pl.anima(dt, mv);
+      resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
+    this.animaGente(dt);
     this.pintaUI();
     this.contexto();
   },

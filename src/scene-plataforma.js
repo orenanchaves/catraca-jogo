@@ -1,6 +1,12 @@
 /* global Phaser */
 /* Catraca — plataforma, chegada do trem e o minigame de entrar no vagão lotado */
 
+/* a plataforma inteira, sem cair no trilho nem entrar na parede */
+function limitaPlataforma(sp) {
+  sp.x = Phaser.Math.Clamp(sp.x, 136, 288);
+  sp.y = Phaser.Math.Clamp(sp.y, 80, 560);
+}
+
 var PlataformaScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function PlataformaScene() { Phaser.Scene.call(this, { key: 'Plataforma' }); },
@@ -30,11 +36,14 @@ var PlataformaScene = new Phaser.Class({
       a.dir = 'left'; a.sp.setDepth(30); a.anima(0, false);
       this.plateia.push(a);
     }
+    this.gente = this.plateia.slice(0);
 
     if (Math.random() < 0.6 - 0.35 * GameState.lotacao()) {
       var pd = new Ator(this, 280, 120 + Math.random() * 380,
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(28); pd.anima(0, false);
+      pd.fixo = true;
+      this.gente.push(pd);
     }
 
     this.pl = new Ator(this, 200, 400, 'ch_' + GameState.charKey);
@@ -302,6 +311,7 @@ var PlataformaScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    resolveCorpos(this.pl, this.gente, limitaPlataforma, limitaPlataforma);
 
     var porta = this.portaPerto();
     this.dica.setText(porta ? nomeAgir() + ': entrar no vagão'

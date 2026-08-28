@@ -19,6 +19,7 @@ var CatracaScene = new Phaser.Class({
 
     this.guarda = new Ator(this, 80, 200, 'np_guardinha');
     this.guarda.sp.setDepth(50);
+    this.guarda.fixo = true;          // ninguém empurra o guardinha
     this.gEstado = 'anda';
     this.gTempo = 0;
     this.gVx = 1;
@@ -34,6 +35,7 @@ var CatracaScene = new Phaser.Class({
       a.t = Math.random() * 2000;
       this.plateia.push(a);
     }
+    this.gente = this.plateia.concat([this.guarda]);
 
     /* quem fica. De madrugada e no vazio eles aparecem mais:
        menos gente passando, mais gente que não vai a lugar nenhum */
@@ -43,6 +45,8 @@ var CatracaScene = new Phaser.Class({
       var pd = new Ator(this, q ? 286 : 34, 300 + Math.random() * 130,
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(38); pd.anima(0, false);
+      pd.fixo = true;                 // quem está agachado não se mexe
+      this.gente.push(pd);
     }
 
     this.pl = new Ator(this, 160, 500, 'ch_' + GameState.charKey);
@@ -363,6 +367,21 @@ var CatracaScene = new Phaser.Class({
     ]);
   },
 
+  /* ninguém atravessa ninguém. O empurrão não pode jogar o jogador
+     pra dentro da parede nem a plateia pra cima do bloqueio. */
+  resolveCorpos: function () {
+    var antes = { x: this.pl.sp.x, y: this.pl.sp.y };
+    var self = this;
+    resolveCorpos(this.pl, this.gente,
+      function (sp) {
+        if (!self.podeIr(sp.x, sp.y)) { sp.x = antes.x; sp.y = antes.y; }
+      },
+      function (sp) {
+        sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
+        sp.y = Phaser.Math.Clamp(sp.y, 258, 534);
+      });
+  },
+
   terminaJogo: function () {
     GameState.salvarRecorde();
     this.scene.start('Fim');
@@ -403,6 +422,7 @@ var CatracaScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    this.resolveCorpos();
 
     if (this.pl.sp.y <= 124) {
       GameState.dentroDoSistema = true;
