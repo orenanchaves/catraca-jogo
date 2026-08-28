@@ -6,7 +6,9 @@ var ASSETS = {
     { key: 'ch_estudante', file: 'assets/chars/estudante.png', pal: PELES.estudante, corpo: 'bone_mochila' },
     { key: 'ch_clt', file: 'assets/chars/clt.png', pal: PELES.clt, corpo: 'padrao' },
     { key: 'ch_senhor', file: 'assets/chars/senhor.png', pal: PELES.senhor, corpo: 'senhor' },
-    { key: 'ch_ambulante', file: 'assets/chars/ambulante.png', pal: PELES.ambulante, corpo: 'bone' }
+    { key: 'ch_ambulante', file: 'assets/chars/ambulante.png', pal: PELES.ambulante, corpo: 'bone' },
+    { key: 'ch_gestante', file: 'assets/chars/gestante.png', pal: PELES.gestanteJog, corpo: 'gestante' },
+    { key: 'ch_turista', file: 'assets/chars/turista.png', pal: PELES.turista, corpo: 'bone_mochila' }
   ],
   npcs: [
     { key: 'np_idoso', file: 'assets/npcs/idoso.png', pal: PELES.idoso, corpo: 'senhor' },
@@ -116,7 +118,7 @@ var config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, FimScene, HudScene]
+  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, FimScene, HudScene, PausaScene]
 };
 
 window.addEventListener('load', function () {

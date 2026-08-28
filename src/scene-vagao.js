@@ -132,6 +132,9 @@ var VagaoScene = new Phaser.Class({
     this.falha = null;
     this.sorteouFalha = false;
     this.corrida = null;
+    this.disputa = null;
+    this.encontro = null;
+    this.tPasso = 0;
     this.sentadoEm = null;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
@@ -729,6 +732,19 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
+  /* O passo sai no compasso da perna, não do quadro: o mesmo 130ms que
+     troca o desenho da caminhada. Alterna de altura pra não virar
+     metrônomo, e cala quando você para. */
+  passos: function (dt, andando) {
+    if (!andando) { this.tPasso = 0; return; }
+    this.tPasso = (this.tPasso || 0) + dt;
+    if (this.tPasso > 260) {
+      this.tPasso = 0;
+      this.pePar = !this.pePar;
+      sfx(this.pePar ? 'passoA' : 'passoB');
+    }
+  },
+
   /* ---------- batalha de rima ----------
      Sai da escolha do jogador, não de sorteio: encarar o rimador é uma
      opção do chapéu, ao lado de dar a moeda e de fingir que dorme. Quem
@@ -821,14 +837,19 @@ var VagaoScene = new Phaser.Class({
     if (taxa >= 0.7) {
       var troco = 2 + Math.round(b.maiorCombo / 6);
       GameState.addCarisma(12); GameState.ganhar(troco);
+      // rima boa vale mais ponto: é o minigame mais difícil dos três
+      var pts = 8 + b.maiorCombo * 2;
       texto = 'O VAGÃO VEIO ABAIXO.\n' + b.acertos + ' de ' + total + ', combo ' + b.maiorCombo +
-        '.\nA galera te deu R$ ' + troco.toFixed(2).replace('.', ',') + '.';
+        '.\nR$ ' + troco.toFixed(2).replace('.', ',') + ' e ' + pts + ' PONTOS.';
       cor = PAL.verde; sfx('vitoria');
+      GameState.ganhaMinigame(pts);
     } else if (taxa >= 0.45) {
       GameState.addCarisma(4);
-      texto = 'EMPATE TÉCNICO.\n' + b.acertos + ' de ' + total + '.\nEle respeitou.';
+      texto = 'EMPATE TÉCNICO.\n' + b.acertos + ' de ' + total +
+        '.\nEle respeitou. +' + GameState.ganhaMinigame(6) + ' PONTOS.';
       cor = PAL.amarelo; sfx('ok');
     } else {
+      GameState.perdeCoracao();
       GameState.addCarisma(-7);
       texto = 'ELE TE ATROPELOU.\n' + b.acertos + ' de ' + total + '.\nO vagão inteiro riu.';
       cor = PAL.vermelho; sfx('erro');
@@ -868,6 +889,148 @@ var VagaoScene = new Phaser.Class({
     this.centro.setY(152).setCor(b.combo >= 4 ? PAL.verde : PAL.branco)
       .setText(b.combo >= 2 ? 'COMBO ' + b.combo
         : (b.acertos + b.erros ? b.acertos + ' DE ' + (b.acertos + b.erros) : 'MANDA!'));
+  },
+
+  /* ---------- disputa pela barra ----------
+     O solavanco sempre foi solitário: vinha o tranco e você segurava.
+     Só que barra de vagão cheio tem fila, e é aí que a coisa vira
+     disputa — dois braços na mesma barra, e um dos dois vai pro chão.
+
+     Uma barra só, com o divisor no meio: cada toque seu empurra pra
+     direita, e o outro empurra pra esquerda sozinho, mais forte quanto
+     mais fundo na corrida. Quem chegar na ponta leva. */
+  comecaDisputa: function (a) {
+    var dif = GameState.dificuldade();
+    this.disputa = {
+      a: a, pos: 0.5, t: 0, dur: 11000,
+      forca: 0.075 + dif * 0.016,       // o quanto ele empurra por segundo
+      empurrao: 0.05                    // o quanto cada toque seu devolve
+    };
+    sfx('empurra');
+  },
+
+  atualizaDisputa: function (dt) {
+    var d = this.disputa;
+    d.t += dt;
+    if (Ctrl.actJust) { d.pos += d.empurrao; sfx('passoA'); }
+    d.pos -= d.forca * dt / 1000;
+    if (d.a && d.a.sp && d.a.sp.active) d.a.anima(dt, true);
+
+    if (d.pos >= 1) { this.fimDaDisputa(true); return; }
+    if (d.pos <= 0 || d.t > d.dur) { this.fimDaDisputa(false); return; }
+  },
+
+  fimDaDisputa: function (ganhou) {
+    var d = this.disputa;
+    this.disputa = null;
+    this.centro.setText('');
+    this.centro.setY(232).setCor(PAL.branco);
+    if (d.a) d.a.fixo = true;
+    if (ganhou) {
+      GameState.addDescanso(3);
+      GameState.addCarisma(2);
+      sfx('ok');
+      this.flash('A BARRA É SUA  +' + GameState.ganhaMinigame(7) + ' PONTOS');
+    } else {
+      GameState.perdeCoracao();
+      GameState.addDescanso(-6);
+      GameState.addCarisma(-4);
+      this.cameras.main.shake(320, 0.008);
+      sfx('nao');
+      this.flash('VOCÊ FOI PRO CHÃO');
+    }
+  },
+
+  pintaDisputa: function (g) {
+    var d = this.disputa;
+    caixa(g, 34, 196, GW - 68, 96, 0x0b9fdd);
+    // a barra da disputa: você empurra pra direita, ele pra esquerda
+    var x0 = 48, larg = GW - 96, y = 244;
+    g.fillStyle(0x1e1e2a, 1).fillRect(x0, y, larg, 16);
+    g.fillStyle(0x00e676, 1).fillRect(x0, y, Math.round(larg * d.pos), 16);
+    g.fillStyle(0xe8362c, 1).fillRect(x0 + Math.round(larg * d.pos), y, Math.round(larg * (1 - d.pos)), 16);
+    g.fillStyle(0xf2f0ff, 1).fillRect(x0 + Math.round(larg * d.pos) - 1, y - 4, 3, 24);
+    this.centro.setY(206).setCor(PAL.branco).setText(nomeAgir().toUpperCase() + ' SEM PARAR!');
+  },
+
+  /* ---------- encontro ----------
+     Os minigames apareciam por sorteio, sem aviso e sem cara. Agora eles
+     têm dono: um passageiro decide te abordar, vem andando, e leva um
+     tempo carregando antes de a coisa começar.
+
+     Esse tempo é de propósito. É a janela pra fugir: se você se afastar
+     antes de a carga encher, ele desiste. Ou você mesmo pode abordar
+     primeiro — quem chega junto e aperta começa na hora. */
+  sorteiaEncontro: function () {
+    if (this.encontro || this.batalha || this.disputa || this.disfarce || this.encena) return;
+    if (this.estado !== 'andando' || !this.npcExtra.length) return;
+    if (Math.random() > Math.min(0.5, 0.14 + GameState.dificuldade() * 0.05)) return;
+
+    var a = this.npcExtra[Math.floor(Math.random() * this.npcExtra.length)];
+    if (!a.sp || !a.sp.active) return;
+    var tipo = (this.sentadoEm || Math.random() < 0.5) ? 'rima' : 'barra';
+    // sentado não disputa barra: quem senta não segura em nada
+    this.encontro = { a: a, tipo: tipo, fase: 'vem', t: 0, carga: 0 };
+    a.fixo = false;
+    sfx('apito');
+  },
+
+  atualizaEncontro: function (dt) {
+    var e = this.encontro;
+    if (!e) return;
+    var a = e.a;
+    if (!a.sp || !a.sp.active) { this.encerraEncontro(); return; }
+    e.t += dt;
+
+    var dx = this.pl.sp.x - a.sp.x, dy = this.pl.sp.y - a.sp.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+
+    if (e.fase === 'vem') {
+      if (e.t > 9000) { this.encerraEncontro(); return; }   // desistiu de te achar
+      if (d > 26) {
+        // atravessar o vagão inteiro a 40px/s levava cinco segundos e a
+        // abordagem morria de tédio antes de chegar
+        var vel = (62 + GameState.dificuldade() * 9) * dt / 1000;
+        a.sp.x += (dx / d) * vel; a.sp.y += (dy / d) * vel;
+        limitaVagao(a.sp);
+        a.setDir(dx, dy);
+        a.anima(dt, true);
+      } else {
+        e.fase = 'carrega'; e.t = 0;
+      }
+      return;
+    }
+
+    // carregando: encheu, começa. Andou pra longe, escapou.
+    a.setDir(dx, dy); a.anima(dt, false);
+    if (d > 92) { this.encerraEncontro(); this.flash('VOCÊ ESCAPOU'); return; }
+    e.carga = Math.min(1, e.carga + dt / 1500);
+    if (e.carga >= 1) {
+      var tipo = e.tipo, quem = e.a;
+      this.encontro = null;
+      if (tipo === 'rima') this.comecaBatalha();
+      else this.comecaDisputa(quem);
+    }
+  },
+
+  encerraEncontro: function () {
+    if (!this.encontro) return;
+    var a = this.encontro.a;
+    if (a && a.sp && a.sp.active) { a.fixo = false; sentaAnimado(a); }
+    this.encontro = null;
+  },
+
+  pintaEncontro: function (g) {
+    var e = this.encontro;
+    if (!e || !e.a.sp || !e.a.sp.active) return;
+    var x = e.a.sp.x, y = e.a.sp.y - 54;
+    // o "!" de quem te escolheu
+    g.fillStyle(0xf2c14e, 1).fillRect(x - 2, y, 4, 11);
+    g.fillStyle(0xf2c14e, 1).fillRect(x - 2, y + 13, 4, 4);
+    if (e.fase !== 'carrega') return;
+    // e a carga, que é o tempo que sobra pra fugir
+    g.fillStyle(0x08080e, 0.7).fillRect(x - 20, y - 10, 40, 7);
+    g.fillStyle(0xe8362c, 1).fillRect(x - 19, y - 9, Math.round(38 * e.carga), 5);
   },
 
   /* ---------- corrida pelo banco ----------
@@ -925,6 +1088,7 @@ var VagaoScene = new Phaser.Class({
       var k = this.npcExtra.indexOf(a);
       if (k >= 0) this.npcExtra.splice(k, 1);
       this.corrida = null;
+      GameState.perdeCoracao();
       sfx('nao');
       this.flash('SENTARAM NO SEU LUGAR');
       return;
@@ -950,6 +1114,7 @@ var VagaoScene = new Phaser.Class({
      o dilema do lugar, que é o coração do jogo, pesa muito mais quando
      você está sentado, porque é aí que ele dói. */
   sorteiaRitmo: function () {
+    this.sorteiaEncontro();
     this.eventoPendente = Math.random() < 0.28;
     this.dilemaPendente = Math.random() < (this.sentadoEm ? 0.45 : 0.10);
     this.tEvento = 2200 + Math.random() * 1400;
@@ -1057,6 +1222,7 @@ var VagaoScene = new Phaser.Class({
     if (d.suspeita >= 100) {
       this.tSeta.setText(''); this.centro.setText('');
       this.disfarce = null;
+      GameState.perdeCoracao();
       GameState.addCarisma(-14);
       this.levanta();
       sfx('erro');
@@ -1071,9 +1237,6 @@ var VagaoScene = new Phaser.Class({
       GameState.addCarisma(-4);
       GameState.stats.disfarcesOk++;
       if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
-    // chegou a estação: o rimador recolhe a caixinha e vai embora também
-    if (this.rimador && this.rimador.fase !== 'sai') { if (this.dialog) this.dialog.fecha(); this.saiRimador(); }
-    this.rima.setText('');
       sfx('ok');
       this.flash('Ele desceu. Você segue sentado.');
     }
@@ -1087,12 +1250,19 @@ var VagaoScene = new Phaser.Class({
     this.estado = 'parado';
     this.t = 0;
     this.pintaPortas(true);
-    sfx('porta');
+    sfx('chegando');
+    var eu = this;
+    this.time.delayedCall(420, function () { sfx('porta'); });
+    this.time.delayedCall(700, function () { if (eu.scene && eu.scene.isActive()) sfx('anuncio'); });
     if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
+    // chegou a estação: o rimador recolhe a caixinha e vai embora também
+    if (this.rimador && this.rimador.fase !== 'sai') { if (this.dialog) this.dialog.fecha(); this.saiRimador(); }
+    this.rima.setText('');
 
     var virou = GameState.avancaTrem();
     var aqui = GameState.estacaoAtual();
     this.encerraCorrida();
+    this.encerraEncontro();
     this.trocaPassageiros();
     this.sorteiaCorrida();
     if (virou) {
@@ -1149,6 +1319,7 @@ var VagaoScene = new Phaser.Class({
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
+    if (this.disputa) { this.atualizaDisputa(dt); this.pintaUI(); return; }
     if (this.disfarce) { this.atualizaDisfarce(dt); this.pintaUI(); return; }
 
     this.t += dt;
@@ -1202,10 +1373,12 @@ var VagaoScene = new Phaser.Class({
         this.pl.setDir(dx, dy);
       }
       this.pl.anima(dt, mv);
+      this.passos(dt, mv);
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
     this.atualizaCorrida(dt);
+    this.atualizaEncontro(dt);
     this.animaGente(dt);
     this.animaRimador(dt);
     this.pintaCaixinha();
@@ -1215,6 +1388,20 @@ var VagaoScene = new Phaser.Class({
 
   contexto: function () {
     var dica = '';
+
+    /* "ou a gente aborda, ou ele te ataca": se ele está vindo e você
+       chega junto, dá pra encarar na hora em vez de esperar. */
+    if (this.encontro && this.encontro.fase === 'vem') {
+      var ea = this.encontro.a;
+      if (ea.sp && ea.sp.active &&
+        Math.hypot(this.pl.sp.x - ea.sp.x, this.pl.sp.y - ea.sp.y) < 62) {
+        this.dica.setText(nomeAgir() + ': ENCARAR', PAL.vermelho);
+        if (Ctrl.actJust) { this.encontro.fase = 'carrega'; this.encontro.t = 0; sfx('empurra'); }
+        this.pintaRota();
+        return;
+      }
+    }
+
     if (this.estado === 'parado') {
       // descer é chegar no vestíbulo, não só estar na altura da porta
       var perto = false;
@@ -1241,7 +1428,15 @@ var VagaoScene = new Phaser.Class({
         var b = this.bancoLivrePerto();
         if (b) {
           dica = nomeAgir() + ': sentar';
-          if (Ctrl.actJust) this.senta(b);
+          if (Ctrl.actJust) {
+            // sentar no banco em disputa é ganhar a corrida
+            var disputado = this.corrida && this.corrida.b === b;
+            this.senta(b);
+            if (disputado) {
+              this.encerraCorrida();
+              this.flash('O BANCO É SEU  +' + GameState.ganhaMinigame(5) + ' PONTOS');
+            }
+          }
         } else {
           dica = 'SEGURE PRA NÃO CAIR';
         }
@@ -1307,5 +1502,7 @@ var VagaoScene = new Phaser.Class({
     }
 
     if (this.batalha) this.pintaBatalha(g);
+    if (this.disputa) this.pintaDisputa(g);
+    if (this.encontro) this.pintaEncontro(g);
   }
 });

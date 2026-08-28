@@ -48,11 +48,11 @@ var PAL = {
 var LINHAS = {
   azul: {
     nome: 'LINHA 1-AZUL', cor: '#0b5fae', num: 0x0b5fae,
-    estacoes: ['JABAQUARA', 'CONCEIÇÃO', 'SÃO JUDAS', 'SAÚDE', 'PÇA DA ÁRVORE',
+    estacoes: ['JABAQUARA', 'CONCEIÇÃO', 'SÃO JUDAS', 'SAÚDE', 'PÇA. ÁRVORE',
       'SANTA CRUZ', 'VILA MARIANA', 'ANA ROSA', 'PARAÍSO', 'VERGUEIRO',
       'SÃO JOAQUIM', 'LIBERDADE', 'SÉ', 'SÃO BENTO', 'LUZ', 'TIRADENTES',
-      'ARMÊNIA', 'PORTUGUESA', 'CARANDIRU', 'SANTANA', 'JD. SÃO PAULO',
-      'PARADA INGLESA', 'TUCURUVI']
+      'ARMÊNIA', 'PORTUGUESA', 'CARANDIRU', 'SANTANA', 'JD.SÃO PAULO',
+      'PD. INGLESA', 'TUCURUVI']
   },
   vermelha: {
     nome: 'LINHA 3-VERMELHA', cor: '#e8362c', num: 0xe8362c,
@@ -76,6 +76,13 @@ var LINHAS = {
    limpo leva de 39 a 58 e chega sempre; um erro é perdoado em 98% dos
    casos; três erros chegam no prazo em 13%. É a curva que queria — a
    cidade perdoa o tropeço e cobra o descuido. */
+/* ---------- corações ----------
+   Carisma e descanso são o desgaste longo da corrida; os corações são o
+   fôlego de um trajeto só. Cinco por perna, um por minigame perdido, e
+   voltam cheios quando você chega — porque cada trajeto é um dia novo,
+   e o que quebra a pessoa é o dia, não a semana. Zerar é acabar. */
+var CORACOES_POR_PERNA = 5;
+
 var LIMITE_ATRASO = 68;
 var MAX_ATRASOS = 3;
 
@@ -185,8 +192,66 @@ var CHARS = {
     desc: 'Vende no vagão. Guardinha persegue.',
     tarifa: 5.20, dinheiro: 6.00, carisma: 50, descanso: 80, descansoMax: 100,
     dreno: 1.0, velocidade: 104, empurraoMult: 1.15, gratuidade: false, valeTransporte: 0
+  },
+  gestante: {
+    nome: 'GESTANTE', asset: 'gestante',
+    desc: 'Recebe o lugar. Cansa em dobro.',
+    tarifa: 5.20, dinheiro: 12.00, carisma: 80, descanso: 60, descansoMax: 80,
+    dreno: 1.5, velocidade: 78, empurraoMult: 0.65, gratuidade: false, valeTransporte: 0,
+    preco: 90
+  },
+  turista: {
+    nome: 'TURISTA', asset: 'turista',
+    desc: 'Grana sobrando. Se perde fácil.',
+    tarifa: 5.20, dinheiro: 40.00, carisma: 45, descanso: 100, descansoMax: 100,
+    dreno: 1.25, velocidade: 96, empurraoMult: 0.9, gratuidade: false, valeTransporte: 0,
+    preco: 150
   }
 };
+
+/* ---------- pontos e personagens destravados ----------
+   Os minigames deixaram de ser só um susto no meio da viagem: ganhar dá
+   ponto, e ponto atravessa a corrida — fica guardado mesmo quando a
+   cidade te quebra. É o que faz valer a pena encarar o rimador numa
+   segunda-feira já sabendo que a semana vai acabar mal.
+
+   O elenco que já existia continua aberto. Cobrar por ele seria tirar
+   de quem já jogava, e comprar tem que abrir coisa nova, não retirar o
+   que estava lá. Os pontos abrem os dois que entraram junto com eles. */
+var LIVRES_DE_SAIDA = ['estudante', 'clt', 'senhor', 'ambulante'];
+
+function lePontos() {
+  try { return parseInt(localStorage.getItem('metrosp_pontos') || '0', 10) || 0; } catch (e) { return 0; }
+}
+function gravaPontos(n) {
+  try { localStorage.setItem('metrosp_pontos', String(Math.max(0, n))); } catch (e) { }
+}
+function leDestravados() {
+  var l = LIVRES_DE_SAIDA.slice(0);
+  try {
+    var g = (localStorage.getItem('metrosp_destravados') || '').split(',');
+    for (var i = 0; i < g.length; i++) if (CHARS[g[i]] && l.indexOf(g[i]) < 0) l.push(g[i]);
+  } catch (e) { }
+  return l;
+}
+function destravado(k) { return leDestravados().indexOf(k) >= 0; }
+function destrava(k) {
+  if (destravado(k)) return;
+  var l = leDestravados();
+  l.push(k);
+  try { localStorage.setItem('metrosp_destravados', l.join(',')); } catch (e) { }
+}
+function precoDe(k) { return CHARS[k] && CHARS[k].preco ? CHARS[k].preco : 0; }
+
+/* compra se der: devolve o que aconteceu, pra tela dizer o porquê */
+function compraPersonagem(k) {
+  if (destravado(k)) return 'ja';
+  var p = lePontos(), c = precoDe(k);
+  if (p < c) return 'falta';
+  gravaPontos(p - c);
+  destrava(k);
+  return 'ok';
+}
 
 /* ---------- estado global ---------- */
 var GameState = {
@@ -205,6 +270,8 @@ var GameState = {
     this.pernasFeitas = 0;
     this.atrasos = 0;
     this.ultimoAtraso = 0;
+    this.coracoes = CORACOES_POR_PERNA;
+    this.pontosDaCorrida = 0;
     this.minutos = horaDaSaida(1) + Math.floor(Math.random() * 25) - 12;
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
@@ -213,7 +280,8 @@ var GameState = {
     this.motivoFim = '';
     this.stats = {
       cedidos: 0, disfarces: 0, disfarcesOk: 0, recusas: 0,
-      catracasPuladas: 0, catracasPagas: 0, causos: 0, baldeacoes: 0
+      catracasPuladas: 0, catracasPagas: 0, causos: 0, baldeacoes: 0,
+      minigamesGanhos: 0, minigamesPerdidos: 0
     };
   },
   linhaAtual: function () { return LINHAS[this.linha]; },
@@ -293,9 +361,40 @@ var GameState = {
      precisa de conta. O minuto continua existindo por baixo. */
   horaLimite: function () { return horaTexto((this.minutoSaida + LIMITE_ATRASO) % 1440); },
 
+  /* um minigame perdido custa um coração; ganho não devolve nada, senão
+     o recurso vira placar e para de doer */
+  perdeCoracao: function () {
+    this.coracoes = Math.max(0, this.coracoes - 1);
+    this.stats.minigamesPerdidos++;
+    return this.coracoes;
+  },
+  /* Ganhar dá ponto, e o ponto é gravado na hora: quem morre no minuto
+     seguinte não perde o que acabou de ganhar. */
+  ganhaMinigame: function (pontos) {
+    this.stats.minigamesGanhos++;
+    var n = pontos || 5;
+    this.pontosDaCorrida = (this.pontosDaCorrida || 0) + n;
+    gravaPontos(lePontos() + n);
+    return n;
+  },
+
+  /* Reiniciar o trajeto devolve a perna ao começo: mesma origem, mesmo
+     relógio da saída, corações cheios. Não perdoa o que já foi gasto de
+     carisma nem de grana — reiniciar é uma segunda chance no caminho,
+     não um apagador da corrida. */
+  reiniciaPerna: function () {
+    this.minutos = this.minutoSaida;
+    this.coracoes = CORACOES_POR_PERNA;
+    this.dentroDoSistema = false;
+    this.sentado = false;
+    this.poeNoTrajeto(this.origemDaPerna());
+    this.faixaAnterior = this.faixa().key;
+  },
+
   chegouNoDestino: function () {
     this.pernasFeitas++;
     this.dentroDoSistema = false;
+    this.coracoes = CORACOES_POR_PERNA;      // trajeto novo, fôlego novo
     this.ultimoAtraso = Math.max(0, this.minutosNaPerna() - LIMITE_ATRASO);
     if (this.perna === 'ida') {
       if (this.ultimoAtraso > 0) this.atrasos++;
@@ -345,6 +444,9 @@ var GameState = {
   gastar: function (n) { this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100); },
   ganhar: function (n) { this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100; },
   derrota: function () {
+    if (this.coracoes <= 0) {
+      return 'O trajeto te moeu.\nVocê desceu numa estação\nqualquer e sentou no chão.';
+    }
     if (this.atrasos >= MAX_ATRASOS) {
       return 'Terceiro atraso no mês.\nO RH não quis saber do metrô.';
     }
@@ -860,6 +962,9 @@ var PELES = {
   idoso: pele('#0a0a12', '#e0b088', '#d8d8e8', '#6b6152', '#4a4438', '#14141c', '#f0eeff'),
   gestante: pele('#0a0a12', '#c99a70', '#3a2a22', '#c85a9a', '#2a2a38', '#14141c', '#e28cc0'),
   guardinha: pele('#0a0a12', '#b07d52', '#1a2540', '#20325c', '#20325c', '#14141c', '#9fb6dd'),
+  // os dois que se compram com ponto de minigame
+  gestanteJog: pele('#0a0a12', '#e0b088', '#4a2f1e', '#d4548e', '#33334a', '#14141c', '#ffd0e6'),
+  turista: pele('#0a0a12', '#f0c8a0', '#e8c96a', '#f2f0ff', '#4a7fc0', '#14141c', '#e8362c'),
   rimador: pele('#0a0a12', '#6b4228', '#0a0a12', '#e8362c', '#1c1c28', '#14141c', '#f0eeff'),
   pedinte: pele('#0a0a12', '#b07d52', '#4a3a2a', '#6b6152', '#4a4438', '#2a2a2a', '#8a8272'),
   ambulanteNpc: pele('#0a0a12', '#8a5a3c', '#e8a33c', '#f2c14e', '#3a3a4d', '#14141c', '#ffffff'),
@@ -1097,12 +1202,47 @@ function ligaSom(v) {
   if (SOM_LIGADO) audioOn();
 }
 
+/* ---------- música ----------
+   Não havia música nenhuma: desligar "música" no menu não desligaria
+   coisa nenhuma, e botão que não faz nada é pior que botão que falta.
+   Então entrou o mínimo honesto — um baixo de metrô, duas notas
+   alternando no compasso do trem, baixo o bastante pra não brigar com
+   os efeitos. É ambiente, não trilha. */
+var MUSICA_LIGADA = true;
+try {
+  MUSICA_LIGADA = (localStorage.getItem('metrosp_musica') !== '0');
+} catch (e) { }
+
+var BAIXO_METRO = [49.0, 49.0, 58.3, 49.0, 43.7, 43.7, 51.9, 43.7];
+var _musicaT = null, _musicaI = 0;
+
+function passoDaMusica() {
+  if (!MUSICA_LIGADA || !AC) return;
+  var f = BAIXO_METRO[_musicaI % BAIXO_METRO.length];
+  _musicaI++;
+  tom(f, 0.55, 'triangle', 0.028);
+  if (_musicaI % 4 === 2) tom(f * 4, 0.10, 'sine', 0.012);
+}
+
+function ligaMusica(v) {
+  MUSICA_LIGADA = !!v;
+  try { localStorage.setItem('metrosp_musica', MUSICA_LIGADA ? '1' : '0'); } catch (e) { }
+  if (MUSICA_LIGADA) { audioOn(); comecaMusica(); }
+  else if (_musicaT) { clearInterval(_musicaT); _musicaT = null; }
+}
+
+function comecaMusica() {
+  if (_musicaT || !MUSICA_LIGADA) return;
+  _musicaT = setInterval(passoDaMusica, 640);
+}
+
 var AC = null;
 function audioOn() {
   if (!AC && (window.AudioContext || window.webkitAudioContext)) {
     AC = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (AC && AC.state === 'suspended') AC.resume();
+  comecaMusica();
 }
 function tom(f, d, tipo, vol) {
   if (!AC) return;
@@ -1124,6 +1264,13 @@ function sfx(n) {
     case 'trem': tom(65, .6, 'sawtooth', .05); break;
     case 'catraca': tom(880, .04); setTimeout(function () { tom(1320, .06); }, 45); break;
     case 'caixa': tom(96, .11, 'sine', .09); setTimeout(function () { tom(62, .17, 'sine', .07); }, 60); break;
+    /* passo: curto e grave, e alterna de altura pra não virar metrônomo */
+    case 'passoA': tom(150, .035, 'triangle', .035); break;
+    case 'passoB': tom(126, .035, 'triangle', .032); break;
+    // o dó-mi do letreiro, antes do nome da estação
+    case 'anuncio': tom(784, .1, 'sine', .05); setTimeout(function () { tom(1046, .16, 'sine', .05); }, 110); break;
+    // o trem entrando na estação: rugido caindo de tom
+    case 'chegando': tom(120, .5, 'sawtooth', .05); setTimeout(function () { tom(80, .45, 'sawtooth', .045); }, 260); break;
     case 'batida': tom(70, .09, 'sine', .09); setTimeout(function () { tom(1300, .03, 'square', .028); }, 95); break;
     case 'erro': tom(200, .1, 'square', .06); setTimeout(function () { tom(120, .22, 'square', .06); }, 100); break;
     case 'fim': [392, 330, 262, 196].forEach(function (f, i) { setTimeout(function () { tom(f, .22, 'triangle', .07); }, i * 160); }); break;
@@ -1199,13 +1346,14 @@ function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 var Ctrl = {
   up: false, down: false, left: false, right: false,
   act: false, actJust: false, back: false, backJust: false,
-  _pa: false, _pb: false,
+  pausaJust: false,
+  _pa: false, _pb: false, _pz: false,
   liga: function (scene) {
     /* WASD e espaço são o controle principal; setas, Z e enter continuam
        valendo pra quem já pegou o costume. enableCapture segura o espaço
        antes que o navegador role a página com ele. */
     this.k = scene.input.keyboard.addKeys(
-      'W,A,S,D,SPACE,UP,DOWN,LEFT,RIGHT,Z,X,ENTER,ESC', true, true);
+      'W,A,S,D,SPACE,UP,DOWN,LEFT,RIGHT,Z,X,P,ENTER,ESC', true, true);
   },
   update: function () {
     var k = this.k;
@@ -1216,8 +1364,12 @@ var Ctrl = {
     var a = k.SPACE.isDown || k.Z.isDown || k.ENTER.isDown || TOUCH.act || TOUCH.pulso;
     this.actJust = a && !this._pa; this._pa = a; this.act = a;
     TOUCH.pulso = false;
-    var b = k.X.isDown || k.ESC.isDown;
+    var b = k.X.isDown;
     this.backJust = b && !this._pb; this._pb = b; this.back = b;
+    /* ESC e P são pausa, não "voltar": no vagão X levanta do banco, e
+       misturar os dois fazia a pausa levantar você junto */
+    var pz = k.ESC.isDown || k.P.isDown;
+    this.pausaJust = pz && !this._pz; this._pz = pz;
   },
 
   /* o disfarce quer uma direção só. No teclado a ordem das teclas
@@ -1642,6 +1794,13 @@ var HudScene = new Phaser.Class({
 
        Com o espaço que sobrou os dois medidores ficaram 80px em vez de
        54, que é a diferença entre ler e adivinhar. */
+    /* O botão de pausa mora na folga entre o medidor de descanso e a
+       grana, e a zona de toque é maior que o desenho: dedo não acerta
+       12 pixels. No teclado é ESC ou P. */
+    var eu = this;
+    this.zonaPausa = this.add.zone(194, 20, 32, 24).setOrigin(0, 0).setInteractive();
+    this.zonaPausa.on('pointerdown', function () { eu.abrePausa(); });
+
     this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
     this.tHora = txt(this, GW - 8, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
     this.tCar = txt(this, 6, 24, 'C', PAL.cinzaEsc, 8).setDepth(1001);
@@ -1677,8 +1836,16 @@ var HudScene = new Phaser.Class({
     this.gManche = this.add.graphics().setDepth(1200);
   },
 
+  abrePausa: function () {
+    if (this.scene.isActive('Pausa')) return;
+    if (!HUD_VISIVEL && !GameState.char) return;   // no título não há o que pausar
+    audioOn();
+    this.scene.launch('Pausa');
+  },
+
   update: function (time) {
     atualizaManche(time);
+    if (Ctrl.pausaJust) { Ctrl.pausaJust = false; this.abrePausa(); }
 
     /* o manche só existe enquanto o dedo está arrastando: parado na tela,
        nada é desenhado, e é isso que devolve o rodapé pro jogo */
@@ -1708,6 +1875,22 @@ var HudScene = new Phaser.Class({
     g.fillStyle(0x000000, 0.35); g.fillRect(0, 22, GW, 1);        // separa as duas linhas
     g.fillStyle(l.num, 1); g.fillRect(0, HUD_H - 4, GW, 4);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1); g.fillRect(0, HUD_H - 4, GW, 1);
+
+    /* Os corações moram na folga entre o nome da estação e o relógio.
+       Coração é desenho, não letra: cinco letras 'V' não leem como
+       vida, e a fonte não tem o glifo. */
+    for (var c = 0; c < CORACOES_POR_PERNA; c++) {
+      var hx = 156 + c * 12, hy = 7, cheio = c < GameState.coracoes;
+      g.fillStyle(cheio ? 0xe8362c : 0x2a2a3c, 1);
+      g.fillRect(hx, hy + 1, 3, 5); g.fillRect(hx + 6, hy + 1, 3, 5);
+      g.fillRect(hx + 1, hy, 7, 4); g.fillRect(hx + 1, hy + 5, 7, 2);
+      g.fillRect(hx + 2, hy + 7, 5, 1); g.fillRect(hx + 3, hy + 8, 3, 1);
+      if (cheio) g.fillStyle(0xff8a80, 1).fillRect(hx + 1, hy, 2, 2);
+    }
+
+    // o ícone de pausa: duas barrinhas, no vão entre o medidor e a grana
+    g.fillStyle(0x5a5f74, 1);
+    g.fillRect(202, 27, 3, 11); g.fillRect(208, 27, 3, 11);
 
     this.tEst.setText(GameState.estacaoAtual());
     this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
