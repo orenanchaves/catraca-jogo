@@ -169,6 +169,8 @@ var VagaoScene = new Phaser.Class({
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
+    // o nome de quem te aborda, flutuando em cima da cabeça dele
+    this.tagEncontro = txtC(this, 0, 0, '', PAL.amarelo, 8).setDepth(530).setVisible(false);
     // uma seta por pista, cada uma debaixo da sua caixa de acerto
     this.setasBatalha = [];
     for (var q = 0; q < 4; q++) {
@@ -539,6 +541,10 @@ var VagaoScene = new Phaser.Class({
      antes de ele terminar. A escolha só aparece depois da última rima,
      que é quando a pessoa já decidiu se vai fingir que dorme. */
   comecaRimador: function () {
+    /* um rimador de cada vez: o que está indo embora ainda é o
+       this.rimador, e montar outro por cima deixa o primeiro plantado
+       no vagão pro resto da viagem */
+    if (this.rimador || this.encena) return;
     this.encena = true;
     var lado = (this.pl.sp.x < 160) ? 1 : -1;      // arma do lado oposto ao seu
     var x = 160 + lado * 24;
@@ -942,7 +948,7 @@ var VagaoScene = new Phaser.Class({
         '.\nEle respeitou. +' + GameState.ganhaMinigame(6) + ' PONTOS.';
       cor = PAL.amarelo; sfx('ok');
     } else {
-      GameState.perdeCoracao();
+      perdeVida(this, this.pl.sp);
       GameState.addCarisma(-7);
       texto = 'ELE TE ATROPELOU.\n' + b.acertos + ' de ' + total + '.\nO vagão inteiro riu.';
       cor = PAL.vermelho; sfx('erro');
@@ -1025,7 +1031,7 @@ var VagaoScene = new Phaser.Class({
       sfx('ok');
       this.flash('A BARRA É SUA  +' + GameState.ganhaMinigame(7) + ' PONTOS');
     } else {
-      GameState.perdeCoracao();
+      perdeVida(this, this.pl.sp);
       GameState.addDescanso(-6);
       GameState.addCarisma(-4);
       this.cameras.main.shake(320, 0.008);
@@ -1056,20 +1062,69 @@ var VagaoScene = new Phaser.Class({
      primeiro — quem chega junto e aperta começa na hora. */
   sorteiaEncontro: function () {
     if (this.encontro || this.batalha || this.disputa || this.disfarce || this.encena) return;
+    // um rimador de cada vez: dois barracos montados e a caixinha que
+    // sai no fim da batalha é a do outro
+    if (this.rimador) return;
     if (this.estado !== 'andando' || !this.npcExtra.length) return;
     if (Math.random() > Math.min(0.5, 0.14 + GameState.dificuldade() * 0.05)) return;
 
-    var a = this.npcExtra[Math.floor(Math.random() * this.npcExtra.length)];
-    if (!a.sp || !a.sp.active) return;
     /* Quanto mais cheio o vagão, mais a briga é por barra: no pico
        ninguém disputa rima, disputa lugar pra segurar. Sentado nunca
        disputa barra — quem senta não segura em nada. */
     var lot = GameState.lotacao();
-    var tipo = this.sentadoEm ? 'rima' : (Math.random() < 0.25 + lot * 0.5 ? 'barra' : 'rima');
-    // sentado não disputa barra: quem senta não segura em nada
-    this.encontro = { a: a, tipo: tipo, fase: 'vem', t: 0, carga: 0 };
+    if (!this.sentadoEm && Math.random() < 0.25 + lot * 0.5) return this.desafioDeBarra();
+    return this.desafioDeRima();
+  },
+
+  /* Quem quer a sua barra é um passageiro qualquer, porque é isso que
+     ele é: gente que também precisa se segurar. */
+  desafioDeBarra: function () {
+    var a = this.npcExtra[Math.floor(Math.random() * this.npcExtra.length)];
+    if (!a.sp || !a.sp.active) return;
+    this.encontro = { a: a, tipo: 'barra', fase: 'vem', t: 0, carga: 0 };
     a.fixo = false;
     sfx('apito');
+  },
+
+  /* ---------- o desafio de rima ----------
+     A batalha vinha de um passageiro sorteado, e o vagão inteiro tem a
+     mesma cara: quem te desafiava podia ser a senhora do banco. Rima é
+     ofício, e quem rima no metrô tem uniforme — boné e caixinha. Agora
+     o desafiante é sempre um rimador, entra pela porta, vem com a
+     moldura amarela e o nome em cima da cabeça, e dá pra ver de longe
+     o que ele quer antes de ele chegar em você. */
+  desafioDeRima: function () {
+    var lado = (this.pl.sp.x < 160) ? 1 : -1;
+    /* entra pela porta mais longe de você: o desafio tem que dar tempo
+       de ser visto atravessando o vagão, senão ele aparece colado em
+       quem joga e vira susto em vez de aviso */
+    var porta = this.portas[0], melhor = -1;
+    for (var i = 0; i < this.portas.length; i++) {
+      var d = Math.abs(this.portas[i] + PORTA_ALT / 2 - this.pl.sp.y);
+      if (d > melhor) { melhor = d; porta = this.portas[i]; }
+    }
+    var a = new Ator(this, 160 + lado * 46, porta + PORTA_ALT / 2, 'np_rimador');
+    a.dir = 'down';
+    a.sp.setDepth(56);
+    a.fixo = false;
+    this.gente.push(a);
+    this.encontro = { a: a, tipo: 'rima', fase: 'vem', t: 0, carga: 0, convidado: true };
+    sfx('apito');
+  },
+
+  /* Aceita a batalha e ele monta o barraco ali mesmo: a caixinha desce,
+     a batida entra, e daí em diante é o mesmo rimador do ritual — é o
+     que faz o fim da batalha saber mandar ele embora. */
+  montaRimadorDoDesafio: function (a) {
+    if (this.rimador) return;
+    var lado = a.sp.x < 160 ? 1 : -1;
+    this.rimador = {
+      a: a, lado: lado, alvo: a.sp.y, fase: 'espera', t: 0, verso: 99, batida: 0,
+      caixa: true, caixaX: a.sp.x + lado * 24, caixaY: a.sp.y + 12
+    };
+    a.fixo = true;
+    this.encena = true;
+    sfx('caixa');
   },
 
   atualizaEncontro: function (dt) {
@@ -1105,29 +1160,73 @@ var VagaoScene = new Phaser.Class({
     if (e.carga >= 1) {
       var tipo = e.tipo, quem = e.a;
       this.encontro = null;
-      if (tipo === 'rima') this.comecaBatalha();
+      this.tagEncontro.setVisible(false);
+      if (tipo === 'rima') { this.montaRimadorDoDesafio(quem); this.comecaBatalha(); }
       else this.comecaDisputa(quem);
     }
   },
 
   encerraEncontro: function () {
     if (!this.encontro) return;
-    var a = this.encontro.a;
-    if (a && a.sp && a.sp.active) { a.fixo = false; sentaAnimado(a); }
+    var a = this.encontro.a, convidado = this.encontro.convidado;
     this.encontro = null;
+    this.tagEncontro.setVisible(false);
+    if (!a || !a.sp || !a.sp.active) return;
+    // o rimador só existia pra esse desafio: sem desafio, ele vai embora
+    if (convidado) {
+      var i = this.gente.indexOf(a);
+      if (i >= 0) this.gente.splice(i, 1);
+      a.destroy();
+      return;
+    }
+    a.fixo = false;
+    sentaAnimado(a);
   },
 
   pintaEncontro: function (g) {
     var e = this.encontro;
-    if (!e || !e.a.sp || !e.a.sp.active) return;
-    var x = e.a.sp.x, y = e.a.sp.y - 54;
-    // o "!" de quem te escolheu
-    g.fillStyle(0xf2c14e, 1).fillRect(x - 2, y, 4, 11);
-    g.fillStyle(0xf2c14e, 1).fillRect(x - 2, y + 13, 4, 4);
+    if (!e || !e.a.sp || !e.a.sp.active) { this.tagEncontro.setVisible(false); return; }
+    var x = Math.round(e.a.sp.x), py = e.a.sp.y;
+    var rima = (e.tipo === 'rima');
+    var cor = rima ? 0xf2c14e : 0xe8362c;
+
+    /* Um "!" solto em cima de um passageiro qualquer não dizia quem
+       era nem o que ele queria: num vagão de doze pessoas iguais, a
+       moldura é o que separa o desafiante do resto, e o nome é o que
+       diz por que ele veio. */
+    /* o boneco tem o pé no sp.y e quarenta e oito de altura: a moldura
+       é o corpo dele, não um quadrado em volta do chão */
+    var topo = py - 50, alt = 54;
+    var pulso = 0.55 + 0.45 * Math.sin(this.time.now / 190);
+    g.fillStyle(cor, 0.14 + 0.1 * pulso).fillRect(x - 14, topo, 28, alt);
+    g.lineStyle(2, cor, 0.55 + 0.45 * pulso);
+    g.strokeRect(x - 14, topo, 28, alt);
+    // cantoneiras: o retângulo fino sumia no meio da multidão
+    g.fillStyle(cor, 1);
+    for (var c = 0; c < 4; c++) {
+      var cx = x - 15 + (c % 2) * 28, cy = topo - 1 + (c > 1 ? alt : 0);
+      g.fillRect(cx, cy, 2, 6); g.fillRect(cx, cy, 6, 2);
+      if (c % 2) g.fillRect(cx - 4, cy, 6, 2);
+      if (c > 1) g.fillRect(cx, cy - 4, 2, 6);
+    }
+
+    /* A etiqueta mora acima da moldura. Quando ele está tão no alto que
+       não sobra espaço — e ali em cima mora a placa de rota — ela desce
+       pros pés dele em vez de brigar pelo mesmo pixel. */
+    var acima = (py - 82 >= 140);
+    var ty = acima ? py - 82 : py + 6;
+    var tx = Phaser.Math.Clamp(x, 48, GW - 48);
+    this.tagEncontro.setVisible(true).setText(rima ? 'RIMADOR' : 'QUER A BARRA');
+    this.tagEncontro.setPosition(tx, ty);
+    var lw = Math.round(this.tagEncontro.width) + 8, lh = Math.round(this.tagEncontro.height) + 4;
+    g.fillStyle(0x08080e, 0.85).fillRect(tx - lw / 2, ty - 2, lw, lh);
+    g.fillStyle(cor, 1).fillRect(tx - lw / 2, ty + lh - 4, lw, 2);
+
     if (e.fase !== 'carrega') return;
     // e a carga, que é o tempo que sobra pra fugir
-    g.fillStyle(0x08080e, 0.7).fillRect(x - 20, y - 10, 40, 7);
-    g.fillStyle(0xe8362c, 1).fillRect(x - 19, y - 9, Math.round(38 * e.carga), 5);
+    var by = acima ? ty - 12 : ty + lh + 4;
+    g.fillStyle(0x08080e, 0.7).fillRect(x - 20, by, 40, 7);
+    g.fillStyle(0xe8362c, 1).fillRect(x - 19, by + 1, Math.round(38 * e.carga), 5);
   },
 
   /* ---------- corrida pelo banco ----------
@@ -1185,7 +1284,7 @@ var VagaoScene = new Phaser.Class({
       var k = this.npcExtra.indexOf(a);
       if (k >= 0) this.npcExtra.splice(k, 1);
       this.corrida = null;
-      GameState.perdeCoracao();
+      perdeVida(this, this.pl.sp);
       sfx('nao');
       this.flash('SENTARAM NO SEU LUGAR');
       return;
@@ -1319,7 +1418,7 @@ var VagaoScene = new Phaser.Class({
     if (d.suspeita >= 100) {
       this.tSeta.setText(''); this.centro.setText('');
       this.disfarce = null;
-      GameState.perdeCoracao();
+      perdeVida(this, this.pl.sp);
       GameState.addCarisma(-14);
       this.levanta();
       sfx('erro');
@@ -1492,12 +1591,20 @@ var VagaoScene = new Phaser.Class({
 
     /* "ou a gente aborda, ou ele te ataca": se ele está vindo e você
        chega junto, dá pra encarar na hora em vez de esperar. */
-    if (this.encontro && this.encontro.fase === 'vem') {
+    if (this.encontro) {
       var ea = this.encontro.a;
       if (ea.sp && ea.sp.active &&
         Math.hypot(this.pl.sp.x - ea.sp.x, this.pl.sp.y - ea.sp.y) < 62) {
-        this.dica.setText(nomeAgir() + ': ENCARAR', PAL.vermelho);
-        if (Ctrl.actJust) { this.encontro.fase = 'carrega'; this.encontro.t = 0; sfx('empurra'); }
+        this.dica.setText(nomeAgir() + (this.encontro.tipo === 'rima'
+          ? ': ACEITAR A RIMA' : ': ENCARAR'), PAL.vermelho);
+        /* Aceitar vale nas duas fases: enquanto ele vem, encarar é ir
+           pra cima; enquanto ele carrega, é dizer que não precisa
+           esperar a barra encher. Quem não quer, anda pra longe. */
+        if (Ctrl.actJust) {
+          if (this.encontro.fase === 'vem') { this.encontro.fase = 'carrega'; this.encontro.t = 0; }
+          else this.encontro.carga = 1;
+          sfx('empurra');
+        }
         this.pintaRota();
         return;
       }
@@ -1640,6 +1747,6 @@ var VagaoScene = new Phaser.Class({
 
     if (this.batalha) this.pintaBatalha(g);
     if (this.disputa) this.pintaDisputa(g);
-    if (this.encontro) this.pintaEncontro(g);
+    if (this.encontro) this.pintaEncontro(g); else this.tagEncontro.setVisible(false);
   }
 });

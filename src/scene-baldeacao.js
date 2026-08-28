@@ -200,7 +200,7 @@ var BaldeacaoScene = new Phaser.Class({
         + GameState.ganhaMinigame(6) + ' PONTOS.';
       sfx('vitoria');
     } else {
-      GameState.perdeCoracao();
+      perdeVida(this, this.pl.sp);
       GameState.addCarisma(-3);
       texto = 'ELE PASSOU NA SUA FRENTE.\n' + this.trombadas + ' trombada(s).\nVocê pega o próximo.';
       sfx('nao');

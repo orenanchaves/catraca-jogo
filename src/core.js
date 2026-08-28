@@ -1363,6 +1363,61 @@ function areaDeJogo(topo, base, foco) {
 
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
+/* ---------- o coração quebrado ----------
+   Perder uma vida acontecia só no alto do HUD: o quinto ícone apagava,
+   a nove pixels de altura, longe de onde a pessoa está olhando — que é
+   o boneco. Agora a perda sai de cima da cabeça dele: o mesmo coração
+   do HUD parte no meio, as duas metades giram pros lados, sobem e
+   somem. Quem viu, entendeu, sem precisar conferir o placar.
+
+   As duas listas são o mesmo desenho do HUD cortado na coluna do meio:
+   cada retângulo é [x, y, largura, altura] em coordenada local. */
+var METADES_CORACAO = [
+  [[0, 1, 3, 5], [1, 0, 4, 4], [1, 5, 4, 2], [2, 7, 3, 1], [3, 8, 2, 1]],
+  [[1, 1, 3, 5], [0, 0, 3, 4], [0, 5, 3, 2], [0, 7, 2, 1], [0, 8, 1, 1]]
+];
+
+function coracaoQuebrado(scene, x, y) {
+  if (!scene || !scene.add || !scene.tweens) return;
+  for (var m = 0; m < 2; m++) {
+    var lado = m ? 1 : -1;
+    var g = scene.add.graphics().setDepth(940);
+    g.setScale(3);
+    g.x = Math.round(x) + (m ? 2 : -14);
+    g.y = Math.round(y) - 14;
+    var r = METADES_CORACAO[m], i;
+    // o contorno escuro primeiro: sem ele o vermelho some no vagão
+    g.fillStyle(0x08080e, 1);
+    for (i = 0; i < r.length; i++) g.fillRect(r[i][0] - 1, r[i][1] - 1, r[i][2] + 2, r[i][3] + 2);
+    g.fillStyle(0xe8362c, 1);
+    for (i = 0; i < r.length; i++) g.fillRect(r[i][0], r[i][1], r[i][2], r[i][3]);
+    g.fillStyle(0xff8a80, 1).fillRect(m ? 0 : 1, 0, 2, 2);
+    /* pouco giro de propósito: a 55 graus o coração de nove pixels
+       vira borrão vermelho e ninguém reconhece o desenho */
+    scene.tweens.add({
+      targets: g, duration: 900, ease: 'Quad.easeOut', delay: 90,
+      x: g.x + lado * 17, y: g.y - 30, angle: lado * 22
+    });
+    /* o sumiço vai num tween separado: junto com o voo, o Quad.easeOut
+       apagava o coração nos primeiros trezentos milissegundos e a
+       metade do tempo de tela era um fantasma */
+    scene.tweens.add({
+      targets: g, duration: 320, delay: 680, alpha: 0,
+      onComplete: function (tw, alvos) { alvos[0].destroy(); }
+    });
+  }
+}
+
+/* Todo lugar que tira um coração passa por aqui: a perda é a coisa
+   mais importante que acontece com o jogador e não podia depender de
+   cada minigame lembrar de mostrar. */
+function perdeVida(scene, sp) {
+  var n = GameState.perdeCoracao();
+  if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40);
+  if (scene && scene.cameras) scene.cameras.main.shake(220, 0.005);
+  return n;
+}
+
 var Ctrl = {
   up: false, down: false, left: false, right: false,
   act: false, actJust: false, back: false, backJust: false,
