@@ -74,6 +74,24 @@ var VERSO_DO_JOGADOR = {
   ambulante: 'ESSE AÍ É DA ÁREA,\nRESPEITO ENTRE COLEGA'
 };
 
+/* ---------- batalha de rima ----------
+   O rimador já entrava, montava a caixinha e mandava quatro versos. O
+   que faltava era o outro lado do microfone.
+
+   Quatro pistas, uma pra cada direção, e as sílabas descendo até a
+   linha de acerto. Direção é o comando que este jogo já ensina duas
+   vezes — no disfarce e no andar — e funciona igual no teclado e no
+   manche do celular, que foi o motivo de não usar botão nenhum novo. */
+var BATALHA_DIRS = ['left', 'up', 'down', 'right'];
+var BATALHA_SETAS = ['◄', '▲', '▼', '►'];
+var BATALHA_CORES = [0xe8362c, 0xf2c14e, 0x00e676, 0x0b9fdd];
+/* O painel mora abaixo da placa de rota (que vai até y=120) e acima da
+   barra de dica. A seta de cada pista fica embaixo da sua caixa de
+   acerto, não no meio da pista: no meio ela virava obstáculo visual em
+   cima das sílabas caindo. */
+var BAT_TOPO = 178, BAT_LINHA = 432, BAT_X0 = 52, BAT_LARG = 54;
+function batalhaX(lane) { return BAT_X0 + lane * BAT_LARG + BAT_LARG / 2; }
+
 /* O corredor tem a largura do vão entre as baias e abre até a parede na
    altura de cada porta. É esse vestíbulo que faz descer virar um
    movimento: sem ele dá pra encostar na baia e nunca na porta.
@@ -113,6 +131,7 @@ var VagaoScene = new Phaser.Class({
     this.tEvento = 0; this.tDilema = 0;
     this.falha = null;
     this.sorteouFalha = false;
+    this.corrida = null;
     this.sentadoEm = null;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
@@ -140,6 +159,14 @@ var VagaoScene = new Phaser.Class({
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
+    // uma seta por pista, cada uma debaixo da sua caixa de acerto
+    this.setasBatalha = [];
+    for (var q = 0; q < 4; q++) {
+      this.setasBatalha.push(
+        txtC(this, batalhaX(q), BAT_LINHA + 22, BATALHA_SETAS[q], PAL.branco, 16)
+          .setDepth(521).setVisible(false));
+    }
+    this.batalha = null;
 
     this.sorteiaRitmo();
 
@@ -538,13 +565,19 @@ var VagaoScene = new Phaser.Class({
         }
       },
       {
+        label: 'Mandar uma rima', cb: function () {
+          self.rima.setText('');
+          self.comecaBatalha();
+        }
+      },
+      {
         label: 'Fingir que dorme', cb: function () {
           GameState.addCarisma(-4); GameState.stats.causos++;
           self.flash('Ele rimou com a sua cara.');
           self.saiRimador();
         }
       }
-    ], { tempo: 7, aoExpirar: function () { GameState.addCarisma(-1); self.saiRimador(); } });
+    ], { tempo: 9, aoExpirar: function () { GameState.addCarisma(-1); self.saiRimador(); } });
   },
 
   /* pega a caixinha de volta e segue pro próximo vagão */
@@ -696,6 +729,220 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
+  /* ---------- batalha de rima ----------
+     Sai da escolha do jogador, não de sorteio: encarar o rimador é uma
+     opção do chapéu, ao lado de dar a moeda e de fingir que dorme. Quem
+     não quer minigame nunca é obrigado a jogar um.
+
+     As sílabas caem no compasso da caixinha — o intervalo entre elas é
+     a batida de verdade, e é por isso que dá pra sentir o ritmo em vez
+     de só reagir. Quanto mais fundo na corrida, mais rápido o rimador
+     manda. */
+  comecaBatalha: function () {
+    var dif = GameState.dificuldade();
+    var bpm = 92 + dif * 7;
+    var batida = 60000 / bpm;
+    var dur = 13000;
+    var notas = [];
+    var t = 1400, ultima = -1;
+    while (t < dur - 1600) {
+      var lane;
+      do { lane = Math.floor(Math.random() * 4); } while (lane === ultima && Math.random() < 0.6);
+      ultima = lane;
+      notas.push({ lane: lane, t: t, feita: false, errada: false });
+      t += batida * (Math.random() < 0.28 ? 0.5 : 1);
+    }
+    this.batalha = {
+      notas: notas, t: 0, dur: dur, acertos: 0, erros: 0, combo: 0, maiorCombo: 0,
+      queda: Math.max(900, 1500 - dif * 70),
+      janela: Math.max(95, 150 - dif * 9),
+      ant: { left: false, up: false, down: false, right: false }
+    };
+    GameState.stats.disfarces = GameState.stats.disfarces;   // não mexe no disfarce
+    sfx('batida');
+  },
+
+  atualizaBatalha: function (dt) {
+    var b = this.batalha, i, n;
+    b.t += dt;
+
+    // a batida da caixinha continua tocando por baixo
+    if (this.rimador) { this.rimador.batida += dt; this.rimador.a.anima(dt, true); }
+
+    /* uma direção vale quando é apertada, não enquanto está apertada:
+       segurar pra esquerda não pode varrer a pista inteira */
+    for (i = 0; i < 4; i++) {
+      var d = BATALHA_DIRS[i];
+      var agora = !!Ctrl[d];
+      if (agora && !b.ant[d]) this.bateNota(i);
+      b.ant[d] = agora;
+    }
+
+    // sílaba que passou da janela sem ser tocada é erro
+    for (i = 0; i < b.notas.length; i++) {
+      n = b.notas[i];
+      if (!n.feita && !n.errada && b.t > n.t + b.janela) {
+        n.errada = true; b.erros++; b.combo = 0;
+      }
+    }
+    if (b.t > b.dur) this.fimDaBatalha();
+  },
+
+  bateNota: function (lane) {
+    var b = this.batalha, melhor = null, dist = 1e9;
+    for (var i = 0; i < b.notas.length; i++) {
+      var n = b.notas[i];
+      if (n.feita || n.errada || n.lane !== lane) continue;
+      var d = Math.abs(n.t - b.t);
+      if (d < dist) { dist = d; melhor = n; }
+    }
+    if (melhor && dist <= b.janela) {
+      melhor.feita = true;
+      b.acertos++; b.combo++;
+      if (b.combo > b.maiorCombo) b.maiorCombo = b.combo;
+      sfx('catraca');
+    } else {
+      b.erros++; b.combo = 0;
+      sfx('nao');
+    }
+  },
+
+  fimDaBatalha: function () {
+    var b = this.batalha, self = this;
+    var total = Math.max(1, b.acertos + b.erros);
+    var taxa = b.acertos / total;
+    this.batalha = null;
+    this.centro.setText('');
+    this.centro.setY(232).setCor(PAL.branco);
+    for (var q = 0; q < 4; q++) this.setasBatalha[q].setVisible(false);
+    GameState.stats.causos++;
+
+    var texto, cor;
+    if (taxa >= 0.7) {
+      var troco = 2 + Math.round(b.maiorCombo / 6);
+      GameState.addCarisma(12); GameState.ganhar(troco);
+      texto = 'O VAGÃO VEIO ABAIXO.\n' + b.acertos + ' de ' + total + ', combo ' + b.maiorCombo +
+        '.\nA galera te deu R$ ' + troco.toFixed(2).replace('.', ',') + '.';
+      cor = PAL.verde; sfx('vitoria');
+    } else if (taxa >= 0.45) {
+      GameState.addCarisma(4);
+      texto = 'EMPATE TÉCNICO.\n' + b.acertos + ' de ' + total + '.\nEle respeitou.';
+      cor = PAL.amarelo; sfx('ok');
+    } else {
+      GameState.addCarisma(-7);
+      texto = 'ELE TE ATROPELOU.\n' + b.acertos + ' de ' + total + '.\nO vagão inteiro riu.';
+      cor = PAL.vermelho; sfx('erro');
+    }
+    fala(this, texto, [{ label: 'Ir embora', cb: function () { self.saiRimador(); } }]);
+  },
+
+  /* as quatro pistas, as sílabas caindo e a linha de acerto */
+  pintaBatalha: function (g) {
+    var b = this.batalha, i, n, cx;
+    caixa(g, 40, 150, GW - 80, 380, 0xf2c14e);
+
+    for (i = 0; i < 4; i++) {
+      cx = batalhaX(i);
+      g.fillStyle(0x000000, 0.3).fillRect(cx - 24, BAT_TOPO, 48, BAT_LINHA - BAT_TOPO + 16);
+      // caixa de acerto: é onde a sílaba tem que estar quando você aperta
+      var viva = b.ant[BATALHA_DIRS[i]];
+      g.fillStyle(BATALHA_CORES[i], viva ? 0.7 : 0.28).fillRect(cx - 24, BAT_LINHA, 48, 16);
+      g.lineStyle(2, BATALHA_CORES[i], 0.9).strokeRect(cx - 24, BAT_LINHA, 48, 16);
+      this.setasBatalha[i].setVisible(true).setTint(viva ? 0xffffff : 0x8b90a6);
+    }
+
+    for (i = 0; i < b.notas.length; i++) {
+      n = b.notas[i];
+      if (n.feita || n.errada) continue;
+      var p = 1 - (n.t - b.t) / b.queda;
+      if (p < 0 || p > 1.1) continue;
+      var y = BAT_TOPO + p * (BAT_LINHA - BAT_TOPO);
+      cx = batalhaX(n.lane);
+      g.fillStyle(BATALHA_CORES[n.lane], 1).fillRect(cx - 20, y, 40, 13);
+      g.fillStyle(0xffffff, 0.5).fillRect(cx - 20, y, 40, 3);
+      g.fillStyle(0x08080e, 0.55).fillRect(cx - 20, y + 10, 40, 3);
+    }
+
+    barra(g, 52, 504, GW - 104, 8, b.t / b.dur, 0xf2c14e, 0x1e1e2a);
+    // o placar mora no alto do painel: embaixo ele tapava as setas do meio
+    this.centro.setY(152).setCor(b.combo >= 4 ? PAL.verde : PAL.branco)
+      .setText(b.combo >= 2 ? 'COMBO ' + b.combo
+        : (b.acertos + b.erros ? b.acertos + ' DE ' + (b.acertos + b.erros) : 'MANDA!'));
+  },
+
+  /* ---------- corrida pelo banco ----------
+     Sentar era só chegar perto e apertar: o banco vago esperava por
+     você. No vagão de verdade o banco vago tem dono em dois segundos —
+     e é justamente na parada, quando alguém desce, que a disputa
+     acontece.
+
+     Não precisou de mecânica nova: é um passageiro com vontade, andando
+     pro mesmo lugar, usando a mesma física de corpo que já empurra todo
+     mundo. Quem chegar primeiro senta. Perder não tira nada de você —
+     só te deixa em pé, que já é o castigo. */
+  sorteiaCorrida: function () {
+    if (this.sentadoEm || this.corrida) return;
+    var livres = [], i;
+    for (i = 0; i < this.bancos.length; i++) if (!this.bancos[i].npc) livres.push(this.bancos[i]);
+    if (!livres.length || !this.npcExtra.length) return;
+    if (Math.random() > 0.55) return;
+
+    var b = livres[Math.floor(Math.random() * livres.length)];
+    // escolhe quem disputa: o passageiro em pé mais perto do banco
+    var quem = null, melhor = 1e9;
+    for (i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active) continue;
+      var d = Math.abs(a.sp.x - b.x) + Math.abs(a.sp.y - (b.y + 24));
+      if (d < melhor) { melhor = d; quem = a; }
+    }
+    if (!quem) return;
+    // se ele já está em cima do banco não é corrida, é sorte dele
+    if (melhor < 40) return;
+    this.corrida = { b: b, a: quem, t: 0 };
+    quem.fixo = false;
+    this.flash('CORRA PRO BANCO');
+  },
+
+  atualizaCorrida: function (dt) {
+    var c = this.corrida;
+    if (!c) return;
+    var a = c.a;
+    // acabou: alguém sentou, o passageiro sumiu, ou o trem parou de novo
+    if (!a.sp || !a.sp.active || c.b.npc || this.sentadoEm === c.b) { this.encerraCorrida(); return; }
+    c.t += dt;
+    if (c.t > 9000) { this.encerraCorrida(); return; }
+
+    var alvoX = c.b.x, alvoY = c.b.y + 24;
+    var dx = alvoX - a.sp.x, dy = alvoY - a.sp.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 6) {                       // chegou: senta e a corrida acabou
+      a.sp.x = alvoX; a.sp.y = alvoY;
+      a.dir = alvoX < 160 ? 'sentadoR' : 'sentadoL';
+      a.sp.setDepth(30); a.fixo = true;
+      sentaAnimado(a);
+      c.b.npc = a;
+      var k = this.npcExtra.indexOf(a);
+      if (k >= 0) this.npcExtra.splice(k, 1);
+      this.corrida = null;
+      sfx('nao');
+      this.flash('SENTARAM NO SEU LUGAR');
+      return;
+    }
+    var vel = (46 + GameState.dificuldade() * 7) * dt / 1000;
+    a.sp.x += (dx / d) * vel;
+    a.sp.y += (dy / d) * vel;
+    a.setDir(dx, dy);
+    a.anima(dt, true);
+  },
+
+  encerraCorrida: function () {
+    if (!this.corrida) return;
+    var a = this.corrida.a;
+    if (a && a.sp && a.sp.active && !a.fixo) sentaAnimado(a);
+    this.corrida = null;
+  },
+
   /* Antes uma cena de vagão era uma estação, e cabia certinho um evento
      e um dilema por cena. Agora a cena é a perna inteira, quinze
      estações: com a mesma regra sairia um ambulante por estação e o
@@ -845,7 +1092,9 @@ var VagaoScene = new Phaser.Class({
 
     var virou = GameState.avancaTrem();
     var aqui = GameState.estacaoAtual();
+    this.encerraCorrida();
     this.trocaPassageiros();
+    this.sorteiaCorrida();
     if (virou) {
       // ficou no trem até a ponta da linha: ele volta, e o desvio custa
       GameState.passaTempo(4);
@@ -899,6 +1148,7 @@ var VagaoScene = new Phaser.Class({
     var dt = Math.min(delta, 50);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
+    if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
     if (this.disfarce) { this.atualizaDisfarce(dt); this.pintaUI(); return; }
 
     this.t += dt;
@@ -955,6 +1205,7 @@ var VagaoScene = new Phaser.Class({
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
+    this.atualizaCorrida(dt);
     this.animaGente(dt);
     this.animaRimador(dt);
     this.pintaCaixinha();
@@ -1026,6 +1277,15 @@ var VagaoScene = new Phaser.Class({
   pintaUI: function () {
     var g = this.gUI; g.clear();
 
+    // o banco em disputa pisca: correr sem saber pra onde não é corrida
+    if (this.corrida) {
+      var b = this.corrida.b;
+      var pulso = 0.35 + 0.3 * Math.sin(this.corrida.t / 110);
+      g.lineStyle(2, 0xf2c14e, pulso);
+      g.strokeRect(b.x - 13, b.y - 4, 26, BAIA_COMP - 8);
+      g.fillStyle(0xf2c14e, pulso).fillRect(b.x - 3, b.y - 12, 6, 5);
+    }
+
     if (this.estado === 'andando') {
       barra(g, 8, HUD_H + 25, GW - 16, 8, this.t / this.duracao, GameState.linhaAtual().num, 0x15151f);
     }
@@ -1045,5 +1305,7 @@ var VagaoScene = new Phaser.Class({
       caixa(g, 40, 192, 240, 92, 0xe8a33c);
       barra(g, 52, 256, 216, 14, this.disfarce.suspeita / 100, 0xe8362c, 0x1e1e2a);
     }
+
+    if (this.batalha) this.pintaBatalha(g);
   }
 });
