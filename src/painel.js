@@ -44,6 +44,7 @@
       '<div class="tecla"><b>W A S D</b><span>andar</span></div>' +
       '<div class="tecla"><b>ESPAÇO</b><span>o mesmo que clicar</span></div>' +
       '<div class="tecla"><b>X</b><span>voltar</span></div>' +
+      '<div class="tecla"><b>ARRASTAR</b><span>andar sem tirar do mouse</span></div>' +
       '<div class="obs">segurar o clique conta como segurar. ' +
       'setas, Z e enter também valem</div></div>' +
       '<div class="bloco"><h2>CONFIGURAÇÕES</h2>' +

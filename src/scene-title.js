@@ -15,39 +15,39 @@ var TitleScene = new Phaser.Class({
     g.fillStyle(num(PAL.bg), 1).fillRect(0, 0, GW, GH);
     pontilhado(g, 0, 0, GW, GH, 0xffffff, 0.03, 8);
 
-    /* a tela é uma pilha só, medida a partir do que sobra: com o
-       direcional ocupando o rodapé o espaço encolhe, e cada bloco
-       encolhe junto em vez de um texto ir parar em cima do outro. */
-    var yb = GH - alturaControles();
-    var largo = (yb >= 520);
+    /* a tela é uma pilha só, medida de cima pra baixo. Havia aqui uma
+       versão apertada de tudo, pro caso do direcional fixo comer o
+       rodapé; o manche flutuante não come nada, então sobrou uma
+       medida só, a folgada, e ela vale no celular também. */
+    var yb = GH;
     var y = 44;
 
     // placa de estação com o nome do jogo
-    var altPlaca = largo ? 104 : 80;
+    var altPlaca = 104;
     g.fillStyle(0x06060c, 1).fillRect(0, y, GW, altPlaca);
     g.fillStyle(0x0b5fae, 1).fillRect(0, y, GW, 8);
     g.fillStyle(num(clarear('#0b5fae', 0.4)), 1).fillRect(0, y, GW, 2);
     g.fillStyle(0xe8362c, 1).fillRect(0, y + altPlaca - 8, GW, 8);
     g.fillStyle(num(clarear('#e8362c', 0.4)), 1).fillRect(0, y + altPlaca - 8, GW, 2);
-    txtC(this, GW / 2, y + (largo ? 22 : 10), 'CATRACA', PAL.branco, largo ? 24 : 16);
-    txtC(this, GW / 2, y + altPlaca - (largo ? 26 : 24), 'METRÔ DE SÃO PAULO', PAL.cinza, 8);
-    y += altPlaca + (largo ? 20 : 10);
+    txtC(this, GW / 2, y + 22, 'CATRACA', PAL.branco, 24);
+    txtC(this, GW / 2, y + altPlaca - 26, 'METRÔ DE SÃO PAULO', PAL.cinza, 8);
+    y += altPlaca + 20;
 
     /* Os quatro na tela, clicáveis. Antes só dava pra trocar de
        personagem com as setas — quem jogava de mouse clicava uma vez e
        já começava como o primeiro da fila, sem nunca descobrir que
        havia escolha. */
     txtC(this, GW / 2, y, 'ESCOLHA QUEM VOCÊ É', PAL.cinzaEsc, 8);
-    y += largo ? 26 : 22;
+    y += 26;
 
-    var cardW = 66, cardH = largo ? 96 : 70, vao = 6;
+    var cardW = 66, cardH = 96, vao = 6;
     var x0 = Math.round((GW - (cardW * 4 + vao * 3)) / 2);
     this.gCards = this.add.graphics().setDepth(1);
     this.cards = [];
     for (var i = 0; i < this.ordem.length; i++) {
       var cx = x0 + i * (cardW + vao);
-      var sp = this.add.sprite(cx + cardW / 2, y + cardH - (largo ? 12 : 10),
-        'ch_' + this.ordem[i], 0).setOrigin(0.5, 1).setScale(largo ? 1.5 : 1.2).setDepth(2);
+      var sp = this.add.sprite(cx + cardW / 2, y + cardH - 12,
+        'ch_' + this.ordem[i], 0).setOrigin(0.5, 1).setScale(1.5).setDepth(2);
       this.cards.push({ x: cx, y: y, w: cardW, h: cardH, sp: sp });
 
       // a zona clicável avisa a cena pra escolher em vez de começar
@@ -60,16 +60,16 @@ var TitleScene = new Phaser.Class({
       })(this, i);
     }
     this.cardY = y; this.cardH = cardH;
-    y += cardH + (largo ? 14 : 10);
+    y += cardH + 14;
 
     this.tNome = txtC(this, GW / 2, y, '', PAL.amarelo, 16);
-    y += largo ? 42 : 40;
+    y += 42;
     this.tDesc = txtC(this, GW / 2, y, '', PAL.cinza, 8);
     this.tDesc.setWordWrapWidth(GW - 56).setAlign('center');
-    y += largo ? 54 : 52;      // duas linhas de 24 e uma folga
+    y += 54;      // duas linhas de 24 e uma folga
 
     // ficha do personagem: rótulo à esquerda, número à direita
-    var passo = largo ? 19 : 17;
+    var passo = 19;
     this.fichaVal = [];
     var rotulos = ['GRANA', 'TARIFA', 'CARISMA', 'DESCANSO'];
     for (var i = 0; i < 4; i++) {
@@ -78,13 +78,15 @@ var TitleScene = new Phaser.Class({
       this.fichaVal.push(txt(this, GW - 62, fy, '', PAL.branco, 8).setOrigin(1, 0));
     }
 
-    /* no celular a tela não tem essa linha de sobra, e o rótulo em cima
-       das cartas com o dedo na mão já basta */
-    if (largo) txtC(this, GW / 2, yb - 96, 'CLIQUE NUM DELES', PAL.cinzaEsc, 8);
-    this.tStart = txtC(this, GW / 2, yb - (largo ? 68 : 56),
-      TOQUE_ATIVO ? 'TOQUE NO OK PRA COMEÇAR' : 'CLIQUE FORA PRA COMEÇAR', PAL.verde, 8);
+    /* como não há mais direcional na tela, é aqui que a pessoa
+       descobre que arrastar anda — é a única instrução que o jogo
+       precisa dar, e ela cabe numa linha */
+    txtC(this, GW / 2, yb - 88,
+      TOQUE_ATIVO ? 'ARRASTE PRA ANDAR' : 'CLIQUE NUM DELES', PAL.cinzaEsc, 8);
+    this.tStart = txtC(this, GW / 2, yb - 60,
+      TOQUE_ATIVO ? 'TOQUE FORA PRA COMEÇAR' : 'CLIQUE FORA PRA COMEÇAR', PAL.verde, 8);
     this.tweens.add({ targets: this.tStart, alpha: 0.25, duration: 600, yoyo: true, repeat: -1 });
-    txtC(this, GW / 2, yb - (largo ? 36 : 28),
+    txtC(this, GW / 2, yb - 28,
       'RECORDE: ' + GameState.recorde() + ' ESTAÇÕES', PAL.cinzaEsc, 8);
 
     this.atualiza();

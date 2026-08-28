@@ -847,6 +847,54 @@ function sfx(n) {
    Sem guardar o pulso, o dedo aperta e o jogo não vê nada. */
 var TOUCH = { up: false, down: false, left: false, right: false, act: false, pulso: false };
 var TOQUE_ATIVO = false;
+
+/* ---------- manche flutuante ----------
+   O direcional fixo comia 108px do rodapé — quase um quinto da tela — e
+   ficava aceso mesmo sem ninguém encostar, bem em cima da multidão. Aqui
+   não há nada desenhado até o dedo tocar: onde ele tocar nasce o manche,
+   e ele some quando o dedo sai. A tela inteira volta a ser jogo.
+
+   Encostar e ficar parado é agir; encostar e arrastar é andar. Como um
+   toque curto pode nascer e morrer dentro do mesmo quadro, quem confirma
+   o toque rápido é a soltura, não o começo — e é por isso também que
+   agir só vale depois de uma espera curta: sem ela, todo começo de
+   caminhada dispararia um agir antes de o dedo sair do lugar. */
+var TOQUE = {
+  ativo: false, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
+};
+var MANCHE = {
+  zonaMorta: 10,   // menos que isso é dedo tremendo, não direção
+  raio: 26,        // passou daqui, o manche desliza junto com o dedo
+  espera: 120,     // parado por esse tempo vira "segurando pra agir"
+  diagonal: 0.45   // o eixo fraco precisa disso do forte pra também contar
+};
+
+function atualizaManche(agora) {
+  TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = TOUCH.act = false;
+  if (!TOQUE.ativo) return;
+
+  var dx = TOQUE.x - TOQUE.ox, dy = TOQUE.y - TOQUE.oy;
+  var d = Math.sqrt(dx * dx + dy * dy);
+
+  /* onde não há pra onde andar (título, resultado) o arrasto não vira
+     direção nenhuma: lá o dedo encostado é só o botão de agir */
+  if (!CONTROLES_VISIVEIS || d <= MANCHE.zonaMorta) {
+    TOQUE.dx = TOQUE.dy = 0;
+    if (!TOQUE.arrastando && agora - TOQUE.t0 > MANCHE.espera) TOUCH.act = true;
+    return;
+  }
+
+  TOQUE.arrastando = true;
+  if (d > MANCHE.raio) {                       // o dedo puxa a base junto
+    var k = (d - MANCHE.raio) / d;
+    TOQUE.ox += dx * k; TOQUE.oy += dy * k;
+    dx = TOQUE.x - TOQUE.ox; dy = TOQUE.y - TOQUE.oy;
+  }
+  var ax = Math.abs(dx), ay = Math.abs(dy), forte = Math.max(ax, ay);
+  if (ax >= forte * MANCHE.diagonal) TOUCH[dx < 0 ? 'left' : 'right'] = true;
+  if (ay >= forte * MANCHE.diagonal) TOUCH[dy < 0 ? 'up' : 'down'] = true;
+  TOQUE.dx = dx; TOQUE.dy = dy;
+}
 /* O HUD e o direcional não servem em toda tela: no título não tem
    medidor pra mostrar, e no resultado o direcional não leva a lugar
    nenhum — lá o toque em qualquer lugar já é o Z. Esconder o que não
@@ -858,7 +906,6 @@ var CONTROLES_VISIVEIS = true;
    mas o nome dele não: quem está no computador clica, quem está no
    celular toca. A dica na tela fala a língua do aparelho. */
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
-function alturaControles() { return (TOQUE_ATIVO && CONTROLES_VISIVEIS) ? 108 : 0; }
 
 var Ctrl = {
   up: false, down: false, left: false, right: false,
@@ -882,6 +929,22 @@ var Ctrl = {
     TOUCH.pulso = false;
     var b = k.X.isDown || k.ESC.isDown;
     this.backJust = b && !this._pb; this._pb = b; this.back = b;
+  },
+
+  /* o disfarce quer uma direção só. No teclado a ordem das teclas
+     resolve; no manche quem manda é o eixo mais puxado, senão uma
+     diagonal involuntária vira resposta errada. */
+  dirDominante: function () {
+    if (TOQUE.arrastando && (TOQUE.dx || TOQUE.dy)) {
+      return Math.abs(TOQUE.dx) >= Math.abs(TOQUE.dy)
+        ? (TOQUE.dx < 0 ? 'left' : 'right')
+        : (TOQUE.dy < 0 ? 'up' : 'down');
+    }
+    if (this.up) return 'up';
+    if (this.down) return 'down';
+    if (this.left) return 'left';
+    if (this.right) return 'right';
+    return null;
   }
 };
 
@@ -1141,7 +1204,7 @@ Plaqueta.prototype.setFilete = function (c) {
    É ela que dá o chão pro texto e tira a sensação de letra jogada. */
 function FaixaDica(scene, depth) {
   var d = (depth === undefined) ? 860 : depth;
-  this.y = GH - 32 - alturaControles();
+  this.y = GH - 32;
   this.g = scene.add.graphics().setDepth(d);
   this.t = txtC(scene, GW / 2, this.y + 6, '', PAL.amarelo, 8).setDepth(d + 1);
   this.setText('');
@@ -1233,7 +1296,7 @@ function Dialog(scene, texto, opcoes, cfg) {
   var hTexto = Math.max(48, Math.round(this.tTexto.height));
 
   var alt = 28 + hTexto + this.opcoes.length * 24 + (this.tempo ? 20 : 0);
-  var y = GH - alt - 12 - alturaControles();
+  var y = GH - alt - 12;
   this.g = scene.add.graphics().setDepth(900);
   caixa(this.g, 8, y, GW - 16, alt, cfg.cor === undefined ? 0xf2f0ff : cfg.cor);
   this.y = y; this.alt = alt;
@@ -1316,66 +1379,47 @@ var HudScene = new Phaser.Class({
     this.montaToque();
   },
 
-  /* os controles precisam existir em toda tela, inclusive no título,
-     por isso esta cena sobe junto com o jogo e nunca é desligada */
+  /* o toque precisa existir em toda tela, inclusive no título, por isso
+     esta cena sobe junto com o jogo e nunca é desligada */
   montaToque: function () {
-    var self = this;
     TOQUE_ATIVO = this.sys.game.device.input.touch;
+    var self = this;
 
-    this.input.on('pointerdown', function (p) { self.toque(p); TOUCH.pulso = true; });
-    this.input.on('pointermove', function (p) { if (p.isDown) self.toque(p); });
+    this.input.on('pointerdown', function (p) {
+      TOQUE.ativo = true; TOQUE.arrastando = false;
+      TOQUE.ox = TOQUE.x = p.x; TOQUE.oy = TOQUE.y = p.y;
+      TOQUE.dx = TOQUE.dy = 0;
+      TOQUE.t0 = self.time.now;
+    });
+    this.input.on('pointermove', function (p) {
+      if (!p.isDown || !TOQUE.ativo) return;
+      TOQUE.x = p.x; TOQUE.y = p.y;
+    });
     this.input.on('pointerup', function () {
+      /* quem confirma o toque curto é a soltura: se o dedo saiu sem ter
+         andado, era um toque, mesmo que tenha durado menos que um quadro */
+      if (TOQUE.ativo && !TOQUE.arrastando) TOUCH.pulso = true;
+      TOQUE.ativo = false; TOQUE.arrastando = false;
       TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = TOUCH.act = false;
     });
 
-    if (!TOQUE_ATIVO) return;
-
-    var bx = 68, by = GH - 60, d = 36;
-    this.bx = bx; this.by = by; this.d = d;
-    this.zonas = [
-      { x: bx, y: by - d, k: 'up' }, { x: bx, y: by + d, k: 'down' },
-      { x: bx - d, y: by, k: 'left' }, { x: bx + d, y: by, k: 'right' }
-    ];
-    this.raio = 30;
-
-    var gd = this.add.graphics().setDepth(1200);
-    this.gControles = gd;
-    gd.fillStyle(0x08080e, 0.5).fillRect(0, GH - alturaControles(), GW, alturaControles());
-    gd.fillStyle(0xf2f0ff, 0.42);
-    gd.fillRect(bx - 16, by - d - 18, 33, 33);
-    gd.fillRect(bx - 16, by + d - 15, 33, 33);
-    gd.fillRect(bx - d - 18, by - 16, 33, 33);
-    gd.fillRect(bx + d - 15, by - 16, 33, 33);
-    gd.fillStyle(0x08080e, 0.65);
-    gd.fillTriangle(bx, by - d - 10, bx - 8, by - d + 6, bx + 8, by - d + 6);
-    gd.fillTriangle(bx, by + d + 10, bx - 8, by + d - 6, bx + 8, by + d - 6);
-    gd.fillTriangle(bx - d - 10, by, bx - d + 6, by - 8, bx - d + 6, by + 8);
-    gd.fillTriangle(bx + d + 10, by, bx + d - 6, by - 8, bx + d - 6, by + 8);
-    gd.fillStyle(0x00e676, 0.45).fillCircle(GW - 66, GH - 56, 36);
-    gd.fillStyle(0x00e676, 0.25).fillCircle(GW - 66, GH - 56, 44);
-    this.tZ = txtC(this, GW - 66, GH - 66, 'OK', PAL.branco, 16).setDepth(1201).setAlpha(0.85);
+    this.gManche = this.add.graphics().setDepth(1200);
   },
 
-  toque: function (p) {
-    TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = false;
-    var noDpad = false;
-    if (this.zonas && CONTROLES_VISIVEIS) {
-      for (var i = 0; i < this.zonas.length; i++) {
-        var z = this.zonas[i];
-        if (Math.abs(p.x - z.x) < this.raio && Math.abs(p.y - z.y) < this.raio) {
-          TOUCH[z.k] = true; noDpad = true;
-        }
-      }
+  update: function (time) {
+    atualizaManche(time);
+
+    /* o manche só existe enquanto o dedo está arrastando: parado na tela,
+       nada é desenhado, e é isso que devolve o rodapé pro jogo */
+    var m = this.gManche; m.clear();
+    if (TOQUE.ativo && TOQUE.arrastando && CONTROLES_VISIVEIS) {
+      m.fillStyle(0x08080e, 0.3).fillCircle(TOQUE.ox, TOQUE.oy, MANCHE.raio + 7);
+      m.lineStyle(2, 0xf2f0ff, 0.2).strokeCircle(TOQUE.ox, TOQUE.oy, MANCHE.raio);
+      m.fillStyle(0xf2f0ff, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 9);
+      m.fillStyle(0x08080e, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 3);
     }
-    TOUCH.act = !noDpad;
-  },
 
-  update: function () {
     var g = this.g; g.clear();
-    if (this.gControles) {
-      this.gControles.setVisible(CONTROLES_VISIVEIS);
-      this.tZ.setVisible(CONTROLES_VISIVEIS);
-    }
     var temJogo = !!GameState.char && HUD_VISIVEL;
     this.tEst.setVisible(temJogo); this.tNum.setVisible(temJogo);
     this.tGrana.setVisible(temJogo); this.tCar.setVisible(temJogo); this.tDes.setVisible(temJogo);

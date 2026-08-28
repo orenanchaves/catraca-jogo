@@ -453,10 +453,8 @@ var VagaoScene = new Phaser.Class({
     if (d.olhar) {
       d.olharT += dt;
       var acertou = false, errou = false;
-      if (Ctrl.up || Ctrl.down || Ctrl.left || Ctrl.right) {
-        var p = Ctrl.up ? 'up' : (Ctrl.down ? 'down' : (Ctrl.left ? 'left' : 'right'));
-        if (p === d.olhar) acertou = true; else errou = true;
-      }
+      var p = Ctrl.dirDominante();
+      if (p) { if (p === d.olhar) acertou = true; else errou = true; }
       if (acertou) { d.suspeita -= 16; d.olhar = null; d.proxOlhar = 700 + Math.random() * 900; d.olharT = 0; sfx('catraca'); }
       else if (errou || d.olharT > Math.max(450, 950 - dif * 60)) {
         d.suspeita += 22; d.olhar = null; d.proxOlhar = 800 + Math.random() * 900; d.olharT = 0; sfx('nao');
