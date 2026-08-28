@@ -19,6 +19,26 @@ function sentaAnimado(a) {
   a.proxOlhada = 2200 + Math.random() * 4500;
 }
 
+/* ---------- o repertório do rimador ----------
+   Ele fecha citando quem está jogando, e é por isso que "ele te citou
+   na rima" faz sentido depois: a rima citou mesmo. Nome de papel, não
+   pronome — o jogo nunca disse o gênero de ninguém. */
+/* Duas linhas, nenhuma passando de 22 caracteres: na largura da tela
+   isso é o limite antes de a placa quebrar em três e ir parar em cima
+   do aviso de solavanco. */
+var VERSOS_RIMADOR = [
+  'LICENÇA, SENHORAS\nE SENHORES',
+  'NÃO É ESMOLA NÃO,\nÉ TRABALHO NA LINHA',
+  null,                                  // aqui entra o verso do personagem
+  'GOSTOU, COLABORA.\nNÃO GOSTOU, DESCULPA'
+];
+var VERSO_DO_JOGADOR = {
+  estudante: 'O ESTUDANTE PAGA MEIA\nE CARREGA O MUNDO',
+  clt: 'O CLT ACORDA CEDO\nPRA CHEGAR ATRASADO',
+  senhor: 'ESSE AÍ NÃO PAGA:\nJÁ PAGOU A VIDA TODA',
+  ambulante: 'ESSE AÍ É DA ÁREA,\nRESPEITO ENTRE COLEGA'
+};
+
 /* o corredor do vagão, entre os bancos */
 function limitaVagao(sp) {
   sp.x = Phaser.Math.Clamp(sp.x, 70, 250);
@@ -54,7 +74,14 @@ var VagaoScene = new Phaser.Class({
     this.pl.sp.setDepth(60);
     this.pl.dir = 'up';
 
+    // a caixinha fica no chão à frente dele: desenha por cima de quem a
+    // largou, por baixo de quem está jogando
+    this.gCaixa = this.add.graphics().setDepth(57);
+    this.rimador = null;
+    this.encena = false;
+
     this.gUI = this.add.graphics().setDepth(500);
+    this.rima = new Plaqueta(this, GW / 2, 104, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
@@ -295,6 +322,148 @@ var VagaoScene = new Phaser.Class({
     a.anima(dt, false);
   },
 
+  /* ---------- o rimador ----------
+     Antes ele era uma linha de diálogo: "O rimador começa." Só que o
+     rimador do metrô tem um ritual, e o ritual é metade da graça — ele
+     atravessa o corredor, escolhe o lugar, agacha, põe a caixinha no
+     chão, liga, e só então abre a boca. Pular isso é contar a piada
+     sem a pausa.
+
+     E nada disso é caixa de diálogo: a cena continua rodando enquanto
+     ele monta o barraco, então dá pra andar, sentar ou sair de perto
+     antes de ele terminar. A escolha só aparece depois da última rima,
+     que é quando a pessoa já decidiu se vai fingir que dorme. */
+  comecaRimador: function () {
+    this.encena = true;
+    var lado = (this.pl.sp.x < 160) ? 1 : -1;      // arma do lado oposto ao seu
+    var x = 160 + lado * 24;
+    var a = new Ator(this, x, 92, 'np_rimador');
+    a.dir = 'down';
+    a.sp.setDepth(56);
+    a.fixo = true;                                  // ninguém empurra quem trabalha
+    this.gente.push(a);
+    this.rimador = {
+      a: a, lado: lado, alvo: 296, fase: 'entra', t: 0,
+      verso: -1, batida: 0, caixa: false, caixaX: x - lado * 26, caixaY: 302
+    };
+    sfx('porta');
+  },
+
+  animaRimador: function (dt) {
+    var r = this.rimador;
+    if (!r) return;
+    r.t += dt;
+    var a = r.a;
+
+    if (r.fase === 'entra') {
+      a.sp.y = Math.min(r.alvo, a.sp.y + 0.075 * dt);
+      a.anima(dt, true);
+      if (a.sp.y >= r.alvo) { r.fase = 'abaixa'; r.t = 0; }
+
+    } else if (r.fase === 'abaixa') {
+      // vira pro lado da caixa e dobra o joelho antes de largar
+      a.dir = r.lado > 0 ? 'left' : 'right';
+      a.sp.y = r.alvo + Math.min(3, r.t / 130);
+      a.anima(dt, false);
+      if (r.t > 440) {
+        r.fase = 'liga'; r.t = 0; r.caixa = true;
+        a.sp.y = r.alvo;
+        sfx('caixa');
+      }
+
+    } else if (r.fase === 'liga') {
+      a.anima(dt, false);
+      if (r.t > 520) { r.fase = 'rima'; r.t = 99999; a.dir = 'down'; }
+
+    } else if (r.fase === 'rima') {
+      r.batida += dt;
+      // rebolado no ritmo: sobe e desce no compasso da caixinha
+      a.sp.y = r.alvo - Math.abs(Math.sin(r.batida / 240)) * 2;
+      a.anima(dt, true);
+      if (r.t > 1500) {
+        r.t = 0; r.verso++;
+        if (r.verso >= VERSOS_RIMADOR.length) { this.fechaRimador(); return; }
+        this.rima.setText(VERSOS_RIMADOR[r.verso] || VERSO_DO_JOGADOR[GameState.charKey]);
+        sfx('batida');
+      }
+
+    } else if (r.fase === 'sai') {
+      a.sp.y += 0.08 * dt;
+      a.dir = 'down';
+      a.anima(dt, true);
+      if (a.sp.y > GH + 60) {
+        var i = this.gente.indexOf(a);
+        if (i >= 0) this.gente.splice(i, 1);
+        a.destroy();
+        this.rimador = null;
+      }
+    }
+  },
+
+  /* a caixinha no chão: corpo, dois alto-falantes, o LED e as ondas,
+     que só saem enquanto ele está rimando */
+  pintaCaixinha: function () {
+    var g = this.gCaixa; g.clear();
+    var r = this.rimador;
+    if (!r || !r.caixa) return;
+    var x = r.caixaX, y = r.caixaY;
+    var tocando = (r.fase === 'rima' || r.fase === 'espera');
+
+    g.fillStyle(0x000000, 0.35).fillEllipse(x, y + 1, 24, 7);
+    g.fillStyle(0x3a3a4e, 1).fillRect(x - 5, y - 14, 10, 2);     // alça
+    g.fillStyle(0x14141c, 1).fillRect(x - 10, y - 12, 20, 12);   // corpo
+    g.fillStyle(0x2e2e40, 1).fillRect(x - 10, y - 12, 20, 2);
+    g.fillStyle(0x08080e, 1).fillRect(x - 10, y - 2, 20, 2);
+    for (var i = 0; i < 2; i++) {
+      var cx = x - 5 + i * 10;
+      g.fillStyle(0x08080e, 1).fillCircle(cx, y - 6, 3);
+      g.fillStyle(tocando ? 0x454560 : 0x22222e, 1).fillCircle(cx, y - 6, 2);
+    }
+    g.fillStyle(tocando ? 0xe8362c : 0x3a1a18, 1).fillRect(x - 1, y - 10, 2, 2);
+    if (!tocando) return;
+
+    var p = (Math.sin(r.batida / 240) + 1) / 2;
+    for (var k = 1; k <= 2; k++) {
+      g.lineStyle(1, 0xf2c14e, (0.34 - k * 0.09) + 0.18 * p);
+      var raio = 13 + k * 6 + p * 2;
+      g.beginPath(); g.arc(x, y - 6, raio, -0.85, 0.85); g.strokePath();
+      g.beginPath(); g.arc(x, y - 6, raio, Math.PI - 0.85, Math.PI + 0.85); g.strokePath();
+    }
+  },
+
+  /* a escolha só entra depois da última rima */
+  fechaRimador: function () {
+    var self = this;
+    this.rimador.fase = 'espera';
+    this.rima.setText('');
+    fala(this, 'Ele encerra e passa o chapéu.', [
+      {
+        label: 'Dar uma moeda (R$ 1,00)', cb: function () {
+          if (GameState.dinheiro < 1) { sfx('nao'); self.flash('Nem moeda você tem.'); return; }
+          GameState.gastar(1); GameState.addCarisma(6); GameState.stats.causos++;
+          sfx('moeda'); self.flash('Ele agradeceu pelo nome.');
+          self.saiRimador();
+        }
+      },
+      {
+        label: 'Fingir que dorme', cb: function () {
+          GameState.addCarisma(-4); GameState.stats.causos++;
+          self.flash('Ele rimou com a sua cara.');
+          self.saiRimador();
+        }
+      }
+    ], { tempo: 7, aoExpirar: function () { GameState.addCarisma(-1); self.saiRimador(); } });
+  },
+
+  /* pega a caixinha de volta e segue pro próximo vagão */
+  saiRimador: function () {
+    this.encena = false;
+    if (!this.rimador) return;
+    this.rimador.caixa = false;
+    this.rimador.fase = 'sai';
+    sfx('caixa');
+  },
+
   flash: function (msg) {
     this.centro.setText(msg);
     var self = this;
@@ -317,23 +486,7 @@ var VagaoScene = new Phaser.Class({
           { label: 'Fazer que não ouviu', cb: function () { GameState.addCarisma(-2); GameState.stats.causos++; } }
         ]);
       },
-      function () {
-        fala(self, 'O rimador começa.\n"Senhoras e senhores, licença..."', [
-          {
-            label: 'Dar uma moeda (R$ 1,00)', cb: function () {
-              if (GameState.dinheiro < 1) { sfx('nao'); self.flash('Nem moeda você tem.'); return; }
-              GameState.gastar(1); GameState.addCarisma(6); GameState.stats.causos++;
-              sfx('moeda'); self.flash('Ele te citou na rima.');
-            }
-          },
-          {
-            label: 'Fingir que dorme', cb: function () {
-              GameState.addCarisma(-4); GameState.stats.causos++;
-              self.flash('Ele rimou com a sua cara.');
-            }
-          }
-        ]);
-      },
+      function () { self.comecaRimador(); },
       function () {
         fala(self, 'Alguém pede ajuda no corredor.', [
           {
@@ -487,6 +640,9 @@ var VagaoScene = new Phaser.Class({
       GameState.addCarisma(-4);
       GameState.stats.disfarcesOk++;
       if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
+    // chegou a estação: o rimador recolhe a caixinha e vai embora também
+    if (this.rimador && this.rimador.fase !== 'sai') { if (this.dialog) this.dialog.fecha(); this.saiRimador(); }
+    this.rima.setText('');
       sfx('ok');
       this.flash('Ele desceu. Você segue sentado.');
     }
@@ -540,7 +696,7 @@ var VagaoScene = new Phaser.Class({
     if (this.estado === 'andando') {
       this.atualizaSolavanco(dt);
       if (!this.eventoFeito && this.t > 3800) { this.eventoFeito = true; this.sorteiaEvento(); this.pintaUI(); return; }
-      if (!this.dilemaFeito && this.t > 9000) { this.dilemaDoLugar(); this.pintaUI(); return; }
+      if (!this.dilemaFeito && !this.encena && this.t > 9000) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
       if (this.t > 6500) {
@@ -570,6 +726,8 @@ var VagaoScene = new Phaser.Class({
     }
 
     this.animaGente(dt);
+    this.animaRimador(dt);
+    this.pintaCaixinha();
     this.pintaUI();
     this.contexto();
   },

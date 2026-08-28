@@ -964,6 +964,8 @@ function sfx(n) {
     case 'apito': tom(2200, .09); setTimeout(function () { tom(2600, .13); }, 90); break;
     case 'trem': tom(65, .6, 'sawtooth', .05); break;
     case 'catraca': tom(880, .04); setTimeout(function () { tom(1320, .06); }, 45); break;
+    case 'caixa': tom(96, .11, 'sine', .09); setTimeout(function () { tom(62, .17, 'sine', .07); }, 60); break;
+    case 'batida': tom(70, .09, 'sine', .09); setTimeout(function () { tom(1300, .03, 'square', .028); }, 95); break;
     case 'erro': tom(200, .1, 'square', .06); setTimeout(function () { tom(120, .22, 'square', .06); }, 100); break;
     case 'fim': [392, 330, 262, 196].forEach(function (f, i) { setTimeout(function () { tom(f, .22, 'triangle', .07); }, i * 160); }); break;
     case 'vitoria': [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tom(f, .14); }, i * 110); }); break;
@@ -1420,7 +1422,10 @@ function Dialog(scene, texto, opcoes, cfg) {
 
   // mede o texto já quebrado e só então desenha a caixa em volta dele
   this.tTexto = txt(scene, 20, -400, texto, PAL.branco, 8).setDepth(901);
-  this.tTexto.setWordWrapWidth(GW - 40);
+  /* com contador, a coluna encolhe: o relógio mora na ponta da primeira
+     linha, e texto que enche a linha passava por baixo dele. O dilema do
+     lugar escapava só porque a primeira linha dele é curta. */
+  this.tTexto.setWordWrapWidth(GW - 40 - (this.tempo ? 30 : 0));
   var hTexto = Math.max(48, Math.round(this.tTexto.height));
 
   var alt = 28 + hTexto + this.opcoes.length * 24 + (this.tempo ? 20 : 0);
