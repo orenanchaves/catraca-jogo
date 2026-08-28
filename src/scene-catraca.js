@@ -6,6 +6,7 @@ var CatracaScene = new Phaser.Class({
   initialize: function CatracaScene() { Phaser.Scene.call(this, { key: 'Catraca' }); },
 
   create: function () {
+    areaDeJogo();
     Ctrl.liga(this);
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
     this.dialog = null;

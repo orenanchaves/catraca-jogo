@@ -12,6 +12,7 @@ var PlataformaScene = new Phaser.Class({
   initialize: function PlataformaScene() { Phaser.Scene.call(this, { key: 'Plataforma' }); },
 
   create: function () {
+    areaDeJogo();
     Ctrl.liga(this);
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
     this.dialog = null;

@@ -1341,6 +1341,26 @@ var CONTROLES_VISIVEIS = true;
 /* O comando de agir é o mesmo em toda parte — clique, toque ou espaço —
    mas o nome dele não: quem está no computador clica, quem está no
    celular toca. A dica na tela fala a língua do aparelho. */
+/* Abaixo desta fração de descanso o jogo passa a dizer, em todo lugar,
+   que a pessoa está caindo de sono: as pálpebras fecham, o medidor
+   muda de cor e o rodapé manda sentar. */
+var LIMIAR_SONO = 0.32;
+
+/* A faixa da tela que as pálpebras podem fechar. Cada cena estreita a
+   sua no create() quando tem placa fixa em cima: dormir escurece o
+   vagão, mas não pode esconder a hora de chegar nem a dica de como
+   sair do sono — perder pra um relógio tapado não é dificuldade.
+
+   O foco é onde as pálpebras se encontram: elas fecham em direção ao
+   aviso do meio da tela, e não ao centro geométrico, senão a fresta
+   sobra num lugar vazio e o recado fica embaixo do preto. */
+var AREA_JOGO = { topo: 0, base: 0, foco: 0 };
+function areaDeJogo(topo, base, foco) {
+  AREA_JOGO.topo = topo || HUD_H;
+  AREA_JOGO.base = base || (GH - 40);
+  AREA_JOGO.foco = foco || Math.round((AREA_JOGO.topo + AREA_JOGO.base) / 2);
+}
+
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
 var Ctrl = {
@@ -1870,6 +1890,7 @@ var HudScene = new Phaser.Class({
     });
 
     this.gManche = this.add.graphics().setDepth(1200);
+    this.gSono = this.add.graphics().setDepth(999);
   },
 
   abrePausa: function () {
@@ -1877,6 +1898,34 @@ var HudScene = new Phaser.Class({
     if (!HUD_VISIVEL && !GameState.char) return;   // no título não há o que pausar
     audioOn();
     this.scene.launch('Pausa');
+  },
+
+  /* ---------- as pálpebras ---------- */
+  /* Dormir era um número que zerava e uma tela de fim de jogo: o
+     jogador só descobria a regra depois de perder por ela. As
+     pálpebras contam a mesma coisa sem texto — quanto menos descanso,
+     mais elas descem, e de vez em quando piscam. Moram no HUD porque é
+     a única cena que fica por cima de todas as outras, e param acima
+     da faixa de dica, que é justamente quem manda sentar. */
+  pintaSono: function (time) {
+    var gs = this.gSono; gs.clear();
+    if (!GameState.char || !HUD_VISIVEL) return;
+    var p = GameState.descanso / GameState.char.descansoMax;
+    if (p >= LIMIAR_SONO) return;
+
+    var f = (LIMIAR_SONO - p) / LIMIAR_SONO;         // 0 na marca, 1 no apagão
+    var topo = AREA_JOGO.topo || HUD_H, base = AREA_JOGO.base || (GH - 40);
+    var foco = AREA_JOGO.foco || Math.round((topo + base) / 2);
+    var pisca = Math.max(0, Math.sin(time / 1500) - 0.88) * 8;
+    var q = Math.min(1, f * (0.78 + pisca));
+    var hc = Math.round((foco - topo) * q), hb = Math.round((base - foco) * q);
+    gs.fillStyle(0x000000, 0.3 * f).fillRect(0, topo, GW, base - topo);
+    gs.fillStyle(0x05050a, 1);
+    gs.fillRect(0, topo, GW, hc);
+    gs.fillRect(0, base - hb, GW, hb);
+    // o fio de luz na beirada da pálpebra, senão parece cortina
+    gs.fillStyle(0x000000, 0.5);
+    gs.fillRect(0, topo + hc, GW, 2); gs.fillRect(0, base - hb - 2, GW, 2);
   },
 
   update: function (time) {
@@ -1892,6 +1941,8 @@ var HudScene = new Phaser.Class({
       m.fillStyle(0xf2f0ff, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 9);
       m.fillStyle(0x08080e, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 3);
     }
+
+    this.pintaSono(time);
 
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
@@ -1932,6 +1983,15 @@ var HudScene = new Phaser.Class({
     this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
     this.tHora.setText('D' + GameState.dia + ' ' + GameState.hora()).setColor(f.cor);
     barra(g, 18, 26, 80, 11, GameState.carisma / 100, 0xe8a33c);
-    barra(g, 116, 26, 80, 11, GameState.descanso / GameState.char.descansoMax, 0x00e676);
+
+    /* O medidor de descanso era verde até o último pixel: cheio e
+       quase vazio tinham a mesma cor, e a única diferença era um
+       comprimento que ninguém compara de relance. Agora ele esquenta
+       conforme baixa, e pisca quando o sono está pra bater. */
+    var pd = GameState.descanso / GameState.char.descansoMax;
+    var corD = pd > 0.55 ? 0x00e676 : (pd > LIMIAR_SONO ? 0xf2c14e : 0xe8362c);
+    if (pd <= LIMIAR_SONO && Math.floor(time / 300) % 2 === 0) corD = 0xff8a80;
+    barra(g, 116, 26, 80, 11, pd, corD);
+    this.tDes.setColor(pd <= LIMIAR_SONO ? PAL.vermelho : PAL.cinzaEsc);
   }
 });

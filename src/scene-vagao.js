@@ -139,6 +139,7 @@ var VagaoScene = new Phaser.Class({
     this.encontro = null;
     this.tPasso = 0;
     this.sentadoEm = null;
+    this.nivelSono = 0;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
     this.gente = [];
@@ -161,6 +162,9 @@ var VagaoScene = new Phaser.Class({
 
     this.gUI = this.add.graphics().setDepth(500);
     this.rota = new Plaqueta(this, GW / 2, 62, { cor: PAL.amarelo, depth: 505 });
+    // a placa de rota e a faixa de dica ficam fora do alcance do sono, e
+    // a fresta que sobra é justo a do aviso do meio da tela
+    areaDeJogo(134, GH - 40, 258);
     this.rima = new Plaqueta(this, GW / 2, 96, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
@@ -397,6 +401,27 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
+  temLugarVago: function () {
+    for (var i = 0; i < this.bancos.length; i++) if (!this.bancos[i].npc) return true;
+    return false;
+  },
+
+  comSono: function () { return GameState.descanso / GameState.char.descansoMax <= LIMIAR_SONO; },
+
+  /* O sono não pode chegar de surpresa: até aqui o descanso zerava e a
+     tela de fim de jogo dizia que você tinha dormido — a primeira e
+     única notícia. Agora ele avisa ao cruzar cada marca, e as
+     pálpebras do HUD vão fechando junto. */
+  atualizaSono: function () {
+    var p = GameState.descanso / GameState.char.descansoMax;
+    var nivel = p <= 0.14 ? 2 : (p <= LIMIAR_SONO ? 1 : 0);
+    if (nivel > this.nivelSono) {
+      if (nivel === 2) { sfx('nao'); this.flash('VOCÊ VAI DORMIR!\nSENTE AGORA'); }
+      else { sfx('empurra'); this.flash('BATEU O SONO\nSENTE NUM LUGAR VERDE'); }
+    }
+    this.nivelSono = nivel;
+  },
+
   bancoLivrePerto: function () {
     for (var i = 0; i < this.bancos.length; i++) {
       var b = this.bancos[i];
@@ -415,6 +440,8 @@ var VagaoScene = new Phaser.Class({
     this.pl.anima(0, false);
     GameState.sentado = true;
     sfx('ok');
+    // a primeira vez que senta é quando dá pra ensinar pra que serve
+    if (this.comSono()) this.flash('SENTOU — O SONO PASSA ▲');
   },
 
   levanta: function () {
@@ -744,7 +771,8 @@ var VagaoScene = new Phaser.Class({
      lotação da hora; banco que vaga pode ser ocupado, e é assim que
      aparece a chance de sentar no meio do caminho. */
   trocaPassageiros: function () {
-    var lot = GameState.lotacao(), i, a;
+    var lot = GameState.lotacao(), i, a, vagou = 0;
+    for (i = 0; i < this.bancos.length; i++) this.bancos[i].vagou = false;
 
     // desce quem estava em pé
     var saem = Math.min(this.npcExtra.length, Math.floor(Math.random() * 3));
@@ -762,6 +790,7 @@ var VagaoScene = new Phaser.Class({
       if (j >= 0) this.gente.splice(j, 1);
       b.npc.destroy();
       b.npc = null;
+      b.vagou = true; vagou++;
     }
 
     // sobe gente nova, na medida da hora
@@ -778,7 +807,11 @@ var VagaoScene = new Phaser.Class({
     // e quem entra no pico não fica de pé se tem banco vago
     for (i = 0; i < this.bancos.length; i++) {
       var v = this.bancos[i];
-      if (v.npc || Math.random() > lot * 0.7) continue;
+      /* quem entra não senta no banco que acabou de vagar: no pico esse
+         banco era retomado no mesmo quadro em que abria, e a única
+         forma de sentar sumia antes de aparecer. O lugar fica seu até
+         a próxima estação — depois disso, alguém senta. */
+      if (v.npc || v.vagou || Math.random() > lot * 0.7) continue;
       var n = new Ator(this, v.x, v.y + 24, sorteiaPax());
       n.dir = v.x < 160 ? 'sentadoR' : 'sentadoL';
       n.anima(0, false); n.sp.setDepth(30); n.fixo = true;
@@ -786,6 +819,10 @@ var VagaoScene = new Phaser.Class({
       v.npc = n;
       this.gente.push(n);
     }
+
+    /* Vagar um lugar é a chance que o jogo dá de descansar, e ela
+       passava calada. Agora avisa, e a seta verde no banco diz qual. */
+    if (vagou && !this.sentadoEm) { sfx('ok'); this.flash('VAGOU UM LUGAR ►'); }
   },
 
   /* O passo sai no compasso da perna, não do quadro: o mesmo 130ms que
@@ -1385,6 +1422,7 @@ var VagaoScene = new Phaser.Class({
 
     this.t += dt;
 
+    this.atualizaSono();
     if (this.sentadoEm) GameState.addDescanso(0.0018 * dt);
     // o cansaço é o eixo que nunca satura: a lotação bate no teto no
     // quarto dia, mas ficar em pé cansa cada vez mais
@@ -1485,12 +1523,13 @@ var VagaoScene = new Phaser.Class({
     if (!dica) {
       if (this.sentadoEm) {
         // no celular não existe tecla X: agir de novo levanta
-        dica = nomeAgir() + ' pra levantar';
+        dica = GameState.descanso < GameState.char.descansoMax - 1
+          ? 'DESCANSANDO ▲' : nomeAgir() + ' pra levantar';
         if (Ctrl.backJust || Ctrl.actJust) this.levanta();
       } else {
         var b = this.bancoLivrePerto();
         if (b) {
-          dica = nomeAgir() + ': sentar';
+          dica = nomeAgir() + ': SENTAR';
           if (Ctrl.actJust) {
             // sentar no banco em disputa é ganhar a corrida
             var disputado = this.corrida && this.corrida.b === b;
@@ -1500,6 +1539,11 @@ var VagaoScene = new Phaser.Class({
               this.flash('O BANCO É SEU  +' + GameState.ganhaMinigame(5) + ' PONTOS');
             }
           }
+        } else if (this.comSono() && this.temLugarVago()) {
+          /* Com sono, mandar segurar na barra é mandar pro lugar
+             errado: barra não descansa ninguém. Enquanto houver lugar
+             vago, o rodapé aponta pra ele. */
+          dica = 'SONO! SENTE NO VERDE ►';
         } else if (this.barraPerto().d <= ALCANCE_BARRA) {
           dica = this.segurando ? 'SEGURANDO' : 'SEGURE PRA NÃO CAIR';
         } else {
@@ -1534,8 +1578,36 @@ var VagaoScene = new Phaser.Class({
     this.rota.setCor(cor).setText(txto);
   },
 
+  /* Sentar é a única coisa que devolve descanso, e até aqui o banco
+     livre era um retângulo azul idêntico ao banco ocupado — quem não
+     sabia procurar, não sentava, e dormia em pé. Agora todo lugar vago
+     acende verde e chama com uma seta, de qualquer canto do vagão; o
+     que está ao alcance acende de vez, que é o convite pra apertar. */
+  pintaLugares: function (g) {
+    var perto = this.sentadoEm ? null : this.bancoLivrePerto();
+    var pulso = 0.5 + 0.5 * Math.sin(this.time.now / 260);
+    for (var i = 0; i < this.bancos.length; i++) {
+      var b = this.bancos[i];
+      // o banco em disputa já tem a moldura amarela da corrida: duas
+      // marcas no mesmo lugar não dizem duas coisas, dizem nenhuma
+      if (b.npc || (this.corrida && this.corrida.b === b)) continue;
+      var aqui = (b === perto);
+      var a = aqui ? 0.95 : 0.3 + 0.25 * pulso;
+      g.fillStyle(0x00e676, aqui ? 0.24 : 0.08 + 0.06 * pulso);
+      g.fillRect(b.x - 8, b.y - 4, 16, BAIA_COMP - 8);
+      g.lineStyle(2, 0x00e676, a);
+      g.strokeRect(b.x - 9, b.y - 5, 18, BAIA_COMP - 6);
+      // a seta nasce no corredor e aponta pro assento
+      var lado = b.x < 160 ? 1 : -1, sx = b.x + lado * 15, sy = b.y + 22;
+      g.fillStyle(0x00e676, a);
+      g.fillTriangle(sx, sy - 5, sx, sy + 5, sx - lado * 7, sy);
+    }
+  },
+
   pintaUI: function () {
     var g = this.gUI; g.clear();
+
+    this.pintaLugares(g);
 
     // o banco em disputa pisca: correr sem saber pra onde não é corrida
     if (this.corrida) {

@@ -19,6 +19,7 @@ var BaldeacaoScene = new Phaser.Class({
   initialize: function BaldeacaoScene() { Phaser.Scene.call(this, { key: 'Baldeacao' }); },
 
   create: function () {
+    areaDeJogo();
     Ctrl.liga(this);
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
 
