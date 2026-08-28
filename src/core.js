@@ -435,7 +435,25 @@ var CORPO_BASE = {
     '...oaaaaaaaao...', '....oaaaaaao....', '.......kkkk.....', '...ojjjjjjjjo...',
     '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..ojjjjjjjjjjo..', '..okjjjjjjjjko..',
     '..okjjjjjjjjko..', '...ojjjjjjjjo...', '...oppppppppo...', '....pppppppp....',
-    '....ppp..ppp....', '....ppp..ppp....', '....ppp..ppp....', '....sss..sss....']
+    '....ppp..ppp....', '....ppp..ppp....', '....ppp..ppp....', '....sss..sss....'],
+
+  /* ---------- sentado ----------
+     Quem senta usava o boneco em pé virado de lado: de cima ficava um
+     sujeito de pé colado no banco. Sentado é a mesma cabeça e o mesmo
+     tronco do perfil — por isso as linhas 0 a 17 são idênticas, e os
+     sete cabelos, a mochila, a bolsa e o celular caem no lugar sem uma
+     linha nova — e pernas que saem pra frente, pro corredor, com o
+     joelho dobrando e o pé descendo.
+
+     Desenhado virado pra direita, pra quem senta na baia da esquerda.
+     A outra parede é a mesma coisa espelhada. */
+  sentado: [
+    '................', '.....oooooo.....', '....oaaaaaaao...', '....oaaaaaaao...',
+    '....oaaaakkko...', '....oaaakkkko...', '....oakokkkko...', '....okkkkkkko...',
+    '.....okkkkko....', '......kkkk......', '.....jjjjjj.....', '....ojjjjjjjo...',
+    '....ojjjjjjjo...', '....ojjjjjjjo...', '....ojjjjjjjko..', '....ojjjjjjjko..',
+    '....ojjjjjjjo...', '.....ojjjjjo....', '....opppppppo...', '....oppppppppo..',
+    '.......opppppo..', '.......opp.ppo..', '.......opp.ppo..', '.......oss.sso..']
 };
 
 /* pernas: os quadros de caminhada trocam as últimas linhas do corpo */
@@ -491,6 +509,13 @@ var MOD_SAIA = {
   side: {
     18: '....opppppo.....', 19: '...opppppppo....', 20: '...opppppppo....',
     21: '....kkk.kk......', 22: '....kk..kk......', 23: '....ss..ss......'
+  },
+  /* sentada a barra cai sobre a coxa e a perna aparece do joelho pra
+     baixo. Sem isto a saia herdava a perna em pé por cima do corpo
+     sentado, e virava uma pessoa de pé colada no banco. */
+  sentado: {
+    18: '...opppppppo....', 19: '...opppppppppo..', 20: '.....oppppppo...',
+    21: '.......okk.kko..', 22: '.......okk.kko..', 23: '.......oss.sso..'
   },
   pernas: {
     inicio: 21,
@@ -552,6 +577,12 @@ var MOD_BENGALA = {
     16: '....ojjjjjjjo.w.', 17: '.....ojjjjjo..w.', 18: '.....pppppp...w.',
     19: '.....pppppp...w.', 20: '.....ppppp....w.', 21: '.....pppp.....w.',
     22: '.....ppp......w.', 23: '.....sss......w.'
+  },
+  /* sentado ele encosta a bengala no banco, ao lado do corpo */
+  sentado: {
+    16: '....ojjjjjjjo.w.', 17: '.....ojjjjjo..w.', 18: '....opppppppow..',
+    19: '....oppppppppow.', 20: '.......opppppow.', 21: '.......opp.ppow.',
+    22: '.......opp.ppow.', 23: '.......oss.ssow.'
   },
   /* o tronco estreita até a linha da mão e para ali: a bengala é uma
      coluna fixa na beirada, e mão que recua solta a bengala no ar.
@@ -759,12 +790,12 @@ var CORPOS = {
   pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE }
 };
 
-var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp'];
+var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado'];
 /* A diagonal parte do que a camada faz de frente (ou de costas) e leva
    por cima só o que é diferente nela. Sem isso, toda camada teria que
    redesenhar as linhas inteiras pra existir na diagonal, e um cabelo
    comprido que só precisa mexer no olho perderia o resto. */
-var DIR_HERDA = { diagDown: 'down', diagUp: 'up' };
+var DIR_HERDA = { diagDown: 'down', diagUp: 'up', sentado: 'side' };
 
 function aplicaDir(alvo, nome, linhas) {
   if (!linhas) return;
@@ -808,7 +839,9 @@ function quadrosDoCorpo(key) {
     var passos = (nome === 'side') ? r.pernas.lado : r.pernas.frente;
     out[nome] = [parado, null, null];
     for (var q = 0; q < 2; q++) {
-      if (r.poseUnica) { out[nome][q + 1] = parado; continue; }
+      // sentado não anda: os três quadros da fileira são o mesmo, e a
+      // vida vem do balanço do trem, que é posição e não desenho
+      if (r.poseUnica || nome === 'sentado') { out[nome][q + 1] = parado; continue; }
       var a = parado.slice(0);
       for (var i = 0; i < passos[q].length; i++) a[r.pernas.inicio + i] = passos[q][i];
       out[nome][q + 1] = a;
@@ -1018,9 +1051,10 @@ function Ator(scene, x, y, key) {
    posicionam gente parada escrevendo o nome do lado direto. */
 var FILEIRA_DIR = {
   down: 0, up: 3, left: 6, right: 6,
-  diagDownL: 9, diagDownR: 9, diagUpL: 12, diagUpR: 12
+  diagDownL: 9, diagDownR: 9, diagUpL: 12, diagUpR: 12,
+  sentadoR: 15, sentadoL: 15
 };
-var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1 };
+var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1 };
 var DIAGONAL_MIN = 0.42;   // o eixo fraco precisa disso do forte pra virar diagonal
 
 Ator.prototype.setDir = function (dx, dy) {
@@ -1484,39 +1518,6 @@ FaixaDica.prototype.setText = function (txto, cor) {
   return this;
 };
 
-/* tarja da hora, colada embaixo do HUD: é o letreiro da estação.
-   Ocupa a largura toda de propósito — vira moldura da tela em vez
-   de mais um texto solto no meio do cenário. */
-function FaixaHora(scene, depth) {
-  var d = (depth === undefined) ? 70 : depth;
-  this.g = scene.add.graphics().setDepth(d);
-  this.tHora = txt(scene, 10, HUD_H + 1, '', PAL.branco, 8).setDepth(d + 1);
-  this.tFaixa = txt(scene, GW - 14, HUD_H + 1, '', PAL.cinza, 8).setDepth(d + 1).setOrigin(1, 0);
-  this.chave = null;
-  this.atualiza();
-}
-/* o relógio anda enquanto você espera o trem: a tarja acompanha */
-FaixaHora.prototype.atualiza = function () {
-  var f = GameState.faixa(), h = GameState.hora();
-  var chave = f.key + h + (PAINEL ? '|lado' : '');
-  if (this.chave === chave) return;
-  this.chave = chave;
-
-  if (PAINEL) {                       // o painel do desktop mostra a hora
-    this.g.clear();
-    this.tHora.setVisible(false);
-    this.tFaixa.setVisible(false);
-    PAINEL.hora(h, f);
-    return;
-  }
-  this.tHora.setVisible(true).setText(h).setColor(f.cor);
-  this.tFaixa.setVisible(true).setText(f.nome);
-  this.g.clear();
-  this.g.fillStyle(0x0a0a14, 0.9).fillRect(0, HUD_H, GW, 19);
-  this.g.fillStyle(0x000000, 0.5).fillRect(0, HUD_H + 18, GW, 1);
-  this.g.fillStyle(num(f.cor), 1).fillRect(0, HUD_H, 3, 19);
-};
-
 /* placa fixa de cenário: nome de setor pintado na estação */
 function placa(scene, x, y, texto, cor, depth) {
   var p = new Plaqueta(scene, x, y, { cor: cor, depth: depth === undefined ? 3 : depth });
@@ -1628,12 +1629,24 @@ var HudScene = new Phaser.Class({
     /* duas linhas, quatro âncoras fixas: onde está a estação hoje
        fica sempre no mesmo canto, e o número nunca dança de lugar */
     this.g = this.add.graphics().setDepth(1000);
+    /* Duas linhas e nada de sobra. O que saiu daqui:
+
+       - o relógio aparecia duas vezes, uma no HUD e outra na tarja de
+         faixa logo abaixo, com o mesmo número;
+       - o contador '#estações' era placar de quando o jogo não tinha
+         destino. Hoje o placar é em dias, e o número não queria dizer
+         mais nada;
+       - a tarja de faixa era uma terceira barra empilhada. O nome da
+         faixa continua aparecendo — só quando ela vira, que é quando
+         importa — e a cor dela pinta o relógio.
+
+       Com o espaço que sobrou os dois medidores ficaram 80px em vez de
+       54, que é a diferença entre ler e adivinhar. */
     this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
     this.tHora = txt(this, GW - 8, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
-    this.tCar = txt(this, 6, 26, 'C', PAL.cinzaEsc, 8).setDepth(1001);
-    this.tDes = txt(this, 80, 26, 'D', PAL.cinzaEsc, 8).setDepth(1001);
-    this.tNum = txt(this, 158, 26, '', PAL.cinza, 8).setDepth(1001);
-    this.tGrana = txt(this, GW - 8, 26, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
+    this.tCar = txt(this, 6, 24, 'C', PAL.cinzaEsc, 8).setDepth(1001);
+    this.tDes = txt(this, 104, 24, 'D', PAL.cinzaEsc, 8).setDepth(1001);
+    this.tGrana = txt(this, GW - 8, 24, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
     this.montaToque();
   },
 
@@ -1679,10 +1692,15 @@ var HudScene = new Phaser.Class({
 
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
-    this.tEst.setVisible(temJogo); this.tNum.setVisible(temJogo);
+    this.tEst.setVisible(temJogo);
     this.tGrana.setVisible(temJogo); this.tCar.setVisible(temJogo); this.tDes.setVisible(temJogo);
     this.tHora.setVisible(temJogo);
     if (!temJogo) return;
+
+    var f = GameState.faixa();
+    /* o painel do desktop mostra hora e faixa na beirada; era a tarja
+       que alimentava essa ponte, e ela saiu do jogo */
+    if (PAINEL) PAINEL.hora(GameState.hora(), f);
 
     var l = GameState.linhaAtual();
     g.fillStyle(0x0e0e18, 1); g.fillRect(0, 0, GW, HUD_H);
@@ -1690,14 +1708,11 @@ var HudScene = new Phaser.Class({
     g.fillStyle(0x000000, 0.35); g.fillRect(0, 22, GW, 1);        // separa as duas linhas
     g.fillStyle(l.num, 1); g.fillRect(0, HUD_H - 4, GW, 4);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1); g.fillRect(0, HUD_H - 4, GW, 1);
-    g.fillStyle(0x2a2a3c, 1); g.fillRect(150, 27, 1, 12);         // separa medidores de números
 
-    var f = GameState.faixa();
     this.tEst.setText(GameState.estacaoAtual());
-    this.tNum.setText('#' + GameState.estacoes);
     this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
     this.tHora.setText('D' + GameState.dia + ' ' + GameState.hora()).setColor(f.cor);
-    barra(g, 18, 29, 54, 10, GameState.carisma / 100, 0xe8a33c);
-    barra(g, 92, 29, 54, 10, GameState.descanso / GameState.char.descansoMax, 0x00e676);
+    barra(g, 18, 26, 80, 11, GameState.carisma / 100, 0xe8a33c);
+    barra(g, 116, 26, 80, 11, GameState.descanso / GameState.char.descansoMax, 0x00e676);
   }
 });

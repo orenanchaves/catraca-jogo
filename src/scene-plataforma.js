@@ -50,7 +50,6 @@ var PlataformaScene = new Phaser.Class({
     this.pl.sp.setDepth(40); this.pl.dir = 'left';
 
     veuDaHora(this, 60);
-    this.tarja = new FaixaHora(this, 72);
     this.dica = new FaixaDica(this);
     // painel do embarque, como o letreiro que fica pendurado na plataforma
     this.painel = new Plaqueta(this, 208, 76, { cor: PAL.branco, filete: num(GameState.faixa().cor), depth: 80 });
@@ -289,7 +288,6 @@ var PlataformaScene = new Phaser.Class({
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
 
-    this.tarja.atualiza();
     this.cicloTrem(dt);
 
     if (this.empurrando) { this.atualizaEmpurrao(dt); return; }

@@ -111,6 +111,8 @@ var VagaoScene = new Phaser.Class({
     this.eventoPendente = false;
     this.dilemaPendente = false;
     this.tEvento = 0; this.tDilema = 0;
+    this.falha = null;
+    this.sorteouFalha = false;
     this.sentadoEm = null;
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
@@ -121,7 +123,6 @@ var VagaoScene = new Phaser.Class({
     this.desenhaCenario();
     this.montaBancos();
     veuDaHora(this, 90);
-    this.tarja = new FaixaHora(this, 510);
 
     this.pl = new Ator(this, 160, 500, 'ch_' + GameState.charKey);
     this.pl.sp.setDepth(60);
@@ -134,8 +135,8 @@ var VagaoScene = new Phaser.Class({
     this.encena = false;
 
     this.gUI = this.add.graphics().setDepth(500);
-    this.rota = new Plaqueta(this, GW / 2, 80, { cor: PAL.amarelo, depth: 505 });
-    this.rima = new Plaqueta(this, GW / 2, 112, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
+    this.rota = new Plaqueta(this, GW / 2, 62, { cor: PAL.amarelo, depth: 505 });
+    this.rima = new Plaqueta(this, GW / 2, 96, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
@@ -293,7 +294,7 @@ var VagaoScene = new Phaser.Class({
     for (var i = 0; i < idx.length - livres; i++) {
       var b = this.bancos[idx[i]];
       var a = new Ator(this, b.x, b.y + 24, sorteiaPax());
-      a.dir = b.x < 160 ? 'right' : 'left';
+      a.dir = b.x < 160 ? 'sentadoR' : 'sentadoL';
       a.anima(0, false);
       a.sp.setDepth(30);
       a.fixo = true;                  // sentado não é empurrado
@@ -327,7 +328,7 @@ var VagaoScene = new Phaser.Class({
     b.npc = 'player';
     this.pl.pos(b.x, b.y + 24);
     sentaAnimado(this.pl);
-    this.pl.dir = b.x < 160 ? 'right' : 'left';
+    this.pl.dir = b.x < 160 ? 'sentadoR' : 'sentadoL';
     this.pl.anima(0, false);
     GameState.sentado = true;
     sfx('ok');
@@ -398,10 +399,13 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
+  /* Quem está em pé olha em volta virando o corpo. Quem está sentado
+     não: sentado tem pose própria, e trocar de direção levantaria a
+     pessoa do banco. A vida de quem senta vem do balanço do trem. */
   olhaEmVolta: function (a, dt) {
     if (!a || !a.sp || !a.sp.active) return;
     a.olhaT += dt;
-    if (a.olhaT > a.proxOlhada) {
+    if (a.olhaT > a.proxOlhada && String(a.dir).indexOf('sentado') !== 0) {
       a.olhaT = 0;
       a.proxOlhada = 2200 + Math.random() * 4500;
       var lados = (a.sp.x < 160) ? ['right', 'down', 'up'] : ['left', 'down', 'up'];
@@ -613,6 +617,35 @@ var VagaoScene = new Phaser.Class({
     baralho[Math.floor(Math.random() * baralho.length)]();
   },
 
+  /* A linha envelhece junto com a corrida. A multidão satura — o vagão
+     só cabe tanta gente, e a partir do quarto dia ela para de piorar.
+     A falha não satura: quanto mais fundo na corrida, mais o trem para
+     entre estações, e mais tempo ele fica parado. Como a derrota agora
+     é chegar atrasado, é isso que aperta pra sempre. */
+  atualizaFalha: function (dt) {
+    var dif = GameState.dificuldade();
+    if (this.falha) {
+      this.falha.t += dt;
+      if (this.falha.t > this.falha.dur) {
+        this.falha = null;
+        this.centro.setText('');
+        sfx('trem');
+      } else {
+        this.centro.setCor(PAL.vermelho).setText('TREM PARADO\nFALHA NO SINAL');
+      }
+      return;
+    }
+    if (this.sorteouFalha) return;
+    this.sorteouFalha = true;
+    if (Math.random() < Math.min(0.42, 0.05 * dif)) {
+      var perde = Math.round(2 + dif * 1.4);
+      this.falha = { t: 0, dur: 1600 + dif * 260 };
+      GameState.passaTempo(perde);
+      GameState.addDescanso(-2);
+      sfx('erro');
+    }
+  },
+
   /* Em cada parada o vagão troca de gente. Sem isso a perna inteira —
      quinze estações — seria a mesma multidão congelada, e o vagão
      viraria um cenário pintado. Quem está em pé desce e sobe conforme a
@@ -655,7 +688,7 @@ var VagaoScene = new Phaser.Class({
       var v = this.bancos[i];
       if (v.npc || Math.random() > lot * 0.7) continue;
       var n = new Ator(this, v.x, v.y + 24, sorteiaPax());
-      n.dir = v.x < 160 ? 'right' : 'left';
+      n.dir = v.x < 160 ? 'sentadoR' : 'sentadoL';
       n.anima(0, false); n.sp.setDepth(30); n.fixo = true;
       sentaAnimado(n);
       v.npc = n;
@@ -871,13 +904,17 @@ var VagaoScene = new Phaser.Class({
     this.t += dt;
 
     if (this.sentadoEm) GameState.addDescanso(0.0018 * dt);
-    else GameState.addDescanso(-0.00082 * GameState.char.dreno * dt);
+    // o cansaço é o eixo que nunca satura: a lotação bate no teto no
+    // quarto dia, mas ficar em pé cansa cada vez mais
+    else GameState.addDescanso(-0.00082 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
 
     var morte = GameState.derrota();
     if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
 
     if (this.estado === 'andando') {
       this.atualizaSolavanco(dt);
+      this.atualizaFalha(dt);
+      if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }
       if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
       if (this.dilemaPendente && !this.encena && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();
@@ -885,6 +922,7 @@ var VagaoScene = new Phaser.Class({
       if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
         this.sorteiaRitmo();
+        this.sorteouFalha = false;
         this.pintaPortas(false);
         sfx('porta');
         // deixar a sua estação passar é o erro caro: agora tem que voltar
@@ -917,9 +955,6 @@ var VagaoScene = new Phaser.Class({
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
-    // o relógio anda 2 a 3 minutos por estação, e a viagem inteira mora
-    // numa cena só: sem isto a tarja congelava na hora do embarque
-    this.tarja.atualiza();
     this.animaGente(dt);
     this.animaRimador(dt);
     this.pintaCaixinha();

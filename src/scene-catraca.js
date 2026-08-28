@@ -112,7 +112,6 @@ var CatracaScene = new Phaser.Class({
     this.pintaCatracas();
 
     veuDaHora(this, 65);
-    this.tarja = new FaixaHora(this, 72);
   },
 
   /* ---------- bloqueio ----------
@@ -401,7 +400,6 @@ var CatracaScene = new Phaser.Class({
     var morte = GameState.derrota();
     if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); this.scene.start('Fim'); return; }
 
-    this.tarja.atualiza();
     this.atualizaGuarda(dt);
 
     for (var i = 0; i < this.plateia.length; i++) {
