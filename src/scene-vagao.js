@@ -17,6 +17,9 @@
 var TEMPO_ENTRE_ESTACOES = 8200;
 var TEMPO_PARADO = 4200;
 
+var BARRAS_X = [90, 226];   // as duas barras de apoio do corredor
+var ALCANCE_BARRA = 34;     // até onde o braço chega
+
 var PORTA_ALT = 60;
 var PORTAS_Y = [96, 268, 440];         // faixas de porta, na parede direita
 var BAIA_FUNDO = 22, BAIA_COMP = 58;   // raso na parede, comprido ao longo dela
@@ -263,13 +266,26 @@ var VagaoScene = new Phaser.Class({
     this.gPortas = this.add.graphics().setDepth(2);
     this.pintaPortas(false);
 
-    /* Barras de apoio. A da direita é cortada na altura de cada porta:
-       barra atravessando a saída é o que mais fazia o vagão parecer
-       trancado, e no vagão de verdade ela também não passa ali. */
+    /* Barras de apoio. Elas saem do cenário e vão pra um gráfico
+       próprio, desenhado POR CIMA de todo mundo: a barra vai do chão ao
+       teto, e visto de cima ela passa acima das cabeças. Desenhada no
+       fundo, dava a impressão de que a pessoa andava por cima da barra
+       em vez de por baixo dela.
+
+       A da direita é cortada na altura de cada porta: barra
+       atravessando a saída é o que mais fazia o vagão parecer trancado,
+       e no vagão de verdade ela também não passa ali. */
+    this.gBarras = this.add.graphics().setDepth(70);
+    this.pintaBarras();
+  },
+
+  pintaBarras: function () {
+    var g = this.gBarras; g.clear();
     for (var i = 0; i < 2; i++) {
-      var px = i ? 226 : 90;
+      var px = BARRAS_X[i];
       for (var by = HUD_H; by < GH; by++) {
         if (i && naPorta(by, 8)) continue;
+        g.fillStyle(0x000000, 0.25).fillRect(px + 8, by, 3, 1);   // sombra no chão
         g.fillStyle(num(PAL.metalSom), 1).fillRect(px, by, 8, 1);
         g.fillStyle(num(PAL.metal), 1).fillRect(px, by, 5, 1);
         g.fillStyle(num(PAL.metalLuz), 1).fillRect(px + 1, by, 2, 1);
@@ -282,6 +298,43 @@ var VagaoScene = new Phaser.Class({
         g.fillRect(px + (i ? -12 : 18), ay, 3, 14);
       }
     }
+
+    /* A mão de quem está segurando. Sem isto, "segurar" era só o texto
+       na barra de baixo mudando de cor — não havia nada na tela que
+       dissesse que aquele boneco está agarrado em alguma coisa. */
+    if (this.segurando) {
+      var m = this.segurando;
+      g.fillStyle(0xf2c14e, 1).fillRect(m.bx - 1, m.y - 3, 11, 6);
+      g.fillStyle(0xffe9a8, 1).fillRect(m.bx - 1, m.y - 3, 11, 2);
+      g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 6, 2, 12);
+      // o braço, do ombro até a barra
+      g.lineStyle(3, 0xf2c14e, 0.9);
+      g.beginPath(); g.moveTo(m.px, m.y + 2); g.lineTo(m.bx + 4, m.y); g.strokePath();
+    }
+  },
+
+  /* A mão só aparece quando há mão: apertando, com barra ao alcance, e
+     de pé. Guardo o ponto do ombro e o ponto da barra pra desenhar o
+     braço entre os dois. */
+  atualizaMao: function () {
+    this.segurando = null;
+    if (this.sentadoEm || !Ctrl.act) return;
+    var b = this.barraPerto();
+    if (b.d > ALCANCE_BARRA) return;
+    this.segurando = { px: this.pl.sp.x, bx: b.x - 4, y: this.pl.sp.y - 26 };
+  },
+
+  /* Quem é a barra mais perto, e a que distância. É o que decide se dá
+     pra segurar e onde a mão vai parar. */
+  barraPerto: function () {
+    var melhor = null, d = 1e9;
+    for (var i = 0; i < BARRAS_X.length; i++) {
+      var bx = BARRAS_X[i] + 4;
+      if (i && naPorta(this.pl.sp.y, 8)) continue;   // ali a barra não existe
+      var dd = Math.abs(this.pl.sp.x - bx);
+      if (dd < d) { d = dd; melhor = bx; }
+    }
+    return { x: melhor, d: d };
   },
 
   pintaPortas: function (aberto) {
@@ -388,7 +441,10 @@ var VagaoScene = new Phaser.Class({
       if (s.t > s.dur) {
         s.fase = 'off'; s.t = 0;
         s.proximo = 2200 + Math.random() * 2600 - dif * 200;
-        if (Ctrl.act) {
+        /* Segurar deixou de ser só apertar: tem que ter barra ao
+           alcance do braço. Antes dava pra "segurar" no meio do
+           corredor, agarrado no ar. */
+        if (Ctrl.act && this.barraPerto().d <= ALCANCE_BARRA) {
           sfx('catraca');
         } else {
           GameState.addCarisma(-3);
@@ -789,9 +845,9 @@ var VagaoScene = new Phaser.Class({
        segurar pra esquerda não pode varrer a pista inteira */
     for (i = 0; i < 4; i++) {
       var d = BATALHA_DIRS[i];
-      var agora = !!Ctrl[d];
-      if (agora && !b.ant[d]) this.bateNota(i);
-      b.ant[d] = agora;
+      // duas batidas na mesma pista valem duas sílabas
+      for (var n = Ctrl[d + 'N']; n > 0; n--) this.bateNota(i);
+      b.ant[d] = !!Ctrl[d];       // só pra acender a caixa de acerto
     }
 
     // sílaba que passou da janela sem ser tocada é erro
@@ -968,7 +1024,11 @@ var VagaoScene = new Phaser.Class({
 
     var a = this.npcExtra[Math.floor(Math.random() * this.npcExtra.length)];
     if (!a.sp || !a.sp.active) return;
-    var tipo = (this.sentadoEm || Math.random() < 0.5) ? 'rima' : 'barra';
+    /* Quanto mais cheio o vagão, mais a briga é por barra: no pico
+       ninguém disputa rima, disputa lugar pra segurar. Sentado nunca
+       disputa barra — quem senta não segura em nada. */
+    var lot = GameState.lotacao();
+    var tipo = this.sentadoEm ? 'rima' : (Math.random() < 0.25 + lot * 0.5 ? 'barra' : 'rima');
     // sentado não disputa barra: quem senta não segura em nada
     this.encontro = { a: a, tipo: tipo, fase: 'vem', t: 0, carga: 0 };
     a.fixo = false;
@@ -1296,7 +1356,8 @@ var VagaoScene = new Phaser.Class({
     if (GameState.faltaBaldear()) {
       GameState.baldeia();
       sfx('ok');
-      this.scene.start('Plataforma');       // baldeação não passa por catraca
+      // baldear não passa por catraca, mas passa pelo corredor da Sé
+      this.scene.start('Baldeacao');
       return;
     }
     var atrasado = GameState.minutosNaPerna() > LIMITE_ATRASO && GameState.perna === 'ida';
@@ -1377,6 +1438,8 @@ var VagaoScene = new Phaser.Class({
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
     }
 
+    this.atualizaMao();
+    this.pintaBarras();
     this.atualizaCorrida(dt);
     this.atualizaEncontro(dt);
     this.animaGente(dt);
@@ -1437,8 +1500,10 @@ var VagaoScene = new Phaser.Class({
               this.flash('O BANCO É SEU  +' + GameState.ganhaMinigame(5) + ' PONTOS');
             }
           }
+        } else if (this.barraPerto().d <= ALCANCE_BARRA) {
+          dica = this.segurando ? 'SEGURANDO' : 'SEGURE PRA NÃO CAIR';
         } else {
-          dica = 'SEGURE PRA NÃO CAIR';
+          dica = 'VÁ ATÉ UMA BARRA';
         }
       }
     }

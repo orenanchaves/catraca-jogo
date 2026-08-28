@@ -1347,13 +1347,32 @@ var Ctrl = {
   up: false, down: false, left: false, right: false,
   act: false, actJust: false, back: false, backJust: false,
   pausaJust: false,
+  leftJust: false, rightJust: false, upJust: false, downJust: false,
+  leftN: 0, rightN: 0, upN: 0, downN: 0,
   _pa: false, _pb: false, _pz: false,
+  _tl: false, _tr: false, _tu: false, _td: false,
+  _nl: 0, _nr: 0, _nu: 0, _nd: 0,
   liga: function (scene) {
     /* WASD e espaço são o controle principal; setas, Z e enter continuam
        valendo pra quem já pegou o costume. enableCapture segura o espaço
        antes que o navegador role a página com ele. */
     this.k = scene.input.keyboard.addKeys(
       'W,A,S,D,SPACE,UP,DOWN,LEFT,RIGHT,Z,X,P,ENTER,ESC', true, true);
+
+    /* Contador de batidas, não de estado. Olhar se a tecla está
+       apertada perde o toque curto; o JustDown do Phaser é um booleano
+       e perde a segunda batida do mesmo quadro. Duas batidas têm que
+       valer duas — é o que a batalha de rima e a troca de pista da
+       baldeação pedem. Repetição de tecla segurada não conta. */
+    var self = this;
+    scene.input.keyboard.on('keydown', function (ev) {
+      if (ev.repeat) return;
+      var c = ev.code;
+      if (c === 'KeyA' || c === 'ArrowLeft') self._nl++;
+      else if (c === 'KeyD' || c === 'ArrowRight') self._nr++;
+      else if (c === 'KeyW' || c === 'ArrowUp') self._nu++;
+      else if (c === 'KeyS' || c === 'ArrowDown') self._nd++;
+    });
   },
   update: function () {
     var k = this.k;
@@ -1370,6 +1389,23 @@ var Ctrl = {
        misturar os dois fazia a pausa levantar você junto */
     var pz = k.ESC.isDown || k.P.isDown;
     this.pausaJust = pz && !this._pz; this._pz = pz;
+
+    /* Direção apertada e solta entre dois quadros sumia: olhar só o
+       estado da tecla perde o toque curto, que é justamente o que a
+       batalha de rima e a corrida da baldeação pedem. JustDown lê o
+       evento do teclado, não o estado.
+
+       Os dois lados de cada par são lidos sem curto-circuito de
+       propósito: com ||, o segundo não seria consumido e voltaria como
+       um toque fantasma no quadro seguinte. */
+    this.leftN = this._nl + ((TOUCH.left && !this._tl) ? 1 : 0); this._nl = 0;
+    this.rightN = this._nr + ((TOUCH.right && !this._tr) ? 1 : 0); this._nr = 0;
+    this.upN = this._nu + ((TOUCH.up && !this._tu) ? 1 : 0); this._nu = 0;
+    this.downN = this._nd + ((TOUCH.down && !this._td) ? 1 : 0); this._nd = 0;
+    this.leftJust = this.leftN > 0; this.rightJust = this.rightN > 0;
+    this.upJust = this.upN > 0; this.downJust = this.downN > 0;
+    this._tl = TOUCH.left; this._tr = TOUCH.right;
+    this._tu = TOUCH.up; this._td = TOUCH.down;
   },
 
   /* o disfarce quer uma direção só. No teclado a ordem das teclas

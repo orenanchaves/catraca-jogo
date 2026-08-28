@@ -118,7 +118,7 @@ var config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, FimScene, HudScene, PausaScene]
+  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, BaldeacaoScene, FimScene, HudScene, PausaScene]
 };
 
 window.addEventListener('load', function () {

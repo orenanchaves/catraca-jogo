@@ -169,12 +169,10 @@ var TitleScene = new Phaser.Class({
     }
 
     var n = this.ordem.length;
-    if (Ctrl.left && !this._pl) this.escolhe((this.sel + n - 1) % n);
-    if (Ctrl.right && !this._pr) this.escolhe((this.sel + 1) % n);
-    if (Ctrl.up && !this._pu) this.escolhe((this.sel + n - 3) % n);
-    if (Ctrl.down && !this._pd) this.escolhe((this.sel + 3) % n);
-    this._pl = Ctrl.left; this._pr = Ctrl.right;
-    this._pu = Ctrl.up; this._pd = Ctrl.down;
+    if (Ctrl.leftJust) this.escolhe((this.sel + n - 1) % n);
+    if (Ctrl.rightJust) this.escolhe((this.sel + 1) % n);
+    if (Ctrl.upJust) this.escolhe((this.sel + n - 3) % n);
+    if (Ctrl.downJust) this.escolhe((this.sel + 3) % n);
 
     if (Ctrl.actJust) {
       if (this.ignoraAct) { this.ignoraAct = false; return; }
