@@ -18,13 +18,16 @@ var CatracaScene = new Phaser.Class({
 
     this.desenhaCenario();
 
-    this.guarda = new Ator(this, 80, 200, 'np_guardinha');
+    this.guarda = new Ator(this, 80, 194, 'np_guardinha');
     this.guarda.sp.setDepth(50);
     this.guarda.fixo = true;          // ninguém empurra o guardinha
     this.gEstado = 'anda';
     this.gTempo = 0;
     this.gVx = 1;
     this.gOlhando = false;
+    this.pulo = null;      // o pulo em andamento, que é o que ele pode ver
+    this.flagra = null;    // ele te pegou e está vindo falar com você
+    this.pulou = false;
 
     this.plateia = [];
     var quantos = Math.round(1 + 8 * GameState.lotacao());
@@ -56,7 +59,11 @@ var CatracaScene = new Phaser.Class({
 
     this.gAviso = this.add.graphics().setDepth(70);
     this.dica = new FaixaDica(this);
-    this.alerta = new Plaqueta(this, GW / 2, 146, { cor: PAL.vermelho, filete: 0xe8362c, depth: 82 });
+    /* A placa vermelha ficava em y=146, que é exatamente a faixa onde o
+       guardinha anda: o aviso tapava a única coisa que o jogador
+       precisava olhar. Ela desceu pro saguão, e o "parou pra olhar"
+       saiu de vez — o cone já conta isso, e conta melhor. */
+    this.alerta = new Plaqueta(this, GW / 2, 320, { cor: PAL.vermelho, filete: 0xe8362c, depth: 82 });
 
     var f = GameState.faixa();
     var cab = GameState.hora() + ', ' + f.nome.toLowerCase() + '.\n';
@@ -244,7 +251,62 @@ var CatracaScene = new Phaser.Class({
     return melhor;
   },
 
-  /* ---------- guardinha ---------- */
+  /* ---------- guardinha ----------
+     O guardinha existia, andava e parava — mas nada disso importava. A
+     decisão de te pegar era um sorteio no instante do aperto: se ele
+     estivesse parado ou perto demais, flagrado; senão, passou. Pular
+     não era um ato que ele pudesse ver, era um número comparado com o
+     x dele.
+
+     Agora ele tem campo de visão, e o campo é desenhado na tela do
+     jeito exato em que é testado — o que está pintado de vermelho é o
+     que ele enxerga, nem um pixel a mais. Pular leva quase um segundo,
+     com você em cima da catraca o tempo todo: se o cone passar por
+     você nesse meio tempo, ele apita, vem falar com você, custa um
+     coração e te devolve pro fim do saguão. */
+
+  /* O que ele enxerga: um trapézio que sai dos olhos dele e abre pro
+     lado pra onde ele está virado. Parado, o cone aponta pra frente e
+     abre mais — é por isso que parar pra olhar é o momento perigoso. */
+  cone: function () {
+    var g = this.guarda, dif = GameState.dificuldade();
+    var o = this.gOlhando;
+    return {
+      ax: g.sp.x,
+      ay: g.sp.y - 8,
+      cx: g.sp.x + (o ? 0 : this.gVx * 54),
+      meia: (o ? 62 : 38) + dif * 3,
+      alc: (o ? 116 : 94) + dif * 5
+    };
+  },
+
+  /* O mesmo trapézio, em conta: o meio anda do apex pro alvo e a
+     largura abre junto. Desenho e teste saem daqui, senão o jogador
+     aprende uma regra e o jogo cobra outra. */
+  guardaVe: function (x, y) {
+    var c = this.cone();
+    if (y < c.ay || y > c.ay + c.alc) return false;
+    var k = (y - c.ay) / c.alc;
+    var meio = c.ax + (c.cx - c.ax) * k;
+    return Math.abs(x - meio) <= c.meia * (0.3 + 0.7 * k);
+  },
+
+  pintaCone: function () {
+    var av = this.gAviso; av.clear();
+    var c = this.cone(), P = Phaser.Geom.Point;
+    var vendo = this.guardaVe(this.pl.sp.x, this.pl.sp.y);
+    var topo = c.meia * 0.3;
+    var pontos = [
+      new P(c.ax - topo, c.ay), new P(c.ax + topo, c.ay),
+      new P(c.cx + c.meia, c.ay + c.alc), new P(c.cx - c.meia, c.ay + c.alc)
+    ];
+    av.fillStyle(0xe8362c, (this.gOlhando ? 0.17 : 0.09) + (vendo ? 0.12 : 0));
+    av.fillPoints(pontos, true);
+    av.lineStyle(1, 0xe8362c, vendo ? 0.85 : 0.3);
+    av.strokePoints(pontos, true);
+    return vendo;
+  },
+
   atualizaGuarda: function (dt) {
     var dif = GameState.dificuldade();
     var vig = GameState.faixa().guarda;   // no pico ele tem mais o que fazer
@@ -254,8 +316,8 @@ var CatracaScene = new Phaser.Class({
     if (this.gEstado === 'anda') {
       var v = (52 + dif * 16) * this.gVx * (dt / 1000);
       var nx = g.sp.x + v;
-      if (nx < 56) { nx = 56; this.gVx = 1; }
-      if (nx > 264) { nx = 264; this.gVx = -1; }
+      if (nx < 60) { nx = 60; this.gVx = 1; }
+      if (nx > 286) { nx = 286; this.gVx = -1; }
       g.sp.x = nx;
       g.dir = this.gVx < 0 ? 'left' : 'right';
       g.anima(dt, true);
@@ -277,25 +339,6 @@ var CatracaScene = new Phaser.Class({
       this.gEstado = 'olha'; this.gTempo = 0;
     }
 
-    var av = this.gAviso; av.clear();
-    if (this.gOlhando) {
-      av.fillStyle(0xe8362c, 0.13);
-      av.fillTriangle(g.sp.x, g.sp.y - 16, g.sp.x - 68, g.sp.y + 92, g.sp.x + 68, g.sp.y + 92);
-      av.fillStyle(0xe8362c, 0.09);
-      av.fillTriangle(g.sp.x, g.sp.y - 16, g.sp.x - 44, g.sp.y + 92, g.sp.x + 44, g.sp.y + 92);
-      this.alerta.setText('! OLHANDO !');
-    } else {
-      this.alerta.setText('');
-    }
-  },
-
-  /* a porta larga é a que todo mundo pula: dá pra passar mais perto dele.
-     Com a estação cheia, ainda tem gente na frente pra te esconder. */
-  seguroPraPular: function (x, gate) {
-    if (this.gOlhando) return false;
-    var margem = (gate && gate.larga) ? 36 : 56;
-    margem -= 10 * GameState.lotacao();
-    return Math.abs(this.guarda.sp.x - x) > margem;
   },
 
   /* ---------- ações ---------- */
@@ -336,34 +379,88 @@ var CatracaScene = new Phaser.Class({
     this.time.delayedCall(1400, function () { if (self.dialog) self.dialog.fecha(); });
   },
 
-  tentaPular: function (gate) {
-    var seguro = this.seguroPraPular(this.pl.sp.x, gate);
-    GameState.addDescanso(gate && gate.larga ? -4 : -6);
+  /* ---------- o pulo ----------
+     Um segundo em cima da catraca, sem poder desistir. É esse tempo
+     que dá ao guardinha a chance de virar e ver — antes, pular era um
+     aperto instantâneo e o guardinha era só uma condição no if. */
+  comecaPulo: function (gate) {
+    if (this.pulo || this.flagra) return;
+    GameState.addDescanso(gate.larga ? -4 : -6);
     GameState.passaTempo(2);
-    if (seguro) {
-      GameState.stats.catracasPuladas++;
-      sfx('ok');
-      this.libera('Passou.\nO coração bateu, mas passou.');
-      return;
-    }
-    sfx('apito');
-    this.cameras.main.shake(220, 0.006);
+    this.pulo = {
+      t: 0,
+      dur: Math.max(560, 880 - GameState.dificuldade() * 45),
+      x: Phaser.Math.Clamp(this.pl.sp.x, gate.x0 + 4, gate.x1 - 4),
+      y0: this.pl.sp.y, y1: 196
+    };
+    this.pl.dir = 'up';
+    sfx('empurra');
+  },
+
+  atualizaPulo: function (dt) {
+    var p = this.pulo;
+    p.t += dt;
+    var k = Math.min(1, p.t / p.dur);
+    // o arco: sobe por cima do bloqueio, não atravessa por dentro
+    this.pl.sp.x = p.x;
+    this.pl.sp.y = p.y0 + (p.y1 - p.y0) * k - Math.sin(k * Math.PI) * 12;
+    this.pl.anima(dt, true);
+
+    if (this.guardaVe(this.pl.sp.x, this.pl.sp.y)) { this.pega(); return; }
+
+    if (k < 1) return;
+    this.pulo = null;
+    this.pulou = true;
+    this.pl.sp.y = p.y1;
+    GameState.stats.catracasPuladas++;
+    GameState.addCarisma(-2);
+    sfx('ok');
     var self = this;
-    if (GameState.carisma >= 55) {
-      GameState.addCarisma(-8);
-      this.libera('O guardinha te reconheceu.\n"Da próxima eu não deixo, hein."');
-      return;
+    fala(this, 'Passou.\nO coração bateu, mas passou.', []);
+    this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
+  },
+
+  /* Ele apita, larga a ronda e vem falar com você. O castigo é o que
+     dói na corrida inteira: um coração a menos e de volta pro fim do
+     saguão, com a catraca ainda fechada. */
+  pega: function () {
+    this.pulo = null;
+    this.pl.sp.y = 252;
+    this.pl.dir = 'down';
+    this.flagra = { t: 0 };
+    sfx('apito');
+    this.cameras.main.shake(340, 0.008);
+    perdeVida(this, this.pl.sp);
+    GameState.addCarisma(-6);
+    GameState.passaTempo(3);
+    this.gEstado = 'olha'; this.gTempo = 0; this.gOlhando = true;
+    this.alerta.setText('! ELE TE VIU !');
+  },
+
+  atualizaFlagra: function (dt) {
+    var f = this.flagra, g = this.guarda;
+    f.t += dt;
+    var dx = this.pl.sp.x - g.sp.x;
+    if (Math.abs(dx) > 8) {
+      g.sp.x += (dx < 0 ? -1 : 1) * 0.15 * dt;
+      g.dir = dx < 0 ? 'left' : 'right';
+      g.anima(dt, true);
+    } else {
+      g.dir = 'down';
+      g.anima(dt, false);
     }
-    if (GameState.dinheiro >= 25) {
-      GameState.gastar(25);
-      GameState.addCarisma(-6);
-      this.libera('Multa de R$ 25,00.\nSaiu mais caro que a passagem.');
-      return;
-    }
-    GameState.motivoFim = 'Sem passagem, sem troco,\nsem argumento.';
-    this.fim = true;
-    fala(this, 'Flagrado e sem dinheiro pra multa.\nVocê foi retirado da estação.', [
-      { label: 'Ver o resultado', cb: function () { self.terminaJogo(); } }
+    this.pl.anima(dt, false);
+    if (f.t < 950) return;
+
+    this.flagra = null;
+    this.alerta.setText('');
+    var self = this;
+    fala(this, '"Ó o moço aí!"\nEle te viu pulando. Voltou\npro fim do saguão.', [
+      {
+        label: 'Voltar pro começo', cb: function () {
+          self.pl.sp.x = 160; self.pl.sp.y = 512; self.pl.dir = 'up';
+        }
+      }
     ]);
   },
 
@@ -401,7 +498,13 @@ var CatracaScene = new Phaser.Class({
     var morte = GameState.derrota();
     if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); this.scene.start('Fim'); return; }
 
+    /* Flagrado: a ronda para, ele vem até você, e o resto da cena
+       espera. Pulando: você não controla mais nada até cair de um dos
+       dois lados — é isso que faz o pulo ser uma aposta. */
+    if (this.flagra) { this.atualizaFlagra(dt); this.pintaCone(); return; }
     this.atualizaGuarda(dt);
+    if (this.pulo) { this.atualizaPulo(dt); if (this.pulo || this.flagra) this.pintaCone(); return; }
+    var vendo = this.pintaCone();
 
     for (var i = 0; i < this.plateia.length; i++) {
       var a = this.plateia[i];
@@ -440,20 +543,23 @@ var CatracaScene = new Phaser.Class({
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
     var naCatraca = (perto && !this.liberado && !gate.fechada);
-    var seguro = naCatraca && this.seguroPraPular(x, gate);
+    /* O cone é a regra inteira: se você está dentro dele, pular é ser
+       pego. Fora dele, o risco é ele virar no meio do pulo. */
+    var seguro = naCatraca && !vendo;
 
     if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
     else if (perto && gate.fechada) dica = 'catraca fora de serviço';
     else if (naCatraca) {
-      dica = seguro
-        ? nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA')
-        : 'ele tá olhando pra cá';
-    } else if (this.liberado) dica = 'suba para a plataforma';
+      dica = vendo
+        ? 'ELE TÁ TE VENDO — ESPERE'
+        : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA');
+    } else if (vendo) dica = 'sai da frente dele';
+    else if (this.liberado || this.pulou) dica = 'suba para a plataforma';
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 
     if (Ctrl.actJust) {
       if (naBilheteria) this.abreMenuBilheteria();
-      else if (naCatraca) this.tentaPular(gate);
+      else if (naCatraca) this.comecaPulo(gate);
     }
   }
 });
