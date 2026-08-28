@@ -651,6 +651,28 @@ var PELES = {
 };
 
 /* desenha um quadro 32x48 a partir da silhueta 16x24, com sombreamento */
+/* quantos pixels faltam até a beirada da forma, andando numa direção.
+   Só interessa 0, 1, 2, 3 ou "longe": passando disso é miolo de chapa,
+   e miolo de chapa é cor cheia de qualquer jeito. Parar cedo também
+   segura o custo — são 270 quadros pra desenhar na carga.
+
+   O pulo importa. Olho, boca, alça de mochila e botão são detalhes de
+   um pixel de arte no meio de uma superfície — marca, não beirada. Sem
+   pular por cima deles o rosto vira uma mancha: cada olho ganharia
+   faixa escura de um lado e clara do outro, como se fosse quina. O
+   contorno de fora não passa nesse teste, porque depois dele vem vazio
+   e não o mesmo material. */
+var ALCANCE_MAX = 4;
+function alcance(m, x, y, dx, dy, mt) {
+  for (var i = 1; i <= ALCANCE_MAX; i++) {
+    if (m(x + dx * i, y + dy * i) === mt) continue;
+    if (m(x + dx * (i + 1), y + dy * (i + 1)) === mt) { i += 1; continue; }
+    if (m(x + dx * (i + 2), y + dy * (i + 2)) === mt) { i += 2; continue; }
+    return i - 1;
+  }
+  return ALCANCE_MAX;
+}
+
 function desenhaQuadro(c2d, art, pal, ox, oy) {
   var L = 16, A = 24;
   // mapa de material ampliado
@@ -676,13 +698,21 @@ function desenhaQuadro(c2d, art, pal, ox, oy) {
       if (mt === 'o') {
         cor = base;                                   // contorno não recebe luz
       } else {
-        var luz = (m(xx, yy - 1) !== mt) || (m(xx - 1, yy) !== mt);
-        var som = (m(xx, yy + 1) !== mt) || (m(xx + 1, yy) !== mt);
-        if (luz && !som) cor = clarear(base, 0.28);
-        else if (som && !luz) cor = escurecer(base, 0.3);
+        /* a luz não pinta só a borda: ela desbota com a distância dela.
+           Antes era claro / cheio / escuro, e a borda tinha 1 pixel — o
+           peito virava uma chapa lisa com um risco em cima e outro
+           embaixo, recortada em papel. Medindo quantos pixels faltam
+           pra beirada de cima-esquerda (luz) e pra de baixo-direita
+           (sombra), a mesma cor rende cinco degraus e o tronco lê como
+           cilindro. Como a arte é 16x24 dobrada, cada degrau tem 2
+           pixels de tela, que é um pixel de desenho. */
+        var dL = Math.min(alcance(m, xx, yy, 0, -1, mt), alcance(m, xx, yy, -1, 0, mt));
+        var dS = Math.min(alcance(m, xx, yy, 0, 1, mt), alcance(m, xx, yy, 1, 0, mt));
+        if (dL < dS) cor = clarear(base, dL < 2 ? 0.3 : 0.13);
+        else if (dS < dL) cor = escurecer(base, dS < 2 ? 0.32 : 0.14);
         else cor = base;
         // faixa de sombra na metade de baixo do corpo, dá volume
-        if (!luz && yy > A) cor = escurecer(cor, 0.08);
+        if (dL > 1 && yy > A) cor = escurecer(cor, 0.08);
       }
       c2d.fillStyle = cor;
       c2d.fillRect(ox + xx, oy + yy, 1, 1);
