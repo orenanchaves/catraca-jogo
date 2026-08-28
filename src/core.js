@@ -133,7 +133,7 @@ var CHARS = {
     dreno: 1.35, velocidade: 100, empurraoMult: 1.0, gratuidade: false, valeTransporte: 2
   },
   senhor: {
-    nome: 'SR. DE IDADE', asset: 'senhor',
+    nome: 'IDOSO', asset: 'senhor',
     desc: 'Passa de graça. Recebe o lugar.',
     tarifa: 0, dinheiro: 20.00, carisma: 75, descanso: 70, descansoMax: 70,
     dreno: 1.1, velocidade: 72, empurraoMult: 0.7, gratuidade: true, valeTransporte: 0
@@ -399,6 +399,92 @@ var MOD_BENGALA = {
   }
 };
 
+/* ---------- formatos de cabelo ----------
+   Antes o cabelo era só troca de cor no mesmo capacete, e a multidão
+   inteira tinha a mesma cabeça. Cada formato aqui é uma edição das
+   linhas do alto da cabeça, então combina com qualquer corpo e com
+   qualquer acessório. */
+
+var CABELO_CARECA = {
+  down: {
+    2: '...okkkkkkkko...', 3: '...okkkkkkkko...', 4: '...oakkkkkkao...'
+  },
+  up: {
+    2: '...okkkkkkkko...', 3: '...okkkkkkkko...', 4: '...okkkkkkkko...',
+    5: '...okkkkkkkko...', 6: '...oakkkkkkao...', 7: '...oaakkkkaao...',
+    8: '...oaaaaaaaao...'
+  },
+  side: {
+    2: '....okkkkkkko...', 3: '....okkkkkkko...', 4: '....oakkkkkko...',
+    5: '....oaakkkkko...'
+  }
+};
+
+/* cabelo alto e cheio, transbordando a largura da cabeça */
+var CABELO_VOLUMOSO = {
+  down: {
+    0: '...oaaaaaaaao...', 1: '..oaaaaaaaaaao..', 2: '..oaaaaaaaaaao..',
+    3: '..oaaaaaaaaaao..', 4: '..oaaaaaaaaaao..', 5: '..oaakkkkkkaao..'
+  },
+  up: {
+    0: '...oaaaaaaaao...', 1: '..oaaaaaaaaaao..', 2: '..oaaaaaaaaaao..',
+    3: '..oaaaaaaaaaao..', 4: '..oaaaaaaaaaao..', 5: '..oaaaaaaaaaao..',
+    6: '..oaaaaaaaaaao..', 7: '..oaaaaaaaaaao..', 8: '...oaaaaaaaao...'
+  },
+  side: {
+    0: '....oooooo......', 1: '...oaaaaaaao....', 2: '..oaaaaaaaaao...',
+    3: '..oaaaaaaaaao...', 4: '..oaaaaaaakkko..', 5: '...oaaaakkkko...'
+  }
+};
+
+/* coque preso no alto: sobe uma linha inteira acima do crânio, senão
+   some no meio do contorno */
+var CABELO_COQUE = {
+  down: {
+    0: '....oaaaaaao....', 1: '...ooaaaaaaoo...'
+  },
+  up: {
+    0: '....oaaaaaao....', 1: '...ooaaaaaaoo...'
+  },
+  side: {
+    0: '...oaaaao.......', 1: '...oaaaaoooo....'
+  }
+};
+
+/* rabo de cavalo: preso, então de frente sobra só a mecha ao lado da
+   orelha; de costas ele desce pela nuca e de perfil fica pra trás.
+   Vai sobre o cabelo curto — sobre o comprido não sobraria rabo. */
+var CABELO_RABO = {
+  down: {
+    4: '...oaaaaaaaaoaa.', 5: '...oakkkkkkaoaa.', 6: '...okkkkkkkkoaa.',
+    7: '...okkokkokkoaa.', 8: '...okkkkkkkkoaa.', 9: '....okkkkkkoaa..'
+  },
+  up: {
+    10: '......aaaa......', 11: '..ojjjaaaajjjo..', 12: '.ojjjjaaaajjjjo.',
+    13: '.ojjjjaaaajjjjo.', 14: '.ojjjjjaajjjjjo.'
+  },
+  side: {
+    4: '..aaoaaaakkko...', 5: '..aaoaaakkkko...', 6: '..aaoakokkkko...',
+    7: '..aaokkkkkkko...', 8: '..aa.okkkkko....', 9: '..aa..kkkk......'
+  }
+};
+
+/* boné, com aba pra frente */
+var CABELO_BONE = {
+  down: {
+    1: '....oooooooo....', 2: '...oaaaaaaaao...', 3: '...oaaaaaaaao...',
+    4: '..owwwwwwwwwwo..'
+  },
+  up: {
+    1: '....oooooooo....', 2: '...oaaaaaaaao...', 3: '...oaaaaaaaao...',
+    4: '...oaaaaaaaao...', 5: '...oawwwwwwao...'
+  },
+  side: {
+    1: '.....oooooo.....', 2: '....oaaaaaaao...', 3: '....oaaaaaaao...',
+    4: '....oaaawwwwwwo.', 5: '....oaaakkkko...'
+  }
+};
+
 /* ---------- acessórios ----------
    Mesma silhueta, gente diferente: quem carrega mochila, quem leva
    bolsa a tiracolo e quem vai o trajeto inteiro no celular. */
@@ -454,8 +540,20 @@ var CORPOS = {
   colo: { mods: [MOD_COLO] },
   colo_longo: { herda: 'longo', mods: [MOD_COLO] },
   gestante: { herda: 'longo', mods: [MOD_BARRIGA] },
-  senhor: { mods: [MOD_BENGALA] },
+  senhor: { mods: [CABELO_CARECA, MOD_BENGALA] },
+  senhor_grisalho: { mods: [MOD_BENGALA] },
   senhora: { herda: 'longo', mods: [MOD_BENGALA] },
+  senhora_coque: { herda: 'longo', mods: [CABELO_COQUE, MOD_BENGALA] },
+  careca: { mods: [CABELO_CARECA] },
+  volumoso: { mods: [CABELO_VOLUMOSO] },
+  volumoso_bolsa: { mods: [CABELO_VOLUMOSO, MOD_BOLSA] },
+  coque: { herda: 'longo', mods: [CABELO_COQUE] },
+  coque_saia: { herda: 'saia', mods: [CABELO_COQUE] },
+  rabo: { mods: [CABELO_RABO] },
+  rabo_mochila: { mods: [CABELO_RABO, MOD_MOCHILA] },
+  bone: { mods: [CABELO_BONE] },
+  bone_mochila: { mods: [CABELO_BONE, MOD_MOCHILA] },
+  careca_celular: { mods: [CABELO_CARECA, MOD_CELULAR] },
   mochila: { mods: [MOD_MOCHILA] },
   mochila_longo: { herda: 'longo', mods: [MOD_MOCHILA] },
   bolsa: { herda: 'longo', mods: [MOD_BOLSA] },
