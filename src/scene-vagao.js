@@ -21,9 +21,27 @@ var BARRAS_X = [90, 226];   // as duas barras de apoio do corredor
 var ALCANCE_BARRA = 34;     // até onde o braço chega
 
 var PORTA_ALT = 60;
-var PORTAS_Y = [96, 268, 440];         // faixas de porta, na parede direita
-var BAIA_FUNDO = 22, BAIA_COMP = 58;   // raso na parede, comprido ao longo dela
-var BAIAS_Y = [168, 340, 508];         // faixas de baia, nos vãos entre as portas
+/* Baia, porta, baia, porta, baia. Eram três portas e três baias de 58,
+   mas baia de 58 só cabe uma pessoa: pra caber duas ela precisa de 88,
+   e três baias de 88 mais três portas não cabem na altura da tela sem
+   empurrar a primeira porta pra debaixo da placa de rota, que é onde
+   ela ficava meio escondida. Uma porta a menos, e as duas que sobram
+   caem no terço e nos dois terços — bem no meio da tela, que é onde a
+   mão alcança. */
+var PORTAS_Y = [212, 376];             // faixas de porta, na parede direita
+var BAIA_FUNDO = 22, BAIA_COMP = 88;   // raso na parede, comprido ao longo dela
+var BAIAS_Y = [116, 280, 444];         // faixas de baia, nos vãos entre as portas
+
+/* Quantos lugares cabem numa baia, e onde cada um começa.
+
+   A baia já era desenhada com dois riscos separando três lugares, mas
+   só existia um: quem chegava sentava no meio e ocupava o banco
+   inteiro, e os outros dois lugares eram pintura. Agora a baia tem 88
+   de comprimento (era 58) e dois lugares de verdade, cada um com o seu
+   ocupante — o vagão passa de seis assentos pra doze, que é o que a
+   folga entre as faixas dava pra pagar sem espremer as portas. */
+var LUGARES = [4, 48];                 // topo de cada lugar, a partir do topo da baia
+var LUGAR_ALT = 40;
 var BAIAS = [
   { x: 28, y: BAIAS_Y[0], dir: 1 }, { x: 28, y: BAIAS_Y[1], dir: 1 }, { x: 28, y: BAIAS_Y[2], dir: 1 },
   { x: 270, y: BAIAS_Y[0], dir: -1 }, { x: 270, y: BAIAS_Y[1], dir: -1 }, { x: 270, y: BAIAS_Y[2], dir: -1 }
@@ -161,11 +179,15 @@ var VagaoScene = new Phaser.Class({
     this.encena = false;
 
     this.gUI = this.add.graphics().setDepth(500);
-    this.rota = new Plaqueta(this, GW / 2, 62, { cor: PAL.amarelo, depth: 505 });
+    /* A placa de rota subiu de 62 pra 48, encostada no HUD: com a baia
+       de cima começando em 116, os catorze pixels que ela devolveu são
+       a diferença entre ver e não ver quem está sentado no primeiro
+       lugar. */
+    this.rota = new Plaqueta(this, GW / 2, 48, { cor: PAL.amarelo, depth: 505 });
     // a placa de rota e a faixa de dica ficam fora do alcance do sono, e
     // a fresta que sobra é justo a do aviso do meio da tela
-    areaDeJogo(134, GH - 40, 258);
-    this.rima = new Plaqueta(this, GW / 2, 96, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
+    areaDeJogo(120, GH - 40, 258);
+    this.rima = new Plaqueta(this, GW / 2, 118, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);
@@ -257,9 +279,13 @@ var VagaoScene = new Phaser.Class({
       g.fillStyle(0x2f7fc4, 1).fillRect(ass, by, BAIA_FUNDO - 6, BAIA_COMP);
       g.fillStyle(0x63aee8, 1).fillRect(ass, by, BAIA_FUNDO - 6, 3);
       g.fillStyle(0x123a63, 1).fillRect(ass, by + BAIA_COMP - 3, BAIA_FUNDO - 6, 3);
-      g.fillStyle(0x1c5288, 0.5);                            // três lugares por baia
-      g.fillRect(ass, by + Math.round(BAIA_COMP / 3), BAIA_FUNDO - 6, 1);
-      g.fillRect(ass, by + Math.round(BAIA_COMP * 2 / 3), BAIA_FUNDO - 6, 1);
+      /* um risco por divisa entre lugares, e só. Antes eram dois riscos
+         pra três lugares que não existiam: o desenho prometia o que o
+         banco não entregava. */
+      g.fillStyle(0x1c5288, 0.5);
+      for (var v = 1; v < LUGARES.length; v++) {
+        g.fillRect(ass, by + LUGARES[v] - 4, BAIA_FUNDO - 6, 1);
+      }
       // poste vertical em cada ponta
       for (var e = 0; e < 2; e++) {
         var ex = ld > 0 ? bx + BAIA_FUNDO - 4 : bx;
@@ -374,12 +400,21 @@ var VagaoScene = new Phaser.Class({
     var dif = GameState.dificuldade();
     this.bancos = [];
     for (var k = 0; k < BAIAS.length; k++) {
-      this.bancos.push({ x: BAIAS[k].x + BAIA_FUNDO / 2, y: BAIAS[k].y + 4, npc: null });
+      for (var l = 0; l < LUGARES.length; l++) {
+        this.bancos.push({
+          x: BAIAS[k].x + BAIA_FUNDO / 2,
+          y: BAIAS[k].y + LUGARES[l],
+          npc: null
+        });
+      }
     }
     // de madrugada o vagão está vazio e sentar é fácil; no pico, esquece
     var lot = GameState.lotacao();
-    var livres = Phaser.Math.Clamp(Math.round(6 - 5.2 * lot - (dif - 1) * 0.6), 0, 5);
-    var idx = Phaser.Utils.Array.Shuffle([0, 1, 2, 3, 4, 5]);
+    var total = this.bancos.length;
+    var livres = Phaser.Math.Clamp(Math.round(total * (1 - lot * 0.88) - (dif - 1) * 1.2), 0, total - 1);
+    var idx = [];
+    for (var n = 0; n < total; n++) idx.push(n);
+    Phaser.Utils.Array.Shuffle(idx);
     for (var i = 0; i < idx.length - livres; i++) {
       var b = this.bancos[idx[i]];
       var a = new Ator(this, b.x, b.y + 24, sorteiaPax());
@@ -425,12 +460,19 @@ var VagaoScene = new Phaser.Class({
   },
 
   bancoLivrePerto: function () {
+    var melhor = null, dist = 1e9;
     for (var i = 0; i < this.bancos.length; i++) {
       var b = this.bancos[i];
       if (b.npc) continue;
-      if (Math.abs(this.pl.sp.x - b.x) < 54 && Math.abs(this.pl.sp.y - (b.y + 24)) < 42) return b;
+      var dx = Math.abs(this.pl.sp.x - b.x), dy = Math.abs(this.pl.sp.y - (b.y + 24));
+      if (dx >= 54 || dy >= 30) continue;
+      // dois lugares na mesma baia ficam a 44 de distância: pegar o
+      // primeiro da lista sentava sempre no de cima, mesmo com o
+      // jogador colado no de baixo
+      var d = dx + dy * 2;
+      if (d < dist) { dist = d; melhor = b; }
     }
-    return null;
+    return melhor;
   },
 
   senta: function (b) {
@@ -1701,9 +1743,9 @@ var VagaoScene = new Phaser.Class({
       var aqui = (b === perto);
       var a = aqui ? 0.95 : 0.3 + 0.25 * pulso;
       g.fillStyle(0x00e676, aqui ? 0.24 : 0.08 + 0.06 * pulso);
-      g.fillRect(b.x - 8, b.y - 4, 16, BAIA_COMP - 8);
+      g.fillRect(b.x - 8, b.y - 2, 16, LUGAR_ALT - 4);
       g.lineStyle(2, 0x00e676, a);
-      g.strokeRect(b.x - 9, b.y - 5, 18, BAIA_COMP - 6);
+      g.strokeRect(b.x - 9, b.y - 3, 18, LUGAR_ALT - 2);
       // a seta nasce no corredor e aponta pro assento
       var lado = b.x < 160 ? 1 : -1, sx = b.x + lado * 15, sy = b.y + 22;
       g.fillStyle(0x00e676, a);
@@ -1721,12 +1763,16 @@ var VagaoScene = new Phaser.Class({
       var b = this.corrida.b;
       var pulso = 0.35 + 0.3 * Math.sin(this.corrida.t / 110);
       g.lineStyle(2, 0xf2c14e, pulso);
-      g.strokeRect(b.x - 13, b.y - 4, 26, BAIA_COMP - 8);
+      g.strokeRect(b.x - 13, b.y - 2, 26, LUGAR_ALT - 4);
       g.fillStyle(0xf2c14e, pulso).fillRect(b.x - 3, b.y - 12, 6, 5);
     }
 
+    /* O quanto falta pra próxima estação era uma barra em HUD_H+25, ou
+       seja, por baixo da placa de rota: aparecia como um risco vermelho
+       cortando o texto. Desceu pro rodapé, rente à faixa de dica, onde
+       tem a tela inteira pra si e não briga com nada. */
     if (this.estado === 'andando') {
-      barra(g, 8, HUD_H + 25, GW - 16, 8, this.t / this.duracao, GameState.linhaAtual().num, 0x15151f);
+      barra(g, 8, GH - 41, GW - 16, 6, this.t / this.duracao, GameState.linhaAtual().num, 0x15151f);
     }
 
     if (this.solavanco.fase === 'aviso') {
