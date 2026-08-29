@@ -12,6 +12,7 @@ var CatracaScene = new Phaser.Class({
     this.dialog = null;
     this.liberado = false;
     this.fim = false;
+    this.montaBarracas();
     this.montaGates();
 
     if (GameState.char.gratuidade) this.liberado = true;
@@ -87,6 +88,67 @@ var CatracaScene = new Phaser.Class({
     this.time.delayedCall(2400, function () { if (self.dialog) self.dialog.fecha(); });
   },
 
+  /* ---------- as barracas do saguão ----------
+     Toda estação de São Paulo tem as mesmas duas coisas: uma banca e um
+     carrinho de dogão. O carrinho é o ponto de encontro da estação, e
+     aqui ele se chama DOG DO CÃO — que é como se fala de coisa
+     monstruosa por aqui, e não é marca de ninguém.
+
+     As duas encostam na parede DIREITA, e isso não é enfeite: a
+     bilheteria fica no canto de cima à esquerda, e o caminho até ela é
+     a coluna esquerda do saguão. Barraca ali estrangulava justamente a
+     passagem de quem vai comprar passagem. */
+  montaBarracas: function () {
+    this.barracas = [
+      {
+        chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
+        x: 242, y: 300, w: 50, h: 58, lado: -1,
+        titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."',
+        cardapio: ['dogao', 'agua', 'chocolate']
+      },
+      {
+        chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0,
+        x: 242, y: 430, w: 50, h: 54, lado: -1,
+        titulo: '"Jornal, bala, pururuca."',
+        cardapio: ['pururuca', 'doce', 'jornal', 'agua']
+      }
+    ];
+  },
+
+  /* está na frente do balcão de alguma? o balcão é o lado que dá pro
+     corredor, não a parede */
+  barracaPerto: function (x, y) {
+    for (var i = 0; i < this.barracas.length; i++) {
+      var b = this.barracas[i];
+      var bx = b.lado > 0 ? b.x + b.w : b.x;          // onde fica o balcão
+      if (Math.abs(x - bx) < 34 && y > b.y - 10 && y < b.y + b.h + 10) return b;
+    }
+    return null;
+  },
+
+  pintaBarracas: function (g) {
+    for (var i = 0; i < this.barracas.length; i++) {
+      var b = this.barracas[i];
+      g.fillStyle(0x000000, 0.35).fillRect(b.x + 3, b.y + b.h, b.w, 4);
+      // o corpo
+      g.fillStyle(0x2b2b3a, 1).fillRect(b.x, b.y, b.w, b.h);
+      g.fillStyle(0x3d3d50, 1).fillRect(b.x, b.y, b.w, 3);
+      // o toldo listrado, virado pro corredor
+      var tx = b.lado > 0 ? b.x + b.w - 10 : b.x;
+      for (var f = 0; f < b.h; f += 8) {
+        g.fillStyle(((f / 8) % 2) ? b.cor : 0xf2f0ff, 1).fillRect(tx, b.y + f, 10, Math.min(8, b.h - f));
+      }
+      // o balcão, e a luz por cima dele
+      var cx = b.lado > 0 ? b.x + b.w : b.x - 4;
+      g.fillStyle(0x8a6b3a, 1).fillRect(cx - (b.lado > 0 ? 0 : 0), b.y + 8, 4, b.h - 16);
+      g.fillStyle(0xf2c14e, 0.14).fillRect(b.lado > 0 ? cx : cx - 24, b.y + 4, 28, b.h - 8);
+      // as caixas na bancada
+      g.fillStyle(0xe8a33c, 1).fillRect(b.x + 8, b.y + 12, 10, 8);
+      g.fillStyle(0x6ac06a, 1).fillRect(b.x + 8, b.y + 26, 10, 8);
+      g.fillStyle(0xd05a8a, 1).fillRect(b.x + 8, b.y + 40, 10, 8);
+    }
+  },
+
   /* ---------- cenário ---------- */
   desenhaCenario: function () {
     var g = this.add.graphics().setDepth(0);
@@ -123,6 +185,16 @@ var CatracaScene = new Phaser.Class({
     g.fillStyle(num(PAL.amarelo), 1).fillRect(20, 226, 64, 5);
     g.fillStyle(num(PAL.amareloSom), 1).fillRect(20, 231, 64, 2);
     placa(this, 52, 246, 'BILHETES', PAL.amarelo);
+
+    this.pintaBarracas(g);
+    for (var pb = 0; pb < this.barracas.length; pb++) {
+      var bb = this.barracas[pb];
+      /* A placa é centrada no nome, e 'DOG DO CÃO' tem 120 pixels: no
+         centro de uma barraca encostada na parede ela saía pela borda
+         da tela. Fica presa dentro do saguão. */
+      var px = Phaser.Math.Clamp(bb.x + bb.w / 2, 8 + bb.nome.length * 6, GW - 8 - bb.nome.length * 6);
+      placa(this, px, bb.y - 18, bb.nome, PAL.amarelo);
+    }
 
     this.gCatracas = this.add.graphics().setDepth(2);
     this.pintaCatracas();
@@ -233,6 +305,11 @@ var CatracaScene = new Phaser.Class({
   /* ---------- áreas caminháveis ---------- */
   podeIr: function (x, y) {
     if (x < 28 || x > 292) return false;
+    // o corpo da barraca é parede; o balcão é onde se atende
+    for (var b = 0; b < this.barracas.length; b++) {
+      var q = this.barracas[b];
+      if (x > q.x - 6 && x < q.x + q.w + 6 && y > q.y - 4 && y < q.y + q.h + 4) return false;
+    }
     if (y >= 244 && y <= 536) return true;
     if (y >= 116 && y <= 204) return true;
     if (y > 204 && y < 244) {
@@ -555,7 +632,9 @@ var CatracaScene = new Phaser.Class({
        pego. Fora dele, o risco é ele virar no meio do pulo. */
     var seguro = naCatraca && !vendo;
 
-    if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
+    var barraca = this.barracaPerto(x, y);
+    if (barraca) dica = nomeAgir() + ': ' + barraca.nome;
+    else if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
     else if (perto && gate.fechada) dica = 'catraca fora de serviço';
     else if (naCatraca) {
       dica = vendo
@@ -566,7 +645,8 @@ var CatracaScene = new Phaser.Class({
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 
     if (Ctrl.actJust) {
-      if (naBilheteria) this.abreMenuBilheteria();
+      if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
+      else if (naBilheteria) this.abreMenuBilheteria();
       else if (naCatraca) this.comecaPulo(gate);
     }
   }

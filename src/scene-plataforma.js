@@ -50,6 +50,8 @@ var PlataformaScene = new Phaser.Class({
     this.pl = new Ator(this, 200, 400, 'ch_' + GameState.charKey);
     this.pl.sp.setDepth(40); this.pl.dir = 'left';
 
+    this.montaAmbulante();
+
     veuDaHora(this, 60);
     this.dica = new FaixaDica(this);
     // painel do embarque, como o letreiro que fica pendurado na plataforma
@@ -283,6 +285,42 @@ var PlataformaScene = new Phaser.Class({
   },
 
   /* ---------- loop ---------- */
+  /* ---------- o ambulante da plataforma ----------
+     O carrinho de dogão fica parado no saguão; na plataforma quem vende
+     anda. É a figura mais constante do metrô de São Paulo: a caixa de
+     isopor, o preço cantado, e o passo que não para nunca.
+
+     Ele carrega o que dá pra carregar andando — bala, chocolate,
+     pururuca e água. E a água é o que ele mais vende quando aperta o
+     calor, que é quando ela também vale mais pra quem compra. */
+  montaAmbulante: function () {
+    this.ambulante = null;
+    // de madrugada não tem ninguém vendendo; no movimento, quase sempre
+    if (Math.random() > 0.35 + GameState.lotacao() * 0.55) return;
+    var a = new Ator(this, 180, 200 + Math.random() * 260,
+      ['np_ambulante_a', 'np_ambulante_b', 'np_ambulante_c'][Math.floor(Math.random() * 3)]);
+    a.sp.setDepth(39);
+    a.vy = (Math.random() < 0.5 ? -1 : 1) * 26;
+    this.ambulante = a;
+    this.gente.push(a);
+  },
+
+  andaAmbulante: function (dt) {
+    var a = this.ambulante;
+    if (!a || !a.sp || !a.sp.active) return;
+    var ny = a.sp.y + a.vy * dt / 1000;
+    if (ny < 150 || ny > 520) { a.vy = -a.vy; ny = a.sp.y; }
+    a.sp.y = ny;
+    a.dir = a.vy < 0 ? 'up' : 'down';
+    a.anima(dt, true);
+  },
+
+  ambulantePerto: function () {
+    var a = this.ambulante;
+    if (!a || !a.sp || !a.sp.active) return null;
+    return Math.hypot(this.pl.sp.x - a.sp.x, this.pl.sp.y - a.sp.y) < 46 ? a : null;
+  },
+
   update: function (time, delta) {
     Ctrl.update();
     var dt = Math.min(delta, 50);
@@ -298,6 +336,7 @@ var PlataformaScene = new Phaser.Class({
     if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
 
     for (var i = 0; i < this.plateia.length; i++) this.plateia[i].anima(dt, false);
+    this.andaAmbulante(dt);
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
     var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
@@ -313,10 +352,23 @@ var PlataformaScene = new Phaser.Class({
     resolveCorpos(this.pl, this.gente, limitaPlataforma, limitaPlataforma);
 
     var porta = this.portaPerto();
-    this.dica.setText(porta ? nomeAgir() + ': entrar no vagão'
-      : (this.estado === 'aberto' ? 'chegue na porta ◄' : ''),
-      porta ? PAL.verde : PAL.amarelo);
-    if (porta && Ctrl.actJust) this.comecaEmpurrao();
+    var vendedor = this.ambulantePerto();
+    /* A porta manda: quem está com o trem aberto na frente não vai
+       parar pra comprar bala. O ambulante é pra quem está esperando. */
+    if (porta) {
+      this.dica.setText(nomeAgir() + ': entrar no vagão', PAL.verde);
+      if (Ctrl.actJust) this.comecaEmpurrao();
+    } else if (vendedor) {
+      // 'COMPRAR DO AMBULANTE' com o prefixo dá 27 caracteres: quatro a
+      // mais do que a faixa aguenta, e o fim sai pela borda
+      this.dica.setText(nomeAgir() + ': COMPRAR', PAL.amarelo);
+      if (Ctrl.actJust) {
+        abreBarraca(this, '"Olha o chocolate, a água\ngeladinha, a pururuca!"',
+          estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua']);
+      }
+    } else {
+      this.dica.setText(this.estado === 'aberto' ? 'chegue na porta ◄' : '', PAL.amarelo);
+    }
   },
 
   fimDeJogo: function () {

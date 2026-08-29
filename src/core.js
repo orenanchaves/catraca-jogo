@@ -251,6 +251,36 @@ var CHARS = {
   }
 };
 
+/* ---------- o que se come na estação ----------
+   Não existia jeito de recuperar fôlego dentro de uma partida: descanso
+   só subia sentado no vagão, e coração só voltava no trajeto seguinte.
+   Quem começava mal, terminava pior.
+
+   Comprar comida na estação é a saída, e é a mais são-paulina que tem:
+   a banca, o carrinho de dogão, o ambulante com a caixa de isopor. Cada
+   compra custa dinheiro e alguns minutos do relógio — quem está
+   adiantado come, quem está atrasado passa reto. É o mesmo relógio que
+   decide tudo no jogo.
+
+   A água vale mais no calor: no pico e nas faixas quentes o corpo pede
+   mais, e é quando ela salva. */
+var ITENS = {
+  chocolate: { nome: 'CHOCOLATE', preco: 2.00, descanso: 8, min: 1 },
+  doce: { nome: 'DOCE', preco: 1.00, descanso: 5, min: 1 },
+  pururuca: { nome: 'PURURUCA', preco: 3.00, descanso: 10, min: 1, carisma: 1 },
+  agua: { nome: 'ÁGUA', preco: 3.00, descanso: 12, min: 1, noCalor: 1.6 },
+  cafe: { nome: 'CAFÉ', preco: 4.00, descanso: 16, min: 2 },
+  dogao: { nome: 'DOGÃO', preco: 12.00, descanso: 26, min: 4, coracao: true },
+  jornal: { nome: 'JORNAL', preco: 4.00, descanso: 4, min: 1, carisma: 5 }
+};
+
+/* Calor é o que faz a água valer o preço: as faixas de mais movimento
+   são as mais abafadas, e o vagão cheio é uma sauna. */
+function estaCalor() {
+  return GameState.lotacao() > 0.55 ||
+    (GameState.minutos > 11 * 60 && GameState.minutos < 17 * 60);
+}
+
 /* ---------- pontos e personagens destravados ----------
    Os minigames deixaram de ser só um susto no meio da viagem: ganhar dá
    ponto, e ponto atravessa a corrida — fica guardado mesmo quando a
@@ -506,6 +536,28 @@ var GameState = {
     this.poeNoTrajeto(this.origem);
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
+  },
+
+  /* Comer devolve fôlego e custa minutos. O dogão é o único que devolve
+     coração — é comida de verdade, e é caro justamente por isso. */
+  consome: function (chave) {
+    var it = ITENS[chave];
+    if (!it) return null;
+    if (this.dinheiro < it.preco) return 'falta';
+    this.gastar(it.preco);
+    this.passaTempo(it.min || 1);
+    var ganho = it.descanso * ((it.noCalor && estaCalor()) ? it.noCalor : 1);
+    this.addDescanso(ganho);
+    if (it.carisma) this.addCarisma(it.carisma);
+    /* Coração só volta se estiver faltando: comprar dogão com a vida
+       cheia é só um dogão. */
+    var deuCoracao = false;
+    if (it.coracao && this.coracoes < CORACOES_POR_PERNA) {
+      this.coracoes++;
+      deuCoracao = true;
+    }
+    this.stats.comprou = (this.stats.comprou || 0) + 1;
+    return deuCoracao ? 'coracao' : 'ok';
   },
 
   /* ---------- relógio ---------- */
@@ -1992,6 +2044,40 @@ Dialog.prototype.fecha = function () {
   for (var i = 0; i < this.tOps.length; i++) this.tOps[i].destroy();
   if (this.scene.dialog === this) this.scene.dialog = null;
 };
+
+/* ---------- comprar ----------
+   Barraca de estação, banca ou ambulante andando: muda o cenário e o
+   cardápio, não a conversa. Uma função só monta o menu, cobra, e diz o
+   que aconteceu — senão cada cena reinventa o troco. */
+function abreBarraca(scene, titulo, cardapio, aoFechar) {
+  var ops = [], i;
+  for (i = 0; i < cardapio.length; i++) {
+    (function (chave) {
+      var it = ITENS[chave];
+      var quanto = it.preco.toFixed(2).replace('.', ',');
+      var etiqueta = it.nome + '  R$ ' + quanto;
+      if (it.noCalor && estaCalor()) etiqueta += '  (CALOR)';
+      ops.push({
+        label: etiqueta, cb: function () {
+          var r = GameState.consome(chave);
+          if (r === 'falta') { sfx('nao'); fecha(scene, 'Não dá. Falta grana.'); return; }
+          sfx('moeda');
+          fecha(scene, r === 'coracao'
+            ? it.nome + ' na veia.\nVocê recuperou um coração.'
+            : it.nome + '. Deu uma segurada.');
+        }
+      });
+    })(cardapio[i]);
+  }
+  ops.push({ label: 'Deixa pra lá', cb: function () { if (aoFechar) aoFechar(); } });
+  fala(scene, titulo, ops);
+
+  function fecha(sc, msg) {
+    fala(sc, msg, []);
+    sc.time.delayedCall(1300, function () { if (sc.dialog) sc.dialog.fecha(); });
+    if (aoFechar) aoFechar();
+  }
+}
 
 function fala(scene, texto, opcoes, cfg) {
   if (scene.dialog) scene.dialog.fecha();
