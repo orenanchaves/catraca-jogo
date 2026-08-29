@@ -65,6 +65,14 @@ var CatracaScene = new Phaser.Class({
        saiu de vez — o cone já conta isso, e conta melhor. */
     this.alerta = new Plaqueta(this, GW / 2, 320, { cor: PAL.vermelho, filete: 0xe8362c, depth: 82 });
 
+    /* O tutorial é uma camada por cima da primeira partida, e a catraca
+       é onde toda partida começa. Quem já viu (ou pulou) não vê de
+       novo; o botão de rever mora no título. */
+    if (GameState.dia === 1 && !GameState.dentroDoSistema && !tutorialFeito()
+      && !this.scene.isActive('Tutorial')) {
+      this.scene.launch('Tutorial');
+    }
+
     var f = GameState.faixa();
     var cab = GameState.hora() + ', ' + f.nome.toLowerCase() + '.\n';
     var msg = GameState.char.gratuidade

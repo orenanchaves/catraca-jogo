@@ -2119,6 +2119,7 @@ var HudScene = new Phaser.Class({
         c.pl.anima(0, false);
       }
     }
+    if (typeof TUTORIAL !== 'undefined') TUTORIAL.viuZap = true;
     this.scene.launch('Zap');
   },
 

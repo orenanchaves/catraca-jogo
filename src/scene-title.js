@@ -86,6 +86,18 @@ var TitleScene = new Phaser.Class({
     // a linha da loja: preço de quem está travado, ou nada
     this.tLoja = txtC(this, GW / 2, y, '', PAL.verde, 8);
 
+    /* Quem pulou o tutorial não fica sem ele pra sempre: o botão de
+       rever mora aqui, no canto, sem disputar com o de começar. */
+    var eu = this;
+    this.tTut = txt(this, 8, GH - 26, '', PAL.cinzaEsc, 8);
+    this.zonaTut = this.add.zone(0, GH - 32, 130, 32).setOrigin(0, 0).setInteractive();
+    this.zonaTut.on('pointerdown', function () {
+      try { localStorage.removeItem('metrosp_tutorial'); } catch (e) { }
+      eu.aviso = 'TUTORIAL LIGADO';
+      sfx('ok');
+      eu.atualiza();
+    });
+
     this.tStart = txtC(this, GW / 2, GH - 28,
       TOQUE_ATIVO ? 'TOQUE FORA PRA COMEÇAR' : 'CLIQUE FORA PRA COMEÇAR', PAL.verde, 8);
     this.tweens.add({ targets: this.tStart, alpha: 0.25, duration: 600, yoyo: true, repeat: -1 });
@@ -164,6 +176,7 @@ var TitleScene = new Phaser.Class({
         .setColor(falta > 0 ? PAL.vermelho : PAL.verde);
     }
     this.tStart.setVisible(aberto);
+    this.tTut.setText(tutorialFeito() ? 'TUTORIAL ►' : '');
   },
 
   update: function (time, delta) {

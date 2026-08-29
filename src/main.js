@@ -118,7 +118,8 @@ var config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, BaldeacaoScene, FimScene, HudScene, PausaScene, ZapScene]
+  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, BaldeacaoScene, FimScene,
+    HudScene, TutorialScene, PausaScene, ZapScene]
 };
 
 window.addEventListener('load', function () {
