@@ -1346,6 +1346,15 @@ var CONTROLES_VISIVEIS = true;
    muda de cor e o rodapé manda sentar. */
 var LIMIAR_SONO = 0.32;
 
+/* A cor do medidor de descanso, numa função só: o topo e a legenda da
+   pausa precisam mostrar a mesma coisa, senão a legenda ensina uma cor
+   que o HUD não usa. */
+function corDescanso(pct, time) {
+  if (pct > 0.55) return 0x00e676;
+  if (pct > LIMIAR_SONO) return 0xf2c14e;
+  return (Math.floor(time / 300) % 2 === 0) ? 0xff8a80 : 0xe8362c;
+}
+
 /* A faixa da tela que as pálpebras podem fechar. Cada cena estreita a
    sua no create() quando tem placa fixa em cima: dormir escurece o
    vagão, mas não pode esconder a hora de chegar nem a dica de como
@@ -1905,17 +1914,28 @@ var HudScene = new Phaser.Class({
 
        Com o espaço que sobrou os dois medidores ficaram 80px em vez de
        54, que é a diferença entre ler e adivinhar. */
-    /* O botão de pausa mora na folga entre o medidor de descanso e a
-       grana, e a zona de toque é maior que o desenho: dedo não acerta
-       12 pixels. No teclado é ESC ou P. */
+    /* Medido, não estimado: com o nome de estação mais longo sobravam 4
+       pixels até os corações, e do dia 10 em diante o relógio ganhava um
+       dígito ('D10 07:22') e passava 9 pixels POR CIMA do último
+       coração. Três coisas disputavam a primeira linha.
+
+       Agora a linha de cima tem duas: onde você está e quando. Os
+       corações desceram pra segunda linha, na esquerda, e os dois
+       medidores encolheram de 80 pra 66 — ainda bem acima dos 54 de
+       antes, que eram os de adivinhar. O botão de pausa subiu pro canto
+       de cima, que é onde a mão procura, e liberou o vão que ele
+       ocupava entre o medidor e a grana.
+
+       As letras 'C' e 'D' saíram. Uma letra solta de 12 pixels não diz
+       carisma nem descanso: lia como um borrão ao lado da barra. Quem
+       quiser conferir o que é cada cor tem a legenda na pausa. */
     var eu = this;
-    this.zonaPausa = this.add.zone(194, 20, 32, 24).setOrigin(0, 0).setInteractive();
+    // a zona de toque é maior que o desenho: dedo não acerta 12 pixels
+    this.zonaPausa = this.add.zone(286, 0, 34, 22).setOrigin(0, 0).setInteractive();
     this.zonaPausa.on('pointerdown', function () { eu.abrePausa(); });
 
     this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
-    this.tHora = txt(this, GW - 8, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
-    this.tCar = txt(this, 6, 24, 'C', PAL.cinzaEsc, 8).setDepth(1001);
-    this.tDes = txt(this, 104, 24, 'D', PAL.cinzaEsc, 8).setDepth(1001);
+    this.tHora = txt(this, 284, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
     this.tGrana = txt(this, GW - 8, 24, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
     this.montaToque();
   },
@@ -2002,7 +2022,7 @@ var HudScene = new Phaser.Class({
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
     this.tEst.setVisible(temJogo);
-    this.tGrana.setVisible(temJogo); this.tCar.setVisible(temJogo); this.tDes.setVisible(temJogo);
+    this.tGrana.setVisible(temJogo);
     this.tHora.setVisible(temJogo);
     if (!temJogo) return;
 
@@ -2018,11 +2038,11 @@ var HudScene = new Phaser.Class({
     g.fillStyle(l.num, 1); g.fillRect(0, HUD_H - 4, GW, 4);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1); g.fillRect(0, HUD_H - 4, GW, 1);
 
-    /* Os corações moram na folga entre o nome da estação e o relógio.
-       Coração é desenho, não letra: cinco letras 'V' não leem como
-       vida, e a fonte não tem o glifo. */
+    /* Coração é desenho, não letra: cinco letras 'V' não leem como
+       vida, e a fonte não tem o glifo. Eles abrem a segunda linha, que
+       é a linha do seu estado — vida, carisma, descanso e grana. */
     for (var c = 0; c < CORACOES_POR_PERNA; c++) {
-      var hx = 156 + c * 12, hy = 7, cheio = c < GameState.coracoes;
+      var hx = 8 + c * 12, hy = 27, cheio = c < GameState.coracoes;
       g.fillStyle(cheio ? 0xe8362c : 0x2a2a3c, 1);
       g.fillRect(hx, hy + 1, 3, 5); g.fillRect(hx + 6, hy + 1, 3, 5);
       g.fillRect(hx + 1, hy, 7, 4); g.fillRect(hx + 1, hy + 5, 7, 2);
@@ -2030,23 +2050,20 @@ var HudScene = new Phaser.Class({
       if (cheio) g.fillStyle(0xff8a80, 1).fillRect(hx + 1, hy, 2, 2);
     }
 
-    // o ícone de pausa: duas barrinhas, no vão entre o medidor e a grana
+    // o ícone de pausa: duas barrinhas, no canto de cima à direita
     g.fillStyle(0x5a5f74, 1);
-    g.fillRect(202, 27, 3, 11); g.fillRect(208, 27, 3, 11);
+    g.fillRect(300, 5, 3, 12); g.fillRect(306, 5, 3, 12);
 
     this.tEst.setText(GameState.estacaoAtual());
     this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
     this.tHora.setText('D' + GameState.dia + ' ' + GameState.hora()).setColor(f.cor);
-    barra(g, 18, 26, 80, 11, GameState.carisma / 100, 0xe8a33c);
+    barra(g, 74, 26, 66, 11, GameState.carisma / 100, 0xe8a33c);
 
     /* O medidor de descanso era verde até o último pixel: cheio e
        quase vazio tinham a mesma cor, e a única diferença era um
        comprimento que ninguém compara de relance. Agora ele esquenta
        conforme baixa, e pisca quando o sono está pra bater. */
     var pd = GameState.descanso / GameState.char.descansoMax;
-    var corD = pd > 0.55 ? 0x00e676 : (pd > LIMIAR_SONO ? 0xf2c14e : 0xe8362c);
-    if (pd <= LIMIAR_SONO && Math.floor(time / 300) % 2 === 0) corD = 0xff8a80;
-    barra(g, 116, 26, 80, 11, pd, corD);
-    this.tDes.setColor(pd <= LIMIAR_SONO ? PAL.vermelho : PAL.cinzaEsc);
+    barra(g, 146, 26, 66, 11, pd, corDescanso(pd, time));
   }
 });

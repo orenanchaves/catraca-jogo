@@ -53,6 +53,13 @@ var PausaScene = new Phaser.Class({
       this.zonas.push(z);
     }
 
+    /* As duas barras do HUD perderam as letras 'C' e 'D' — uma letra
+       solta de 12 pixels não dizia carisma nem descanso, lia como
+       borrão ao lado da barra. A legenda mora aqui, que é onde quem
+       ficou na dúvida vai olhar, e são as mesmas barras do topo. */
+    this.tLegC = txt(this, 138, 452, 'CARISMA', PAL.cinzaEsc, 8).setDepth(2002);
+    this.tLegD = txt(this, 138, 486, 'DESCANSO', PAL.cinzaEsc, 8).setDepth(2002);
+
     this.input.keyboard.on('keydown', function (ev) {
       var c = ev.code;
       if (c === 'Escape' || c === 'KeyP') { self.fecha(); return; }
@@ -93,6 +100,15 @@ var PausaScene = new Phaser.Class({
       this.itens[i].setText(it.rotulo())
         .setColor(!vale ? PAL.cinzaEsc : (sel ? PAL.amarelo : PAL.cinza));
     }
+
+    // a legenda das duas barras, com os valores de agora
+    this.tLegC.setVisible(dentro); this.tLegD.setVisible(dentro);
+    if (!dentro) return;
+    g.fillStyle(0x232336, 1).fillRect(88, 440, 168, 1);
+    var pd = GameState.descanso / GameState.char.descansoMax;
+    barra(g, 88, 458, 40, 9, GameState.carisma / 100, 0xe8a33c);
+    // a mesma cor do topo, senão a legenda ensina uma cor que não existe
+    barra(g, 88, 492, 40, 9, pd, corDescanso(pd, 0));
   },
 
   escolhe: function () {
