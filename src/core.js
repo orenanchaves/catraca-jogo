@@ -1332,20 +1332,25 @@ function sfx(n) {
 var TOUCH = { up: false, down: false, left: false, right: false, act: false, pulso: false };
 var TOQUE_ATIVO = false;
 
-/* ---------- manche flutuante ----------
+/* ---------- manche flutuante, e a tela dividida ----------
    O direcional fixo comia 108px do rodapé — quase um quinto da tela — e
    ficava aceso mesmo sem ninguém encostar, bem em cima da multidão. Aqui
    não há nada desenhado até o dedo tocar: onde ele tocar nasce o manche,
    e ele some quando o dedo sai. A tela inteira volta a ser jogo.
 
-   Encostar e ficar parado é agir; encostar e arrastar é andar. Como um
-   toque curto pode nascer e morrer dentro do mesmo quadro, quem confirma
-   o toque rápido é a soltura, não o começo — e é por isso também que
-   agir só vale depois de uma espera curta: sem ela, todo começo de
-   caminhada dispararia um agir antes de o dedo sair do lugar. */
+   Só que "onde tocar nasce o manche" tinha um preço: todo toque pra
+   agir começava um manche, e todo começo de caminhada corria o risco de
+   virar um agir. As duas coisas disputavam o mesmo gesto, e o jogo
+   ficava adivinhando qual era qual pelo tempo que o dedo passou parado.
+
+   Agora a tela é dividida: a metade ESQUERDA anda, a metade DIREITA
+   age. Um polegar em cada lado, os dois ao mesmo tempo — dá pra
+   atravessar o vagão segurando na barra, que antes era impossível. */
+var LADO_ACAO = GW / 2;
 var TOQUE = {
-  ativo: false, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
+  ativo: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
 };
+var TOQUE_DIR = { ativo: false, id: -1, x: 0, y: 0, t0: 0 };
 var MANCHE = {
   zonaMorta: 10,   // menos que isso é dedo tremendo, não direção
   raio: 26,        // passou daqui, o manche desliza junto com o dedo
@@ -1355,6 +1360,10 @@ var MANCHE = {
 
 function atualizaManche(agora) {
   TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = TOUCH.act = false;
+
+  // o dedo da direita é o botão: enquanto está encostado, está agindo
+  if (TOQUE_DIR.ativo) TOUCH.act = true;
+
   if (!TOQUE.ativo) return;
 
   var dx = TOQUE.x - TOQUE.ox, dy = TOQUE.y - TOQUE.oy;
@@ -1364,7 +1373,10 @@ function atualizaManche(agora) {
      direção nenhuma: lá o dedo encostado é só o botão de agir */
   if (!CONTROLES_VISIVEIS || d <= MANCHE.zonaMorta) {
     TOQUE.dx = TOQUE.dy = 0;
-    if (!TOQUE.arrastando && agora - TOQUE.t0 > MANCHE.espera) TOUCH.act = true;
+    /* Onde não há pra onde andar (título, resultado) a tela inteira é
+       botão, e o dedo parado age. Onde há, agir é coisa da direita: o
+       dedo esquerdo parado é só um dedo parado. */
+    if (!CONTROLES_VISIVEIS && !TOQUE.arrastando && agora - TOQUE.t0 > MANCHE.espera) TOUCH.act = true;
     return;
   }
 
@@ -1997,22 +2009,39 @@ var HudScene = new Phaser.Class({
     TOQUE_ATIVO = this.sys.game.device.input.touch;
     var self = this;
 
+    // dois dedos: um anda e o outro age, ao mesmo tempo
+    this.input.addPointer(2);
+
     this.input.on('pointerdown', function (p) {
-      TOQUE.ativo = true; TOQUE.arrastando = false;
+      if (CONTROLES_VISIVEIS && p.x >= LADO_ACAO) {
+        TOQUE_DIR.ativo = true; TOQUE_DIR.id = p.id;
+        TOQUE_DIR.x = p.x; TOQUE_DIR.y = p.y; TOQUE_DIR.t0 = self.time.now;
+        return;
+      }
+      TOQUE.ativo = true; TOQUE.id = p.id; TOQUE.arrastando = false;
       TOQUE.ox = TOQUE.x = p.x; TOQUE.oy = TOQUE.y = p.y;
       TOQUE.dx = TOQUE.dy = 0;
       TOQUE.t0 = self.time.now;
     });
     this.input.on('pointermove', function (p) {
-      if (!p.isDown || !TOQUE.ativo) return;
-      TOQUE.x = p.x; TOQUE.y = p.y;
+      if (!p.isDown) return;
+      if (TOQUE_DIR.ativo && p.id === TOQUE_DIR.id) { TOQUE_DIR.x = p.x; TOQUE_DIR.y = p.y; return; }
+      if (TOQUE.ativo && p.id === TOQUE.id) { TOQUE.x = p.x; TOQUE.y = p.y; }
     });
-    this.input.on('pointerup', function () {
-      /* quem confirma o toque curto é a soltura: se o dedo saiu sem ter
-         andado, era um toque, mesmo que tenha durado menos que um quadro */
-      if (TOQUE.ativo && !TOQUE.arrastando) TOUCH.pulso = true;
-      TOQUE.ativo = false; TOQUE.arrastando = false;
-      TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = TOUCH.act = false;
+    this.input.on('pointerup', function (p) {
+      if (TOQUE_DIR.ativo && p.id === TOQUE_DIR.id) {
+        /* quem confirma o toque curto é a soltura: um toque pode nascer
+           e morrer dentro do mesmo quadro */
+        TOUCH.pulso = true;
+        TOQUE_DIR.ativo = false; TOQUE_DIR.id = -1;
+        TOUCH.act = false;
+        return;
+      }
+      if (TOQUE.ativo && p.id !== TOQUE.id) return;
+      // sem direcional na tela, o toque solto de qualquer lado é o Z
+      if (TOQUE.ativo && !TOQUE.arrastando && !CONTROLES_VISIVEIS) TOUCH.pulso = true;
+      TOQUE.ativo = false; TOQUE.id = -1; TOQUE.arrastando = false;
+      TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = false;
     });
 
     this.gManche = this.add.graphics().setDepth(1200);
@@ -2066,6 +2095,11 @@ var HudScene = new Phaser.Class({
       m.lineStyle(2, 0xf2f0ff, 0.2).strokeCircle(TOQUE.ox, TOQUE.oy, MANCHE.raio);
       m.fillStyle(0xf2f0ff, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 9);
       m.fillStyle(0x08080e, 0.5).fillCircle(TOQUE.ox + TOQUE.dx, TOQUE.oy + TOQUE.dy, 3);
+    }
+    // e o dedo da direita ganha um anel: sem retorno, toque não parece toque
+    if (TOQUE_DIR.ativo) {
+      m.lineStyle(2, 0xf2c14e, 0.55).strokeCircle(TOQUE_DIR.x, TOQUE_DIR.y, 15);
+      m.fillStyle(0xf2c14e, 0.18).fillCircle(TOQUE_DIR.x, TOQUE_DIR.y, 13);
     }
 
     this.pintaSono(time);
