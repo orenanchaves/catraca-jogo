@@ -14,7 +14,11 @@ var ASSETS = {
     { key: 'np_idoso', file: 'assets/npcs/idoso.png', pal: PELES.idoso, corpo: 'senhor' },
     { key: 'np_gestante', file: 'assets/npcs/gestante.png', pal: PELES.gestante, corpo: 'gestante' },
     { key: 'np_mae_bebe', file: 'assets/npcs/mae_bebe.png', pal: PELES.colo0, corpo: 'colo_longo' },
+    /* Os três uniformes do metrô: azul com azul é o menorzinho, azul
+       com bege é o do meio, e preto todo é o grandão. */
     { key: 'np_guardinha', file: 'assets/npcs/guardinha.png', pal: PELES.guardinha, corpo: 'padrao' },
+    { key: 'np_guarda_medio', file: 'assets/npcs/guarda_medio.png', pal: PELES.guardaMedio, corpo: 'careca' },
+    { key: 'np_guarda_forte', file: 'assets/npcs/guarda_forte.png', pal: PELES.guardaForte, corpo: 'volumoso' },
     { key: 'np_rimador', file: 'assets/npcs/rimador.png', pal: PELES.rimador, corpo: 'bone' },
     { key: 'np_pedinte', file: 'assets/npcs/pedinte.png', pal: PELES.pedinte, corpo: 'pedinte' },
     { key: 'np_pedinte_b', file: 'assets/npcs/pedinte_b.png', pal: PELES.pedinte2, corpo: 'pedinte' },

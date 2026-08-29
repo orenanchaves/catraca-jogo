@@ -466,10 +466,14 @@ var GameState = {
      precisa de conta. O minuto continua existindo por baixo. */
   horaLimite: function () { return horaTexto((this.minutoSaida + LIMITE_ATRASO) % 1440); },
 
-  /* um minigame perdido custa um coração; ganho não devolve nada, senão
-     o recurso vira placar e para de doer */
-  perdeCoracao: function () {
-    this.coracoes = Math.max(0, this.coracoes - 1);
+  /* Um minigame perdido custa um coração; ganho não devolve nada, senão
+     o recurso vira placar e para de doer.
+
+     O quanto passou a variar por causa dos guardinhas: o menorzinho
+     tira meio, o do meio um, e o grandão dois. Por isso o contador
+     virou fracionário e o HUD desenha meio coração. */
+  perdeCoracao: function (quanto) {
+    this.coracoes = Math.max(0, this.coracoes - (quanto || 1));
     this.stats.minigamesPerdidos++;
     return this.coracoes;
   },
@@ -1105,7 +1109,12 @@ var PELES = {
   ambulante: pele('#0a0a12', '#8a5a3c', '#e8a33c', '#e8a33c', '#2e2e40', '#14141c', '#f0eeff'),
   idoso: pele('#0a0a12', '#e0b088', '#d8d8e8', '#6b6152', '#4a4438', '#14141c', '#f0eeff'),
   gestante: pele('#0a0a12', '#c99a70', '#3a2a22', '#c85a9a', '#2a2a38', '#14141c', '#e28cc0'),
+  /* Os três uniformes do metrô, e cada um é uma patente. Quem joga
+     aprende a ler a roupa antes de ler o número: preto todo é o
+     grandão, azul com bege é o do meio, azul com azul é o menorzinho. */
   guardinha: pele('#0a0a12', '#b07d52', '#1a2540', '#20325c', '#20325c', '#14141c', '#9fb6dd'),
+  guardaMedio: pele('#0a0a12', '#e0b088', '#2a2a30', '#20325c', '#b09a68', '#2a2a30', '#d8e24a'),
+  guardaForte: pele('#0a0a12', '#8a5a3c', '#0a0a12', '#15151d', '#15151d', '#0a0a12', '#4a4a5c'),
   // os dois que se compram com ponto de minigame
   gestanteJog: pele('#0a0a12', '#e0b088', '#4a2f1e', '#d4548e', '#33334a', '#14141c', '#ffd0e6'),
   turista: pele('#0a0a12', '#f0c8a0', '#e8c96a', '#f2f0ff', '#4a7fc0', '#14141c', '#e8362c'),
@@ -1526,6 +1535,44 @@ function areaDeJogo(topo, base, foco) {
   AREA_JOGO.foco = foco || Math.round((AREA_JOGO.topo + AREA_JOGO.base) / 2);
 }
 
+/* ---------- as três patentes do guardinha ----------
+   No metrô de verdade o uniforme diz a patente, e quem anda de metrô
+   aprende a ler isso sem pensar. Aqui vale a mesma coisa: a roupa
+   avisa quanto custa ser pego, antes de custar.
+
+   O tamanho acompanha: o grandão é desenhado maior, e o menorzinho
+   menor. Ninguém precisa ler número nenhum pra saber qual é qual. */
+var GUARDAS = {
+  fraco: {
+    chave: 'fraco', sprite: 'np_guardinha', escala: 0.88, custo: 0.5,
+    nome: 'O GUARDINHA', vel: 1.15, cone: 0.85,
+    fala: '"Ó o moço aí!"\nDeu bronca e liberou.'
+  },
+  medio: {
+    chave: 'medio', sprite: 'np_guarda_medio', escala: 1, custo: 1,
+    nome: 'O FISCAL', vel: 1, cone: 1,
+    fala: '"Vem cá você."\nAnotou seu nome e te devolveu\npro fim do saguão.'
+  },
+  forte: {
+    chave: 'forte', sprite: 'np_guarda_forte', escala: 1.25, custo: 2,
+    nome: 'O SEGURANÇA', vel: 0.82, cone: 1.25,
+    fala: '"Perdeu, playboy."\nEsse não passa a mão na cabeça\nde ninguém.'
+  }
+};
+
+/* Quem está de plantão hoje. De madrugada sobra o menorzinho; no pico
+   a estação chama o grandão, e a dificuldade puxa junto. */
+function sorteiaGuarda() {
+  /* O peso tem teto: sem ele, no décimo dia de pico o grandão aparecia
+     em nove de cada dez partidas, e ser pego custa dois dos cinco
+     corações — a catraca virava roleta-russa em vez de decisão. */
+  var peso = Math.min(0.55, GameState.lotacao() * 0.45 + (GameState.dificuldade() - 1) * 0.10);
+  var r = Math.random();
+  if (r < 0.10 + peso * 0.6) return GUARDAS.forte;
+  if (r < 0.55 + peso * 0.3) return GUARDAS.medio;
+  return GUARDAS.fraco;
+}
+
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
 /* o verbo que só este personagem tem */
@@ -1545,8 +1592,15 @@ var METADES_CORACAO = [
   [[1, 1, 3, 5], [0, 0, 3, 4], [0, 5, 3, 2], [0, 7, 2, 1], [0, 8, 1, 1]]
 ];
 
-function coracaoQuebrado(scene, x, y) {
+function coracaoQuebrado(scene, x, y, quanto) {
   if (!scene || !scene.add || !scene.tweens) return;
+  /* Dois corações partindo quando o grandão pega: o número no HUD cai
+     dois, e o desenho precisa dizer a mesma coisa. */
+  var vezes = (quanto || 1) >= 2 ? 2 : 1;
+  for (var v = 0; v < vezes; v++) desenhaCoracaoQuebrado(scene, x + (vezes > 1 ? (v ? 14 : -14) : 0), y);
+}
+
+function desenhaCoracaoQuebrado(scene, x, y) {
   for (var m = 0; m < 2; m++) {
     var lado = m ? 1 : -1;
     var g = scene.add.graphics().setDepth(940);
@@ -1579,10 +1633,10 @@ function coracaoQuebrado(scene, x, y) {
 /* Todo lugar que tira um coração passa por aqui: a perda é a coisa
    mais importante que acontece com o jogador e não podia depender de
    cada minigame lembrar de mostrar. */
-function perdeVida(scene, sp) {
-  var n = GameState.perdeCoracao();
-  if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40);
-  if (scene && scene.cameras) scene.cameras.main.shake(220, 0.005);
+function perdeVida(scene, sp, quanto) {
+  var n = GameState.perdeCoracao(quanto);
+  if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40, quanto);
+  if (scene && scene.cameras) scene.cameras.main.shake(220 * Math.min(2, quanto || 1), 0.005 * Math.min(2, quanto || 1));
   return n;
 }
 
@@ -2282,12 +2336,19 @@ var HudScene = new Phaser.Class({
     for (var c = 0; c < CORACOES_POR_PERNA; c++) {
       // passo 14 e não 12: com 3 pixels entre um e outro os cinco liam
       // como um borrão vermelho só, em vez de cinco vidas
-      var hx = 8 + c * 14, hy = 33, cheio = c < GameState.coracoes;
-      g.fillStyle(cheio ? 0xe8362c : 0x2a2a3c, 1);
-      g.fillRect(hx, hy + 1, 3, 5); g.fillRect(hx + 6, hy + 1, 3, 5);
-      g.fillRect(hx + 1, hy, 7, 4); g.fillRect(hx + 1, hy + 5, 7, 2);
-      g.fillRect(hx + 2, hy + 7, 5, 1); g.fillRect(hx + 3, hy + 8, 3, 1);
-      if (cheio) g.fillStyle(0xff8a80, 1).fillRect(hx + 1, hy, 2, 2);
+      var hx = 8 + c * 14, hy = 33;
+      var sobra = GameState.coracoes - c;
+      // o guardinha menorzinho tira meio coração: metade acesa, metade não
+      var meio = (sobra > 0 && sobra < 1);
+      g.fillStyle(sobra >= 1 || meio ? 0xe8362c : 0x2a2a3c, 1);
+      g.fillRect(hx, hy + 1, 3, 5);
+      g.fillRect(hx + 1, hy, 4, 4); g.fillRect(hx + 1, hy + 5, 4, 2);
+      g.fillRect(hx + 2, hy + 7, 3, 1); g.fillRect(hx + 3, hy + 8, 2, 1);
+      g.fillStyle(sobra >= 1 ? 0xe8362c : 0x2a2a3c, 1);
+      g.fillRect(hx + 6, hy + 1, 3, 5);
+      g.fillRect(hx + 5, hy, 3, 4); g.fillRect(hx + 5, hy + 5, 3, 2);
+      g.fillRect(hx + 5, hy + 7, 2, 1); g.fillRect(hx + 5, hy + 8, 1, 1);
+      if (sobra >= 1 || meio) g.fillStyle(0xff8a80, 1).fillRect(hx + 1, hy, 2, 2);
     }
 
     // o ícone de pausa: duas barrinhas, no canto de cima à direita

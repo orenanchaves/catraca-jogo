@@ -19,8 +19,13 @@ var CatracaScene = new Phaser.Class({
 
     this.desenhaCenario();
 
-    this.guarda = new Ator(this, 80, 194, 'np_guardinha');
+    /* Quem está de plantão muda a partida inteira: o menorzinho tira
+       meio coração, o do meio um, o grandão dois. A roupa avisa antes
+       do número, e o tamanho avisa antes da roupa. */
+    this.patente = sorteiaGuarda();
+    this.guarda = new Ator(this, 80, 194, this.patente.sprite);
     this.guarda.sp.setDepth(50);
+    this.guarda.sp.setScale(this.patente.escala);
     this.guarda.fixo = true;          // ninguém empurra o guardinha
     this.gEstado = 'anda';
     this.gTempo = 0;
@@ -356,12 +361,14 @@ var CatracaScene = new Phaser.Class({
   cone: function () {
     var g = this.guarda, dif = GameState.dificuldade();
     var o = this.gOlhando;
+    // o grandão enxerga mais longe, e o menorzinho menos
+    var k = this.patente.cone;
     return {
       ax: g.sp.x,
       ay: g.sp.y - 8,
       cx: g.sp.x + (o ? 0 : this.gVx * 54),
-      meia: (o ? 62 : 38) + dif * 3,
-      alc: (o ? 116 : 94) + dif * 5
+      meia: ((o ? 62 : 38) + dif * 3) * k,
+      alc: ((o ? 116 : 94) + dif * 5) * k
     };
   },
 
@@ -399,7 +406,7 @@ var CatracaScene = new Phaser.Class({
     var g = this.guarda;
 
     if (this.gEstado === 'anda') {
-      var v = (52 + dif * 16) * this.gVx * (dt / 1000);
+      var v = (52 + dif * 16) * this.patente.vel * this.gVx * (dt / 1000);
       var nx = g.sp.x + v;
       if (nx < 60) { nx = 60; this.gVx = 1; }
       if (nx > 286) { nx = 286; this.gVx = -1; }
@@ -514,12 +521,11 @@ var CatracaScene = new Phaser.Class({
     this.pl.dir = 'down';
     this.flagra = { t: 0 };
     sfx('apito');
-    this.cameras.main.shake(340, 0.008);
-    perdeVida(this, this.pl.sp);
-    GameState.addCarisma(-6);
+    perdeVida(this, this.pl.sp, this.patente.custo);
+    GameState.addCarisma(-6 * this.patente.custo);
     GameState.passaTempo(3);
     this.gEstado = 'olha'; this.gTempo = 0; this.gOlhando = true;
-    this.alerta.setText('! ELE TE VIU !');
+    this.alerta.setText('! ' + this.patente.nome + ' TE VIU !');
   },
 
   atualizaFlagra: function (dt) {
@@ -540,7 +546,7 @@ var CatracaScene = new Phaser.Class({
     this.flagra = null;
     this.alerta.setText('');
     var self = this;
-    fala(this, '"Ó o moço aí!"\nEle te viu pulando. Voltou\npro fim do saguão.', [
+    fala(this, this.patente.fala, [
       {
         label: 'Voltar pro começo', cb: function () {
           self.pl.sp.x = 160; self.pl.sp.y = 512; self.pl.dir = 'up';
