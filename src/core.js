@@ -143,21 +143,15 @@ var FAIXAS = [
   }
 ];
 
-/* cada dia sai de casa numa hora diferente: é sempre o mesmo trajeto,
-   mas nunca na mesma São Paulo. A volta é a saída mais uma jornada, e é
-   isso que amarra as duas pontas do dia — quem sai 4h20 volta no
-   entre-pico, quem sai 16h20 volta no último trem. */
-var JORNADA = 9 * 60 + 30;
-var HORAS_INICIO = [
-  6 * 60 + 10,        // dia 1: pico da manhã, o batismo
-  4 * 60 + 20,        // madrugada, estação abrindo
-  16 * 60 + 20,       // pico da tarde virando noite
-  9 * 60 + 50,        // entre-pico, o dia inteiro morno
-  22 * 60 + 20,       // noite virando último trem e madrugada
-  13 * 60 + 30        // tarde engrossando pro pico
-];
+/* A hora de sair era uma lista fixa, uma por dia: dia 1 no pico da
+   manhã, dia 2 de madrugada, e assim por diante. Isso dava variedade
+   ENTRE os dias, mas o dia de dentro era sempre igual — sai, volta, e
+   as duas pontas na mesma São Paulo.
 
-function horaDaSaida(dia) { return HORAS_INICIO[(dia - 1) % HORAS_INICIO.length]; }
+   Agora quem diz a hora de cada perna é a rotina do personagem (ver
+   ROTINAS em zipzap.js), e a variedade mudou de lugar: o estudante sai
+   6h50 no pico, volta da faculdade 13h10 no entre-pico e pega o último
+   trem às 22h40 — três São Paulos no mesmo dia. */
 
 function faixaDe(min) {
   var m = ((min % 1440) + 1440) % 1440;
@@ -311,7 +305,15 @@ var GameState = {
     this.descanso = c.descanso;
     this.dinheiro = c.dinheiro;
     this.valeRestante = c.valeTransporte;
-    this.perna = 'ida';                       // ida = casa→trabalho, volta = trabalho→casa
+    /* O dia deixou de ser ida-e-volta: agora é a lista de pernas da
+       rotina deste personagem (ver zipzap.js). A perna 0 sai de casa, e
+       a última sempre volta pra casa. */
+    this.pernaIdx = 0;
+    this.origem = CASA;
+    this.compromisso = null;
+    this.destino = this.destinoDaRotina();
+    this.perna = this.ultimaPerna() ? 'volta' : 'ida';
+    this.zap = montaZap(charKey);
     this.poeNoTrajeto(CASA);
     this.estacoes = 0;
     this.dia = 1;
@@ -320,13 +322,14 @@ var GameState = {
     this.ultimoAtraso = 0;
     this.coracoes = CORACOES_POR_PERNA;
     this.pontosDaCorrida = 0;
-    this.minutos = horaDaSaida(1) + Math.floor(Math.random() * 25) - 12;
+    this.minutos = this.pernaAtual().saida + Math.floor(Math.random() * 21) - 10;
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
     this.dentroDoSistema = false;
     this.sentado = false;
     this.motivoFim = '';
     this.stats = {
+      compromissos: 0,
       cedidos: 0, disfarces: 0, disfarcesOk: 0, recusas: 0,
       catracasPuladas: 0, catracasPagas: 0, causos: 0, baldeacoes: 0,
       minigamesGanhos: 0, minigamesPerdidos: 0
@@ -349,8 +352,32 @@ var GameState = {
      O jogo não conduz ninguém pela mão: o trem anda sozinho no sentido
      certo, mas quem tem que descer na estação certa é você. Descer
      antes custa o trem seguinte; passar da sua custa a volta. */
-  destinoFinal: function () { return this.perna === 'ida' ? TRABALHO : CASA; },
-  origemDaPerna: function () { return this.perna === 'ida' ? CASA : TRABALHO; },
+  /* ---------- rotina, compromisso e destino ---------- */
+  pernaAtual: function () {
+    var r = rotinaDe(this.charKey);
+    return r[Math.min(this.pernaIdx, r.length - 1)];
+  },
+  destinoDaRotina: function () { return this.pernaAtual().estacao; },
+  /* O rótulo da perna é o que o jogo diz que você está fazendo. Com
+     compromisso aceito é o dele, porque o destino é o dele. */
+  rotuloDaPerna: function () {
+    return this.compromisso ? this.compromisso.rotulo : this.pernaAtual().rotulo;
+  },
+  ultimaPerna: function () { return this.pernaIdx >= rotinaDe(this.charKey).length - 1; },
+
+  destinoFinal: function () { return this.destino; },
+  origemDaPerna: function () { return this.origem; },
+
+  /* Aceitar um compromisso no ZipZap troca a estação desta perna. É a
+     única coisa no jogo que muda o destino, e sai de graça: o preço é o
+     caminho ficar mais longo, mais curto, ou mudar de linha. */
+  aceitaCompromisso: function (fio) {
+    if (!fio || !fio.vai) return;
+    fio.aceito = true;
+    this.compromisso = { rotulo: fio.vai.rotulo, estacao: fio.vai.estacao, de: fio.nome };
+    this.destino = fio.vai.estacao;
+    this.apontaPraAlvo();
+  },
 
   // precisa trocar de linha pra chegar no destino?
   faltaBaldear: function () {
@@ -439,27 +466,44 @@ var GameState = {
     this.faixaAnterior = this.faixa().key;
   },
 
+  /* Chegou onde tinha que chegar. A perna que acabou vira a origem da
+     próxima, o compromisso é dado por cumprido, e a caixa do ZipZap é
+     nova: cada trecho traz a sua própria confusão. */
   chegouNoDestino: function () {
     this.pernasFeitas++;
     this.dentroDoSistema = false;
     this.coracoes = CORACOES_POR_PERNA;      // trajeto novo, fôlego novo
     this.ultimoAtraso = Math.max(0, this.minutosNaPerna() - LIMITE_ATRASO);
-    if (this.perna === 'ida') {
-      if (this.ultimoAtraso > 0) this.atrasos++;
-    } else {
+    var eraUltima = this.ultimaPerna();
+
+    if (eraUltima) {
       // dormir: quanto mais tarde chega em casa, menos noite sobra
       this.addDescanso(Phaser.Math.Clamp(30 - this.ultimoAtraso * 0.4, 6, 30));
+    } else if (this.ultimoAtraso > 0) {
+      this.atrasos++;
     }
-    if (this.perna === 'ida') {
-      this.perna = 'volta';
-      this.minutos = (horaDaSaida(this.dia) + JORNADA + Math.floor(Math.random() * 40) - 20 + 1440) % 1440;
-    } else {
-      this.perna = 'ida';
+    if (this.compromisso) { this.stats.compromissos++; this.compromisso = null; }
+
+    this.origem = this.destino;
+    if (eraUltima) {
+      this.pernaIdx = 0;
       this.dia++;
       this.valeRestante = this.char.valeTransporte;
-      this.minutos = (horaDaSaida(this.dia) + Math.floor(Math.random() * 25) - 12 + 1440) % 1440;
+      this.origem = CASA;
+    } else {
+      this.pernaIdx++;
     }
-    this.poeNoTrajeto(this.origemDaPerna());
+    this.destino = this.destinoDaRotina();
+    this.perna = this.ultimaPerna() ? 'volta' : 'ida';
+
+    /* Sair antes da hora não existe: se você chegou cedo, o relógio
+       espera o próximo compromisso; se chegou atrasado, você sai
+       atrasado e a próxima perna já começa apertada. */
+    var saida = this.pernaAtual().saida + Math.floor(Math.random() * 21) - 10;
+    if (eraUltima || saida > this.minutos) this.minutos = (saida + 1440) % 1440;
+
+    this.zap = montaZap(this.charKey);
+    this.poeNoTrajeto(this.origem);
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
   },
@@ -1997,9 +2041,15 @@ var HudScene = new Phaser.Class({
     this.zonaPausa = this.add.zone(286, 0, 34, 26).setOrigin(0, 0).setInteractive();
     this.zonaPausa.on('pointerdown', function () { eu.abrePausa(); });
 
+    /* A alça do celular, no canto direito da segunda linha. Grana e dia
+       moravam no topo e foram pra dentro dele: eram as duas coisas que
+       não mudam nenhuma decisão no meio de um vagão, e eram justamente
+       as que espremiam o resto. */
+    this.zonaZap = this.add.zone(268, 26, 52, 26).setOrigin(0, 0).setInteractive();
+    this.zonaZap.on('pointerdown', function () { eu.abreZap(); });
+
     this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
     this.tHora = txt(this, 284, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
-    this.tGrana = txt(this, GW - 8, 30, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
     this.montaToque();
   },
 
@@ -2049,10 +2099,27 @@ var HudScene = new Phaser.Class({
   },
 
   abrePausa: function () {
-    if (this.scene.isActive('Pausa')) return;
+    if (this.scene.isActive('Pausa') || this.scene.isActive('Zap')) return;
     if (!HUD_VISIVEL && !GameState.char) return;   // no título não há o que pausar
     audioOn();
     this.scene.launch('Pausa');
+  },
+
+  /* Abrir o celular é parar de olhar pra frente: o jogo congela e o
+     boneco baixa a cabeça pro aparelho. */
+  abreZap: function () {
+    if (this.scene.isActive('Zap') || this.scene.isActive('Pausa')) return;
+    if (!GameState.char || !HUD_VISIVEL) return;
+    audioOn();
+    var cenas = this.scene.manager.getScenes(true);
+    for (var i = 0; i < cenas.length; i++) {
+      var c = cenas[i];
+      if (c.pl && c.pl.sp && c.pl.sp.active && !c.sentadoEm) {
+        c.pl.dir = 'down';
+        c.pl.anima(0, false);
+      }
+    }
+    this.scene.launch('Zap');
   },
 
   /* ---------- as pálpebras ---------- */
@@ -2107,7 +2174,6 @@ var HudScene = new Phaser.Class({
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
     this.tEst.setVisible(temJogo);
-    this.tGrana.setVisible(temJogo);
     this.tHora.setVisible(temJogo);
     if (!temJogo) return;
 
@@ -2142,8 +2208,21 @@ var HudScene = new Phaser.Class({
     g.fillRect(300, 6, 3, 12); g.fillRect(306, 6, 3, 12);
 
     this.tEst.setText(GameState.estacaoAtual());
-    this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
-    this.tHora.setText('D' + GameState.dia + ' ' + GameState.hora()).setColor(f.cor);
+    this.tHora.setText(GameState.hora()).setColor(f.cor);
+
+    /* O celular: um retângulo com tela, e a bolinha vermelha de não
+       lidas por cima. É a linguagem de qualquer aparelho — quem vê
+       bolinha vermelha sabe que tem recado esperando. */
+    var zx = 286, zy = 29;
+    g.fillStyle(0x2c2c3a, 1).fillRect(zx, zy, 16, 22);
+    g.fillStyle(0x0d1a14, 1).fillRect(zx + 2, zy + 3, 12, 15);
+    g.fillStyle(0x00e676, 0.75).fillRect(zx + 3, zy + 5, 10, 2);
+    g.fillStyle(0x00e676, 0.45).fillRect(zx + 3, zy + 9, 7, 2);
+    g.fillStyle(0x4a4a5e, 1).fillRect(zx + 6, zy + 19, 4, 1);
+    if (naoLidas(GameState.zap)) {
+      g.fillStyle(0xe8362c, 1).fillCircle(zx + 15, zy + 3, 5);
+      g.fillStyle(0xffffff, 1).fillRect(zx + 14, zy + 1, 2, 4);
+    }
     /* Os quatro blocos da segunda linha com o mesmo respiro entre eles:
        corações 8..73, carisma 84..144, descanso 155..215, grana até 312.
        Onze pixels em cada vão, em vez de seis entre as barras. */

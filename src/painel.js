@@ -171,7 +171,7 @@
       var falta = GameState.faltamEstacoes();
       el.destino.textContent = GameState.alvoAtual() + (falta > 0 ? ' (' + falta + ')' : '');
       el.destino.style.color = falta <= 1 ? '#00e676' : '#f2f0ff';
-      el.perna.textContent = GameState.perna === 'ida' ? 'TRABALHO' : 'CASA';
+      el.perna.textContent = GameState.rotuloDaPerna();
       if (GameState.perna === 'ida') {
         var fg = GameState.minutosParaOAtraso();
         el.folga.textContent = GameState.horaLimite() + (fg > 0 ? ' (' + fg + ')' : ' ATRASADO');

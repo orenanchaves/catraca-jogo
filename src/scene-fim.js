@@ -33,7 +33,7 @@ var FimScene = new Phaser.Class({
 
     var linhas = [
       ['PAROU EM', GameState.estacaoAtual()],
-      ['INDO PRA', GameState.perna === 'ida' ? 'O TRABALHO' : 'CASA'],
+      ['INDO PRA', GameState.rotuloDaPerna()],
       ['PAROU ÀS', GameState.hora()],
       ['ATRASOS', GameState.atrasos + ' de ' + MAX_ATRASOS],
       ['LUGARES DADOS', String(s.cedidos)],

@@ -85,8 +85,7 @@ var PausaScene = new Phaser.Class({
 
     var dentro = !!GameState.char;
     this.tSub.setText(dentro
-      ? GameState.estacaoAtual() + '\nINDO PRO TRABALHO'.replace('PRO TRABALHO',
-        GameState.perna === 'ida' ? 'PRO TRABALHO' : 'PRA CASA')
+      ? GameState.estacaoAtual() + '\n► ' + GameState.rotuloDaPerna()
       : '');
 
     for (var i = 0; i < ITENS_PAUSA.length; i++) {

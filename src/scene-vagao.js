@@ -1934,6 +1934,10 @@ var VagaoScene = new Phaser.Class({
     if (falta <= 0) { txto = 'DESÇA NA ' + alvo; cor = PAL.verde; }
     else if (falta === 1) { txto = 'PRÓXIMA É A SUA: ' + alvo; cor = PAL.verde; }
     else { txto = alvo + ' EM ' + falta + ' ESTAÇÕES'; cor = PAL.amarelo; }
+    /* Onde descer não diz o que você vai fazer lá, e agora o destino
+       muda todo dia: a linha do compromisso é o que dá sentido à
+       estação. */
+    if (!GameState.faltaBaldear()) txto += '\n► ' + GameState.rotuloDaPerna();
 
     /* Na ida existe hora de entrada, e atraso que a pessoa não vê
        chegando é injusto: a hora aparece junto com a rota, com os
