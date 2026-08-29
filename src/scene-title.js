@@ -60,7 +60,12 @@ var TitleScene = new Phaser.Class({
     y += cardH * 2 + vao + 10;
 
     this.tNome = txtC(this, GW / 2, y, '', PAL.amarelo, 16);
-    y += 50;
+    y += 38;
+    /* O verbo que só este personagem tem. Escolher personagem passou a
+       ser escolher como se joga, e isso precisa aparecer na hora da
+       escolha — não no meio da terceira viagem. */
+    this.tPoder = txtC(this, GW / 2, y, '', PAL.verde, 8);
+    y += 24;
     this.tDesc = txtC(this, GW / 2, y, '', PAL.cinza, 8);
     this.tDesc.setWordWrapWidth(GW - 56).setAlign('center');
     y += 52;
@@ -136,7 +141,13 @@ var TitleScene = new Phaser.Class({
     }
 
     this.tNome.setText(c.nome).setColor(aberto ? PAL.amarelo : PAL.cinzaEsc);
-    this.tDesc.setText(c.desc);
+    /* Dois personagens dividem o mesmo verbo, e não jogam igual: a
+       gestante nunca é recusada e a multidão se abre pra ela. Quando o
+       personagem tem rótulo próprio, é o dele que aparece. */
+    var pd = PODERES[c.poder] || {};
+    var rotulo = c.poderRotulo || pd.nome;
+    this.tPoder.setText(rotulo ? '► ' + rotulo : '').setColor(aberto ? PAL.verde : PAL.cinzaEsc);
+    this.tDesc.setText(c.poderComo || pd.como || c.desc);
     var tarifa = c.tarifa === 0 ? 'GRÁTIS' : ('R$ ' + c.tarifa.toFixed(2).replace('.', ','));
     var vals = [
       'R$ ' + c.dinheiro.toFixed(2).replace('.', ','), tarifa,

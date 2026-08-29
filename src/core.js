@@ -173,36 +173,78 @@ function horaTexto(min) {
 }
 
 /* ---------- personagens jogáveis ---------- */
+/* ---------- o que cada um sabe fazer ----------
+   Os seis personagens diferiam só em número: tarifa, velocidade, dreno,
+   quanto empurra. Trocar de personagem mudava a dificuldade, não o
+   jogo — as mesmas ações, na mesma ordem, com os medidores andando mais
+   rápido ou mais devagar.
+
+   Agora cada um tem um verbo que só ele tem, e todos os seis mexem nos
+   sistemas que já estavam de pé: o banco, o sono, a barra, a rota e o
+   dinheiro. Escolher personagem passou a ser escolher como se joga o
+   trajeto, não em que dificuldade. */
+var PODERES = {
+  chao: {
+    nome: 'SENTAR NO CHÃO',
+    como: 'Senta no chão. Só fora do pico.'
+  },
+  cochilo: {
+    nome: 'COCHILAR NA BARRA',
+    como: 'Dorme em pé na barra. E perde a rota.'
+  },
+  pedeLugar: {
+    nome: 'PEDIR O LUGAR',
+    como: 'Pede o banco de quem está sentado.'
+  },
+  vende: {
+    nome: 'VENDER NO VAGÃO',
+    como: 'Vende no vagão. O fiscal repara.'
+  },
+  perdido: {
+    nome: 'NÃO SABE A LINHA',
+    como: 'Só vê a rota de perto. Pague pra saber.'
+  }
+};
+
 var CHARS = {
   estudante: {
     nome: 'ESTUDANTE', asset: 'estudante',
     desc: 'Meia passagem. Mochila atrapalha.',
     tarifa: 2.60, dinheiro: 14.00, carisma: 55, descanso: 90, descansoMax: 100,
-    dreno: 0.9, velocidade: 92, empurraoMult: 0.8, gratuidade: false, valeTransporte: 0
+    dreno: 0.9, velocidade: 92, empurraoMult: 0.8, gratuidade: false, valeTransporte: 0,
+    poder: 'chao'
   },
   clt: {
     nome: 'CLT', asset: 'clt',
     desc: 'Vale-transporte. Já sai cansado.',
     tarifa: 5.20, dinheiro: 9.00, carisma: 60, descanso: 55, descansoMax: 100,
-    dreno: 1.35, velocidade: 100, empurraoMult: 1.0, gratuidade: false, valeTransporte: 2
+    dreno: 1.35, velocidade: 100, empurraoMult: 1.0, gratuidade: false, valeTransporte: 2,
+    poder: 'cochilo'
   },
   senhor: {
     nome: 'IDOSO', asset: 'senhor',
     desc: 'Passa de graça. Recebe o lugar.',
     tarifa: 0, dinheiro: 20.00, carisma: 75, descanso: 70, descansoMax: 70,
-    dreno: 1.1, velocidade: 72, empurraoMult: 0.7, gratuidade: true, valeTransporte: 0
+    dreno: 1.1, velocidade: 72, empurraoMult: 0.7, gratuidade: true, valeTransporte: 0,
+    poder: 'pedeLugar'
   },
   ambulante: {
     nome: 'AMBULANTE', asset: 'ambulante',
     desc: 'Vende no vagão. Guardinha persegue.',
     tarifa: 5.20, dinheiro: 6.00, carisma: 50, descanso: 80, descansoMax: 100,
-    dreno: 1.0, velocidade: 104, empurraoMult: 1.15, gratuidade: false, valeTransporte: 0
+    dreno: 1.0, velocidade: 104, empurraoMult: 1.15, gratuidade: false, valeTransporte: 0,
+    poder: 'vende'
   },
   gestante: {
     nome: 'GESTANTE', asset: 'gestante',
     desc: 'Recebe o lugar. Cansa em dobro.',
     tarifa: 5.20, dinheiro: 12.00, carisma: 80, descanso: 60, descansoMax: 80,
     dreno: 1.5, velocidade: 78, empurraoMult: 0.65, gratuidade: false, valeTransporte: 0,
+    /* Ela também pede o lugar, e pra ela ninguém recusa. O que a separa
+       do idoso é o resto: cansa em dobro, e a multidão abre caminho. */
+    poder: 'pedeLugar', abremCaminho: true, nuncaRecusam: true,
+    poderRotulo: 'ABREM CAMINHO',
+    poderComo: 'Ninguém recusa, e a multidão abre.',
     preco: 90
   },
   turista: {
@@ -210,6 +252,7 @@ var CHARS = {
     desc: 'Grana sobrando. Se perde fácil.',
     tarifa: 5.20, dinheiro: 40.00, carisma: 45, descanso: 100, descansoMax: 100,
     dreno: 1.25, velocidade: 96, empurraoMult: 0.9, gratuidade: false, valeTransporte: 0,
+    poder: 'perdido',
     preco: 150
   }
 };
@@ -1376,6 +1419,9 @@ function areaDeJogo(topo, base, foco) {
 }
 
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
+
+/* o verbo que só este personagem tem */
+function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
 
 /* ---------- o coração quebrado ----------
    Perder uma vida acontecia só no alto do HUD: o quinto ícone apagava,

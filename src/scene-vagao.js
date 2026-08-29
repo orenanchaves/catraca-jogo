@@ -158,6 +158,12 @@ var VagaoScene = new Phaser.Class({
     this.tPasso = 0;
     this.sentadoEm = null;
     this.nivelSono = 0;
+    this.noChao = false;      // estudante
+    this.cochilo = 0;         // clt: quanto tempo já está cochilando na barra
+    this.pediu = false;       // idoso/gestante: um pedido por estação
+    this.vendas = 0;          // ambulante: quantas vendas nesta perna
+    this.fiscal = 0;          // ...e o quanto o fiscal já reparou
+    this.sabeARota = false;   // turista: pagou alguém pra se situar
     this.disfarce = null;
     this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
     this.gente = [];
@@ -438,6 +444,141 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
+  /* ---------- os poderes ----------
+     Cada personagem tem um verbo que só ele tem, e todos eles entram
+     por aqui: a dica do rodapé pergunta primeiro o que este personagem
+     sabe fazer, e só depois cai nas ações que valem pra todo mundo. */
+
+  /* ESTUDANTE — senta no chão. Não precisa de banco, mas precisa de
+     espaço: no pico não tem chão sobrando, e sentar no chão custa
+     carisma toda vez (o vagão inteiro olha). */
+  podeSentarNoChao: function () {
+    if (!temPoder('chao') || this.sentadoEm || this.noChao) return false;
+    if (GameState.lotacao() > 0.62) return false;
+    return this.pl.sp.x > 96 && this.pl.sp.x < 240 && !naPorta(this.pl.sp.y, -8);
+  },
+
+  sentaNoChao: function () {
+    this.noChao = true;
+    GameState.addCarisma(-3);
+    GameState.sentado = true;
+    this.pl.dir = this.pl.sp.x < 160 ? 'sentadoR' : 'sentadoL';
+    this.pl.anima(0, false);
+    sentaAnimado(this.pl);
+    sfx('caixa');
+    this.flash('SENTOU NO CHÃO.\nNINGUÉM ACHOU BONITO.');
+  },
+
+  levantaDoChao: function () {
+    this.noChao = false;
+    GameState.sentado = false;
+    this.pl.dir = 'down';
+  },
+
+  /* CLT — cochila em pé, segurando a barra. Descansa de graça, e o
+     preço é a rota: de olho fechado você não vê a estação passar. */
+  atualizaCochilo: function (dt) {
+    if (!temPoder('cochilo') || this.sentadoEm) { this.cochilo = 0; return; }
+    // com teto: sem ele o contador cresce a viagem inteira e soltar a
+    // barra levaria segundos pra acordar
+    if (this.segurando && !this.andandoAgora) this.cochilo = Math.min(1900, this.cochilo + dt);
+    else this.cochilo = Math.max(0, this.cochilo - dt * 3);
+  },
+
+  cochilando: function () { return this.cochilo > 1100; },
+
+  /* IDOSO e GESTANTE — pedem o lugar. Pra ela ninguém recusa; pra ele,
+     um em cada seis finge que dorme, e isso custa a vergonha. */
+  bancoOcupadoPerto: function () {
+    if (!temPoder('pedeLugar') || this.sentadoEm || this.pediu) return null;
+    var melhor = null, dist = 1e9;
+    for (var i = 0; i < this.bancos.length; i++) {
+      var b = this.bancos[i];
+      if (!b.npc || b.npc === 'player') continue;
+      var dx = Math.abs(this.pl.sp.x - b.x), dy = Math.abs(this.pl.sp.y - (b.y + 24));
+      if (dx >= 54 || dy >= 30) continue;
+      var d = dx + dy * 2;
+      if (d < dist) { dist = d; melhor = b; }
+    }
+    return melhor;
+  },
+
+  pedeOLugar: function (b) {
+    this.pediu = true;
+    if (!GameState.char.nuncaRecusam && Math.random() < 0.17) {
+      GameState.addCarisma(-4);
+      sfx('nao');
+      this.flash('ELE FINGIU QUE DORMIU.');
+      return;
+    }
+    var a = b.npc, k = this.gente.indexOf(a);
+    if (k >= 0) this.gente.splice(k, 1);
+    a.destroy();
+    b.npc = null;
+    GameState.addCarisma(2);
+    this.senta(b);
+    this.flash('CEDERAM O LUGAR.');
+  },
+
+  /* AMBULANTE — a única fonte de renda do jogo. Cada venda paga pouco e
+     chama mais o fiscal; a quinta é quase certeza de encrenca. */
+  podeVender: function () {
+    return temPoder('vende') && !this.sentadoEm && !this.noChao &&
+      this.estado === 'andando' && this.pl.sp.x > 90 && this.pl.sp.x < 240;
+  },
+
+  vende: function () {
+    var lot = GameState.lotacao();
+    this.vendas++;
+    this.fiscal += 16 + this.vendas * 5;
+    GameState.addDescanso(-3);
+
+    if (Math.random() > 0.35 + lot * 0.5) {
+      GameState.addCarisma(-2);
+      sfx('nao');
+      this.flash('NINGUÉM QUIS.');
+    } else {
+      var ganho = 1 + Math.round(Math.random() * 3);
+      GameState.ganhar(ganho);
+      GameState.addCarisma(2);
+      sfx('moeda');
+      this.flash('VENDEU. +R$ ' + ganho.toFixed(2).replace('.', ','));
+    }
+
+    if (this.fiscal >= 100) {
+      this.fiscal = 0;
+      var multa = Math.min(GameState.dinheiro, 12);
+      GameState.gastar(multa);
+      perdeVida(this, this.pl.sp);
+      sfx('apito');
+      fala(this, '"Vendendo no vagão de novo?"\nO fiscal recolheu a mercadoria.\nR$ ' +
+        multa.toFixed(2).replace('.', ',') + ' e um coração.', []);
+      var eu = this;
+      this.time.delayedCall(2200, function () { if (eu.dialog) eu.dialog.fecha(); });
+    }
+  },
+
+  /* TURISTA — não sabe a linha. A rota só aparece quando já está
+     colada, e o jeito de enxergar longe é pagar alguém pra explicar. */
+  passageiroPerto: function () {
+    if (!temPoder('perdido') || this.sabeARota) return null;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active) continue;
+      if (Math.hypot(this.pl.sp.x - a.sp.x, this.pl.sp.y - a.sp.y) < 44) return a;
+    }
+    return null;
+  },
+
+  perguntaARota: function () {
+    if (GameState.dinheiro < 2) { sfx('nao'); this.flash('SEM TROCO PRA PERGUNTAR.'); return; }
+    GameState.gastar(2);
+    GameState.addCarisma(3);
+    this.sabeARota = true;
+    sfx('moeda');
+    this.flash('ELE EXPLICOU O CAMINHO.');
+  },
+
   temLugarVago: function () {
     for (var i = 0; i < this.bancos.length; i++) if (!this.bancos[i].npc) return true;
     return false;
@@ -548,11 +689,34 @@ var VagaoScene = new Phaser.Class({
       this.olhaEmVolta(a, dt);
     }
     for (i = 0; i < this.npcExtra.length; i++) this.olhaEmVolta(this.npcExtra[i], dt);
+    this.abremCaminho(dt);
 
     // o jogador sentado balança junto
     if (this.sentadoEm && this.pl.bx !== undefined) {
       this.pl.sp.x = this.pl.bx + Math.sin(this.tBalanco / 520 + this.pl.fase) * amp;
       this.pl.sp.y = this.pl.by + Math.sin(this.tBalanco / 880 + this.pl.fase * 1.7) * amp * 0.5;
+    }
+  },
+
+  /* GESTANTE — a multidão abre caminho. Ninguém empurra grávida, e no
+     vagão de verdade as pessoas se encolhem quando ela passa. É o
+     contrário do resto do elenco, que tem que abrir espaço no braço:
+     ela atravessa o pico andando, e paga por isso cansando em dobro. */
+  abremCaminho: function (dt) {
+    if (!GameState.char.abremCaminho || this.sentadoEm) return;
+    var px = this.pl.sp.x, py = this.pl.sp.y;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active || a.fixo) continue;
+      var dx = a.sp.x - px, dy = a.sp.y - py;
+      var d = Math.hypot(dx, dy);
+      if (d > 46 || d < 0.5) continue;
+      var vel = (52 * (1 - d / 46)) * dt / 1000;
+      a.sp.x += (dx / d) * vel;
+      a.sp.y += (dy / d) * vel;
+      limitaVagao(a.sp);
+      a.setDir(dx, dy);
+      a.anima(dt, true);
     }
   },
 
@@ -724,6 +888,9 @@ var VagaoScene = new Phaser.Class({
   },
 
   flash: function (msg) {
+    // cena parada no meio de um aviso: o objeto ainda existe, mas o
+    // texto dele já foi destruído junto com a cena
+    if (!this.centro || !this.scene.isActive()) return;
     this.centro.setText(msg);
     var self = this;
     this.time.delayedCall(900, function () { if (self.centro) self.centro.setText(''); });
@@ -1493,6 +1660,12 @@ var VagaoScene = new Phaser.Class({
     this.time.delayedCall(420, function () { sfx('porta'); });
     this.time.delayedCall(700, function () { if (eu.scene && eu.scene.isActive()) sfx('anuncio'); });
     if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
+    /* Um pedido de lugar por estação: pedir sem parar transformaria o
+       idoso num botão de sentar. O cochilo NÃO é zerado aqui de
+       propósito — se a parada acordasse, cochilar não custaria nada e
+       passar da estação nunca aconteceria. */
+    this.pediu = false;
+    if (this.noChao) { this.levantaDoChao(); this.flash('O TREM PAROU. VOCÊ LEVANTOU.'); }
     // chegou a estação: o rimador recolhe a caixinha e vai embora também
     if (this.rimador && this.rimador.fase !== 'sai') { if (this.dialog) this.dialog.fecha(); this.saiRimador(); }
     this.rima.setText('');
@@ -1564,7 +1737,11 @@ var VagaoScene = new Phaser.Class({
     this.t += dt;
 
     this.atualizaSono();
+    this.atualizaCochilo(dt);
     if (this.sentadoEm) GameState.addDescanso(0.0018 * dt);
+    // o chão descansa menos que o banco, e o cochilo em pé menos ainda
+    else if (this.noChao) GameState.addDescanso(0.0011 * dt);
+    else if (this.cochilando()) GameState.addDescanso(0.0008 * dt);
     // o cansaço é o eixo que nunca satura: a lotação bate no teto no
     // quarto dia, mas ficar em pé cansa cada vez mais
     else GameState.addDescanso(-0.00082 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
@@ -1599,12 +1776,14 @@ var VagaoScene = new Phaser.Class({
     this.eraSuaEstacao = (this.estado === 'parado')
       && GameState.estacaoAtual() === GameState.alvoAtual();
 
-    if (!this.sentadoEm) {
+    if (!this.sentadoEm && !this.noChao) {
       var vel = GameState.char.velocidade * (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
       if (Ctrl.act) vel *= 0.35;
       var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
       var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
       var mv = (dx !== 0 || dy !== 0);
+      // quem anda acorda: o cochilo só conta com o corpo parado
+      this.andandoAgora = mv;
       if (mv) {
         var n = Math.sqrt(dx * dx + dy * dy);
         this.pl.sp.x += (dx / n) * vel * dt / 1000;
@@ -1630,6 +1809,16 @@ var VagaoScene = new Phaser.Class({
 
   contexto: function () {
     var dica = '';
+
+    /* De olho fechado não se vê nada — nem a placa de rota, nem o aviso
+       de que a sua estação é esta. Cochilar devolve descanso de graça, e
+       o preço é esse: quem dorme em pé passa da estação. Soltar a barra
+       acorda na hora. */
+    if (this.cochilando()) {
+      this.dica.setText('COCHILANDO ▲   SOLTE PRA ACORDAR', PAL.cinza);
+      this.pintaRota();
+      return;
+    }
 
     /* "ou a gente aborda, ou ele te ataca": se ele está vindo e você
        chega junto, dá pra encarar na hora em vez de esperar. */
@@ -1669,6 +1858,10 @@ var VagaoScene = new Phaser.Class({
         dica = 'DESÇA AQUI ►';
       }
     }
+    if (!dica && this.noChao) {
+      dica = 'NO CHÃO ▲  ' + nomeAgir() + ' PRA LEVANTAR';
+      if (Ctrl.backJust || Ctrl.actJust) this.levantaDoChao();
+    }
     if (!dica) {
       if (this.sentadoEm) {
         // no celular não existe tecla X: agir de novo levanta
@@ -1688,6 +1881,19 @@ var VagaoScene = new Phaser.Class({
               this.flash('O BANCO É SEU  +' + GameState.ganhaMinigame(5) + ' PONTOS');
             }
           }
+        } else if (this.bancoOcupadoPerto()) {
+          // o idoso e a gestante não caçam banco vago: eles pedem
+          dica = nomeAgir() + ': PEDIR O LUGAR';
+          if (Ctrl.actJust) this.pedeOLugar(this.bancoOcupadoPerto());
+        } else if (this.passageiroPerto()) {
+          dica = nomeAgir() + ': PERGUNTAR (R$ 2)';
+          if (Ctrl.actJust) this.perguntaARota();
+        } else if (this.podeSentarNoChao() && (this.comSono() || !this.temLugarVago())) {
+          dica = nomeAgir() + ': SENTAR NO CHÃO';
+          if (Ctrl.actJust) this.sentaNoChao();
+        } else if (this.podeVender()) {
+          dica = nomeAgir() + ': VENDER  (FISCAL ' + Math.round(this.fiscal) + '%)';
+          if (Ctrl.actJust) this.vende();
         } else if (this.comSono() && this.temLugarVago()) {
           /* Com sono, mandar segurar na barra é mandar pro lugar
              errado: barra não descansa ninguém. Enquanto houver lugar
@@ -1711,6 +1917,20 @@ var VagaoScene = new Phaser.Class({
   pintaRota: function () {
     var falta = GameState.faltamEstacoes(), alvo = GameState.alvoAtual();
     var txto, cor;
+
+    /* De olho fechado ninguém lê placa. O CLT cochila de graça, e o
+       preço é este: a rota some enquanto ele dorme em pé. */
+    if (this.cochilando()) {
+      this.rota.setCor(PAL.cinzaEsc).setText('ZZZ...');
+      return;
+    }
+    /* O turista não conhece a linha: a placa só serve de perto. De
+       longe ele tem que perguntar — e perguntar custa. */
+    if (temPoder('perdido') && !this.sabeARota && falta > 1) {
+      this.rota.setCor(PAL.cinzaEsc).setText('VOCÊ NÃO SABE\nONDE DESCER');
+      return;
+    }
+
     if (falta <= 0) { txto = 'DESÇA NA ' + alvo; cor = PAL.verde; }
     else if (falta === 1) { txto = 'PRÓXIMA É A SUA: ' + alvo; cor = PAL.verde; }
     else { txto = alvo + ' EM ' + falta + ' ESTAÇÕES'; cor = PAL.amarelo; }
