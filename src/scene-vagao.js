@@ -28,9 +28,9 @@ var PORTA_ALT = 60;
    ela ficava meio escondida. Uma porta a menos, e as duas que sobram
    caem no terço e nos dois terços — bem no meio da tela, que é onde a
    mão alcança. */
-var PORTAS_Y = [212, 376];             // faixas de porta, na parede direita
+var PORTAS_Y = [222, 384];             // faixas de porta, na parede direita
 var BAIA_FUNDO = 22, BAIA_COMP = 88;   // raso na parede, comprido ao longo dela
-var BAIAS_Y = [116, 280, 444];         // faixas de baia, nos vãos entre as portas
+var BAIAS_Y = [126, 288, 450];         // faixas de baia, nos vãos entre as portas
 
 /* Quantos lugares cabem numa baia, e onde cada um começa.
 
@@ -183,11 +183,11 @@ var VagaoScene = new Phaser.Class({
        de cima começando em 116, os catorze pixels que ela devolveu são
        a diferença entre ver e não ver quem está sentado no primeiro
        lugar. */
-    this.rota = new Plaqueta(this, GW / 2, 48, { cor: PAL.amarelo, depth: 505 });
+    this.rota = new Plaqueta(this, GW / 2, 56, { cor: PAL.amarelo, depth: 505 });
     // a placa de rota e a faixa de dica ficam fora do alcance do sono, e
     // a fresta que sobra é justo a do aviso do meio da tela
-    areaDeJogo(120, GH - 40, 258);
-    this.rima = new Plaqueta(this, GW / 2, 118, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
+    areaDeJogo(126, GH - 40, 258);
+    this.rima = new Plaqueta(this, GW / 2, 126, { cor: PAL.amarelo, filete: 0xe8362c, depth: 510 });
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 232, { cor: PAL.branco, depth: 522 });
     this.tSeta = txtC(this, GW / 2, 280, '', PAL.amarelo, 24).setDepth(520);

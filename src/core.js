@@ -5,7 +5,12 @@
    Cada material tem rampa de 3 tons: luz, base e sombra.
    ========================================================= */
 
-var GW = 320, GH = 576, HUD_H = 44;
+/* O HUD cresceu de 44 pra 52. Não era só o aperto lateral: as duas
+   linhas tinham 6 pixels entre uma tinta e outra, e duas fileiras de
+   coisa colada lê como um bloco só. Com 52 a distância vai pra 12, que
+   é o que separa "duas linhas" de "uma linha grossa". Custa oito
+   pixels de jogo, e todas as cenas desenham a partir de HUD_H. */
+var GW = 320, GH = 576, HUD_H = 52;
 
 /* ---------- cor ---------- */
 function hex2rgb(h) {
@@ -1931,12 +1936,12 @@ var HudScene = new Phaser.Class({
        quiser conferir o que é cada cor tem a legenda na pausa. */
     var eu = this;
     // a zona de toque é maior que o desenho: dedo não acerta 12 pixels
-    this.zonaPausa = this.add.zone(286, 0, 34, 22).setOrigin(0, 0).setInteractive();
+    this.zonaPausa = this.add.zone(286, 0, 34, 26).setOrigin(0, 0).setInteractive();
     this.zonaPausa.on('pointerdown', function () { eu.abrePausa(); });
 
     this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
     this.tHora = txt(this, 284, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
-    this.tGrana = txt(this, GW - 8, 24, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
+    this.tGrana = txt(this, GW - 8, 30, '', PAL.verde, 8).setDepth(1001).setOrigin(1, 0);
     this.montaToque();
   },
 
@@ -2034,7 +2039,7 @@ var HudScene = new Phaser.Class({
     var l = GameState.linhaAtual();
     g.fillStyle(0x0e0e18, 1); g.fillRect(0, 0, GW, HUD_H);
     g.fillStyle(0x1c1c2c, 1); g.fillRect(0, 0, GW, 2);
-    g.fillStyle(0x000000, 0.35); g.fillRect(0, 22, GW, 1);        // separa as duas linhas
+    g.fillStyle(0x000000, 0.35); g.fillRect(0, 25, GW, 1);        // separa as duas linhas
     g.fillStyle(l.num, 1); g.fillRect(0, HUD_H - 4, GW, 4);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1); g.fillRect(0, HUD_H - 4, GW, 1);
 
@@ -2042,7 +2047,9 @@ var HudScene = new Phaser.Class({
        vida, e a fonte não tem o glifo. Eles abrem a segunda linha, que
        é a linha do seu estado — vida, carisma, descanso e grana. */
     for (var c = 0; c < CORACOES_POR_PERNA; c++) {
-      var hx = 8 + c * 12, hy = 27, cheio = c < GameState.coracoes;
+      // passo 14 e não 12: com 3 pixels entre um e outro os cinco liam
+      // como um borrão vermelho só, em vez de cinco vidas
+      var hx = 8 + c * 14, hy = 33, cheio = c < GameState.coracoes;
       g.fillStyle(cheio ? 0xe8362c : 0x2a2a3c, 1);
       g.fillRect(hx, hy + 1, 3, 5); g.fillRect(hx + 6, hy + 1, 3, 5);
       g.fillRect(hx + 1, hy, 7, 4); g.fillRect(hx + 1, hy + 5, 7, 2);
@@ -2052,18 +2059,21 @@ var HudScene = new Phaser.Class({
 
     // o ícone de pausa: duas barrinhas, no canto de cima à direita
     g.fillStyle(0x5a5f74, 1);
-    g.fillRect(300, 5, 3, 12); g.fillRect(306, 5, 3, 12);
+    g.fillRect(300, 6, 3, 12); g.fillRect(306, 6, 3, 12);
 
     this.tEst.setText(GameState.estacaoAtual());
     this.tGrana.setText('R$' + GameState.dinheiro.toFixed(2).replace('.', ','));
     this.tHora.setText('D' + GameState.dia + ' ' + GameState.hora()).setColor(f.cor);
-    barra(g, 74, 26, 66, 11, GameState.carisma / 100, 0xe8a33c);
+    /* Os quatro blocos da segunda linha com o mesmo respiro entre eles:
+       corações 8..73, carisma 84..144, descanso 155..215, grana até 312.
+       Onze pixels em cada vão, em vez de seis entre as barras. */
+    barra(g, 84, 32, 60, 11, GameState.carisma / 100, 0xe8a33c);
 
     /* O medidor de descanso era verde até o último pixel: cheio e
        quase vazio tinham a mesma cor, e a única diferença era um
        comprimento que ninguém compara de relance. Agora ele esquenta
        conforme baixa, e pisca quando o sono está pra bater. */
     var pd = GameState.descanso / GameState.char.descansoMax;
-    barra(g, 146, 26, 66, 11, pd, corDescanso(pd, time));
+    barra(g, 155, 32, 60, 11, pd, corDescanso(pd, time));
   }
 });
