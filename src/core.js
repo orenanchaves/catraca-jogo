@@ -205,51 +205,126 @@ var CHARS = {
     nome: 'ESTUDANTE', asset: 'estudante',
     desc: 'Meia passagem. Mochila atrapalha.',
     tarifa: 2.60, dinheiro: 14.00, carisma: 55, descanso: 90, descansoMax: 100,
-    dreno: 0.9, velocidade: 92, empurraoMult: 0.8, gratuidade: false, valeTransporte: 0,
-    poder: 'chao'
+    dreno: 0.9, velocidade: 108, empurraoMult: 0.8, gratuidade: false, valeTransporte: 0,
+    poder: 'chao',
+    visual: { m: { corpo: 'bone_mochila', pal: 'estudante' }, f: { corpo: 'rabo_mochila', pal: 'estudanteF' } }
   },
   clt: {
     nome: 'CLT', asset: 'clt',
     desc: 'Vale-transporte. Já sai cansado.',
     tarifa: 5.20, dinheiro: 9.00, carisma: 60, descanso: 55, descansoMax: 100,
-    dreno: 1.35, velocidade: 100, empurraoMult: 1.0, gratuidade: false, valeTransporte: 2,
-    poder: 'cochilo'
+    dreno: 1.35, velocidade: 92, empurraoMult: 1.0, gratuidade: false, valeTransporte: 2,
+    poder: 'cochilo',
+    visual: { m: { corpo: 'padrao', pal: 'clt' }, f: { corpo: 'bolsa', pal: 'cltF' } }
   },
   senhor: {
     nome: 'IDOSO', asset: 'senhor',
     desc: 'Passa de graça. Recebe o lugar.',
     tarifa: 0, dinheiro: 20.00, carisma: 75, descanso: 70, descansoMax: 70,
-    dreno: 1.1, velocidade: 72, empurraoMult: 0.7, gratuidade: true, valeTransporte: 0,
-    poder: 'pedeLugar'
+    dreno: 1.1, velocidade: 62, empurraoMult: 0.7, gratuidade: true, valeTransporte: 0,
+    poder: 'pedeLugar', nomeF: 'IDOSA',
+    visual: { m: { corpo: 'senhor', pal: 'senhor' }, f: { corpo: 'senhora_coque', pal: 'senhoraJog' } }
   },
   ambulante: {
     nome: 'AMBULANTE', asset: 'ambulante',
     desc: 'Vende no vagão. Guardinha persegue.',
     tarifa: 5.20, dinheiro: 6.00, carisma: 50, descanso: 80, descansoMax: 100,
-    dreno: 1.0, velocidade: 104, empurraoMult: 1.15, gratuidade: false, valeTransporte: 0,
-    poder: 'vende'
+    dreno: 1.0, velocidade: 118, empurraoMult: 1.15, gratuidade: false, valeTransporte: 0,
+    poder: 'vende',
+    visual: { m: { corpo: 'bone', pal: 'ambulante' }, f: { corpo: 'rabo', pal: 'ambulanteF' } }
   },
   gestante: {
     nome: 'GESTANTE', asset: 'gestante',
     desc: 'Recebe o lugar. Cansa em dobro.',
     tarifa: 5.20, dinheiro: 12.00, carisma: 80, descanso: 60, descansoMax: 80,
-    dreno: 1.5, velocidade: 78, empurraoMult: 0.65, gratuidade: false, valeTransporte: 0,
+    dreno: 1.5, velocidade: 74, empurraoMult: 0.65, gratuidade: false, valeTransporte: 0,
     /* Ela também pede o lugar, e pra ela ninguém recusa. O que a separa
        do idoso é o resto: cansa em dobro, e a multidão abre caminho. */
     poder: 'pedeLugar', abremCaminho: true, nuncaRecusam: true,
     poderRotulo: 'ABREM CAMINHO',
     poderComo: 'Ninguém recusa, e a multidão abre.',
+    /* a única sem escolha de gênero, e por causa do próprio verbo: o
+       dela é estar grávida */
+    visual: { f: { corpo: 'gestante', pal: 'gestanteJog' } },
     preco: 90
   },
   turista: {
     nome: 'TURISTA', asset: 'turista',
     desc: 'Grana sobrando. Se perde fácil.',
     tarifa: 5.20, dinheiro: 40.00, carisma: 45, descanso: 100, descansoMax: 100,
-    dreno: 1.25, velocidade: 96, empurraoMult: 0.9, gratuidade: false, valeTransporte: 0,
+    dreno: 1.25, velocidade: 98, empurraoMult: 0.9, gratuidade: false, valeTransporte: 0,
     poder: 'perdido',
+    visual: { m: { corpo: 'bone_mochila', pal: 'turista' }, f: { corpo: 'mochila_longo', pal: 'turistaF' } },
     preco: 150
   }
 };
+
+/* ---------- gênero, e o passo de cada um ----------
+   Quem joga escolhe um personagem pra ser. O elenco vinha com um gênero
+   decidido de fábrica em cada carta, e metade de quem pega esse trem
+   toda manhã não tinha onde se reconhecer.
+
+   Gênero aqui é ARTE e NOME, nunca número: o mesmo estudante corre o
+   mesmo tanto, cansa o mesmo tanto e paga a mesma meia passagem nas duas
+   versões. Amarrar estatística a gênero seria inventar uma diferença
+   que não existe, e o jogo não tem nada a ganhar com isso. O que muda é
+   o corpo (cabelo, silhueta, o que carrega), o tom da roupa e, quando o
+   português pede, o nome: IDOSO e IDOSA.
+
+   A gestante é a única sem escolha, e por um motivo que é do próprio
+   personagem: o verbo dela é estar grávida. */
+var GENEROS = ['m', 'f'];
+
+function generosDe(k) {
+  var v = CHARS[k] && CHARS[k].visual, out = [];
+  for (var i = 0; i < GENEROS.length; i++) if (v && v[GENEROS[i]]) out.push(GENEROS[i]);
+  return out;
+}
+/* o gênero válido mais próximo do pedido: personagem de um gênero só
+   devolve o dele, e não uma carta em branco */
+function generoValido(k, g) {
+  var l = generosDe(k);
+  return l.indexOf(g) >= 0 ? g : (l[0] || 'm');
+}
+function outroGenero(k, g) {
+  var l = generosDe(k);
+  if (l.length < 2) return g;
+  return l[(l.indexOf(generoValido(k, g)) + 1) % l.length];
+}
+function spriteChar(k, g) { return 'ch_' + k + '_' + generoValido(k, g); }
+function spriteJogador() { return spriteChar(GameState.charKey, GameState.genero); }
+function nomeDoChar(k, g) {
+  var c = CHARS[k];
+  return (generoValido(k, g) === 'f' && c.nomeF) ? c.nomeF : c.nome;
+}
+
+/* a escolha fica gravada por personagem: quem joga de estudante mulher
+   não quer reescolher isso toda partida */
+function leGenero(k) {
+  try { return generoValido(k, localStorage.getItem('metrosp_genero_' + k) || 'm'); }
+  catch (e) { return generoValido(k, 'm'); }
+}
+function gravaGenero(k, g) {
+  try { localStorage.setItem('metrosp_genero_' + k, generoValido(k, g)); } catch (e) { }
+}
+
+/* ---------- o passo ----------
+   A velocidade sempre existiu na ficha e nunca apareceu em lugar
+   nenhum: nem na tela de escolha, nem em palavra dentro do jogo. Quem
+   trocava de personagem sentia alguma coisa diferente e não sabia
+   dizer o quê. Agora a faixa é larga o bastante pra sentir (o ambulante
+   anda quase o dobro do idoso) e tem nome na tela de escolha. */
+var PASSOS = [
+  { ate: 70, nome: 'DEVAGAR' },
+  { ate: 84, nome: 'SEM PRESSA' },
+  { ate: 100, nome: 'NORMAL' },
+  { ate: 112, nome: 'LIGEIRO' },
+  { ate: 999, nome: 'CORRIDO' }
+];
+function nomeDoPasso(v) {
+  for (var i = 0; i < PASSOS.length; i++) if (v <= PASSOS[i].ate) return PASSOS[i].nome;
+  return PASSOS[PASSOS.length - 1].nome;
+}
 
 /* ---------- o que se come na estação ----------
    Não existia jeito de recuperar fôlego dentro de uma partida: descanso
@@ -327,10 +402,14 @@ function compraPersonagem(k) {
 
 /* ---------- estado global ---------- */
 var GameState = {
-  init: function (charKey) {
+  init: function (charKey, genero) {
     var c = CHARS[charKey];
     this.charKey = charKey;
     this.char = c;
+    /* Gênero é arte e nome, não número: nada abaixo desta linha olha
+       pra ele. Sem argumento, vale o que ficou gravado da última vez. */
+    this.genero = genero ? generoValido(charKey, genero) : leGenero(charKey);
+    this.nome = nomeDoChar(charKey, this.genero);
     this.carisma = c.carisma;
     this.descanso = c.descanso;
     this.dinheiro = c.dinheiro;
@@ -362,7 +441,8 @@ var GameState = {
       compromissos: 0,
       cedidos: 0, disfarces: 0, disfarcesOk: 0, recusas: 0,
       catracasPuladas: 0, catracasPagas: 0, causos: 0, baldeacoes: 0,
-      minigamesGanhos: 0, minigamesPerdidos: 0
+      minigamesGanhos: 0, minigamesPerdidos: 0,
+      caidos: 0, achados: 0
     };
   },
   linhaAtual: function () { return LINHAS[this.linha]; },
@@ -591,15 +671,19 @@ var GameState = {
   addDescanso: function (n) { this.descanso = Phaser.Math.Clamp(this.descanso + n, 0, this.char.descansoMax); },
   gastar: function (n) { this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100); },
   ganhar: function (n) { this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100; },
+  /* A tela de fim reserva TRÊS linhas pro motivo, e a caixa quebra a 22
+     caracteres. Estes textos tinham linha de 24 e de 29: viravam cinco
+     linhas e entravam por cima do placar. Cada linha aqui cabe medida —
+     e motivo de derrota é melhor curto de qualquer jeito. */
   derrota: function () {
     if (this.coracoes <= 0) {
-      return 'O trajeto te moeu.\nVocê desceu numa estação\nqualquer e sentou no chão.';
+      return 'O trajeto te moeu.\nVocê sentou no chão\nnuma estação qualquer.';
     }
     if (this.atrasos >= MAX_ATRASOS) {
-      return 'Terceiro atraso no mês.\nO RH não quis saber do metrô.';
+      return 'Terceiro atraso.\nO RH não quis saber\ndo metrô.';
     }
-    if (this.descanso <= 0) return 'Você dormiu. Acordou no fim da linha.\nTodo mundo já desceu.';
-    if (this.carisma <= 0) return 'O vagão fechou na sua cara.\nDe novo. E de novo.';
+    if (this.descanso <= 0) return 'Você dormiu.\nAcordou no fim da\nlinha, sozinho.';
+    if (this.carisma <= 0) return 'O vagão fechou na sua\ncara. De novo.';
     return null;
   },
   /* O recorde passou a ser em dias, e por isso mudou de chave: a antiga
@@ -703,7 +787,37 @@ var CORPO_BASE = {
     '.....okkkkko....', '......kkkk......', '.....jjjjjj.....', '....ojjjjjjjo...',
     '....ojjjjjjjo...', '....ojjjjjjjo...', '....ojjjjjjjko..', '....ojjjjjjjko..',
     '....ojjjjjjjo...', '.....ojjjjjo....', '....opppppppo...', '....oppppppppo..',
-    '.......opppppo..', '.......opp.ppo..', '.......opp.ppo..', '.......oss.sso..']
+    '.......opppppo..', '.......opp.ppo..', '.......opp.ppo..', '.......oss.sso..'],
+
+  /* ---------- sentado de frente e sentado de costas ----------
+     O banco de perfil dava conta enquanto todo banco era encostado na
+     parede. O vagão de verdade não é assim: ele tem os dois bancos
+     virados um pro outro, e quem senta neles fica de frente pra outra
+     pessoa — olhando pro fundo do vagão ou pra você.
+
+     De frente: a mesma cabeça e o mesmo tronco do boneco de frente
+     (linhas 0 a 17 idênticas, e por isso os sete cabelos, a mochila, a
+     bolsa e o celular caem no lugar sem uma linha nova), e as coxas
+     abrindo em direção a quem olha, com o joelho vindo pra frente e o
+     pé aparecendo por baixo.
+
+     De costas: a mesma coisa do boneco de costas, e as pernas somem —
+     de cima, quem está sentado de costas pra você mostra o ombro e o
+     encosto, não a perna. */
+  sentadoFrente: [
+    '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '...oakkkkkkao...', '...okkkkkkkko...', '...okkokkokko...',
+    '...okkkkkkkko...', '....okkkkkko....', '......kkkk......', '..ojjjjjjjjjjo..',
+    '.ojjjjjjjjjjjjo.', '.ojjjjjjjjjjjjo.', '.ojjjjjjjjjjjjo.', '.okjjjjjjjjjjko.',
+    '.okjjjjjjjjjjko.', '..ojjjjjjjjjjo..', '...oppppppppo...', '..opppppppppppo.',
+    '..opppo..opppo..', '..opppo..opppo..', '..osso....osso..', '................'],
+  sentadoCostas: [
+    '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...',
+    '...oaaaaaaaao...', '....oaaaaaao....', '......kkkk......', '..ojjjjjjjjjjo..',
+    '.ojjjjjjjjjjjjo.', '.ojjjjjjjjjjjjo.', '.ojjjjjjjjjjjjo.', '.okjjjjjjjjjjko.',
+    '.okjjjjjjjjjjko.', '..ojjjjjjjjjjo..', '...oppppppppo...', '...oppppppppo...',
+    '....pppppppp....', '................', '................', '................']
 };
 
 /* pernas: os quadros de caminhada trocam as últimas linhas do corpo */
@@ -766,6 +880,19 @@ var MOD_SAIA = {
   sentado: {
     18: '...opppppppo....', 19: '...opppppppppo..', 20: '.....oppppppo...',
     21: '.......okk.kko..', 22: '.......okk.kko..', 23: '.......oss.sso..'
+  },
+  /* Nos bancos virados um pro outro a saia precisa das duas vistas
+     dela: de frente a barra cai sobre a coxa e o joelho aparece por
+     baixo; de costas ela cobre o banco inteiro e não sobra perna
+     nenhuma pra ver. Sem isto a saia herdava a perna EM PÉ do boneco
+     de frente por cima do corpo sentado. */
+  sentadoFrente: {
+    18: '..opppppppppppo.', 19: '.oppppppppppppo.', 20: '..oppppppppppo..',
+    21: '...okkk..kkko...', 22: '...osso..osso...', 23: '................'
+  },
+  sentadoCostas: {
+    18: '..opppppppppppo.', 19: '.oppppppppppppo.', 20: '..oppppppppppo..',
+    21: '................', 22: '................', 23: '................'
   },
   pernas: {
     inicio: 21,
@@ -833,6 +960,16 @@ var MOD_BENGALA = {
     16: '....ojjjjjjjo.w.', 17: '.....ojjjjjo..w.', 18: '....opppppppow..',
     19: '....oppppppppow.', 20: '.......opppppow.', 21: '.......opp.ppow.',
     22: '.......opp.ppow.', 23: '.......oss.ssow.'
+  },
+  /* nos bancos virados um pro outro a bengala fica encostada na
+     lateral, e as pernas são as de quem está sentado */
+  sentadoFrente: {
+    18: '...oppppppppo..w', 19: '..opppppppppppow', 20: '..opppo..opppo.w',
+    21: '..opppo..opppo.w', 22: '..osso....osso.w', 23: '...............w'
+  },
+  sentadoCostas: {
+    18: '...oppppppppo..w', 19: '...oppppppppo..w', 20: '....pppppppp...w',
+    21: '...............w', 22: '...............w', 23: '................'
   },
   /* o tronco estreita até a linha da mão e para ali: a bengala é uma
      coluna fixa na beirada, e mão que recua solta a bengala no ar.
@@ -1040,12 +1177,15 @@ var CORPOS = {
   pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE }
 };
 
-var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado'];
+var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas'];
 /* A diagonal parte do que a camada faz de frente (ou de costas) e leva
    por cima só o que é diferente nela. Sem isso, toda camada teria que
    redesenhar as linhas inteiras pra existir na diagonal, e um cabelo
    comprido que só precisa mexer no olho perderia o resto. */
-var DIR_HERDA = { diagDown: 'down', diagUp: 'up', sentado: 'side' };
+var DIR_HERDA = {
+  diagDown: 'down', diagUp: 'up', sentado: 'side',
+  sentadoFrente: 'down', sentadoCostas: 'up'
+};
 
 function aplicaDir(alvo, nome, linhas) {
   if (!linhas) return;
@@ -1091,7 +1231,7 @@ function quadrosDoCorpo(key) {
     for (var q = 0; q < 2; q++) {
       // sentado não anda: os três quadros da fileira são o mesmo, e a
       // vida vem do balanço do trem, que é posição e não desenho
-      if (r.poseUnica || nome === 'sentado') { out[nome][q + 1] = parado; continue; }
+      if (r.poseUnica || nome.indexOf('sentado') === 0) { out[nome][q + 1] = parado; continue; }
       var a = parado.slice(0);
       for (var i = 0; i < passos[q].length; i++) a[r.pernas.inicio + i] = passos[q][i];
       out[nome][q + 1] = a;
@@ -1115,6 +1255,19 @@ var PELES = {
   guardinha: pele('#0a0a12', '#b07d52', '#1a2540', '#20325c', '#20325c', '#14141c', '#9fb6dd'),
   guardaMedio: pele('#0a0a12', '#e0b088', '#2a2a30', '#20325c', '#b09a68', '#2a2a30', '#d8e24a'),
   guardaForte: pele('#0a0a12', '#8a5a3c', '#0a0a12', '#15151d', '#15151d', '#0a0a12', '#4a4a5c'),
+  /* A outra metade do elenco. Mesma pessoa, mesmo ofício, mesmos
+     números — o que muda é cabelo, silhueta e um tom de roupa, que é o
+     que basta pra quem joga se reconhecer na tela. */
+  /* As femininas trocavam só pele e cabelo, e a roupa era a MESMA cor da
+     masculina. Num boneco de 32x48 isso é invisível: quem tocava em
+     MULHER via o mesmo boneco e concluía, com razão, que o botão não
+     funcionava. Agora a roupa muda junto — sem sair da família de cor do
+     personagem, que é como se reconhece um estudante de um turista. */
+  estudanteF: pele('#0a0a12', '#8a5a3c', '#3a2418', '#3fa07d', '#3a3f6b', '#14141c', '#e8a33c'),
+  cltF: pele('#0a0a12', '#c99a70', '#2a1c14', '#e8dcc0', '#3d2f4a', '#14141c', '#a05ac8'),
+  senhoraJog: pele('#0a0a12', '#f0c8a0', '#d8d8e8', '#8a5a9a', '#4a4438', '#14141c', '#f0eeff'),
+  ambulanteF: pele('#0a0a12', '#6b4228', '#1a1a22', '#e8623c', '#3a2e34', '#14141c', '#f0eeff'),
+  turistaF: pele('#0a0a12', '#e0b088', '#c07a2a', '#7fd0e8', '#d8d8e8', '#14141c', '#e8362c'),
   // os dois que se compram com ponto de minigame
   gestanteJog: pele('#0a0a12', '#e0b088', '#4a2f1e', '#d4548e', '#33334a', '#14141c', '#ffd0e6'),
   turista: pele('#0a0a12', '#f0c8a0', '#e8c96a', '#f2f0ff', '#4a7fc0', '#14141c', '#e8362c'),
@@ -1270,11 +1423,20 @@ function separaCorpos(a, b, pesoA, pesoB) {
    não sai do lugar. `limita` é a regra de parede de cada cena, que é
    diferente em cada uma — sem ela um empurrão poderia jogar alguém
    pra dentro do trilho. */
+/* Dois corpos só têm o que resolver se estiverem perto: o corpo tem 6
+   pixels de meio-eixo em y, então acima de 16 de distância não existe
+   sobreposição possível. O teste é uma subtração, e ele é o que segura
+   o custo — o trem de oito carros tem mais de 200 pessoas, e o segundo
+   laço aqui é de todos contra todos. Sem esse corte eram 13 mil pares
+   de elipse por quadro pra resolver, na prática, nenhum. */
+var PERTO_Y = 16;
+
 function resolveCorpos(pl, gente, limitaPl, limitaNpc) {
-  var i, j, o;
+  var i, j, o, py = pl.sp.y;
   for (i = 0; i < gente.length; i++) {
     o = gente[i];
     if (!o || !o.sp || !o.sp.active) continue;
+    if (Math.abs(o.sp.y - py) > PERTO_Y) continue;
     var peso = o.fixo ? 0 : 0.4;
     if (separaCorpos(pl.sp, o.sp, 1 - peso, peso)) {
       if (limitaPl) limitaPl(pl.sp);
@@ -1284,8 +1446,10 @@ function resolveCorpos(pl, gente, limitaPl, limitaNpc) {
   // a multidão também não se atravessa, mas com muito menos empenho
   for (i = 0; i < gente.length; i++) {
     if (!gente[i] || !gente[i].sp || gente[i].fixo) continue;
+    var yi = gente[i].sp.y;
     for (j = i + 1; j < gente.length; j++) {
       if (!gente[j] || !gente[j].sp) continue;
+      if (Math.abs(gente[j].sp.y - yi) > PERTO_Y) continue;
       var pj = gente[j].fixo ? 0 : 0.5;
       if (separaCorpos(gente[i].sp, gente[j].sp, 1 - pj, pj) && limitaNpc) {
         limitaNpc(gente[i].sp);
@@ -1310,7 +1474,10 @@ function Ator(scene, x, y, key) {
 var FILEIRA_DIR = {
   down: 0, up: 3, left: 6, right: 6,
   diagDownL: 9, diagDownR: 9, diagUpL: 12, diagUpR: 12,
-  sentadoR: 15, sentadoL: 15
+  sentadoR: 15, sentadoL: 15,
+  // quem senta no banco virado pro outro banco: olhando pro fundo do
+  // vagão, ou olhando pra quem está do outro lado do joelho
+  sentadoFrente: 18, sentadoCostas: 21
 };
 var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1 };
 var DIAGONAL_MIN = 0.42;   // o eixo fraco precisa disso do forte pra virar diagonal
@@ -1573,6 +1740,44 @@ function sorteiaGuarda() {
   return GUARDAS.fraco;
 }
 
+/* ---------- a muamba do ambulante ----------
+   Ele vendia "alguma coisa": uma venda genérica, um número de dinheiro,
+   e pronto. Ambulante de metrô não vende alguma coisa — ele vende bala
+   de um real anunciando de ponta a ponta do vagão, e vende carregador
+   de quinze com a caixa fechada e o olho na porta.
+
+   É a diferença que faz o ofício ter decisão: bala vende sempre, paga
+   pouco e o fiscal nem olha; carregador quase não vende, mas uma venda
+   paga o dia inteiro — e é o que faz o fiscal vir atrás de você. Água
+   entra no meio disso valendo o dobro no calor, que é quando o vagão
+   inteiro está querendo. */
+var MUAMBA = [
+  { nome: 'BALA', grito: 'OLHA A BALA, UM REAL', preco: 1, chance: 0.85, risco: 8 },
+  { nome: 'CHOCOLATE', grito: 'OLHA O CHOCOLATE, DOIS REAL', preco: 2, chance: 0.7, risco: 12 },
+  { nome: 'PURURUCA', grito: 'PURURUCA, TRÊS REAL', preco: 3, chance: 0.55, risco: 14 },
+  { nome: 'ÁGUA', grito: 'ÁGUA GELADA, TRÊS REAL', preco: 3, chance: 0.45, risco: 14, noCalor: 2.1 },
+  { nome: 'FONE', grito: 'FONE DE OUVIDO, DEZ', preco: 10, chance: 0.22, risco: 30 },
+  { nome: 'CARREGADOR', grito: 'CARREGADOR, QUINZE', preco: 15, chance: 0.14, risco: 38 }
+];
+
+/* O que ele tira da caixa agora. Não é sorteio puro: o que o vagão quer
+   depende da hora e de quanta gente tem. No calor a água sobe na mão
+   dele; no vagão cheio a bala e o chocolate saem sozinhos, e é quando
+   vale insistir no barato. */
+function tiraDaMuamba() {
+  var calor = estaCalor(), lot = GameState.lotacao(), pesos = [], total = 0, i;
+  for (i = 0; i < MUAMBA.length; i++) {
+    var m = MUAMBA[i], w = m.chance;
+    if (m.noCalor && calor) w *= m.noCalor;
+    // vagão cheio é freguês, mas freguês de coisa barata
+    if (m.preco <= 3) w *= (0.7 + lot * 0.8);
+    pesos.push(w); total += w;
+  }
+  var r = Math.random() * total;
+  for (i = 0; i < pesos.length; i++) { r -= pesos[i]; if (r <= 0) return MUAMBA[i]; }
+  return MUAMBA[0];
+}
+
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
 /* o verbo que só este personagem tem */
@@ -1650,6 +1855,19 @@ var Ctrl = {
   _tl: false, _tr: false, _tu: false, _td: false,
   _nl: 0, _nr: 0, _nu: 0, _nd: 0,
   liga: function (scene) {
+    /* ---------- o toque não atravessa a troca de tela ----------
+       O pulso de um toque curto vive até o próximo Ctrl.update() da cena
+       que o recebeu. Se esse toque TROCA de cena, a cena velha morre sem
+       consumir o pulso e a nova o encontra intacto: era isso que fazia o
+       ladrilho TROCAR, na tela de fim, levar ao título e o título já
+       começar a partida com o mesmo dedo. Um toque, uma tela.
+
+       O _pa vai pra true de propósito: quem chega numa tela com o dedo
+       ainda encostado só age depois de soltar e tocar de novo. */
+    TOUCH.pulso = false;
+    this._pa = true;
+    this.actJust = false;
+
     /* WASD e espaço são o controle principal; setas, Z e enter continuam
        valendo pra quem já pegou o costume. enableCapture segura o espaço
        antes que o navegador role a página com ele. */
@@ -1937,8 +2155,18 @@ function Plaqueta(scene, x, y, cfg) {
   this.x = Math.round(x); this.y = Math.round(y);
   this.centro = (cfg.centro !== false);
   this.filete = cfg.filete || null;
-  this.g = scene.add.graphics().setDepth(d);
-  this.t = txt(scene, this.x, this.y + 5, '', cfg.cor || PAL.branco, cfg.tam || 8).setDepth(d + 1);
+  this.led = !!cfg.led;
+  /* Nada de UI acompanha a câmera. No vagão de oito carros a câmera
+     anda com quem joga, e sem isto a placa de rota, a dica e o diálogo
+     ficariam pendurados no trilho, saindo da tela junto com o cenário.
+     Nas cenas de tela parada isto não faz diferença nenhuma.
+     A exceção é a placa pregada na parede: essa é cenário, tem lugar
+     no mundo, e some da tela quando a câmera sobe. Quem a pendura pede
+     mundo: true. */
+  var sf = cfg.mundo ? 1 : 0;
+  this.g = scene.add.graphics().setDepth(d).setScrollFactor(sf);
+  this.t = txt(scene, this.x, this.y + 5, '', cfg.cor || PAL.branco, cfg.tam || 8)
+    .setDepth(d + 1).setScrollFactor(sf);
   if (this.centro) this.t.setOrigin(0.5, 0);
   this.t.setWordWrapWidth(cfg.largura || (GW - 24));
   if (cfg.centro !== false) this.t.setAlign('center');
@@ -1953,6 +2181,29 @@ Plaqueta.prototype.setText = function (txto) {
   var w = Math.round(this.t.width), h = Math.round(this.t.height);
   var x0 = this.centro ? this.x - Math.round(w / 2) : this.x;
   var lx = x0 - 7, ly = this.y, lw = w + 14, lh = h + 10;
+
+  /* ---------- modo letreiro ----------
+     O painel de LED do vagão não é uma placa com texto: é uma chapa
+     preta com pontinhos acesos. A diferença toda está na grade — sem
+     ela, "letreiro" é só uma caixa com letra laranja, que é o que
+     qualquer caixa é. */
+  if (this.led) {
+    this.g.fillStyle(0x0a0a06, 1).fillRect(lx - 6, ly - 4, lw + 12, lh + 8);
+    this.g.fillStyle(0x1c1608, 1).fillRect(lx - 4, ly - 2, lw + 8, lh + 4);
+    // a grade de LEDs apagados, por baixo da letra
+    this.g.fillStyle(0x2a2008, 1);
+    for (var gy = ly; gy < ly + lh; gy += 3) {
+      for (var gx = lx - 2; gx < lx + lw + 2; gx += 3) this.g.fillRect(gx, gy, 1, 1);
+    }
+    // a moldura de metal do painel, e o brilho de cima
+    this.g.fillStyle(num(PAL.metalSom), 1);
+    this.g.fillRect(lx - 6, ly - 4, lw + 12, 2);
+    this.g.fillRect(lx - 6, ly + lh + 4, lw + 12, 2);
+    this.g.fillStyle(num(PAL.metalLuz), 0.5).fillRect(lx - 6, ly - 4, lw + 12, 1);
+    if (this.filete) this.g.fillStyle(this.filete, 1).fillRect(lx - 4, ly + lh + 2, lw + 8, 2);
+    return this;
+  }
+
   this.g.fillStyle(0x08080e, 0.8).fillRect(lx, ly, lw, lh);
   this.g.fillStyle(0x232336, 0.9).fillRect(lx, ly, lw, 2);
   this.g.fillStyle(0x000000, 0.4).fillRect(lx, ly + lh - 2, lw, 2);
@@ -1979,8 +2230,8 @@ Plaqueta.prototype.setFilete = function (c) {
 function FaixaDica(scene, depth) {
   var d = (depth === undefined) ? 860 : depth;
   this.y = GH - 32;
-  this.g = scene.add.graphics().setDepth(d);
-  this.t = txtC(scene, GW / 2, this.y + 6, '', PAL.amarelo, 8).setDepth(d + 1);
+  this.g = scene.add.graphics().setDepth(d).setScrollFactor(0);
+  this.t = txtC(scene, GW / 2, this.y + 6, '', PAL.amarelo, 8).setDepth(d + 1).setScrollFactor(0);
   this.setText('');
 }
 FaixaDica.prototype.setText = function (txto, cor) {
@@ -2003,9 +2254,133 @@ FaixaDica.prototype.setText = function (txto, cor) {
   return this;
 };
 
+/* ---------- achados e perdidos ----------
+   Do Crossy Road, e é a ideia dele que mais cabe aqui: lá você NUNCA
+   compra um personagem. Você alimenta uma maquininha de prêmio e ela
+   cospe um aleatório com fanfarra. A loja daqui era uma tabela de preços
+   — 90, 150 — e tabela é transação, não momento.
+
+   O lugar já existia na vida real: toda estação grande de São Paulo tem
+   um guichê de achados e perdidos, e o que tem lá dentro é exatamente o
+   sortimento de uma máquina de prêmio — guarda-chuva quebrado, carteira,
+   molho de chaves, a mochila que alguém esqueceu.
+
+   E ela dá um destino pro PONTO dentro da partida. Antes ele só servia
+   na tela de título, entre uma corrida e outra; agora existe a escolha
+   de gastar hoje ou guardar pro personagem, que é uma decisão de
+   verdade e não uma poupança. */
+/* 20 e não 25, e a mochila pesa 18 e não 12: medido em 200 puxadas, o
+   preço velho dava uma mochila a cada 233 pontos, e a gestante custa 90
+   na tabela — a máquina era estritamente pior que a loja, e máquina que
+   não compete com a loja não é escolha, é enfeite. Com 20 e 18 ela sai
+   por volta de 130, entre o personagem barato e o caro, e ainda devolve
+   grana e ponto pelo caminho. */
+var ACHADOS_PRECO = 20;
+
+var ACHADOS = [
+  { peso: 20, nome: 'UM GUARDA-CHUVA', fala: 'Quebrado. Você levou mesmo assim.' },
+  { peso: 24, nome: 'UMA CARTEIRA', grana: [5, 20], fala: 'Sem documento nenhum dentro.\nSó o dinheiro.' },
+  { peso: 18, nome: 'UM VALE VELHO', pontos: [8, 16], fala: 'Ainda tem crédito.' },
+  { peso: 14, nome: 'UMA MARMITA', descanso: 22, fala: 'Fria, mas é comida.' },
+  { peso: 12, nome: 'UM MOLHO DE CHAVES', carisma: 8, fala: 'Você devolveu no guichê.\nAlguém vai dormir melhor hoje.' },
+  { peso: 18, nome: 'A MOCHILA DE ALGUÉM', personagem: true,
+    fala: 'Dentro tinha a vida de outra pessoa.' }
+];
+
+/* quem ainda está trancado; vazio quando já se abriu todo mundo */
+function travadosAgora() {
+  var out = [];
+  for (var k in CHARS) {
+    if (!CHARS.hasOwnProperty(k)) continue;
+    if (!destravado(k)) out.push(k);
+  }
+  return out;
+}
+
+/* Sorteia, cobra e entrega. Devolve o que saiu pra tela contar. */
+function puxaAchados() {
+  if (lePontos() < ACHADOS_PRECO) return { falta: ACHADOS_PRECO - lePontos() };
+  gravaPontos(lePontos() - ACHADOS_PRECO);
+
+  var total = 0, i;
+  for (i = 0; i < ACHADOS.length; i++) total += ACHADOS[i].peso;
+  var r = Math.random() * total, item = ACHADOS[0];
+  for (i = 0; i < ACHADOS.length; i++) {
+    r -= ACHADOS[i].peso;
+    if (r <= 0) { item = ACHADOS[i]; break; }
+  }
+
+  var saiu = { nome: item.nome, fala: item.fala };
+  if (item.personagem) {
+    var t = travadosAgora();
+    /* Já abriu todo mundo: a mochila vira o que ela seria de qualquer
+       jeito, um punhado de troco. Prêmio que não existe mais não pode
+       virar prêmio nenhum. */
+    if (!t.length) {
+      saiu.nome = 'UMA CARTEIRA';
+      saiu.fala = 'Sem documento nenhum dentro.\nSó o dinheiro.';
+      item = { grana: [5, 20] };
+    } else {
+      var k = t[Math.floor(Math.random() * t.length)];
+      destrava(k);
+      saiu.personagem = k;
+      saiu.nomePersonagem = CHARS[k].nome;
+    }
+  }
+  if (item.grana) {
+    saiu.grana = Math.round(Phaser.Math.FloatBetween(item.grana[0], item.grana[1]) * 4) / 4;
+    GameState.ganhar(saiu.grana);
+  }
+  if (item.pontos) {
+    saiu.pontos = Phaser.Math.Between(item.pontos[0], item.pontos[1]);
+    gravaPontos(lePontos() + saiu.pontos);
+  }
+  if (item.descanso) { saiu.descanso = item.descanso; GameState.addDescanso(item.descanso); }
+  if (item.carisma) { saiu.carisma = item.carisma; GameState.addCarisma(item.carisma); }
+  GameState.stats.achados = (GameState.stats.achados || 0) + 1;
+  return saiu;
+}
+
+/* ---------- ir pro fim de jogo ----------
+   Era um corte seco pra uma tela preta: você perdia e o lugar onde
+   perdeu sumia. O Crossy Road deixa o seu corpo achatado na pista atrás
+   do placar, e é isso que faz a morte ter endereço em vez de ser um
+   número.
+
+   Em vez de trocar de cena, CONGELA a que está rodando e abre a do fim
+   por cima, translúcida: o vagão, o guarda, a plataforma — onde quer que
+   tenha acabado — continuam ali atrás. A cena do fim é quem depois mata
+   as congeladas, porque quem sai da tela de fim vai pra outro lugar. */
+function vaiPraOFim(scene) {
+  var congeladas = [];
+  scene.scene.manager.getScenes(true).forEach(function (sc) {
+    var k = sc.scene.key;
+    if (k === 'Fim' || k === 'Hud') return;
+    congeladas.push(k);
+    scene.scene.pause(k);
+  });
+  HUD_VISIVEL = false; CONTROLES_VISIVEIS = false;
+  scene.scene.launch('Fim', { congeladas: congeladas });
+}
+
+/* ---------- ladrilho ----------
+   O botão do jogo, e ele é uma coisa só em toda tela: corpo, aba clara
+   em cima, sombra embaixo e moldura. É o que faz o olho ver botão sem
+   ninguém precisar escrever a palavra "botão". Nasceu na tela de título
+   e a de fim de jogo pediu o mesmo — duas cópias do mesmo desenho em
+   arquivos diferentes é como duas telas começam a não parecer o mesmo
+   jogo. */
+function ladrilho(g, x, y, w, h, corpo, aba, borda) {
+  g.fillStyle(0x000000, 0.45).fillRect(x + 2, y + 4, w, h);
+  g.fillStyle(corpo, 1).fillRect(x, y, w, h);
+  g.fillStyle(aba, 1).fillRect(x, y, w, 4);
+  g.fillStyle(0x000000, 0.22).fillRect(x, y + h - 5, w, 5);
+  g.lineStyle(2, borda, 1).strokeRect(x + 1, y + 1, w - 2, h - 2);
+}
+
 /* placa fixa de cenário: nome de setor pintado na estação */
 function placa(scene, x, y, texto, cor, depth) {
-  var p = new Plaqueta(scene, x, y, { cor: cor, depth: depth === undefined ? 3 : depth });
+  var p = new Plaqueta(scene, x, y, { cor: cor, mundo: true, depth: depth === undefined ? 3 : depth });
   p.setText(texto);
   return p;
 }
@@ -2015,10 +2390,209 @@ function placa(scene, x, y, texto, cor, depth) {
 function veuDaHora(scene, depth) {
   var f = GameState.faixa();
   if (!f.luzA) return null;
-  var g = scene.add.graphics().setDepth(depth === undefined ? 90 : depth);
+  var g = scene.add.graphics().setDepth(depth === undefined ? 90 : depth).setScrollFactor(0);
   g.fillStyle(f.luz, f.luzA).fillRect(0, HUD_H, GW, GH - HUD_H);
   return g;
 }
+
+/* ---------- cenário que vira imagem ----------
+   Um Graphics no Phaser não é uma imagem: é uma lista de comandos que o
+   motor repassa inteira a cada quadro. Cenário de estação e de vagão são
+   milhares de retângulos que nunca mudam, e num mundo que não cabe na
+   tela isso se multiplica pelo número de pedaços. Desenhar uma vez,
+   virar textura e pôr imagens na tela troca milhares de comandos por
+   quadro por nenhum. */
+function texturaDeCena(scene, chave, larg, alt, pinta) {
+  if (scene.textures.exists(chave)) scene.textures.remove(chave);
+  var g = scene.make.graphics({ add: false });
+  pinta(g);
+  g.generateTexture(chave, larg, alt);
+  g.destroy();
+}
+
+/* ---------- o que fica caído no chão ----------
+   Metrô de verdade tem coisa no chão, e quem anda olhando pra baixo
+   acha. Isso não é enfeite: o trem tem oito carros e a estação tem dois
+   andares, e até agora andar até a ponta não pagava nada — você ia
+   porque o jogo mandava, não porque tinha algo lá. Moeda no chão é o que
+   transforma "atravessar o vagão" em uma escolha sua.
+
+   Quanto mais vazio, mais tem: às seis da manhã ninguém passou ali
+   ainda; no pico já veio gente antes de você. É a regra mais justa que
+   este jogo podia ter, e ela sozinha dá motivo pra jogar fora do pico.
+
+   O bilhete único é o prêmio raro: vale PONTO, que é a moeda que
+   atravessa a corrida e abre personagem. Achar um no chão do vagão é a
+   melhor coisa que pode acontecer numa terça-feira. */
+var CAIDOS = {
+  moeda: {
+    peso: 62, nome: 'MOEDA', raio: 6,
+    grana: [0.25, 1.50], pontos: 0,
+    cor: 0xf2c14e, corSom: 0x9a7420, corLuz: 0xfff3c4
+  },
+  nota: {
+    peso: 26, nome: 'NOTA', raio: 7,
+    grana: [2.00, 6.00], pontos: 0,
+    cor: 0x7fd6a0, corSom: 0x2f7a52, corLuz: 0xd8ffe8
+  },
+  bilhete: {
+    peso: 12, nome: 'BILHETE ÚNICO', raio: 7,
+    grana: [0, 0], pontos: 3,
+    cor: 0x4d9bf0, corSom: 0x1d4c86, corLuz: 0xbfe2ff
+  }
+};
+
+function sorteiaCaido() {
+  var total = 0, k;
+  for (k in CAIDOS) if (CAIDOS.hasOwnProperty(k)) total += CAIDOS[k].peso;
+  var r = Math.random() * total;
+  for (k in CAIDOS) {
+    if (!CAIDOS.hasOwnProperty(k)) continue;
+    r -= CAIDOS[k].peso;
+    if (r <= 0) return k;
+  }
+  return 'moeda';
+}
+
+/* o desenho de cada coisa, virado textura uma vez por cena */
+function texturasDoChao(scene) {
+  for (var k in CAIDOS) {
+    if (!CAIDOS.hasOwnProperty(k)) continue;
+    (function (chave, c) {
+      /* O piso da estação é cinza escuro e o do vagão é cinza claro: sem
+         o halo, a moeda some num dos dois. O halo é o que faz ela ser
+         achada de longe, que é o ponto inteiro de ter moeda no chão. */
+      texturaDeCena(scene, 'caido_' + chave, 20, 20, function (g) {
+        g.fillStyle(c.cor, 0.16).fillCircle(10, 9, 9);
+        g.fillStyle(c.cor, 0.22).fillCircle(10, 9, 7);
+        g.fillStyle(0x000000, 0.4).fillEllipse(10, 15, 13, 5);
+        if (chave === 'moeda') {
+          g.fillStyle(c.corSom, 1).fillCircle(10, 9, 6);
+          g.fillStyle(c.cor, 1).fillCircle(10, 8, 6);
+          g.fillStyle(c.corLuz, 1).fillCircle(8, 6, 2);
+          g.fillStyle(c.corSom, 1).fillRect(9, 6, 2, 5);
+        } else if (chave === 'nota') {
+          g.fillStyle(c.corSom, 1).fillRect(3, 5, 14, 9);
+          g.fillStyle(c.cor, 1).fillRect(3, 4, 14, 9);
+          g.fillStyle(c.corLuz, 1).fillRect(4, 5, 12, 2);
+          g.fillStyle(c.corSom, 1).fillRect(8, 7, 4, 4);
+        } else {
+          g.fillStyle(c.corSom, 1).fillRect(4, 4, 12, 11);
+          g.fillStyle(c.cor, 1).fillRect(4, 3, 12, 11);
+          g.fillStyle(c.corLuz, 1).fillRect(5, 4, 10, 3);
+          g.fillStyle(0xf2f0ff, 1).fillRect(5, 10, 8, 2);
+        }
+      });
+    })(k, CAIDOS[k]);
+  }
+}
+
+/* Quantas coisas o chão de uma cena guarda. Vazio rende; pico não. */
+function quantoCaiNoChao(base) {
+  var vazio = 1 - GameState.lotacao();
+  return Math.max(0, Math.round(base * (0.35 + 1.15 * vazio) * Phaser.Math.FloatBetween(0.7, 1.3)));
+}
+
+/* ---------- o chão de uma cena ----------
+   Quem usa entrega uma função que sorteia um ponto pisável; o resto é
+   daqui: desenhar, brilhar, ser pego e dizer quanto valeu. */
+function Chao(scene, depth) {
+  this.scene = scene;
+  this.depth = (depth === undefined) ? 5 : depth;
+  this.itens = [];
+  this.avisos = [];
+  texturasDoChao(scene);
+}
+
+Chao.prototype.poe = function (x, y, chave) {
+  chave = chave || sorteiaCaido();
+  var sp = this.scene.add.image(Math.round(x), Math.round(y), 'caido_' + chave)
+    .setDepth(this.depth);
+  /* Uma coisa parada no chão de um jogo pixelado some no piso. O pulinho
+     de dois pixels é o que faz o olho achar sozinho. */
+  this.scene.tweens.add({
+    targets: sp, y: sp.y - 2, duration: 620, yoyo: true, repeat: -1,
+    ease: 'Sine.easeInOut', delay: Math.random() * 620
+  });
+  var it = { chave: chave, sp: sp, base: Math.round(y) };
+  this.itens.push(it);
+  return it;
+};
+
+/* espalha n coisas usando o sorteador de ponto de quem chamou */
+Chao.prototype.semeia = function (n, sorteiaPonto) {
+  for (var i = 0; i < n; i++) {
+    for (var t = 0; t < 24; t++) {
+      var p = sorteiaPonto();
+      if (!p) continue;
+      if (this.perto(p.x, p.y, 26)) continue;   // nunca duas grudadas
+      this.poe(p.x, p.y);
+      break;
+    }
+  }
+};
+
+Chao.prototype.perto = function (x, y, r) {
+  for (var i = 0; i < this.itens.length; i++) {
+    var it = this.itens[i];
+    if (Math.abs(it.sp.x - x) < r && Math.abs(it.base - y) < r) return it;
+  }
+  return null;
+};
+
+/* Pegar é passar por cima: nada de botão. O jogo já pede muito do
+   polegar, e abaixar pra pegar moeda não é uma decisão — é um desvio. */
+Chao.prototype.atualiza = function (dt, px, py) {
+  var pego = null;
+  for (var i = this.itens.length - 1; i >= 0; i--) {
+    var it = this.itens[i];
+    /* A caixa de pegar é maior que o desenho: no corredor do trem
+       passar a um pixel de uma moeda e não pegar é pior que não ter
+       moeda nenhuma. Ainda dá pra passar reto — só não por engano. */
+    if (Math.abs(px - it.sp.x) > 19 || Math.abs(py - it.base) > 15) continue;
+    pego = this.pega(i);
+  }
+  for (var j = this.avisos.length - 1; j >= 0; j--) {
+    var a = this.avisos[j];
+    a.t += dt;
+    a.o.y -= dt * 0.022;
+    a.o.setAlpha(Math.max(0, 1 - a.t / 900));
+    if (a.t > 900) { a.o.destroy(); this.avisos.splice(j, 1); }
+  }
+  return pego;
+};
+
+Chao.prototype.pega = function (i) {
+  var it = this.itens[i], c = CAIDOS[it.chave];
+  var grana = c.grana[1] > 0
+    ? Math.round(Phaser.Math.FloatBetween(c.grana[0], c.grana[1]) * 4) / 4
+    : 0;
+  if (grana > 0) GameState.ganhar(grana);
+  if (c.pontos > 0) gravaPontos(lePontos() + c.pontos);
+  GameState.stats.caidos = (GameState.stats.caidos || 0) + 1;
+
+  var rotulo = c.pontos > 0
+    ? '+' + c.pontos + ' PONTOS'
+    : '+' + grana.toFixed(2).replace('.', ',');
+  var o = txtC(this.scene, it.sp.x, it.base - 44, rotulo,
+    c.pontos > 0 ? PAL.verde : PAL.amarelo, 8).setDepth(420);
+  o.setScrollFactor(it.sp.scrollFactorX, it.sp.scrollFactorY);
+  this.avisos.push({ o: o, t: 0 });
+
+  this.scene.tweens.killTweensOf(it.sp);
+  it.sp.destroy();
+  this.itens.splice(i, 1);
+  sfx('moeda');
+  return { chave: it.chave, grana: grana, pontos: c.pontos, nome: c.nome };
+};
+
+Chao.prototype.limpa = function () {
+  for (var i = 0; i < this.itens.length; i++) {
+    this.scene.tweens.killTweensOf(this.itens[i].sp);
+    this.itens[i].sp.destroy();
+  }
+  this.itens = [];
+};
 
 /* ---------- diálogo ---------- */
 function Dialog(scene, texto, opcoes, cfg) {
@@ -2032,7 +2606,7 @@ function Dialog(scene, texto, opcoes, cfg) {
   this.aoExpirar = cfg.aoExpirar || null;
 
   // mede o texto já quebrado e só então desenha a caixa em volta dele
-  this.tTexto = txt(scene, 20, -400, texto, PAL.branco, 8).setDepth(901);
+  this.tTexto = txt(scene, 20, -400, texto, PAL.branco, 8).setDepth(901).setScrollFactor(0);
   /* com contador, a coluna encolhe: o relógio mora na ponta da primeira
      linha, e texto que enche a linha passava por baixo dele. O dilema do
      lugar escapava só porque a primeira linha dele é curta. */
@@ -2041,7 +2615,7 @@ function Dialog(scene, texto, opcoes, cfg) {
 
   var alt = 28 + hTexto + this.opcoes.length * 24 + (this.tempo ? 20 : 0);
   var y = GH - alt - 12;
-  this.g = scene.add.graphics().setDepth(900);
+  this.g = scene.add.graphics().setDepth(900).setScrollFactor(0);
   caixa(this.g, 8, y, GW - 16, alt, cfg.cor === undefined ? 0xf2f0ff : cfg.cor);
   this.y = y; this.alt = alt;
   this.tTexto.setPosition(20, y + 10);
@@ -2049,13 +2623,13 @@ function Dialog(scene, texto, opcoes, cfg) {
   this.tOps = [];
   for (var i = 0; i < this.opcoes.length; i++) {
     var ty = y + 20 + hTexto + i * 24;
-    this.tOps.push(txt(scene, 32, ty, this.opcoes[i].label, PAL.cinza, 8).setDepth(901));
+    this.tOps.push(txt(scene, 32, ty, this.opcoes[i].label, PAL.cinza, 8).setDepth(901).setScrollFactor(0));
   }
-  this.cursor = txt(scene, 16, y + 20 + hTexto, '>', PAL.amarelo, 8).setDepth(901);
+  this.cursor = txt(scene, 16, y + 20 + hTexto, '>', PAL.amarelo, 8).setDepth(901).setScrollFactor(0);
   if (this.opcoes.length === 0) this.cursor.setVisible(false);
   this.tTimer = null;
   if (this.tempo) {
-    this.tTimer = txt(scene, GW - 24, y + 10, '', PAL.vermelho, 8).setDepth(901).setOrigin(1, 0);
+    this.tTimer = txt(scene, GW - 24, y + 10, '', PAL.vermelho, 8).setDepth(901).setOrigin(1, 0).setScrollFactor(0);
   }
   this.redesenha();
 }
@@ -2186,9 +2760,22 @@ var HudScene = new Phaser.Class({
        não mudam nenhuma decisão no meio de um vagão, e eram justamente
        as que espremiam o resto. */
     this.zonaZap = this.add.zone(268, 26, 52, 26).setOrigin(0, 0).setInteractive();
-    this.zonaZap.on('pointerdown', function () { eu.abreZap(); });
+    /* A alça LIGA E DESLIGA. Quem abre o celular tocando aqui tenta
+       fechá-lo tocando aqui de novo — é o que qualquer aplicativo faz — e
+       antes esse toque não fazia nada, o que dava exatamente a sensação
+       de estar preso dentro do aparelho. O ZipZap não põe zona de toque
+       em cima da alça justamente pra este toque ter um dono só. */
+    this.zonaZap.on('pointerdown', function () {
+      var z = eu.scene.manager.getScene('Zap');
+      if (z && eu.scene.isActive('Zap')) { z.fecha(); return; }
+      eu.abreZap();
+    });
 
-    this.tEst = txt(this, 8, 4, '', PAL.branco, 8).setDepth(1001);
+    /* A estação saiu daqui. O topo não é lugar de dizer onde você está:
+       quem diz é o letreiro do vagão, que é onde se olha na vida real, e
+       quem perdeu o letreiro tem o mapinha no celular. Com ela fora, a
+       primeira linha ficou com uma coisa só — a hora — e o topo parou de
+       ser uma fileira de informação disputando espaço. */
     this.tHora = txt(this, 284, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
     this.montaToque();
   },
@@ -2314,7 +2901,6 @@ var HudScene = new Phaser.Class({
 
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
-    this.tEst.setVisible(temJogo);
     this.tHora.setVisible(temJogo);
     if (!temJogo) return;
 
@@ -2336,7 +2922,12 @@ var HudScene = new Phaser.Class({
     for (var c = 0; c < CORACOES_POR_PERNA; c++) {
       // passo 14 e não 12: com 3 pixels entre um e outro os cinco liam
       // como um borrão vermelho só, em vez de cinco vidas
-      var hx = 8 + c * 14, hy = 33;
+      /* Os corações subiram pra primeira linha. Com a estação fora do
+         topo, a linha de cima tinha uma coisa só (a hora) e a de baixo
+         tinha tudo — e duas linhas desequilibradas leem tão apertado
+         quanto uma linha cheia. Agora é vida em cima, medidores
+         embaixo, e um vão de verdade entre elas. */
+      var hx = 8 + c * 14, hy = 7;
       var sobra = GameState.coracoes - c;
       // o guardinha menorzinho tira meio coração: metade acesa, metade não
       var meio = (sobra > 0 && sobra < 1);
@@ -2355,7 +2946,6 @@ var HudScene = new Phaser.Class({
     g.fillStyle(0x5a5f74, 1);
     g.fillRect(300, 6, 3, 12); g.fillRect(306, 6, 3, 12);
 
-    this.tEst.setText(GameState.estacaoAtual());
     this.tHora.setText(GameState.hora()).setColor(f.cor);
 
     /* O celular: um retângulo com tela, e a bolinha vermelha de não
@@ -2371,16 +2961,25 @@ var HudScene = new Phaser.Class({
       g.fillStyle(0xe8362c, 1).fillCircle(zx + 15, zy + 3, 5);
       g.fillStyle(0xffffff, 1).fillRect(zx + 14, zy + 1, 2, 4);
     }
-    /* Os quatro blocos da segunda linha com o mesmo respiro entre eles:
-       corações 8..73, carisma 84..144, descanso 155..215, grana até 312.
-       Onze pixels em cada vão, em vez de seis entre as barras. */
-    barra(g, 84, 32, 60, 11, GameState.carisma / 100, 0xe8a33c);
+    /* ---------- os dois medidores, empilhados ----------
+       Lado a lado eles disputavam a largura com os corações e com a
+       alça do celular, e o que sobrava pra cada um eram 60 pixels — a
+       terceira vez que este HUD ficou apertado.
+
+       Empilhados, cada um ganha 104: quase o dobro de barra pra ler, no
+       mesmo espaço. E sobra ar de verdade entre eles e o
+       celular, que é o que faltava — "amontoado" nunca foi excesso de
+       coisa, foi falta de vão entre as coisas.
+
+       O de cima é sempre o carisma. Quem quiser conferir a cor tem a
+       legenda na pausa. */
+    barra(g, 8, 29, 104, 8, GameState.carisma / 100, 0xe8a33c);
 
     /* O medidor de descanso era verde até o último pixel: cheio e
        quase vazio tinham a mesma cor, e a única diferença era um
        comprimento que ninguém compara de relance. Agora ele esquenta
        conforme baixa, e pisca quando o sono está pra bater. */
     var pd = GameState.descanso / GameState.char.descansoMax;
-    barra(g, 155, 32, 60, 11, pd, corDescanso(pd, time));
+    barra(g, 8, 40, 104, 8, pd, corDescanso(pd, time));
   }
 });

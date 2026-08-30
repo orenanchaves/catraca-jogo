@@ -1,15 +1,30 @@
 /* global Phaser */
 /* Catraca — boot, carga de arte e configuração do jogo */
 
+/* A ficha de arte de cada jogável sai do próprio elenco, não de uma
+   lista à parte: cada personagem tem uma versão por gênero (ver
+   CHARS[k].visual), e manter as duas listas em dia à mão seria pedir
+   pra elas discordarem. Sai uma folha por versão — 'ch_estudante_m',
+   'ch_estudante_f' — e quem só tem um gênero só gera uma. */
+function fichasDosJogaveis() {
+  var out = [], k, g;
+  for (k in CHARS) {
+    var gs = generosDe(k);
+    for (var i = 0; i < gs.length; i++) {
+      g = gs[i];
+      var v = CHARS[k].visual[g];
+      out.push({
+        key: 'ch_' + k + '_' + g,
+        file: 'assets/chars/' + k + '_' + g + '.png',
+        pal: PELES[v.pal], corpo: v.corpo
+      });
+    }
+  }
+  return out;
+}
+
 var ASSETS = {
-  chars: [
-    { key: 'ch_estudante', file: 'assets/chars/estudante.png', pal: PELES.estudante, corpo: 'bone_mochila' },
-    { key: 'ch_clt', file: 'assets/chars/clt.png', pal: PELES.clt, corpo: 'padrao' },
-    { key: 'ch_senhor', file: 'assets/chars/senhor.png', pal: PELES.senhor, corpo: 'senhor' },
-    { key: 'ch_ambulante', file: 'assets/chars/ambulante.png', pal: PELES.ambulante, corpo: 'bone' },
-    { key: 'ch_gestante', file: 'assets/chars/gestante.png', pal: PELES.gestanteJog, corpo: 'gestante' },
-    { key: 'ch_turista', file: 'assets/chars/turista.png', pal: PELES.turista, corpo: 'bone_mochila' }
-  ],
+  chars: fichasDosJogaveis(),
   npcs: [
     { key: 'np_idoso', file: 'assets/npcs/idoso.png', pal: PELES.idoso, corpo: 'senhor' },
     { key: 'np_gestante', file: 'assets/npcs/gestante.png', pal: PELES.gestante, corpo: 'gestante' },
@@ -122,8 +137,8 @@ var config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, CatracaScene, PlataformaScene, VagaoScene, BaldeacaoScene, FimScene,
-    HudScene, TutorialScene, PausaScene, ZapScene]
+  scene: [BootScene, TitleScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
+    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene]
 };
 
 window.addEventListener('load', function () {

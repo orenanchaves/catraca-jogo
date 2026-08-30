@@ -42,7 +42,7 @@ var BaldeacaoScene = new Phaser.Class({
     this.gFundo = this.add.graphics().setDepth(0);
     this.gUI = this.add.graphics().setDepth(500);
 
-    this.pl = new Ator(this, this.x, BALD_JOGADOR_Y, 'ch_' + GameState.charKey);
+    this.pl = new Ator(this, this.x, BALD_JOGADOR_Y, spriteJogador());
     this.pl.sp.setDepth(60);
     this.pl.dir = 'up';
 
@@ -52,6 +52,17 @@ var BaldeacaoScene = new Phaser.Class({
 
     this.dica = new FaixaDica(this, 520);
     this.centro = new Plaqueta(this, GW / 2, 150, { cor: PAL.branco, depth: 522 });
+
+    /* A estação saiu do topo da tela, e aqui ela só existia na fala de
+       abertura — que some em um segundo e meio. O corredor da Sé é a
+       única cena sem placa própria, então ganhou a dela: a mesma placa
+       de saguão da catraca, com o nome da estação e a linha pra onde
+       este corredor leva. */
+    var gPlaca = this.add.graphics().setDepth(504);
+    gPlaca.fillStyle(0x06060c, 1).fillRect(0, HUD_H, GW, 30);
+    gPlaca.fillStyle(num(LINHAS[GameState.linha].cor), 1).fillRect(0, HUD_H + 27, GW, 3);
+    txtC(this, GW / 2, HUD_H + 5, 'SÉ  ►  ' + LINHAS[GameState.linha].nome,
+      PAL.branco, 8).setDepth(505);
 
     var self = this;
     fala(this, 'SÉ. Baldeação pra ' + LINHAS[GameState.linha].nome + '.\nCorre que o trem não espera.', []);
@@ -208,8 +219,10 @@ var BaldeacaoScene = new Phaser.Class({
     fala(this, texto, [{
       label: 'Seguir', cb: function () {
         var morte = GameState.derrota();
-        if (morte) { GameState.motivoFim = morte; GameState.salvarRecorde(); self.scene.start('Fim'); return; }
-        self.scene.start('Plataforma');
+        if (morte) { GameState.motivoFim = morte; GameState.salvarRecorde(); vaiPraOFim(self); return; }
+        /* Sai da baldeação direto na plataforma: quem baldeia já está
+           dentro do sistema, e não passa por catraca nenhuma. */
+        self.scene.start('Estacao', { onde: 'plataforma' });
       }
     }]);
   }

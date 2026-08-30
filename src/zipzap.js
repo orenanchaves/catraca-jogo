@@ -60,6 +60,25 @@ function rotinaDe(k) { return ROTINAS[k] || ROTINAS.clt; }
 
    As mensagens são curtas de propósito: a tela do celular tem 240
    pixels de largura útil, e a fonte gasta 12 por caractere. */
+/* O que VOCÊ manda de volta. O ZipZap era um mural: a mensagem chegava,
+   você aceitava, e a sua resposta nunca existia — o que fazia a
+   conversa parecer um aviso do sistema com nome de gente.
+
+   Toda conversa tem resposta, e conversa com compromisso tem as duas: a
+   de quem vai e a de quem não vai. Cada personagem responde do jeito
+   dele, e quando a conversa não diz qual é, cai numa destas. */
+/* Curtas por obrigação: o botão da resposta tem 236 pixels úteis, e a
+   fonte gasta 12 por caractere — dezessete letras, contando a seta. */
+var RESPOSTA_PADRAO = {
+  estudante: { sim: 'blz, tô indo', nao: 'hj não dá', ok: 'kkkk' },
+  clt: { sim: 'Ok, estou indo', nao: 'Hoje não dá', ok: 'Certo' },
+  senhor: { sim: 'Pode deixar', nao: 'Hoje não, filho', ok: 'Que bom' },
+  ambulante: { sim: 'tamo junto', nao: 'hj tô na correria', ok: 'salve salve' },
+  gestante: { sim: 'Tá bom, eu vou', nao: 'Hoje não dá, amor', ok: 'Obrigada' },
+  turista: { sim: 'Ok! I go there', nao: 'Not today, sorry', ok: 'Nice!' }
+};
+function respostaPadrao(k) { return RESPOSTA_PADRAO[k] || RESPOSTA_PADRAO.clt; }
+
 var CONTATOS = {
   estudante: [
     {
@@ -254,6 +273,7 @@ function contatosDe(k) { return CONTATOS[k] || CONTATOS.clt; }
    sorteio, não decisão. */
 function montaZap(charKey) {
   var lista = contatosDe(charKey);
+  FIO_VOZ = respostaPadrao(charKey);
   var caixa = [];
   var comVai = [], semVai = [], i, j;
 
@@ -286,14 +306,27 @@ function montaZap(charKey) {
   return caixa;
 }
 
+/* a voz do personagem da vez, pra quando a conversa não traz resposta
+   escrita à mão */
+var FIO_VOZ = RESPOSTA_PADRAO.clt;
+
 function novoFio(item, temVai) {
+  var c = item.conversa;
   return {
     nome: item.contato.nome,
     grupo: !!item.contato.grupo,
-    msgs: item.conversa.msgs.slice(0),
-    vai: temVai ? item.conversa.vai : null,
+    msgs: c.msgs.slice(0),
+    vai: temVai ? c.vai : null,
+    /* o que você manda de volta: uma resposta pra cada saída, e a
+       conversa fiada também tem a dela — responder "kkkk" pra piada da
+       resenha é metade do que faz o ZipZap parecer um ZipZap */
+    resSim: c.resSim || FIO_VOZ.sim,
+    resNao: c.resNao || FIO_VOZ.nao,
+    resOk: c.resOk || FIO_VOZ.ok,
+    enviadas: [],
     lida: false,
-    aceito: false
+    aceito: false,
+    respondido: false
   };
 }
 

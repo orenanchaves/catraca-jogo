@@ -17,12 +17,26 @@
 var ABAS_ZAP = ['ZAP', 'MAPA', 'GRANA'];
 
 /* a moldura e as faixas: tudo medido uma vez só, e todo mundo lê daqui */
+/* O botão da resposta ocupa quase toda a largura útil da tela do
+   celular: com a caixa estreita, "hj tô na correria" saía por cima da
+   moldura do aparelho — e a moldura é a única coisa da tela que não
+   pode ser atravessada. */
+var ZAP_BOTAO = { dx: 8, dy: -92, alt: 30, altNota: 40, passo: 44, texto: 18 };
+
 var ZAP = {
   x0: 16, x1: 304, y0: 36, y1: 552,   // moldura
   tx0: 26, tx1: 294,                  // tela útil
   ty0: 62, ty1: 528,
   status: 62, topo: 92, abas: 486
 };
+
+/* O botão da resposta tem 236 pixels úteis a 12 por caractere: dezessete
+   letras depois da seta. Resposta escrita à mão maior que isso saía pela
+   borda do celular, e a moldura do aparelho é a única coisa na tela que
+   não pode ser atravessada. */
+function rotuloResposta(t) {
+  return '► ' + (t.length > 17 ? t.slice(0, 16) + '.' : t);
+}
 
 var ZapScene = new Phaser.Class({
   Extends: Phaser.Scene,
@@ -33,6 +47,7 @@ var ZapScene = new Phaser.Class({
     this.aba = 0;
     this.sel = 0;
     this.fio = null;          // conversa aberta, se alguma
+    this.opBotao = 0;         // qual das respostas está na mira
     this.congeladas = [];
 
     this.scene.manager.getScenes(true).forEach(function (sc) {
@@ -44,7 +59,7 @@ var ZapScene = new Phaser.Class({
 
     this.g = this.add.graphics().setDepth(2400);
     this.tStatus = txt(this, ZAP.tx0 + 6, ZAP.status + 4, '', PAL.cinza, 8).setDepth(2402);
-    this.tHora = txt(this, ZAP.tx1 - 6, ZAP.status + 4, '', PAL.branco, 8).setDepth(2402).setOrigin(1, 0);
+    this.tHora = txt(this, ZAP.tx1 - 34, ZAP.status + 4, '', PAL.branco, 8).setDepth(2402).setOrigin(1, 0);
 
     /* Um punhado de linhas dá conta das três abas; reaproveitar os
        mesmos objetos evita criar e destruir texto a cada toque, que no
@@ -56,7 +71,48 @@ var ZapScene = new Phaser.Class({
     }
     this.tRodape = txtC(this, GW / 2, ZAP.abas - 26, '', PAL.cinzaEsc, 8).setDepth(2402);
 
-    // as três abas são zonas de toque; o resto da tela fecha o celular
+    /* A saída precisa estar ESCRITA. O aparelho ocupa a tela quase
+       inteira, e as portas que ele tinha — o ✕, o botão de baixo, a
+       faixa de fora — eram todas pequenas e mudas: quem não adivinhava
+       ficava preso lá dentro. Esta linha mora na faixa de fora de baixo,
+       que é ela própria uma das portas, entre as duas mãos. */
+    this.tSaida = txtC(this, GW / 2, ZAP.y1 + 2, '▼ TOQUE PRA SAIR ▼', PAL.amarelo, 8)
+      .setDepth(2402);
+
+    /* ---------- guardar o celular ----------
+       Isto não existia, e no celular não havia saída nenhuma: fechar
+       dependia de Esc, P ou X, que são teclas — num aparelho de toque
+       o ZipZap era uma sala sem porta. Agora há três portas, e todas
+       são as que a pessoa já procuraria sozinha: o ✕ na barra de
+       status, o botão embaixo do aparelho, e tocar fora dele. */
+    this.zonaX = this.add.zone(ZAP.tx1 - 34, ZAP.status - 2, 38, 28)
+      .setOrigin(0, 0).setInteractive();
+    this.zonaX.on('pointerdown', function () { self.fecha(); });
+
+    this.zonaBotao = this.add.zone(GW / 2 - 60, ZAP.y1 - 28, 120, 30)
+      .setOrigin(0, 0).setInteractive();
+    this.zonaBotao.on('pointerdown', function () { self.fecha(); });
+
+    /* Fora do aparelho são quatro faixas, e não uma tela inteira por
+       baixo: com a tela inteira, qualquer toque no meio de uma conversa
+       vazia guardaria o celular sem querer.
+
+       A faixa de cima abre um buraco na alça do celular do HUD (268..320,
+       y até 26): aquele retângulo é da alça, que agora liga e desliga.
+       Duas cenas ouvindo o mesmo toque fechavam e reabriam o aparelho no
+       mesmo quadro. */
+    var fora = [
+      [0, 0, 268, ZAP.y0], [268, 0, GW - 268, 26],
+      [0, ZAP.y1, GW, GH - ZAP.y1],
+      [0, ZAP.y0, ZAP.x0, ZAP.y1 - ZAP.y0], [ZAP.x1, ZAP.y0, GW - ZAP.x1, ZAP.y1 - ZAP.y0]
+    ];
+    for (i = 0; i < fora.length; i++) {
+      this.add.zone(fora[i][0], fora[i][1], fora[i][2], fora[i][3])
+        .setOrigin(0, 0).setInteractive()
+        .on('pointerdown', function () { self.fecha(); });
+    }
+
+    // as três abas são zonas de toque
     this.zonas = [];
     for (i = 0; i < ABAS_ZAP.length; i++) {
       var largura = Math.floor((ZAP.tx1 - ZAP.tx0) / ABAS_ZAP.length);
@@ -66,6 +122,14 @@ var ZapScene = new Phaser.Class({
       })(i);
       this.zonas.push(z);
     }
+    // o cabeçalho da conversa volta pra lista
+    this.zonaVolta = this.add.zone(ZAP.tx0, ZAP.topo - 10, ZAP.tx1 - ZAP.tx0, 30)
+      .setOrigin(0, 0).setInteractive();
+    this.zonaVolta.on('pointerdown', function () {
+      if (!self.fio) return;
+      self.fio = null; self.opBotao = 0; sfx('catraca'); self.pinta();
+    });
+
     // uma zona por linha da lista, pra abrir conversa no toque
     this.zonasLinha = [];
     for (i = 0; i < 6; i++) {
@@ -80,10 +144,17 @@ var ZapScene = new Phaser.Class({
       })(i);
       this.zonasLinha.push(zl);
     }
-    // botão de aceitar / voltar, dentro da conversa
-    this.zonaOk = this.add.zone(ZAP.tx0 + 20, ZAP.abas - 62, (ZAP.tx1 - ZAP.tx0) - 40, 52)
-      .setOrigin(0, 0).setInteractive();
-    this.zonaOk.on('pointerdown', function () { if (self.fio) self.confirma(); });
+    /* Dois botões dentro da conversa, um em cima do outro: responder
+       indo e responder que hoje não dá. Fora do compromisso, só um. */
+    this.zonasBotao = [];
+    for (i = 0; i < 2; i++) {
+      var zb = this.add.zone(ZAP.tx0 + ZAP_BOTAO.dx, ZAP.abas + ZAP_BOTAO.dy + i * ZAP_BOTAO.passo,
+        (ZAP.tx1 - ZAP.tx0) - ZAP_BOTAO.dx * 2, ZAP_BOTAO.altNota).setOrigin(0, 0).setInteractive();
+      (function (idx) {
+        zb.on('pointerdown', function () { if (self.fio) { self.opBotao = idx; self.confirma(); } });
+      })(i);
+      this.zonasBotao.push(zb);
+    }
 
     this.input.keyboard.on('keydown', function (ev) {
       var c = ev.code;
@@ -109,7 +180,14 @@ var ZapScene = new Phaser.Class({
   },
 
   move: function (d) {
-    if (this.fio) return;
+    if (this.fio) {
+      var n = this.respostasDoFio().length;
+      if (n < 2) return;
+      this.opBotao = (this.opBotao + d + n) % n;
+      sfx('catraca');
+      this.pinta();
+      return;
+    }
     var n = (GameState.zap || []).length;
     if (this.aba !== 0 || !n) return;
     this.sel = (this.sel + d + n) % n;
@@ -122,21 +200,48 @@ var ZapScene = new Phaser.Class({
     if (this.aba !== 0 || !caixa.length) return;
     this.fio = caixa[Math.min(this.sel, caixa.length - 1)];
     this.fio.lida = true;
+    this.opBotao = 0;
     sfx('ok');
     this.pinta();
   },
 
-  /* Dentro da conversa o botão é um só: se tem compromisso e ainda não
-     foi aceito, aceitar; senão, voltar pra lista. */
-  confirma: function () {
-    if (this.fio && this.fio.vai && !this.fio.aceito) {
-      GameState.aceitaCompromisso(this.fio);
-      sfx('moeda');
-      this.pinta();
-      return;
+  /* ---------- responder ----------
+     O ZipZap era um mural: a mensagem chegava, você aceitava, e a sua
+     resposta nunca existia — o que fazia a conversa parecer um aviso
+     do sistema com nome de gente. Agora você responde, e o que você
+     mandou fica no fio, do seu lado, em verde.
+
+     Compromisso tem duas respostas, e as duas mudam o dia: dizer que
+     vai troca o destino da perna; dizer que hoje não dá encerra o
+     assunto e o dia segue a rotina. Conversa fiada tem uma só, que não
+     muda nada além da conversa — e é justamente por isso que ela
+     importa. */
+  respostasDoFio: function () {
+    var f = this.fio;
+    if (!f) return [];
+    if (f.respondido) return [{ rotulo: nomeAgir() + ': VOLTAR', cor: PAL.cinzaEsc, acao: 'volta' }];
+    if (f.vai) {
+      return [
+        { rotulo: rotuloResposta(f.resSim), cor: PAL.verde, acao: 'sim', nota: f.vai.rotulo },
+        { rotulo: rotuloResposta(f.resNao), cor: PAL.cinza, acao: 'nao' }
+      ];
     }
-    this.fio = null;
-    sfx('catraca');
+    return [{ rotulo: rotuloResposta(f.resOk), cor: PAL.verde, acao: 'ok' }];
+  },
+
+  confirma: function () {
+    var f = this.fio;
+    if (!f) return;
+    var ops = this.respostasDoFio();
+    var op = ops[Math.min(this.opBotao, ops.length - 1)];
+
+    if (op.acao === 'volta') { this.fio = null; sfx('catraca'); this.pinta(); return; }
+
+    f.enviadas.push(op.acao === 'sim' ? f.resSim : (op.acao === 'nao' ? f.resNao : f.resOk));
+    f.respondido = true;
+    this.opBotao = 0;
+    if (op.acao === 'sim') { GameState.aceitaCompromisso(f); sfx('moeda'); }
+    else sfx('ok');
     this.pinta();
   },
 
@@ -164,14 +269,25 @@ var ZapScene = new Phaser.Class({
     g.fillStyle(0x17171f, 1).fillRect(ZAP.x0, ZAP.y0, ZAP.x1 - ZAP.x0, ZAP.y1 - ZAP.y0);
     g.fillStyle(0x2c2c3a, 1).fillRect(ZAP.x0, ZAP.y0, ZAP.x1 - ZAP.x0, 3);
     g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0, ZAP.ty0 - 12, ZAP.tx1 - ZAP.tx0, ZAP.ty1 - ZAP.ty0 + 12);
-    // alto-falante e botão
+    // alto-falante, e o botão de guardar o celular
     g.fillStyle(0x3a3a4c, 1).fillRect(GW / 2 - 16, ZAP.y0 + 9, 32, 3);
-    g.fillStyle(0x3a3a4c, 1).fillRect(GW / 2 - 11, ZAP.y1 - 18, 22, 3);
+    g.fillStyle(0x4a4a60, 1).fillRect(GW / 2 - 34, ZAP.y1 - 20, 68, 7);
+    g.fillStyle(0x6e6e88, 1).fillRect(GW / 2 - 34, ZAP.y1 - 20, 68, 2);
 
     // barra de status: a hora do celular é a hora do jogo
     g.fillStyle(0x101a16, 1).fillRect(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, 22);
     this.tStatus.setText('ZIPZAP');
     this.tHora.setText(GameState.char ? GameState.hora() : '--:--');
+    /* O ✕ não existe na fonte do jogo, então ele é dois riscos — que é
+       tudo que um ✕ é. Dois riscos cinza soltos na barra, porém, não
+       pareciam clicáveis: ele ganhou moldura e ficou branco, que é o que
+       separa um enfeite de um botão. */
+    var xc = ZAP.tx1 - 15, yc = ZAP.status + 11;
+    g.fillStyle(0x2a1418, 1).fillRect(xc - 13, yc - 10, 26, 20);
+    g.lineStyle(1, 0xe8362c, 1).strokeRect(xc - 13, yc - 10, 26, 20);
+    g.lineStyle(2, 0xf2f0ff, 1);
+    g.beginPath(); g.moveTo(xc - 5, yc - 5); g.lineTo(xc + 5, yc + 5); g.strokePath();
+    g.beginPath(); g.moveTo(xc + 5, yc - 5); g.lineTo(xc - 5, yc + 5); g.strokePath();
 
     if (this.aba === 0) this.pintaZap(g);
     else if (this.aba === 1) this.pintaMapa(g);
@@ -194,31 +310,62 @@ var ZapScene = new Phaser.Class({
     if (this.fio) {
       // conversa aberta: o nome no topo e os balões embaixo
       g.fillStyle(0x14231c, 1).fillRect(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, 26);
-      this.linha(0, ZAP.topo - 4, (this.fio.grupo ? '# ' : '') + this.fio.nome, PAL.verde);
-      var y = ZAP.topo + 32;
-      for (i = 0; i < this.fio.msgs.length && i < 8; i++) {
-        var largura = Math.min(ZAP.tx1 - ZAP.tx0 - 24, this.fio.msgs[i].length * 12 + 14);
-        g.fillStyle(0x1e2c26, 1).fillRect(ZAP.tx0 + 8, y - 4, largura, 24);
-        g.fillStyle(0x2a3d34, 1).fillRect(ZAP.tx0 + 8, y - 4, largura, 2);
-        this.linha(i + 1, y, this.fio.msgs[i], PAL.branco);
+      /* A seta de voltar mora no nome, como em qualquer aplicativo de
+         mensagem. Sem ela, a conversa com compromisso não tinha saída
+         que não fosse responder: as duas opções eram sim e não, e
+         nenhuma delas era "depois eu vejo". */
+      this.linha(0, ZAP.topo - 4, '◄ ' + (this.fio.grupo ? '# ' : '') + this.fio.nome, PAL.verde);
+
+      /* Os balões: o que chegou fica à esquerda, cinza; o que VOCÊ
+         mandou fica à direita, verde. É a única coisa que faz uma tela
+         de mensagens parecer uma conversa em vez de um mural. */
+      var y = ZAP.topo + 32, n = 0;
+      for (i = 0; i < this.fio.msgs.length && n < 9; i++, n++) {
+        this.balao(g, n + 1, y, this.fio.msgs[i], false);
         y += 30;
       }
-      if (this.fio.vai) {
-        var jaVai = this.fio.aceito;
-        g.fillStyle(jaVai ? 0x16321f : 0x2a2410, 1)
-          .fillRect(ZAP.tx0 + 20, ZAP.abas - 62, (ZAP.tx1 - ZAP.tx0) - 40, 52);
-        g.lineStyle(2, jaVai ? 0x00e676 : 0xf2c14e, 1)
-          .strokeRect(ZAP.tx0 + 20, ZAP.abas - 62, (ZAP.tx1 - ZAP.tx0) - 40, 52);
-        this.linha(10, ZAP.abas - 58, jaVai ? '  ✓ VOCÊ VAI PRA' : '  ► TÁ BOM, EU VOU',
-          jaVai ? PAL.verde : PAL.amarelo);
-        this.linha(11, ZAP.abas - 36, jaVai ? '    ' + this.fio.vai.estacao : '    ' + this.fio.vai.rotulo,
-          jaVai ? PAL.verde : PAL.cinza);
-      } else {
-        this.linha(10, ZAP.abas - 42, '  ' + nomeAgir() + ': VOLTAR', PAL.cinzaEsc);
+      for (i = 0; i < this.fio.enviadas.length && n < 9; i++, n++) {
+        this.balao(g, n + 1, y, this.fio.enviadas[i], true);
+        y += 30;
       }
+
+      // e as respostas possíveis, uma por linha, com a mira na escolhida
+      var ops = this.respostasDoFio();
+      for (i = 0; i < ops.length; i++) {
+        var by = ZAP.abas + ZAP_BOTAO.dy + i * ZAP_BOTAO.passo;
+        var mira = (i === Math.min(this.opBotao, ops.length - 1));
+        var cor = num(ops[i].cor);
+        var bx = ZAP.tx0 + ZAP_BOTAO.dx, bw = (ZAP.tx1 - ZAP.tx0) - ZAP_BOTAO.dx * 2;
+        var bh = ops[i].nota ? ZAP_BOTAO.altNota : ZAP_BOTAO.alt;
+        g.fillStyle(mira ? 0x1b2a22 : 0x11161d, 1).fillRect(bx, by, bw, bh);
+        g.lineStyle(2, mira ? cor : 0x2a2a3a, 1).strokeRect(bx, by, bw, bh);
+        /* o texto começa dentro da caixa do botão, não na margem da
+           tela: com o recuo em espaços a resposta longa encostava na
+           borda direita da moldura */
+        this.linha(10 + i * 2, by + 5, ops[i].rotulo, mira ? ops[i].cor : PAL.cinzaEsc)
+          .setPosition(bx + 10, by + 5);
+        if (ops[i].nota) {
+          this.linha(11 + i * 2, by + 24, '► ' + ops[i].nota, PAL.cinza)
+            .setPosition(bx + 24, by + 24);
+        }
+      }
+      /* Zona de toque só onde há coisa desenhada. Dentro da conversa a
+         lista não existe, e o cabeçalho é o botão de voltar; na lista é
+         o contrário. As duas se sobrepõem no alto da tela, e deixar as
+         duas ligadas fazia a primeira conversa da lista não abrir. */
+      for (i = 0; i < this.zonasBotao.length; i++) {
+        if (i < ops.length) this.zonasBotao[i].setInteractive();
+        else this.zonasBotao[i].disableInteractive();
+      }
+      this.zonaVolta.setInteractive();
+      for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].disableInteractive();
       this.tRodape.setText('');
       return;
     }
+
+    for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
+    this.zonaVolta.disableInteractive();
+    for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].setInteractive();
 
     if (!caixa.length) {
       this.linha(0, ZAP.topo + 40, '  NENHUMA MENSAGEM.', PAL.cinzaEsc);
@@ -246,10 +393,26 @@ var ZapScene = new Phaser.Class({
     this.tRodape.setText(naoLidas(caixa) + ' NÃO LIDA(S)');
   },
 
+  /* Um balão. Recebido nasce na margem esquerda; enviado é empurrado
+     pra direita e vem em verde, que é como todo mundo já sabe ler uma
+     conversa antes de ler o texto. */
+  balao: function (g, idx, y, texto, meu) {
+    var larg = Math.min(ZAP.tx1 - ZAP.tx0 - 24, texto.length * 12 + 14);
+    var x = meu ? (ZAP.tx1 - 8 - larg) : (ZAP.tx0 + 8);
+    g.fillStyle(meu ? 0x14432c : 0x1e2c26, 1).fillRect(x, y - 4, larg, 24);
+    g.fillStyle(meu ? 0x1d6e42 : 0x2a3d34, 1).fillRect(x, y - 4, larg, 2);
+    var t = this.linhas[idx];
+    t.setVisible(true).setOrigin(0, 0).setPosition(x + 7, y)
+      .setText(texto).setColor(meu ? PAL.verde : PAL.branco);
+  },
+
   // a prévia cabe em 18 caracteres; o resto vira reticências
   previa: function (f) {
     if (f.aceito) return '✓ ' + f.vai.estacao;
-    var m = f.msgs[0] || '';
+    // já respondida: a prévia é o que VOCÊ mandou, como em qualquer zap
+    var m = f.respondido && f.enviadas.length
+      ? '► ' + f.enviadas[f.enviadas.length - 1]
+      : (f.msgs[0] || '');
     return m.length > 18 ? m.slice(0, 17) + '...' : m;
   },
 
@@ -294,7 +457,13 @@ var ZapScene = new Phaser.Class({
 
     this.linha(2, ZAP.topo, '► ' + GameState.rotuloDaPerna(), PAL.amarelo);
     this.linha(3, ZAP.topo + 18, '  ' + GameState.destinoFinal(), PAL.verde);
-    this.tRodape.setText(GameState.faltamEstacoes() + ' ESTAÇÕES ATÉ ' + GameState.alvoAtual());
+    /* O nome da estação em que você está saiu do topo da tela e passou a
+       morar em dois lugares: o letreiro do vagão e este mapa. Aqui ele
+       fica no rodapé, colado no ponto que pisca — a bolinha diz ONDE, e
+       o rodapé diz o nome do onde. */
+    this.linha(4, ZAP.topo + 36, '  ' + GameState.faltamEstacoes() +
+      ' ATÉ ' + GameState.alvoAtual(), PAL.cinza);
+    this.tRodape.setText(GameState.estacaoAtual());
   },
 
   /* ---------- aba 3: a grana ----------
