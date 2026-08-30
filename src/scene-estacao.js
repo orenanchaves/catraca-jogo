@@ -63,6 +63,16 @@ var ACH = { y: 352, h: 62, alcance: 64 };
 var PLAT_X0 = 136, PLAT_X1 = 288;
 function platY(y) { return y + PLAT_Y - HUD_H; }   // y de tela da plataforma → mundo
 
+/* Onde as portas do trem param, de 118 em 118. É função pura de propósito:
+   a pintura da plataforma precisa das mesmas posições pra marcar o chão, e
+   ela é chamada com `this` nulo pela tela de título. Duas contas da mesma
+   coisa saem de sincronia na primeira mudança. */
+function portasDoTrem() {
+  var out = [];
+  for (var p = 76; p + 52 <= PLAT_ALT - 24; p += 118) out.push(p);
+  return out;
+}
+
 /* a plataforma inteira, sem cair no trilho nem entrar na parede */
 function limitaPlataforma(sp) {
   sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
@@ -100,8 +110,7 @@ var EstacaoScene = new Phaser.Class({
     /* As portas nascem do comprimento do trem, de 118 em 118: com a
        plataforma mudando de tamanho, lista fixa deixava metade dela
        sem porta nenhuma. */
-    this.portas = [];
-    for (var pq = 76; pq + 52 <= PLAT_ALT - 24; pq += 118) this.portas.push(pq);
+    this.portas = portasDoTrem();
     this.estado = 'espera';
     this.t = 0;
     this.perdido = false;
@@ -135,7 +144,13 @@ var EstacaoScene = new Phaser.Class({
     /* Duas plateias, uma em cada andar: quem está no saguão anda de um
        lado pro outro, quem está na plataforma espera olhando o trilho. */
     this.plateia = [];
-    var quantos = Math.round(1 + 8 * GameState.lotacao()), i;
+    /* ---------- quanta gente ----------
+       Eram 9 no saguão e 10 na plataforma no pico, espalhadas por 900px:
+       dava uma pessoa a cada noventa pixels, que é o oposto de pico. Pico
+       na Sé é parede de gente com uma canaleta livre na faixa amarela,
+       e é essa densidade que faz o horário significar alguma coisa —
+       sem ela, escolher a madrugada não é escolha, é preferência. */
+    var quantos = Math.round(2 + 16 * GameState.lotacao()), i;
     for (i = 0; i < quantos; i++) {
       var a = new Ator(this, 40 + Math.random() * 240,
         280 + Math.random() * 230, sorteiaPax());
@@ -145,10 +160,20 @@ var EstacaoScene = new Phaser.Class({
       this.plateia.push(a);
     }
     this.esperando = [];
-    quantos = Math.round(1 + 9 * GameState.lotacao());
+    quantos = Math.round(2 + 34 * GameState.lotacao());
     for (i = 0; i < quantos; i++) {
-      var e = new Ator(this, PLAT_X0 + 14 + Math.random() * 130,
-        platY(100 + Math.random() * (PLAT_ALT - 160)), sorteiaPax());
+      /* Ninguém espera espalhado por igual: espera-se ONDE A PORTA PARA.
+         Dois terços nascem colados numa porta e o resto fica solto, que é
+         o que faz a plataforma ter bolo e vão em vez de chuvisco. */
+      var ey;
+      if (Math.random() < 0.66 && this.portas.length) {
+        var pp = this.portas[Math.floor(Math.random() * this.portas.length)];
+        ey = platY(pp - HUD_H + 26 + (Math.random() - 0.5) * 90);
+      } else {
+        ey = platY(100 + Math.random() * (PLAT_ALT - 160));
+      }
+      var e = new Ator(this, PLAT_X0 + 10 + Math.random() * 140,
+        Phaser.Math.Clamp(ey, platY(90), ESC_Y - 30), sorteiaPax());
       e.dir = 'left'; e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
     }
@@ -342,10 +367,26 @@ var EstacaoScene = new Phaser.Class({
     tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
     /* A placa da escada fica NO PISO, rente à boca: pendurada no vão
        ela virava parede na frente de quem sobe. */
-    placa(this, GW / 2, 126, '▲ PLATAFORMA', PAL.cinza);
-    // a placa vertical da plataforma, com o nome da estação
-    var t = txt(this, 308, platY(220), GameState.estacaoAtual(), PAL.branco, 8);
-    t.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+    placaSaida(this, GW / 2, 126, '▲ PLATAFORMA', 3);
+    /* o nome repetido na faixa, de 260 em 260: é assim que a estação se
+       identifica de qualquer ponto da plataforma, e é o marco que diz
+       quanto você já andou */
+    for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
+      var tn = txt(this, 309, platY(ny), GameState.estacaoAtual(), PAL.branco, 8);
+      tn.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+    }
+
+    /* ---------- pra que lado este trem vai ----------
+       A plataforma dizia só onde VOCÊ está, que é a informação que menos
+       falta: o nome da estação já está no alto da tela e no letreiro do
+       vagão. O que faltava é a que toda plataforma de metrô grita antes
+       de qualquer outra — o TERMINAL pra onde o trem sai daqui.
+
+       Sem isso não existe lado errado, porque não existe lado. Ela sai
+       da linha em que você está: na Vermelha é Barra Funda ou Itaquera,
+       na Azul é Jabaquara ou Tucuruvi. Nunca escrita à mão. */
+    placaSaida(this, GW / 2, platY(26),
+      '► ' + GameState.sentidoAtual(), 3, GameState.linhaAtual().nome);
 
     this.gCatracas = this.add.graphics().setDepth(2);
     this.pintaCatracas();
@@ -471,6 +512,11 @@ var EstacaoScene = new Phaser.Class({
   },
 
   pintaPlataforma: function (g, l) {
+    /* A tela de título usa este mesmo desenho como papel de parede e
+       chama com a linha NULA, porque lá ainda não existe partida. Tudo
+       que depende da cor da linha precisa de um chão: sem isto, a faixa
+       da parede derrubava o jogo antes da primeira tela. */
+    l = l || LINHAS.vermelha;
     /* A plataforma é desenhada na origem da própria textura, então tudo
        que era HUD_H vira 0 e o resto acompanha. */
     var GH_ = PLAT_ALT, HUD_H_ = 0;
@@ -511,10 +557,37 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(0xffffff, 0.05).fillRect(150, HUD_H_, 28, GH_ - HUD_H_);
     g.fillStyle(0xffffff, 0.03).fillRect(232, HUD_H_, 20, GH_ - HUD_H_);
 
+    /* ---------- as marcas de porta no chão ----------
+       Círculo escuro com seta, pintado no piso onde a porta para. Na
+       estação de verdade ele diz por onde sai quem desce; aqui ele diz,
+       ANTES do trem chegar, onde vale a pena esperar. É informação de
+       jogo escondida dentro de um detalhe que já existe na vida. */
+    var pts = portasDoTrem();
+    for (var pi = 0; pi < pts.length; pi++) {
+      var cy = pts[pi] + 26;
+      g.fillStyle(0x000000, 0.28).fillCircle(150, cy, 15);
+      g.fillStyle(0x000000, 0.4).fillCircle(150, cy, 11);
+      g.lineStyle(2, 0xffffff, 0.3).strokeCircle(150, cy, 13);
+      // a seta apontando pro trilho, que é por onde se entra e se sai
+      g.fillStyle(0xffffff, 0.35);
+      g.fillTriangle(141, cy, 149, cy - 6, 149, cy + 6);
+      g.fillRect(149, cy - 2, 7, 4);
+    }
+
     // parede da direita
     g.fillStyle(num(PAL.paredeSom), 1).fillRect(296, HUD_H_, 24, GH_ - HUD_H_);
     g.fillStyle(num(PAL.parede), 1).fillRect(300, HUD_H_, 20, GH_ - HUD_H_);
     g.fillStyle(num(PAL.paredeLuz), 1).fillRect(300, HUD_H_, 3, GH_ - HUD_H_);
+    /* ---------- a faixa da linha na parede ----------
+       Plataforma de metrô não tem uma placa com o nome: tem uma FAIXA da
+       cor da linha correndo a parede inteira, com o nome repetido de
+       tantos em tantos metros. É o que você lê da janela do trem antes de
+       decidir se desce, e é também o que dá marco a uma plataforma
+       comprida — sem repetição, andar 900px é andar no mesmo lugar. */
+    g.fillStyle(num(escurecer(l.cor, 0.45)), 1).fillRect(298, HUD_H_, 22, GH_ - HUD_H_);
+    g.fillStyle(l.num, 1).fillRect(300, HUD_H_, 18, GH_ - HUD_H_);
+    g.fillStyle(num(clarear(l.cor, 0.35)), 1).fillRect(300, HUD_H_, 18, 2);
+    g.fillStyle(0x000000, 0.3).fillRect(300, GH_ - 2, 18, 2);
 
   },
 
@@ -1220,7 +1293,20 @@ var EstacaoScene = new Phaser.Class({
   resolveCorpos: function () {
     var antes = { x: this.pl.sp.x, y: this.pl.sp.y };
     var self = this;
-    resolveCorpos(this.pl, this.gente,
+    /* ---------- só quem está na janela ----------
+       A separação de corpos compara todo mundo com todo mundo. Com a
+       plataforma cheia de pico — mais de trinta pessoas, mais o saguão —
+       isso é pár a pár num mundo de 1572px de altura, sendo que a tela
+       mostra 576. Quem está seiscentos pixels acima não pode esbarrar em
+       ninguém aqui embaixo, e conferir isso custou 25 quadros por
+       segundo. A peneira é O(n) e mata a conta quadrática. */
+    var topo = this.cameras.main.scrollY - 80, base = topo + GH + 160;
+    var perto = [];
+    for (var q = 0; q < this.gente.length; q++) {
+      var g = this.gente[q];
+      if (g && g.sp && g.sp.y > topo && g.sp.y < base) perto.push(g);
+    }
+    resolveCorpos(this.pl, perto,
       function (sp) {
         if (!self.podeIr(sp.x, sp.y)) { sp.x = antes.x; sp.y = antes.y; }
       },

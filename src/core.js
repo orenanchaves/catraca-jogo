@@ -557,6 +557,28 @@ var GameState = {
     this.idx = this.linhaAtual().estacoes.indexOf(estacao);
     this.apontaPraAlvo();
   },
+  /* ---------- o sentido ----------
+     Plataforma de metrô não se anuncia pelo nome dela: se anuncia pelo
+     TERMINAL pra onde o trem vai. Quem está na Sé não escolhe entre
+     "esquerda" e "direita", escolhe entre Barra Funda e Itaquera — e é
+     por isso que o nome tem que sair da linha em que você está, e nunca
+     ser escrito à mão em lugar nenhum. Na Azul os mesmos dois lados se
+     chamam Jabaquara e Tucuruvi.
+
+     dir > 0 anda pro fim da lista, dir < 0 pro começo. */
+  terminal: function (dir) {
+    var e = this.linhaAtual().estacoes;
+    return (dir > 0) ? e[e.length - 1] : e[0];
+  },
+  sentidoAtual: function () { return this.terminal(this.dir); },
+  /* qual dos dois lados leva ao seu alvo — é o que a placa do corredor
+     precisa saber pra não virar adivinhação, e o que a rota usa pra
+     dizer que você embarcou pro lado errado */
+  sentidoCerto: function () {
+    var i = this.linhaAtual().estacoes.indexOf(this.alvoAtual());
+    return this.terminal(i >= this.idx ? 1 : -1);
+  },
+
   apontaPraAlvo: function () {
     var i = this.linhaAtual().estacoes.indexOf(this.alvoAtual());
     this.dir = (i >= this.idx) ? 1 : -1;
@@ -2305,6 +2327,21 @@ function Plaqueta(scene, x, y, cfg) {
   this.centro = (cfg.centro !== false);
   this.filete = cfg.filete || null;
   this.led = !!cfg.led;
+  /* ---------- placa de metrô ----------
+     A sinalização do Metrô de SP tem gramática fixa, e é ela que faz uma
+     placa parecer estação antes de ser lida: chapa PRETA, nome em BRANCO
+     centrado, e uma TARJA da cor da linha na base. A tarja é o que diz
+     de qual linha aquele acesso é, e é a única cor da peça.
+     A preferencial do vagão é o inverso da mesma gramática: chapa AZUL,
+     texto e seta em branco. */
+  this.metro = !!cfg.metro;
+  /* E a placa de DIREÇÃO é o contrário da de identidade: a chapa inteira
+     é da cor da linha, e a seta e o texto são brancos. É por isso que numa
+     estação você acha a saída sem ler: identidade é preta, caminho é
+     colorido. As duas juntas são a sinalização inteira do metrô. */
+  this.saida = !!cfg.saida;
+  this.pref = !!cfg.pref;
+  this.faixaCor = (cfg.faixaCor === undefined) ? num(GameState.linhaAtual().cor) : cfg.faixaCor;
   /* Nada de UI acompanha a câmera. No vagão de oito carros a câmera
      anda com quem joga, e sem isto a placa de rota, a dica e o diálogo
      ficariam pendurados no trilho, saindo da tela junto com o cenário.
@@ -2319,6 +2356,17 @@ function Plaqueta(scene, x, y, cfg) {
   if (this.centro) this.t.setOrigin(0.5, 0);
   this.t.setWordWrapWidth(cfg.largura || (GW - 24));
   if (cfg.centro !== false) this.t.setAlign('center');
+  /* ---------- o rodapé ----------
+     A placa de embarque do metrô tem duas alturas: o destino grande e,
+     numa tarja mais escura embaixo, o nome da linha. As duas juntas são
+     o que faz a placa dizer "deste lado, por esta linha" numa olhada.
+     Sem a tarja, destino sozinho é só uma palavra grande. */
+  this.rodape = cfg.rodape || '';
+  if (this.rodape) {
+    this.tRod = txt(scene, this.x, this.y, '', PAL.branco, 8)
+      .setDepth(d + 1).setScrollFactor(sf);
+    if (this.centro) this.tRod.setOrigin(0.5, 0);
+  }
   this.setText(cfg.texto || '');
 }
 Plaqueta.prototype.setText = function (txto) {
@@ -2353,6 +2401,37 @@ Plaqueta.prototype.setText = function (txto) {
     return this;
   }
 
+  if (this.metro) {
+    this.g.fillStyle(0x000000, 1).fillRect(lx - 5, ly - 4, lw + 10, lh + 13);
+    this.g.fillStyle(0x1e1e1e, 1).fillRect(lx - 5, ly - 4, lw + 10, 2);
+    // a tarja da linha, na base, com o selo do número à esquerda
+    this.g.fillStyle(this.faixaCor, 1).fillRect(lx - 5, ly + lh + 3, lw + 10, 6);
+    this.g.fillStyle(0xffffff, 0.9).fillRect(lx - 2, ly + lh + 4, 4, 4);
+    return this;
+  }
+  if (this.saida) {
+    var rod = this.rodape ? 22 : 0;
+    this.g.fillStyle(this.faixaCor, 1).fillRect(lx - 6, ly - 5, lw + 12, lh + 10);
+    // a tarja de cabeçalho, um tom acima, como no 'Saída | Exit' da real
+    this.g.fillStyle(0xffffff, 0.22).fillRect(lx - 6, ly - 5, lw + 12, 3);
+    if (rod) {
+      // a tarja da linha, mais escura, embaixo do destino
+      this.g.fillStyle(0x000000, 0.42).fillRect(lx - 6, ly + lh + 5, lw + 12, rod);
+      this.g.fillStyle(0xffffff, 0.18).fillRect(lx - 6, ly + lh + 5, lw + 12, 1);
+      this.tRod.x = this.x; this.tRod.y = ly + lh + 9;
+      this.tRod.setText(this.rodape).setVisible(true);
+    } else {
+      this.g.fillStyle(0x000000, 0.28).fillRect(lx - 6, ly + lh + 2, lw + 12, 3);
+    }
+    return this;
+  }
+  if (this.pref) {
+    this.g.fillStyle(0x0b3fa0, 1).fillRect(lx - 5, ly - 4, lw + 10, lh + 8);
+    this.g.fillStyle(0x1f5fd0, 1).fillRect(lx - 5, ly - 4, lw + 10, 2);
+    this.g.lineStyle(2, 0xffffff, 0.95);
+    this.g.strokeRect(lx - 3, ly - 2, lw + 6, lh + 4);
+    return this;
+  }
   this.g.fillStyle(0x08080e, 0.8).fillRect(lx, ly, lw, lh);
   this.g.fillStyle(0x232336, 0.9).fillRect(lx, ly, lw, 2);
   this.g.fillStyle(0x000000, 0.4).fillRect(lx, ly + lh - 2, lw, 2);
@@ -2530,6 +2609,28 @@ function ladrilho(g, x, y, w, h, corpo, aba, borda) {
 /* placa fixa de cenário: nome de setor pintado na estação */
 function placa(scene, x, y, texto, cor, depth) {
   var p = new Plaqueta(scene, x, y, { cor: cor, mundo: true, depth: depth === undefined ? 3 : depth });
+  p.setText(texto);
+  return p;
+}
+
+/* a placa de IDENTIDADE: preta, nome branco, tarja da linha na base.
+   É a que diz onde você está. */
+function placaMetro(scene, x, y, texto, depth) {
+  var p = new Plaqueta(scene, x, y, {
+    cor: PAL.branco, mundo: true, metro: true,
+    depth: depth === undefined ? 3 : depth
+  });
+  p.setText(texto);
+  return p;
+}
+
+/* a placa de DIREÇÃO: chapa da cor da linha, seta e texto brancos.
+   É a que diz pra onde ir. */
+function placaSaida(scene, x, y, texto, depth, rodape) {
+  var p = new Plaqueta(scene, x, y, {
+    cor: PAL.branco, mundo: true, saida: true, rodape: rodape,
+    depth: depth === undefined ? 3 : depth
+  });
   p.setText(texto);
   return p;
 }
