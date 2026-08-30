@@ -16,8 +16,8 @@
    virar uma novela. */
 /* 14000 e não 8200: em 8,2s não dá tempo de atravessar dois carros num
    trem de oito, e o trecho entre estações é justamente onde tudo
-   acontece — a situação do carro, o ambulante, a encarada, a corrida
-   pelo banco. O jogador chegava antes de decidir qualquer coisa.
+   acontece — a situação do carro, o ambulante, a encarada, o dilema
+   do lugar. O jogador chegava antes de decidir qualquer coisa.
    Medido andando de ponta a ponta: 14s dão dois carros e uma decisão. */
 var TEMPO_ENTRE_ESTACOES = 14000;
 /* 30000 e nao 4200: quatro segundos de porta aberta e menos do que se
@@ -297,7 +297,6 @@ var VagaoScene = new Phaser.Class({
     this.tEvento = 0; this.tDilema = 0;
     this.falha = null;
     this.sorteouFalha = false;
-    this.corrida = null;
     this.duelando = false;
     this.encontro = null;
     this.tPasso = 0;
@@ -2129,79 +2128,6 @@ var VagaoScene = new Phaser.Class({
     g.fillStyle(0xe8362c, 1).fillRect(x - 19, by + 1, Math.round(38 * e.carga), 5);
   },
 
-  /* ---------- corrida pelo banco ----------
-     Sentar era só chegar perto e apertar: o banco vago esperava por
-     você. No vagão de verdade o banco vago tem dono em dois segundos —
-     e é justamente na parada, quando alguém desce, que a disputa
-     acontece.
-
-     Não precisou de mecânica nova: é um passageiro com vontade, andando
-     pro mesmo lugar, usando a mesma física de corpo que já empurra todo
-     mundo. Quem chegar primeiro senta. Perder não tira nada de você —
-     só te deixa em pé, que já é o castigo. */
-  sorteiaCorrida: function () {
-    if (this.sentadoEm || this.corrida) return;
-    var livres = [], i;
-    for (i = 0; i < this.bancos.length; i++) if (!this.bancos[i].npc) livres.push(this.bancos[i]);
-    if (!livres.length || !this.npcExtra.length) return;
-    if (Math.random() > 0.55) return;
-
-    var b = livres[Math.floor(Math.random() * livres.length)];
-    // escolhe quem disputa: o passageiro em pé mais perto do banco
-    var quem = null, melhor = 1e9;
-    for (i = 0; i < this.npcExtra.length; i++) {
-      var a = this.npcExtra[i];
-      if (!a.sp || !a.sp.active) continue;
-      var d = Math.abs(a.sp.x - b.x) + Math.abs(a.sp.y - (b.y + 24));
-      if (d < melhor) { melhor = d; quem = a; }
-    }
-    if (!quem) return;
-    // se ele já está em cima do banco não é corrida, é sorte dele
-    if (melhor < 40) return;
-    this.corrida = { b: b, a: quem, t: 0 };
-    quem.fixo = false;
-    this.flash('CORRA PRO BANCO');
-  },
-
-  atualizaCorrida: function (dt) {
-    var c = this.corrida;
-    if (!c) return;
-    var a = c.a;
-    // acabou: alguém sentou, o passageiro sumiu, ou o trem parou de novo
-    if (!a.sp || !a.sp.active || c.b.npc || this.sentadoEm === c.b) { this.encerraCorrida(); return; }
-    c.t += dt;
-    if (c.t > 9000) { this.encerraCorrida(); return; }
-
-    var alvoX = c.b.x, alvoY = c.b.y + 24;
-    var dx = alvoX - a.sp.x, dy = alvoY - a.sp.y;
-    var d = Math.sqrt(dx * dx + dy * dy);
-    if (d < 6) {                       // chegou: senta e a corrida acabou
-      a.sp.x = alvoX; a.sp.y = alvoY;
-      a.dir = alvoX < 160 ? 'sentadoR' : 'sentadoL';
-      a.sp.setDepth(30); a.fixo = true;
-      sentaAnimado(a);
-      c.b.npc = a;
-      var k = this.npcExtra.indexOf(a);
-      if (k >= 0) this.npcExtra.splice(k, 1);
-      this.corrida = null;
-      perdeVida(this, this.pl.sp);
-      sfx('nao');
-      this.flash('SENTARAM NO SEU LUGAR');
-      return;
-    }
-    var vel = (46 + GameState.dificuldade() * 7) * dt / 1000;
-    a.sp.x += (dx / d) * vel;
-    a.sp.y += (dy / d) * vel;
-    a.setDir(dx, dy);
-    a.anima(dt, true);
-  },
-
-  encerraCorrida: function () {
-    if (!this.corrida) return;
-    var a = this.corrida.a;
-    if (a && a.sp && a.sp.active && !a.fixo) sentaAnimado(a);
-    this.corrida = null;
-  },
 
   /* Antes uma cena de vagão era uma estação, e cabia certinho um evento
      e um dilema por cena. Agora a cena é a perna inteira, quinze
@@ -2393,14 +2319,12 @@ var VagaoScene = new Phaser.Class({
     var virou = GameState.avancaTrem();
     var aqui = GameState.estacaoAtual();
     this.marcaEstacao();
-    this.encerraCorrida();
     this.encerraEncontro();
     /* Na estação o fiscal desce. Não é misericórdia: perseguição que
        atravessa a parada vira perseguição sem fim, e o vagão que para é
        exatamente onde um ambulante troca de carro na vida real. */
     if (this.fuga) { this.encerraFuga(); this.flash('O FISCAL DESCEU.'); }
     this.trocaPassageiros();
-    this.sorteiaCorrida();
     if (virou) {
       // ficou no trem até a ponta da linha: ele volta, e o desvio custa
       GameState.passaTempo(4);
@@ -2552,7 +2476,6 @@ var VagaoScene = new Phaser.Class({
 
     this.atualizaMao();
     this.pintaMao();
-    this.atualizaCorrida(dt);
     this.atualizaEncontro(dt);
     this.animaGente(dt);
     this.animaRimador(dt);
@@ -2636,15 +2559,7 @@ var VagaoScene = new Phaser.Class({
           /* O rodapé avisa ANTES: quem senta na preferencial sem
              precisar dela escolheu isso, não tropeçou nisso. */
           dica = nomeAgir() + (b.pref ? ': PREFERENCIAL' : ': SENTAR');
-          if (Ctrl.actJust) {
-            // sentar no banco em disputa é ganhar a corrida
-            var disputado = this.corrida && this.corrida.b === b;
-            this.senta(b);
-            if (disputado) {
-              this.encerraCorrida();
-              this.flash('O BANCO É SEU  +' + GameState.ganhaMinigame(5) + ' PONTOS');
-            }
-          }
+          if (Ctrl.actJust) this.senta(b);
         } else if (this.bancoOcupadoPerto()) {
           // o idoso e a gestante não caçam banco vago: eles pedem
           dica = nomeAgir() + ': PEDIR O LUGAR';
@@ -2780,9 +2695,7 @@ var VagaoScene = new Phaser.Class({
     for (var i = 0; i < this.bancos.length; i++) {
       var b = this.bancos[i];
       if (b.y < topo || b.y > base) continue;
-      // o banco em disputa já tem a moldura amarela da corrida: duas
-      // marcas no mesmo lugar não dizem duas coisas, dizem nenhuma
-      if (b.npc || (this.corrida && this.corrida.b === b)) continue;
+      if (b.npc) continue;
       var aqui = (b === perto);
       var a = aqui ? 0.95 : 0.3 + 0.25 * pulso;
       /* A preferencial é amarela, não verde: é a cor com que o metrô
@@ -2806,16 +2719,6 @@ var VagaoScene = new Phaser.Class({
     var gm = this.gMundoUI; gm.clear();
 
     this.pintaLugares(gm);
-
-    // o banco em disputa pisca: correr sem saber pra onde não é corrida
-    if (this.corrida) {
-      var b = this.corrida.b;
-      var pulso = 0.35 + 0.3 * Math.sin(this.corrida.t / 110);
-      var cw = b.w || 26, chh = b.h || (LUGAR_ALT - 4);
-      gm.lineStyle(2, 0xf2c14e, pulso);
-      gm.strokeRect(b.x - cw / 2 - 2, b.y - 2, cw + 4, chh + 4);
-      gm.fillStyle(0xf2c14e, pulso).fillRect(b.x - 3, b.y - 12, 6, 5);
-    }
 
     /* O quanto falta pra próxima estação era uma barra em HUD_H+25, ou
        seja, por baixo da placa de rota: aparecia como um risco vermelho
