@@ -685,11 +685,14 @@ var GameState = {
      linhas e entravam por cima do placar. Cada linha aqui cabe medida —
      e motivo de derrota é melhor curto de qualquer jeito. */
   derrota: function () {
+    /* O atraso vem PRIMEIRO porque ele zera os corações: se a conta do
+       coração respondesse antes, quem perdeu por chegar tarde leria que
+       o trajeto o moeu, e nunca saberia que quem o matou foi o relógio. */
+    if (this.atrasos >= MAX_ATRASOS) {
+      return 'Você chegou tarde.\nO RH não quis saber\ndo metrô.';
+    }
     if (this.coracoes <= 0) {
       return 'O trajeto te moeu.\nVocê sentou no chão\nnuma estação qualquer.';
-    }
-    if (this.atrasos >= MAX_ATRASOS) {
-      return 'Terceiro atraso.\nO RH não quis saber\ndo metrô.';
     }
     if (this.descanso <= 0) return 'Você dormiu.\nAcordou no fim da\nlinha, sozinho.';
     if (this.carisma <= 0) return 'O vagão fechou na sua\ncara. De novo.';
