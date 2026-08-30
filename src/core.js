@@ -106,42 +106,89 @@ function linhaDaEstacao(nome) {
    O metrô não é o mesmo o dia inteiro. Cada faixa muda a lotação, a
    espera do trem, quantas catracas ficam abertas e o humor do guardinha.
    É o mesmo trajeto, mas em outra São Paulo. */
+/* Cada faixa tinha UMA frase, e uma frase por faixa repete toda vez que
+   o relógio passa por ali: na terceira manhã o jogo já dizia a mesma
+   coisa que na primeira, e o horário parava de parecer um lugar. Agora
+   é repertório, e a escolha evita repetir a última — ouvir duas vezes
+   seguidas a mesma linha é justamente o que se estava tentando matar. */
+var ultimaFrase = '';
+function fraseDaFaixa(f) {
+  var lista = (f && f.frases) || [];
+  if (!lista.length) return '';
+  if (lista.length === 1) return lista[0];
+  var i, tenta = 0;
+  do { i = Math.floor(Math.random() * lista.length); tenta++; }
+  while (lista[i] === ultimaFrase && tenta < 8);
+  ultimaFrase = lista[i];
+  return lista[i];
+}
+
 var FAIXAS = [
   {
     key: 'madrugada', nome: 'MADRUGADA', ini: 0, fim: 5 * 60 + 29,
     lotacao: 0.15, espera: 1.85, guarda: 1.2, catracas: 0.35,
     cor: '#7c8ac4', luz: 0x0a0c1e, luzA: 0.34,
-    frase: 'Estação vazia. O guardinha só tem você pra olhar.'
+    frases: [
+      'Estação vazia. O guardinha só tem você pra olhar.',
+      'Quatro pessoas na plataforma e todas de costas.',
+      'O trem demora tanto que dá pra ouvir o túnel.',
+      'Ninguém aqui está indo trabalhar agora.'
+    ]
   },
   {
     key: 'picoManha', nome: 'PICO DA MANHÃ', ini: 5 * 60 + 30, fim: 9 * 60 + 29,
     lotacao: 1.0, espera: 0.55, guarda: 0.75, catracas: 1.0,
     cor: '#f2c14e', luz: 0x2a1e08, luzA: 0.1,
-    frase: 'Todo mundo indo pro mesmo lugar na mesma hora.'
+    frases: [
+      'Todo mundo indo pro mesmo lugar na mesma hora.',
+      'A plataforma enche antes do trem chegar.',
+      'Ninguém olha pra ninguém. Todo mundo olha o relógio.',
+      'Três trens até caber você. É assim mesmo.'
+    ]
   },
   {
     key: 'entrePico', nome: 'ENTRE-PICO', ini: 9 * 60 + 30, fim: 15 * 60 + 59,
     lotacao: 0.4, espera: 1.25, guarda: 1.0, catracas: 0.7,
     cor: '#8bd0ff', luz: 0x101a2c, luzA: 0.1,
-    frase: 'Meio da tarde. Dá até pra sentar.'
+    frases: [
+      'Meio da tarde. Dá até pra sentar.',
+      'O vagão respira. Aproveita.',
+      'Essa hora o metrô parece de outra cidade.',
+      'Tem banco vazio. Anota o horário.'
+    ]
   },
   {
     key: 'picoTarde', nome: 'PICO DA TARDE', ini: 16 * 60, fim: 19 * 60 + 59,
     lotacao: 1.0, espera: 0.6, guarda: 0.8, catracas: 1.0,
     cor: '#e8a33c', luz: 0x2c1408, luzA: 0.13,
-    frase: 'A cidade inteira voltando pra casa junto.'
+    frases: [
+      'A cidade inteira voltando pra casa junto.',
+      'Todo mundo cansado e ninguém com pressa de ceder.',
+      'O pior horário, e você sabia disso quando saiu.',
+      'Ombro com ombro até a Sé.'
+    ]
   },
   {
     key: 'noite', nome: 'NOITE', ini: 20 * 60, fim: 22 * 60 + 59,
     lotacao: 0.35, espera: 1.4, guarda: 1.05, catracas: 0.55,
     cor: '#9f8ce0', luz: 0x0c0c22, luzA: 0.2,
-    frase: 'O vagão esvaziou. A estação também.'
+    frases: [
+      'O vagão esvaziou. A estação também.',
+      'Sobrou quem trabalha até tarde e quem não quer chegar.',
+      'A essa hora o trem para mais tempo em cada estação.',
+      'Silêncio no vagão. Estranho e bom.'
+    ]
   },
   {
     key: 'ultimo', nome: 'ÚLTIMO TREM', ini: 23 * 60, fim: 24 * 60 - 1,
     lotacao: 0.22, espera: 2.1, guarda: 1.15, catracas: 0.35,
     cor: '#e8362c', luz: 0x0a0a1c, luzA: 0.28,
-    frase: 'Se perder esse, dormiu na estação.'
+    frases: [
+      'Se perder esse, dormiu na estação.',
+      'Último trem. Não tem próximo pra corrigir erro.',
+      'A estação já está fechando atrás de você.',
+      'Agora é esse ou um táxi que você não pode pagar.'
+    ]
   }
 ];
 

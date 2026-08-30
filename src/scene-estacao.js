@@ -232,7 +232,7 @@ var EstacaoScene = new Phaser.Class({
             + (GameState.valeRestante > 1 ? ' passagens.' : ' passagem.')
           : cabec + 'Tarifa R$ '
             + GameState.char.tarifa.toFixed(2).replace('.', ',') + '.');
-      fala(this, msg + '\n' + f.frase, []);
+      fala(this, msg + '\n' + fraseDaFaixa(f), []);
       var self = this;
       this.time.delayedCall(2400, function () { if (self.dialog) self.dialog.fecha(); });
     }

@@ -146,13 +146,22 @@
       : 'preenche a altura da janela';
   }
 
+  var faixaNoPainel = null;   // qual faixa ja tem frase escrita no painel
+
   /* ---------- ponte com o jogo ---------- */
   var ponte = {
     hora: function (h, f) {
       el.hora.textContent = h;
       el.hora.style.color = f.cor;
       el.faixa.textContent = f.nome;
-      el.frase.textContent = f.frase;
+      /* A frase e sorteada, e isto roda todo quadro: sem guardar a faixa
+         anterior o painel sorteava sessenta frases por segundo e o texto
+         virava chuvisco. Troca quando a faixa troca, que e quando ela tem
+         o que dizer de novo. */
+      if (faixaNoPainel !== f.key) {
+        faixaNoPainel = f.key;
+        el.frase.textContent = fraseDaFaixa(f);
+      }
     },
     dica: function (txto, cor) {
       el.dica.textContent = txto || '—';
