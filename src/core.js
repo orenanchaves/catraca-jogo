@@ -1678,6 +1678,28 @@ var CONTROLES_VISIVEIS = true;
    muda de cor e o rodapé manda sentar. */
 var LIMIAR_SONO = 0.32;
 
+/* ---------- o preço do sono ----------
+   As pálpebras fechando eram a forma de contar isto sem texto, e a
+   forma custava caro demais: elas tapavam justamente a faixa da tela
+   onde se joga, e no celular a pessoa perdia de vista o que estava
+   fazendo bem na hora em que mais precisava enxergar. Aviso que
+   atrapalha mais que a coisa avisada não é aviso, é castigo dobrado.
+
+   Agora o sono cobra onde dói e não onde cega: em coração, um a cada
+   nove segundos abaixo do limiar. O medidor piscando vermelho no topo
+   continua dizendo por quê, e a tela continua inteira. */
+var SONO_INTERVALO = 9000;
+var sonoAcumulado = 0;
+function cobraSono(scene, delta) {
+  if (!GameState.char || !HUD_VISIVEL) { sonoAcumulado = 0; return; }
+  var p = GameState.descanso / GameState.char.descansoMax;
+  if (p >= LIMIAR_SONO) { sonoAcumulado = 0; return; }
+  sonoAcumulado += delta;
+  if (sonoAcumulado < SONO_INTERVALO) return;
+  sonoAcumulado -= SONO_INTERVALO;
+  perdeVida(scene, null, 1);
+}
+
 /* A cor do medidor de descanso, numa função só: o topo e a legenda da
    pausa precisam mostrar a mesma coisa, senão a legenda ensina uma cor
    que o HUD não usa. */
@@ -2857,29 +2879,33 @@ var HudScene = new Phaser.Class({
      mais elas descem, e de vez em quando piscam. Moram no HUD porque é
      a única cena que fica por cima de todas as outras, e param acima
      da faixa de dica, que é justamente quem manda sentar. */
+  /* Ficou a moldura, não a pálpebra: uma borda vermelha pulsando nas
+     quatro beiradas diz 'você está no vermelho' sem tirar um pixel da
+     área de jogo. A cobrança de verdade é em coração (ver cobraSono). */
   pintaSono: function (time) {
     var gs = this.gSono; gs.clear();
     if (!GameState.char || !HUD_VISIVEL) return;
     var p = GameState.descanso / GameState.char.descansoMax;
     if (p >= LIMIAR_SONO) return;
 
-    var f = (LIMIAR_SONO - p) / LIMIAR_SONO;         // 0 na marca, 1 no apagão
+    var f = (LIMIAR_SONO - p) / LIMIAR_SONO;         // 0 na marca, 1 no fundo
+    var pulso = 0.5 + 0.5 * Math.sin(time / 420);
+    var a = (0.12 + 0.3 * f) * (0.55 + 0.45 * pulso);
     var topo = AREA_JOGO.topo || HUD_H, base = AREA_JOGO.base || (GH - 40);
-    var foco = AREA_JOGO.foco || Math.round((topo + base) / 2);
-    var pisca = Math.max(0, Math.sin(time / 1500) - 0.88) * 8;
-    var q = Math.min(1, f * (0.78 + pisca));
-    var hc = Math.round((foco - topo) * q), hb = Math.round((base - foco) * q);
-    gs.fillStyle(0x000000, 0.3 * f).fillRect(0, topo, GW, base - topo);
-    gs.fillStyle(0x05050a, 1);
-    gs.fillRect(0, topo, GW, hc);
-    gs.fillRect(0, base - hb, GW, hb);
-    // o fio de luz na beirada da pálpebra, senão parece cortina
-    gs.fillStyle(0x000000, 0.5);
-    gs.fillRect(0, topo + hc, GW, 2); gs.fillRect(0, base - hb - 2, GW, 2);
+    var esp = 4 + Math.round(8 * f);
+    gs.fillStyle(0xe8362c, a);
+    gs.fillRect(0, topo, GW, esp);
+    gs.fillRect(0, base - esp, GW, esp);
+    gs.fillRect(0, topo, esp, base - topo);
+    gs.fillRect(GW - esp, topo, esp, base - topo);
+    gs.fillStyle(0xe8362c, a * 0.4);
+    gs.fillRect(0, topo + esp, GW, 3);
+    gs.fillRect(0, base - esp - 3, GW, 3);
   },
 
-  update: function (time) {
+  update: function (time, delta) {
     atualizaManche(time);
+    cobraSono(this, delta);
     if (Ctrl.pausaJust) { Ctrl.pausaJust = false; this.abrePausa(); }
 
     /* o manche só existe enquanto o dedo está arrastando: parado na tela,
