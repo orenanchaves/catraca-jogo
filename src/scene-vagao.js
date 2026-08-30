@@ -377,6 +377,18 @@ var VagaoScene = new Phaser.Class({
        baixo da letra: é o painel do metrô, e ele é reconhecível antes
        de ser lido. */
     this.rota = new Plaqueta(this, GW / 2, 58, { cor: PAL.amarelo, depth: 505, led: true });
+    /* ---------- o letreiro é aviso, não moldura ----------
+       Ele ficava aceso o tempo todo, três ou quatro linhas encostadas
+       no HUD, bem em cima da faixa do vagão onde se joga. No metrô de
+       verdade o painel também fica aceso, mas ali ele é ambiente; na
+       tela vira tarja fixa na frente do jogo.
+
+       Agora ele desce quando a informação MUDA, fica o tempo de ler e
+       sobe, como notificação de celular. Quem quiser consultar fora
+       da hora tem o mapinha no Zap, como na vida. */
+    this.rotaVis = 0;       // 0 escondido atrás do HUD, 1 aberto
+    this.rotaAte = 0;       // até quando fica aberto
+    this.rotaChave = null;  // o que estava escrito da última vez
     // a placa de rota e a faixa de dica ficam fora do alcance do sono, e
     // a fresta que sobra é justo a do aviso do meio da tela
     areaDeJogo(126, GH - 40, 258);
@@ -2414,6 +2426,9 @@ var VagaoScene = new Phaser.Class({
   update: function (time, delta) {
     Ctrl.update();
     var dt = Math.min(delta, 50);
+    // a descida roda antes de qualquer saída antecipada, senão o painel
+    // congela no meio do caminho durante um diálogo ou uma briga
+    this.aplicaRota(dt);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
@@ -2635,13 +2650,13 @@ var VagaoScene = new Phaser.Class({
     /* De olho fechado ninguém lê placa. O CLT cochila de graça, e o
        preço é este: a rota some enquanto ele dorme em pé. */
     if (this.cochilando()) {
-      this.rota.setCor(PAL.cinzaEsc).setText('ZZZ...');
+      this.poeNoLetreiro(PAL.cinzaEsc, 'ZZZ...', 'zzz');
       return;
     }
     /* O turista não conhece a linha: a placa só serve de perto. De
        longe ele tem que perguntar — e perguntar custa. */
     if (temPoder('perdido') && !this.sabeARota && falta > 1) {
-      this.rota.setCor(PAL.cinzaEsc).setText('VOCÊ NÃO SABE\nONDE DESCER');
+      this.poeNoLetreiro(PAL.cinzaEsc, 'VOCÊ NÃO SABE\nONDE DESCER', 'perdido');
       return;
     }
 
@@ -2669,7 +2684,43 @@ var VagaoScene = new Phaser.Class({
         (folga > 0 ? ' (' + folga + ' MIN)' : ' — ATRASADO');
       if (folga <= 12) cor = PAL.vermelho;
     }
+    /* A chave NÃO inclui os minutos que faltam. Eles andam sozinhos, e
+       um painel que desce a cada minuto é metade do que incomodava.
+       Ela guarda só o que é notícia: onde estou, quantas faltam, pra
+       que serve a perna, e se entrei no vermelho do atraso. */
+    var chave = (parado ? 'p' : 'a') + '|' + aqui + '|' + falta +
+      '|' + GameState.rotuloDaPerna() + '|' + (cor === PAL.vermelho ? 1 : 0);
+    this.poeNoLetreiro(cor, txto, chave);
+  },
+
+  poeNoLetreiro: function (cor, txto, chave) {
+    if (chave !== this.rotaChave) { this.rotaChave = chave; this.mostraRota(3400); }
+    /* Parado é a hora de decidir descer: enquanto a porta está aberta
+       o painel fica, e some sozinho quando o trem volta a andar. */
+    if (this.estado === 'parado') this.mostraRota(500);
     this.rota.setCor(cor).setText(txto);
+  },
+
+  mostraRota: function (ms) {
+    var ate = this.time.now + ms;
+    if (ate > this.rotaAte) this.rotaAte = ate;
+  },
+
+  /* Sobe atrás do HUD, que tem depth maior e o engole. 96 é o painel
+     de quatro linhas mais a folga da moldura — medido no letreiro
+     cheio, que é o caso pior. Mexe no g.y e no t.y em vez de chamar
+     setY porque setY redesenha a chapa inteira, e isto roda todo
+     quadro durante a descida. */
+  aplicaRota: function (dt) {
+    var alvo = (this.time.now < this.rotaAte) ? 1 : 0;
+    var passo = dt / 180;
+    if (this.rotaVis < alvo) this.rotaVis = Math.min(alvo, this.rotaVis + passo);
+    else if (this.rotaVis > alvo) this.rotaVis = Math.max(alvo, this.rotaVis - passo);
+    var desloc = -Math.round((1 - this.rotaVis) * 96);
+    this.rota.g.y = desloc;
+    this.rota.t.y = this.rota.y + 5 + desloc;
+    this.rota.g.alpha = this.rotaVis;
+    this.rota.t.alpha = this.rotaVis;
   },
 
   /* Sentar é a única coisa que devolve descanso, e até aqui o banco
