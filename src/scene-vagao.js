@@ -14,7 +14,12 @@
    17s; agora ela é a perna inteira, quinze estações de Itaquera até a
    Sé, então cada trecho precisa ser curto o bastante pra a perna não
    virar uma novela. */
-var TEMPO_ENTRE_ESTACOES = 8200;
+/* 14000 e não 8200: em 8,2s não dá tempo de atravessar dois carros num
+   trem de oito, e o trecho entre estações é justamente onde tudo
+   acontece — a situação do carro, o ambulante, a encarada, a corrida
+   pelo banco. O jogador chegava antes de decidir qualquer coisa.
+   Medido andando de ponta a ponta: 14s dão dois carros e uma decisão. */
+var TEMPO_ENTRE_ESTACOES = 14000;
 var TEMPO_PARADO = 4200;
 
 /* As barras saíam de dentro dos módulos agora que eles avançam 62px
@@ -64,7 +69,13 @@ var MODULO_ASSENTOS = [16, 46];           // centro de cada assento, a partir da
 /* A preferencial mora entre as duas portas, encostada na parede e
    virada pro corredor — a única cadeira do carro de lado, que é
    exatamente o que ela é na vida. Uma de cada lado. */
-var PREF_Y = 306, PREF_ALT = 44, PREF_FUNDO = 28;
+/* Era UM lugar por lado, e um banco comprido com uma pessoa só nele lê
+   como banco quebrado. Entre as duas portas sobram 102px livres (a de
+   cima acaba em 282, a de baixo começa em 384) e cada assento ocupa 44,
+   então cabem dois por lado com 7px de folga em cada ponta: quatro
+   preferenciais por carro, que é o que um carro tem. */
+var PREF_PASSO = 44, PREF_LUGARES = 2;
+var PREF_Y = 289, PREF_ALT = PREF_PASSO * PREF_LUGARES, PREF_FUNDO = 28;
 var PREF_X = [30, 262];
 
 var LUGAR_ALT = 40;
@@ -503,19 +514,27 @@ var VagaoScene = new Phaser.Class({
     g.fillStyle(num(PAL.metalLuz), 1).fillRect(px, y - 4, 2, MODULO_ALT + 8);
   },
 
-  /* A preferencial: uma cadeira só, encostada na parede e virada pro
-     corredor. Ela é a única do carro nessa direção, e é de propósito —
-     quem olha pro vagão de cima vê logo qual é a diferente. O azul é
-     mais claro e a faixa do encosto é amarela, que é como o metrô
-     marca. */
+  /* A preferencial: banco encostado na parede e virado pro corredor,
+     o único do carro nessa direção, e de propósito — quem olha o vagão
+     de cima vê logo qual é o diferente. O azul é mais claro e a faixa
+     do encosto é amarela, que é como o metrô marca.
+
+     A costura entre as almofadas é o que faz o banco ter LUGARES em
+     vez de ser uma tira azul: sem ela, dois sentados no mesmo banco
+     parecem dois bonecos empilhados num móvel só. */
   desenhaPreferencial: function (g, x, y, esquerda) {
     var enc = esquerda ? x : x + PREF_FUNDO - 6;      // encosto na parede
     var ass = esquerda ? x + 6 : x;                    // assento pro corredor
     g.fillStyle(0x000000, 0.3).fillRect(x, y + PREF_ALT, PREF_FUNDO, 3);
     g.fillStyle(0x1c5288, 1).fillRect(enc, y - 3, 6, PREF_ALT + 3);
-    g.fillStyle(0x3f93d8, 1).fillRect(ass, y, PREF_FUNDO - 6, PREF_ALT);
-    g.fillStyle(0x7cc0f0, 1).fillRect(ass, y, PREF_FUNDO - 6, 3);
-    g.fillStyle(0x123a63, 1).fillRect(ass, y + PREF_ALT - 3, PREF_FUNDO - 6, 3);
+    for (var q = 0; q < PREF_LUGARES; q++) {
+      var qy = y + q * PREF_PASSO;
+      g.fillStyle(0x3f93d8, 1).fillRect(ass, qy, PREF_FUNDO - 6, PREF_PASSO);
+      g.fillStyle(0x7cc0f0, 1).fillRect(ass, qy, PREF_FUNDO - 6, 3);
+      g.fillStyle(0x123a63, 1).fillRect(ass, qy + PREF_PASSO - 3, PREF_FUNDO - 6, 3);
+      // costura entre um lugar e o outro
+      if (q) g.fillStyle(0x1c5288, 1).fillRect(ass, qy - 1, PREF_FUNDO - 6, 2);
+    }
     // a marca amarela do encosto
     g.fillStyle(num(PAL.amarelo), 0.85).fillRect(enc + 1, y + 8, 4, PREF_ALT - 16);
     for (var e = 0; e < 2; e++) {
@@ -759,11 +778,14 @@ var VagaoScene = new Phaser.Class({
       }
     }
     for (lado = 0; lado < 2; lado++) {
-      out.push({
-        x: PREF_X[lado] + PREF_FUNDO / 2, y: yDoCarro(c, PREF_Y), carro: c,
-        w: PREF_FUNDO - 6, h: PREF_ALT,
-        pose: lado === 0 ? 'sentadoR' : 'sentadoL', pref: true, npc: null
-      });
+      for (var q = 0; q < PREF_LUGARES; q++) {
+        out.push({
+          x: PREF_X[lado] + PREF_FUNDO / 2,
+          y: yDoCarro(c, PREF_Y + q * PREF_PASSO), carro: c,
+          w: PREF_FUNDO - 6, h: PREF_PASSO,
+          pose: lado === 0 ? 'sentadoR' : 'sentadoL', pref: true, npc: null
+        });
+      }
     }
     return out;
   },

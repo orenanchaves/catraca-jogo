@@ -1005,7 +1005,12 @@ var EstacaoScene = new Phaser.Class({
   /* intervalo entre trens: no pico vem um atrás do outro, de madrugada
      você espera de verdade. Depois de perder um, o próximo perdoa. */
   intervalo: function () {
-    var e = 3400 * GameState.faixa().espera;
+    /* 5600 e não 3400: no pico a espera caía pra 1,9s, que é menos do
+       que a porta demora abrindo — o trem parecia estar sempre ali, e
+       perder um não custava nada. Agora vai de 3,1s no pico a 11,8s de
+       madrugada, e a faixa de horário volta a ser uma escolha: pico é
+       cheio mas passa direto, madrugada é vazio mas você espera. */
+    var e = 5600 * GameState.faixa().espera;
     return this.perdido ? e * 0.6 : e;
   },
 

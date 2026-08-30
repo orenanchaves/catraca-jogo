@@ -84,7 +84,10 @@ var TitleScene = new Phaser.Class({
     this.tPontos = txt(this, GW - 8, y, '', PAL.amarelo, 8).setOrigin(1, 0);
     y += 22;
 
-    var cardW = 96, cardH = 76, vao = 6, porLinha = 3;
+    /* 68 e não 76: o boneco tem 48 de altura e a carta lhe dava 60 de
+       folga. Os 8px que sobram de cada fileira são 16 no total, e eles
+       viram respiro lá embaixo, que é onde faltava. */
+    var cardW = 96, cardH = 68, vao = 6, porLinha = 3;
     var x0 = Math.round((GW - (cardW * porLinha + vao * (porLinha - 1))) / 2);
     this.gCards = this.add.graphics().setDepth(1);
     this.cards = [];
@@ -105,7 +108,7 @@ var TitleScene = new Phaser.Class({
         });
       })(this, i);
     }
-    y += cardH * 2 + vao + 2;
+    y += cardH * 2 + vao + 8;
 
     this.tNome = txtC(this, GW / 2, y, '', PAL.amarelo, 16);
     /* 44 e não 34: a tinta do nome em tam 16 vai de y+8 a y+44, e as
@@ -160,15 +163,38 @@ var TitleScene = new Phaser.Class({
        em lugar nenhum: quem trocava de personagem sentia a diferença e
        não sabia dizer o quê. Agora a faixa vai de 62 (idoso) a 118
        (ambulante) e tem nome. */
+    /* Eram cinco linhas soltas boiando entre a descrição e os
+       ladrilhos, sem chapa embaixo e sem folga entre uma coisa e
+       outra: a tela toda virava uma pilha de texto centralizado.
+
+       Duas delas — CARISMA e DESCANSO — são medidores de 0 a 100 que
+       o jogo mostra como BARRA no HUD a partida inteira. Número aqui e
+       barra lá é a mesma informação em duas línguas; viraram barra,
+       nas mesmas cores do HUD (laranja carisma, verde descanso), e a
+       pessoa reconhece antes de ler.
+
+       E o resto ganhou a chapa escura do resto do jogo, pra ler como
+       UM objeto e não como três frases perdidas. */
+    /* As cinco linhas continuam cinco — tirar rótulo não deixa mais
+       claro, deixa mais mudo. O que mudou é que as duas últimas têm
+       BARRA na coluna do valor em vez de número, nas mesmas cores que
+       o HUD usa a partida inteira (laranja carisma, verde descanso),
+       e que as cinco moram numa chapa só. Antes eram cinco frases
+       soltas boiando entre a descrição e os ladrilhos, e a tela
+       inteira lia como uma pilha de texto centralizado sem hierarquia. */
     var passo = 17;
+    this.fichaY = y;
+    this.fichaAlt = 8 + passo * 5 + 8;
+    this.gFicha = this.add.graphics().setDepth(1);
     this.fichaVal = [];
     var rotulos = ['GRANA', 'TARIFA', 'PASSO', 'CARISMA', 'DESCANSO'];
-    for (i = 0; i < 5; i++) {
-      var fy = y + i * passo;
-      txt(this, 52, fy, rotulos[i], PAL.cinzaEsc, 8);
-      this.fichaVal.push(txt(this, GW - 52, fy, '', PAL.branco, 8).setOrigin(1, 0));
+    for (i = 0; i < rotulos.length; i++) {
+      var fy = y + 8 + i * passo;
+      txt(this, 44, fy, rotulos[i], PAL.cinzaEsc, 8).setDepth(2);
+      // as duas últimas mostram barra; o texto delas fica vazio
+      this.fichaVal.push(txt(this, GW - 44, fy, '', PAL.branco, 8).setOrigin(1, 0).setDepth(2));
     }
-    y += passo * 4 + 20;
+    y += this.fichaAlt + 10;
 
     /* ---------- os três ladrilhos ---------- */
     this.gBot = this.add.graphics().setDepth(1);
@@ -305,10 +331,17 @@ var TitleScene = new Phaser.Class({
     var tarifa = c.tarifa === 0 ? 'GRÁTIS' : ('R$ ' + c.tarifa.toFixed(2).replace('.', ','));
     var vals = [
       'R$ ' + c.dinheiro.toFixed(2).replace('.', ','), tarifa,
-      nomeDoPasso(c.velocidade),
-      String(c.carisma), c.descanso + '/' + c.descansoMax
+      nomeDoPasso(c.velocidade)
     ];
     for (var i = 0; i < vals.length; i++) this.fichaVal[i].setText(vals[i]);
+    /* a chapa e as duas barras da coluna do valor */
+    var gf = this.gFicha; gf.clear();
+    gf.fillStyle(0x0d0d18, 0.92).fillRect(34, this.fichaY, GW - 68, this.fichaAlt);
+    gf.fillStyle(0x272738, 1).fillRect(34, this.fichaY, GW - 68, 2);
+    gf.fillStyle(0x000000, 0.5).fillRect(34, this.fichaY + this.fichaAlt - 2, GW - 68, 2);
+    var bx = GW - 44 - 96, bw = 96;
+    barra(gf, bx, this.fichaY + 8 + 17 * 3 + 2, bw, 11, c.carisma / 100, 0xe8a33c);
+    barra(gf, bx, this.fichaY + 8 + 17 * 4 + 2, bw, 11, c.descanso / c.descansoMax, 0x00e676);
 
     this.tTopo.setText('RECORDE: ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));
