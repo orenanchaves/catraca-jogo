@@ -57,7 +57,12 @@ var TitleScene = new Phaser.Class({
        quando o elenco foi de quatro pra seis: a placa perdeu 28px e as
        cartas viraram duas fileiras de três. Carta espremida a 44px de
        largura não mostra boneco nenhum. */
-    var y = 20, altPlaca = 78;
+    /* Sem o subtítulo a placa é só o nome: 'CATRACA' em tam 20 tem 60px de
+   tinta a partir de y+2, então 68 dá 6 de folga em cima e em baixo.
+   'METRÔ DE SÃO PAULO' saiu porque o jogo já se chama Catraca e a
+   estação inteira atrás diz de onde é: era legenda de uma coisa que
+   não precisava de legenda, e custava 22px numa tela sem sobra. */
+    var y = 20, altPlaca = 68;
 
     // placa de estação com o nome do jogo
     g.fillStyle(0x06060c, 1).fillRect(0, y, GW, altPlaca);
@@ -68,9 +73,8 @@ var TitleScene = new Phaser.Class({
     /* Texto desta fonte ocupa três vezes o tam em altura: 'CATRACA' em
        tam 20 come 60px, e o subtítulo a 38px dele estava entrando por
        baixo das letras. A pilha inteira abaixo é medida assim. */
-    txtC(this, GW / 2, y + 2, 'CATRACA', PAL.branco, 20);
-    txtC(this, GW / 2, y + 46, 'METRÔ DE SÃO PAULO', PAL.cinza, 8);
-    y += altPlaca + 4;
+    txtC(this, GW / 2, y + 4, 'CATRACA', PAL.branco, 20);
+    y += altPlaca + 10;
 
     /* ---------- o placar e a bolsa ----------
        No alto, um de cada lado, como o placar e as moedas do Crossy
@@ -82,12 +86,12 @@ var TitleScene = new Phaser.Class({
     texturasDoChao(this);
     this.add.image(GW - 74, y + 11, 'caido_moeda').setDepth(1);
     this.tPontos = txt(this, GW - 8, y, '', PAL.amarelo, 8).setOrigin(1, 0);
-    y += 22;
+    y += 28;
 
     /* 68 e não 76: o boneco tem 48 de altura e a carta lhe dava 60 de
        folga. Os 8px que sobram de cada fileira são 16 no total, e eles
        viram respiro lá embaixo, que é onde faltava. */
-    var cardW = 96, cardH = 68, vao = 6, porLinha = 3;
+    var cardW = 96, cardH = 64, vao = 6, porLinha = 3;
     var x0 = Math.round((GW - (cardW * porLinha + vao * (porLinha - 1))) / 2);
     this.gCards = this.add.graphics().setDepth(1);
     this.cards = [];
@@ -108,12 +112,12 @@ var TitleScene = new Phaser.Class({
         });
       })(this, i);
     }
-    y += cardH * 2 + vao + 8;
+    y += cardH * 2 + vao + 20;
 
     this.tNome = txtC(this, GW / 2, y, '', PAL.amarelo, 16);
     /* 44 e não 34: a tinta do nome em tam 16 vai de y+8 a y+44, e as
        abas de gênero entravam por cima dela. Medido, não estimado. */
-    y += 44;
+    y += 46;
 
     /* ---------- o gênero ----------
        Fica colado no nome porque é parte do nome: quem escolhe a idosa
@@ -143,18 +147,18 @@ var TitleScene = new Phaser.Class({
       (function (g) { zg.on('pointerdown', function () { eu.poeGenero(g); }); })(i ? 'f' : 'm');
       this.zonaGen.push(zg);
     }
-    y += GEN_ABA.h + 4;
+    y += GEN_ABA.h + 16;
     /* O verbo que só este personagem tem. Escolher personagem passou a
        ser escolher como se joga, e isso precisa aparecer na hora da
        escolha — não no meio da terceira viagem. */
     this.tPoder = txtC(this, GW / 2, y, '', PAL.verde, 8);
-    y += 21;
+    y += 26;
     this.tDesc = txtC(this, GW / 2, y, '', PAL.cinza, 8);
     this.tDesc.setWordWrapWidth(GW - 56).setAlign('center');
     /* 48 e não 46: a descrição quebra em duas linhas e a segunda vai
        até y+45. Com 46 ela encostava na primeira linha da ficha — dois
        pixels, que num tipo de 14 de altura é meia letra. */
-    y += 48;
+    y += 34;
 
     /* Ficha em uma coluna. Em duas, a coluna tinha 136px pra caber
        'DESCANSO' mais '90/100' — 192px de texto — e o rótulo entrava
@@ -182,7 +186,7 @@ var TitleScene = new Phaser.Class({
        e que as cinco moram numa chapa só. Antes eram cinco frases
        soltas boiando entre a descrição e os ladrilhos, e a tela
        inteira lia como uma pilha de texto centralizado sem hierarquia. */
-    var passo = 17;
+    var passo = 16;
     this.fichaY = y;
     this.fichaAlt = 8 + passo * 5 + 8;
     this.gFicha = this.add.graphics().setDepth(1);
@@ -340,8 +344,8 @@ var TitleScene = new Phaser.Class({
     gf.fillStyle(0x272738, 1).fillRect(34, this.fichaY, GW - 68, 2);
     gf.fillStyle(0x000000, 0.5).fillRect(34, this.fichaY + this.fichaAlt - 2, GW - 68, 2);
     var bx = GW - 44 - 96, bw = 96;
-    barra(gf, bx, this.fichaY + 8 + 17 * 3 + 2, bw, 11, c.carisma / 100, 0xe8a33c);
-    barra(gf, bx, this.fichaY + 8 + 17 * 4 + 2, bw, 11, c.descanso / c.descansoMax, 0x00e676);
+    barra(gf, bx, this.fichaY + 8 + 16 * 3 + 2, bw, 11, c.carisma / 100, 0xe8a33c);
+    barra(gf, bx, this.fichaY + 8 + 16 * 4 + 2, bw, 11, c.descanso / c.descansoMax, 0x00e676);
 
     this.tTopo.setText('RECORDE: ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));

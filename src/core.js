@@ -180,23 +180,23 @@ function horaTexto(min) {
 var PODERES = {
   chao: {
     nome: 'SENTAR NO CHÃO',
-    como: 'Senta no chão. Só fora do pico.'
+    como: 'No chão, fora do pico.'
   },
   cochilo: {
     nome: 'COCHILAR NA BARRA',
-    como: 'Dorme em pé na barra. E perde a rota.'
+    como: 'Dorme em pé. Perde a rota.'
   },
   pedeLugar: {
     nome: 'PEDIR O LUGAR',
-    como: 'Pede o banco de quem está sentado.'
+    como: 'Pede o banco dos outros.'
   },
   vende: {
     nome: 'VENDER NO VAGÃO',
-    como: 'Vende no vagão. O fiscal repara.'
+    como: 'Vende no vagão. Tem risco.'
   },
   perdido: {
     nome: 'NÃO SABE A LINHA',
-    como: 'Só vê a rota de perto. Pague pra saber.'
+    como: 'Só vê a rota de perto.'
   }
 };
 
@@ -242,7 +242,7 @@ var CHARS = {
        do idoso é o resto: cansa em dobro, e a multidão abre caminho. */
     poder: 'pedeLugar', abremCaminho: true, nuncaRecusam: true,
     poderRotulo: 'ABREM CAMINHO',
-    poderComo: 'Ninguém recusa, e a multidão abre.',
+    poderComo: 'Ninguém recusa a ela.',
     /* a única sem escolha de gênero, e por causa do próprio verbo: o
        dela é estar grávida */
     visual: { f: { corpo: 'gestante', pal: 'gestanteJog' } },

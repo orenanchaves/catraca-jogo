@@ -25,13 +25,34 @@
    estação podia fazer. */
 
 /* ---------- a planta da estação ---------- */
-var PLAT_ALT = 524;              // a plataforma tem a altura de uma tela
+/* 900 e não 524. Uma tela de altura fazia a plataforma caber inteira na
+   vista: você via a ponta de cima e a de baixo ao mesmo tempo, e andar
+   nela não levava a lugar nenhum — era sempre o mesmo trecho. Com 900
+   ela tem uma tela e meia larga, a câmera precisa acompanhar, e as duas
+   pontas viram lugares diferentes: perto da escada e longe dela. */
+var PLAT_ALT = 900;
 var ESCADA_ALT = 148;            // a escada rolante entre ela e o saguão
 var PLAT_Y = HUD_H - ESCADA_ALT - PLAT_ALT;   // topo da plataforma (negativo)
 var ESC_Y = PLAT_Y + PLAT_ALT;                // onde a escada começa
 /* o que a escada deixa passar: uma boca estreita no meio da parede do
    fundo do saguão */
-var ESC_X0 = 136, ESC_X1 = 200;
+/* ---------- a escada rolante ----------
+   Era UMA, servindo de subida e descida ao mesmo tempo, o que nenhuma
+   estação tem: escada rolante anda pra um lado só. Agora são duas lado
+   a lado, a da esquerda subindo e a da direita descendo, separadas pela
+   balaustrada do meio.
+
+   O vão passou de 64 pra 96 porque duas pistas de 44 precisam caber um
+   boneco de 32 cada uma. De quebra isso alivia o gargalo que obrigou a
+   existir o funil: 96 numa parede de 320 ainda é aperto, mas é aperto
+   de estação, não de porta de armário. */
+var ESC_X0 = 112, ESC_X1 = 208;
+var ESC_DIV = 8;                                  // a balaustrada do meio
+var ESC_MEIO = (ESC_X0 + ESC_X1) / 2;
+var ESC_PISTA = [
+  { x0: ESC_X0, x1: ESC_MEIO - ESC_DIV / 2, sobe: true },
+  { x0: ESC_MEIO + ESC_DIV / 2, x1: ESC_X1, sobe: false }
+];
 /* o guichê de achados e perdidos, na parede da esquerda do saguão */
 /* Desceu de 296 pra 352 depois de medido na tela: a placa dele batia na
    do DOG DO CÃO, que fica na parede de frente na mesma altura. */
@@ -76,11 +97,20 @@ var EstacaoScene = new Phaser.Class({
 
     /* ---------- a plataforma ---------- */
     // cinco portas ao longo do trem: sempre tem uma perto de onde você está
-    this.portas = [76, 194, 312, 430, 548];
+    /* As portas nascem do comprimento do trem, de 118 em 118: com a
+       plataforma mudando de tamanho, lista fixa deixava metade dela
+       sem porta nenhuma. */
+    this.portas = [];
+    for (var pq = 76; pq + 52 <= PLAT_ALT - 24; pq += 118) this.portas.push(pq);
     this.estado = 'espera';
     this.t = 0;
     this.perdido = false;
-    this.tremAlt = PLAT_ALT + 80;
+    /* Era PLAT_ALT + 80, e os 80 sobravam POR BAIXO da plataforma: o
+       trem parado enfiava oitenta pixels de lata dentro da escada
+       rolante. Agora ele tem o comprimento exato da plataforma, e o
+       desenho ainda é recortado nela (ver pintaTrem) pra que nem
+       durante a chegada e a partida ele apareça onde não cabe. */
+    this.tremAlt = PLAT_ALT;
     this.tremY = PLAT_Y - this.tremAlt;
     this.empurrando = false;
     this.pressao = 0;
@@ -118,7 +148,7 @@ var EstacaoScene = new Phaser.Class({
     quantos = Math.round(1 + 9 * GameState.lotacao());
     for (i = 0; i < quantos; i++) {
       var e = new Ator(this, PLAT_X0 + 14 + Math.random() * 130,
-        platY(100 + Math.random() * 430), sorteiaPax());
+        platY(100 + Math.random() * (PLAT_ALT - 160)), sorteiaPax());
       e.dir = 'left'; e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
     }
@@ -136,7 +166,7 @@ var EstacaoScene = new Phaser.Class({
       this.gente.push(pd);
     }
     if (Math.random() < 0.6 - 0.35 * GameState.lotacao()) {
-      var pp = new Ator(this, 280, platY(120 + Math.random() * 380),
+      var pp = new Ator(this, 280, platY(120 + Math.random() * (PLAT_ALT - 200)),
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pp.sp.setDepth(28); pp.anima(0, false);
       pp.fixo = true;
@@ -149,7 +179,7 @@ var EstacaoScene = new Phaser.Class({
        baldeação ou desceu na estação errada já está lá em cima. */
     var noAlto = (this.entrada === 'plataforma');
     this.pl = new Ator(this, noAlto ? 200 : 160,
-      noAlto ? platY(400) : 500, spriteJogador());
+      noAlto ? platY(PLAT_ALT - 140) : 500, spriteJogador());
     this.pl.sp.setDepth(60);
     this.pl.dir = noAlto ? 'left' : 'up';
 
@@ -292,12 +322,20 @@ var EstacaoScene = new Phaser.Class({
 
     /* Os letreiros são texto, e texto não entra em textura: eles ficam
        no mundo, cada um na parede a que pertence. */
-    /* A placa do guichê é alinhada à esquerda e não centrada: 'ACHADOS E
-       PERDIDOS' são 216 pixels, e centrada no guichê ela saía pela borda
-       da tela. */
-    var pAch = new Plaqueta(this, 8, ACH.y - 66,
-      { cor: PAL.amarelo, centro: false, mundo: true, depth: 3, largura: 120 });
-    pAch.setText('ACHADOS E PERDIDOS');
+    /* ---------- por que o saguão não tem mais placa ----------
+       Eram sete chapas de texto numa tela só: PLATAFORMA, BILHETES,
+       ACHADOS E PERDIDOS, DOG DO CÃO, BANCA, o nome da estação e a
+       faixa de baixo. Chapa preta com letra grande é o objeto mais
+       pesado que este jogo desenha, e cinco delas empilhadas cobriam
+       justamente o caminho por onde se anda.
+
+       E não diziam nada de novo: a faixa de dica JÁ nomeia o que está
+       na sua frente quando você chega perto — 'CLIQUE: DOG DO CÃO',
+       'CLIQUE: COMPRAR PASSAGEM'. A placa repetia de longe uma coisa
+       que o jogo diz de perto, e cobrava a tela inteira por isso.
+
+       Ficou só a da escada: essa não nomeia, ela APONTA, e é a única
+       informação do saguão que você precisa ter antes de chegar perto. */
 
     // o nome da estação desceu: o guichê ocupou a altura em que ele morava
     var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
@@ -305,15 +343,6 @@ var EstacaoScene = new Phaser.Class({
     /* A placa da escada fica NO PISO, rente à boca: pendurada no vão
        ela virava parede na frente de quem sobe. */
     placa(this, GW / 2, 126, '▲ PLATAFORMA', PAL.cinza);
-    placa(this, 52, 246, 'BILHETES', PAL.amarelo);
-    for (var pb = 0; pb < this.barracas.length; pb++) {
-      var bb = this.barracas[pb];
-      /* A placa é centrada no nome, e 'DOG DO CÃO' tem 120 pixels: no
-         centro de uma barraca encostada na parede ela saía pela borda
-         da tela. Fica presa dentro do saguão. */
-      var px = Phaser.Math.Clamp(bb.x + bb.w / 2, 8 + bb.nome.length * 6, GW - 8 - bb.nome.length * 6);
-      placa(this, px, bb.y - 18, bb.nome, PAL.amarelo);
-    }
     // a placa vertical da plataforma, com o nome da estação
     var t = txt(this, 308, platY(220), GameState.estacaoAtual(), PAL.branco, 8);
     t.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
@@ -396,18 +425,44 @@ var EstacaoScene = new Phaser.Class({
 
   /* o vão por onde a escada entra no saguão: mesmo desenho da escada,
      continuado pra baixo até o piso, pra emenda não aparecer */
-  bocaDaEscada: function (g, y0, y1) {
-    g.fillStyle(0x22252f, 1).fillRect(ESC_X0 - 10, y0, ESC_X1 - ESC_X0 + 20, y1 - y0);
-    for (var y = y0; y < y1; y += 10) {
-      g.fillStyle(0x3d4152, 1).fillRect(ESC_X0, y, ESC_X1 - ESC_X0, 7);
-      g.fillStyle(0x4a4f63, 1).fillRect(ESC_X0, y, ESC_X1 - ESC_X0, 2);
-      g.fillStyle(0x16181f, 1).fillRect(ESC_X0, y + 7, ESC_X1 - ESC_X0, 3);
+  /* Os degraus das duas pistas, a balaustrada do meio e os corrimãos.
+     Está numa função só porque a escada e a boca dela no saguão são o
+     mesmo desenho continuado — duas cópias da mesma conta saem de
+     sincronia na primeira mudança. */
+  pintaDegraus: function (g, y0, y1) {
+    var alt = y1 - y0, p, i;
+    g.fillStyle(0x22252f, 1).fillRect(ESC_X0 - 10, y0, ESC_X1 - ESC_X0 + 20, alt);
+    for (i = 0; i < ESC_PISTA.length; i++) {
+      p = ESC_PISTA[i];
+      var larg = p.x1 - p.x0;
+      for (var y = y0; y < y1; y += 10) {
+        g.fillStyle(0x3d4152, 1).fillRect(p.x0, y, larg, 7);
+        g.fillStyle(0x4a4f63, 1).fillRect(p.x0, y, larg, 2);
+        g.fillStyle(0x16181f, 1).fillRect(p.x0, y + 7, larg, 3);
+      }
+      /* A seta é o que diz o sentido, e ela mora NA pista: seta no meio
+         do vão não pertence a lado nenhum e não informa nada. */
+      var cx = (p.x0 + p.x1) / 2;
+      g.fillStyle(p.sobe ? 0x00e676 : 0xe8a33c, 0.32);
+      for (var sy = y0 + 22; sy < y1 - 20; sy += 44) {
+        if (p.sobe) g.fillTriangle(cx, sy, cx - 11, sy + 13, cx + 11, sy + 13);
+        else g.fillTriangle(cx, sy + 13, cx - 11, sy, cx + 11, sy);
+      }
     }
+    // a balaustrada entre as duas, que é o que faz serem duas
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_MEIO - ESC_DIV / 2, y0, ESC_DIV, alt);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(ESC_MEIO - ESC_DIV / 2, y0, 2, alt);
+    g.fillStyle(0x000000, 0.35).fillRect(ESC_MEIO + ESC_DIV / 2 - 2, y0, 2, alt);
+    // corrimão de fora, dos dois lados
     for (var d = 0; d < 2; d++) {
       var hx = d ? ESC_X1 : ESC_X0 - 6;
-      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 6, y1 - y0);
-      g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx, y0, 2, y1 - y0);
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 6, alt);
+      g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx, y0, 2, alt);
     }
+  },
+
+  bocaDaEscada: function (g, y0, y1) {
+    this.pintaDegraus(g, y0, y1);
     // o pente de metal onde o degrau some no piso
     g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_X0 - 10, y1 - 8, ESC_X1 - ESC_X0 + 20, 8);
     g.fillStyle(num(PAL.amareloSom), 1).fillRect(ESC_X0 - 10, y1 - 8, ESC_X1 - ESC_X0 + 20, 3);
@@ -476,25 +531,8 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(num(PAL.paredeLuz), 1).fillRect(0, 0, ESC_X0 - 10, 3);
     g.fillStyle(num(PAL.paredeLuz), 1).fillRect(ESC_X1 + 10, 0, GW - ESC_X1 - 10, 3);
 
-    // o vão da escada, e os degraus subindo
-    g.fillStyle(0x22252f, 1).fillRect(ESC_X0 - 10, 0, ESC_X1 - ESC_X0 + 20, ESCADA_ALT);
-    for (var y = 0; y < ESCADA_ALT; y += 10) {
-      g.fillStyle(0x3d4152, 1).fillRect(ESC_X0, y, ESC_X1 - ESC_X0, 7);
-      g.fillStyle(0x4a4f63, 1).fillRect(ESC_X0, y, ESC_X1 - ESC_X0, 2);
-      g.fillStyle(0x16181f, 1).fillRect(ESC_X0, y + 7, ESC_X1 - ESC_X0, 3);
-    }
-    // corrimão dos dois lados
-    for (var d = 0; d < 2; d++) {
-      var hx = d ? ESC_X1 : ESC_X0 - 6;
-      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, 0, 6, ESCADA_ALT);
-      g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx, 0, 2, ESCADA_ALT);
-    }
-    // a seta do sentido, subindo
-    for (var s = 0; s < 3; s++) {
-      var sy = 24 + s * 44, cx = (ESC_X0 + ESC_X1) / 2;
-      g.fillStyle(0x00e676, 0.35);
-      g.fillTriangle(cx, sy, cx - 12, sy + 14, cx + 12, sy + 14);
-    }
+    // as duas pistas: sobe pela esquerda, desce pela direita
+    this.pintaDegraus(g, 0, ESCADA_ALT);
   },
 
   /* ---------- bloqueio ----------
@@ -604,7 +642,10 @@ var EstacaoScene = new Phaser.Class({
     // ---- escada rolante: a única passagem entre os dois andares ----
     if (y < 116) return x > ESC_X0 && x < ESC_X1;
     // ---- saguão ----
-    if (x < 28 || x > 292) return false;
+    /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
+       saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
+       são o único jeito de contornar — cada pixel de beirada é caminho. */
+    if (x < 22 || x > 298) return false;
     // o corpo da barraca é parede; o balcão é onde se atende
     for (var b = 0; b < this.barracas.length; b++) {
       var q = this.barracas[b];
@@ -954,17 +995,30 @@ var EstacaoScene = new Phaser.Class({
     var y0 = this.tremY, alt = this.tremAlt;
     var l = GameState.linhaAtual();
 
-    // corpo com volume
-    g.fillStyle(num(PAL.metalSom), 1).fillRect(20, y0, 88, alt);
-    g.fillStyle(num(PAL.metal), 1).fillRect(24, y0, 78, alt);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(28, y0, 10, alt);
-    g.fillStyle(0x000000, 0.28).fillRect(92, y0, 16, alt);
-    // faixa da linha
-    g.fillStyle(num(escurecer(l.cor, 0.35)), 1).fillRect(24, y0, 78, 12);
-    g.fillStyle(l.num, 1).fillRect(24, y0 + 2, 78, 8);
+    /* ---------- o recorte ----------
+       O trem só existe na faixa da plataforma. Sem isto, na chegada e
+       na partida ele desliza por cima da escada rolante e do saguão,
+       que é o andar de baixo: aparecia lata de trem atravessando a
+       estação inteira. Recortar é mais simples que máscara e não custa
+       nada, porque tudo aqui é retângulo. */
+    var topo = Math.max(y0, PLAT_Y), base = Math.min(y0 + alt, ESC_Y);
+    if (base <= topo) return;
+    var ac = base - topo;
 
-    // janelas
+    // corpo com volume
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(20, topo, 88, ac);
+    g.fillStyle(num(PAL.metal), 1).fillRect(24, topo, 78, ac);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(28, topo, 10, ac);
+    g.fillStyle(0x000000, 0.28).fillRect(92, topo, 16, ac);
+    // faixa da linha, só se a testeira do trem estiver na plataforma
+    if (y0 >= PLAT_Y && y0 + 12 <= ESC_Y) {
+      g.fillStyle(num(escurecer(l.cor, 0.35)), 1).fillRect(24, y0, 78, 12);
+      g.fillStyle(l.num, 1).fillRect(24, y0 + 2, 78, 8);
+    }
+
+    // janelas: as que caem fora do recorte simplesmente não existem
     for (var y = y0 + 30; y < y0 + alt - 40; y += 80) {
+      if (y < topo || y + 48 > base) continue;
       g.fillStyle(0x11161f, 1).fillRect(38, y, 58, 48);
       g.fillStyle(0x1f2a3d, 1).fillRect(40, y + 2, 54, 44);
       g.fillStyle(0x3a4a6a, 0.7).fillRect(42, y + 4, 50, 10);
@@ -975,7 +1029,8 @@ var EstacaoScene = new Phaser.Class({
     var ab = (this.estado === 'aberto');
     for (var i = 0; i < this.portas.length; i++) {
       var py = this.portas[i] + y0;
-      if (py < PLAT_Y - 60 || py > ESC_Y + 60) continue;
+      // porta pela metade não é porta: ou cabe inteira, ou não aparece
+      if (py < topo || py + 52 > base) continue;
       if (ab) {
         g.fillStyle(0x07070c, 1).fillRect(76, py, 32, 52);
         g.fillStyle(0x232d42, 1).fillRect(80, py + 4, 24, 44);
@@ -1135,7 +1190,7 @@ var EstacaoScene = new Phaser.Class({
     this.ambulante = null;
     // de madrugada não tem ninguém vendendo; no movimento, quase sempre
     if (Math.random() > 0.35 + GameState.lotacao() * 0.55) return;
-    var a = new Ator(this, 180, platY(200 + Math.random() * 260),
+    var a = new Ator(this, 180, platY(200 + Math.random() * (PLAT_ALT - 340)),
       ['np_ambulante_a', 'np_ambulante_b', 'np_ambulante_c'][Math.floor(Math.random() * 3)]);
     a.sp.setDepth(39);
     a.vy = (Math.random() < 0.5 ? -1 : 1) * 26;
@@ -1147,7 +1202,7 @@ var EstacaoScene = new Phaser.Class({
     var a = this.ambulante;
     if (!a || !a.sp || !a.sp.active) return;
     var ny = a.sp.y + a.vy * dt / 1000;
-    if (ny < platY(150) || ny > platY(520)) { a.vy = -a.vy; ny = a.sp.y; }
+    if (ny < platY(150) || ny > platY(PLAT_ALT - 40)) { a.vy = -a.vy; ny = a.sp.y; }
     a.sp.y = ny;
     a.dir = a.vy < 0 ? 'up' : 'down';
     a.anima(dt, true);
@@ -1295,7 +1350,8 @@ var EstacaoScene = new Phaser.Class({
     if (barraca) dica = nomeAgir() + ': ' + barraca.nome;
     /* 'TOQUE: ACHADOS E PERDIDOS' dá 25 caracteres com o prefixo, e a
        faixa cabe 26 justos. O preço é a informação que decide. */
-    else if (noGuiche) dica = nomeAgir() + ': TENTAR (' + ACHADOS_PRECO + ')';
+    // sem a placa em cima do guichê, é a dica que diz o que ele é
+    else if (noGuiche) dica = nomeAgir() + ': ACHADOS (' + ACHADOS_PRECO + ')';
     else if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
     else if (perto && gate.fechada) dica = 'catraca fora de serviço';
     else if (naCatraca) {
