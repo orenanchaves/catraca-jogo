@@ -593,8 +593,17 @@ var GameState = {
     var eraUltima = this.ultimaPerna();
 
     if (eraUltima) {
-      // dormir: quanto mais tarde chega em casa, menos noite sobra
-      this.addDescanso(Phaser.Math.Clamp(30 - this.ultimoAtraso * 0.4, 6, 30));
+      /* ---------- a noite ----------
+         Fechar a volta inteira — ida E volta, o dia completo — é a única
+         coisa no jogo que devolve o corpo. Antes a noite dava um punhado
+         de descanso e mais nada, o que fazia o dia terminar sem nenhuma
+         sensação de ter valido: você acordava tão moído quanto dormiu.
+
+         Agora o dia fechado no horário devolve o descanso CHEIO e todos
+         os corações. É o prêmio de ter chegado, e é o que faz o trajeto
+         ser um ciclo em vez de uma ladeira só pra baixo. */
+      this.descanso = this.char.descansoMax;
+      this.coracoes = CORACOES_POR_PERNA;
     } else if (this.ultimoAtraso > 0) {
       /* Chegar atrasado leva TODOS os corações de uma vez.
          Eram três avisos antes de doer, e três avisos transformam o
@@ -1584,6 +1593,49 @@ function tom(f, d, tipo, vol) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + d);
   o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + 0.02);
 }
+/* ---------- ruído ----------
+   Oscilador não faz trem. Freio de metrô é ruído branco passado por um
+   filtro estreito que desce de tom, e chiado de ar é ruído agudo sem
+   altura nenhuma: as duas coisas são impossíveis com onda periódica,
+   por mais camada que se empilhe. O buffer é gerado uma vez e reusado. */
+var bufRuido = null;
+function ruido(dur, vol, f0, f1, q, tipo, atraso) {
+  if (!AC) return;
+  if (!bufRuido) {
+    var n = AC.sampleRate * 2;
+    bufRuido = AC.createBuffer(1, n, AC.sampleRate);
+    var d = bufRuido.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  var t = AC.currentTime + (atraso || 0);
+  var src = AC.createBufferSource(); src.buffer = bufRuido; src.loop = true;
+  var filtro = AC.createBiquadFilter();
+  filtro.type = tipo || 'bandpass';
+  filtro.Q.value = (q === undefined) ? 1 : q;
+  filtro.frequency.setValueAtTime(f0, t);
+  filtro.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+  var g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.12, dur * 0.3));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filtro); filtro.connect(g); g.connect(AC.destination);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+/* um tom que escorrega de uma altura pra outra, que é como soa motor */
+function glissando(f0, f1, dur, tipo, vol, atraso) {
+  if (!AC) return;
+  var t = AC.currentTime + (atraso || 0);
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = tipo || 'sawtooth';
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+
 function sfx(n) {
   if (!SOM_LIGADO) return;
   switch (n) {
@@ -1601,8 +1653,24 @@ function sfx(n) {
     case 'passoB': tom(126, .035, 'triangle', .032); break;
     // o dó-mi do letreiro, antes do nome da estação
     case 'anuncio': tom(784, .1, 'sine', .05); setTimeout(function () { tom(1046, .16, 'sine', .05); }, 110); break;
-    // o trem entrando na estação: rugido caindo de tom
-    case 'chegando': tom(120, .5, 'sawtooth', .05); setTimeout(function () { tom(80, .45, 'sawtooth', .045); }, 260); break;
+    /* ---------- o trem entrando na estação ----------
+       Três camadas, porque trem é três coisas ao mesmo tempo: o rolamento
+       grave desacelerando, o guincho do freio — que é o que faz a pessoa
+       reconhecer metrô antes de olhar pra tela — e o chiado do ar no fim.
+       O guincho entra depois do rolamento, como na plataforma de verdade.
+       Oscilador sozinho não faz nada disso: freio é ruído filtrado. */
+    case 'chegando':
+      glissando(128, 46, 1.9, 'sawtooth', 0.055);           // o rolamento
+      ruido(1.9, 0.05, 260, 70, 1.1);                       // rodas no trilho
+      ruido(1.15, 0.035, 2900, 1250, 14, 'bandpass', 0.55); // o guincho do freio
+      ruido(0.55, 0.03, 5200, 3400, 0.8, 'highpass', 1.7);  // o ar escapando
+      break;
+    /* e o trem saindo: o contrário, subindo de tom e sumindo no túnel */
+    case 'partindo':
+      ruido(0.4, 0.03, 4600, 3000, 0.8, 'highpass', 0);
+      glissando(52, 150, 1.7, 'sawtooth', 0.05, 0.25);
+      ruido(1.7, 0.045, 80, 300, 1.1, 'bandpass', 0.25);
+      break;
     case 'batida': tom(70, .09, 'sine', .09); setTimeout(function () { tom(1300, .03, 'square', .028); }, 95); break;
     case 'erro': tom(200, .1, 'square', .06); setTimeout(function () { tom(120, .22, 'square', .06); }, 100); break;
     case 'fim': [392, 330, 262, 196].forEach(function (f, i) { setTimeout(function () { tom(f, .22, 'triangle', .07); }, i * 160); }); break;
@@ -1630,7 +1698,17 @@ var TOQUE_ATIVO = false;
    Agora a tela é dividida: a metade ESQUERDA anda, a metade DIREITA
    age. Um polegar em cada lado, os dois ao mesmo tempo — dá pra
    atravessar o vagão segurando na barra, que antes era impossível. */
+/* A metade direita da tela é o botão de agir, e a esquerda é o
+   direcional. Isso resolve mão de celular, onde os dois polegares
+   trabalham ao mesmo tempo e não existe cursor.
+
+   No computador é o contrário de ajuda: existe UM cursor, ele aponta
+   pra onde quiser, e partir a tela ao meio faz o clique na esquerda
+   virar arrasto e o da direita virar ação — duas regras invisíveis
+   pra quem tem teclado e mouse. Fora do celular a divisão não existe:
+   clique em qualquer lugar é agir, e quem anda é o WASD. */
 var LADO_ACAO = GW / 2;
+function dividirTela() { return TOQUE_ATIVO; }
 var TOQUE = {
   ativo: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
 };
@@ -2814,7 +2892,7 @@ var HudScene = new Phaser.Class({
     this.input.addPointer(2);
 
     this.input.on('pointerdown', function (p) {
-      if (CONTROLES_VISIVEIS && p.x >= LADO_ACAO) {
+      if (dividirTela() && CONTROLES_VISIVEIS && p.x >= LADO_ACAO) {
         TOQUE_DIR.ativo = true; TOQUE_DIR.id = p.id;
         TOQUE_DIR.x = p.x; TOQUE_DIR.y = p.y; TOQUE_DIR.t0 = self.time.now;
         return;
@@ -2840,7 +2918,7 @@ var HudScene = new Phaser.Class({
       }
       if (TOQUE.ativo && p.id !== TOQUE.id) return;
       // sem direcional na tela, o toque solto de qualquer lado é o Z
-      if (TOQUE.ativo && !TOQUE.arrastando && !CONTROLES_VISIVEIS) TOUCH.pulso = true;
+      if (TOQUE.ativo && !TOQUE.arrastando && (!CONTROLES_VISIVEIS || !dividirTela())) TOUCH.pulso = true;
       TOQUE.ativo = false; TOQUE.id = -1; TOQUE.arrastando = false;
       TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = false;
     });

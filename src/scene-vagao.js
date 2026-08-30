@@ -20,7 +20,12 @@
    pelo banco. O jogador chegava antes de decidir qualquer coisa.
    Medido andando de ponta a ponta: 14s dão dois carros e uma decisão. */
 var TEMPO_ENTRE_ESTACOES = 14000;
-var TEMPO_PARADO = 4200;
+/* 30000 e nao 4200: quatro segundos de porta aberta e menos do que se
+   leva pra atravessar um carro ate a porta, e descer virava reflexo em
+   vez de decisao. Trinta segundos e o tempo de olhar o letreiro,
+   decidir, levantar e caminhar. O preco disso esta no relogio do jogo,
+   nao no seu: parada longa tambem faz o horario andar. */
+var TEMPO_PARADO = 30000;
 
 /* As barras saíam de dentro dos módulos agora que eles avançam 62px
    pra dentro do carro: elas recuaram pro corredor, que é onde a mão
@@ -2368,6 +2373,7 @@ var VagaoScene = new Phaser.Class({
   chega: function () {
     this.estado = 'parado';
     this.t = 0;
+    this.avisouPorta = false;
     this.pintaPortas(true);
     sfx('chegando');
     var eu = this;
@@ -2479,12 +2485,27 @@ var VagaoScene = new Phaser.Class({
       if (this.dilemaPendente && !this.encena && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
+      /* Trinta segundos de porta aberta sem aviso viram trinta segundos
+         de nada seguidos de um susto. O apito de fechar entra a seis do
+         fim, que é o tempo de correr até a porta de onde quer que você
+         esteja no carro — é assim que a estação avisa, e é a única
+         parte da parada que precisa de pressa. */
+      if (!this.avisouPorta && this.t > TEMPO_PARADO - 6000) {
+        this.avisouPorta = true;
+        sfx('apito');
+        this.flash('PORTAS FECHANDO');
+      }
       if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
         this.sorteiaRitmo();
         this.sorteouFalha = false;
         this.pintaPortas(false);
         sfx('porta');
+        /* a porta fecha e o trem sai: o som de partir e o de chegar ao
+           contrario, e e ele que diz 'acabou o tempo de descer' pra quem
+           nao estava olhando pro letreiro */
+        var euP = this;
+        this.time.delayedCall(380, function () { if (euP.scene && euP.scene.isActive()) sfx('partindo'); });
         // deixar a sua estação passar é o erro caro: agora tem que voltar
         if (this.eraSuaEstacao) {
           GameState.addDescanso(-8);
