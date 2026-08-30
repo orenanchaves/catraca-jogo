@@ -45,7 +45,7 @@ var TitleScene = new Phaser.Class({
        sem costura. O véu por cima é o que deixa o texto legível: fundo
        bonito que não dá pra ler é fundo ruim. */
     texturaDeCena(this, 'tit_fundo', GW, PLAT_ALT, function (gp) {
-      EstacaoScene.prototype.pintaPlataforma.call(null, gp, null);
+      EstacaoScene.prototype.pintaPlataforma.call(null, gp, null, false);
     });
     this.add.image(0, GH - PLAT_ALT, 'tit_fundo').setOrigin(0, 0).setDepth(-10);
     this.add.image(0, GH - PLAT_ALT * 2, 'tit_fundo').setOrigin(0, 0).setDepth(-10);

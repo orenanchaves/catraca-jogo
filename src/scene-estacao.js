@@ -60,7 +60,73 @@ var ACH = { y: 352, h: 62, alcance: 64 };
 
 /* a plataforma em coordenadas do mundo: o piso vai da faixa tátil à
    parede da direita */
-var PLAT_X0 = 136, PLAT_X1 = 288;
+/* ---------- as duas plantas de plataforma ----------
+   A maioria das estações é LATERAL: uma via encostada na parede de um
+   lado e a plataforma do outro. A Sé não: ela é CENTRAL, você fica no
+   meio e o trem vem dos dois lados. Não é enfeite — é o que torna a
+   baldeação uma escolha de onde ficar em pé, e é por isso que ela é a
+   estação que todo mundo reconhece de olho fechado.
+
+   Central cabe em 320px justamente porque a plataforma some das bordas:
+   duas plataformas lado a lado não caberiam, uma no meio cabe. */
+var PLAT_X0 = 136, PLAT_X1 = 288;          // lateral: piso 124..296
+var PLAT_C_X0 = 104, PLAT_C_X1 = 216;      // central: piso 92..228
+var CENTRAL = false;                        // esta estação é de plataforma central?
+
+/* a via, a faixa tátil e a borda de um lado. lado -1 = via à esquerda do
+   piso, lado +1 = via à direita. Uma função só porque a central desenha
+   as duas e a lateral desenha uma: duas cópias sairiam de sincronia. */
+function pintaVia(g, x0, larg, alt, lado) {
+  g.fillStyle(num(PAL.brita), 1).fillRect(x0, 0, larg, alt);
+  g.fillStyle(0x1e1e28, 1);
+  var d0 = x0 + 16, dw = larg - 32;
+  for (var y = 0; y < alt; y += 24) g.fillRect(d0, y, dw, 9);
+  g.fillStyle(num(PAL.dormente), 1);
+  for (var y2 = 0; y2 < alt; y2 += 24) g.fillRect(d0, y2, dw, 7);
+  pontilhado(g, x0, 0, larg, alt, 0x000000, 0.25, 6);
+  // dois trilhos, com o brilho de cima
+  var t1 = x0 + Math.round(larg * 0.3), t2 = x0 + Math.round(larg * 0.72);
+  [t1, t2].forEach(function (tx) {
+    g.fillStyle(num(PAL.trilhoSom), 1).fillRect(tx, 0, 8, alt);
+    g.fillStyle(num(PAL.trilho), 1).fillRect(tx, 0, 5, alt);
+  });
+  // a borda escura da plataforma e a faixa tátil, do lado do piso
+  var bx = (lado < 0) ? x0 + larg : x0 - 8;
+  g.fillStyle(0x000000, 0.6).fillRect(bx, 0, 8, alt);
+  var fx = (lado < 0) ? bx + 8 : bx - 16;
+  g.fillStyle(num(PAL.amareloSom), 1).fillRect(fx, 0, 16, alt);
+  g.fillStyle(num(PAL.amarelo), 1).fillRect(fx + (lado < 0 ? 0 : 2), 0, 14, alt);
+  g.fillStyle(num(PAL.amareloSom), 1);
+  for (var yy = 4; yy < alt; yy += 12) g.fillRect(fx + 3, yy, 8, 5);
+  g.fillStyle(num(PAL.amareloLuz), 1);
+  for (var y3 = 4; y3 < alt; y3 += 12) g.fillRect(fx + 3, y3, 8, 2);
+}
+
+/* o piso quadriculado com o reflexo do teto */
+function pintaPisoPlat(g, x0, x1, alt) {
+  g.fillStyle(num(PAL.rejunte), 1).fillRect(x0, 0, x1 - x0, alt);
+  for (var py = 0; py < alt; py += 16) {
+    for (var px = x0; px < x1; px += 16) {
+      g.fillStyle(((px / 16 + py / 16) % 2) ? 0x3f3f52 : 0x494960, 1);
+      g.fillRect(px + 1, py + 1, 14, 14);
+      g.fillStyle(0xffffff, 0.07).fillRect(px + 1, py + 1, 14, 2);
+      g.fillStyle(0x000000, 0.16).fillRect(px + 1, py + 13, 14, 2);
+    }
+  }
+  g.fillStyle(0xffffff, 0.05).fillRect(x0 + 26, 0, 28, alt);
+  g.fillStyle(0xffffff, 0.03).fillRect(x1 - 64, 0, 20, alt);
+}
+
+/* o círculo de porta pintado no chão, com a seta apontando pra via */
+function marcaDePorta(g, cx, cy, lado) {
+  g.fillStyle(0x000000, 0.28).fillCircle(cx, cy, 15);
+  g.fillStyle(0x000000, 0.4).fillCircle(cx, cy, 11);
+  g.lineStyle(2, 0xffffff, 0.3).strokeCircle(cx, cy, 13);
+  g.fillStyle(0xffffff, 0.35);
+  var p = (lado < 0) ? -1 : 1;
+  g.fillTriangle(cx + p * 9, cy, cx + p, cy - 6, cx + p, cy + 6);
+  g.fillRect(Math.min(cx + p, cx - p * 7), cy - 2, 7, 4);
+}
 function platY(y) { return y + PLAT_Y - HUD_H; }   // y de tela da plataforma → mundo
 
 /* Onde as portas do trem param, de 118 em 118. É função pura de propósito:
@@ -110,6 +176,14 @@ var EstacaoScene = new Phaser.Class({
     /* As portas nascem do comprimento do trem, de 118 em 118: com a
        plataforma mudando de tamanho, lista fixa deixava metade dela
        sem porta nenhuma. */
+    /* ---------- que planta é esta estação ----------
+       A Sé é central: você fica no meio e o trem vem dos dois lados.
+       Isso muda o piso caminhável, e por isso é decidido ANTES de
+       qualquer coisa ser desenhada ou posicionada. */
+    CENTRAL = (GameState.estacaoAtual() === BALDEACAO);
+    PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
+    PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
+
     this.portas = portasDoTrem();
     this.estado = 'espera';
     this.t = 0;
@@ -172,7 +246,10 @@ var EstacaoScene = new Phaser.Class({
       } else {
         ey = platY(100 + Math.random() * (PLAT_ALT - 160));
       }
-      var e = new Ator(this, PLAT_X0 + 10 + Math.random() * 140,
+      /* Dentro da faixa caminhável, e não a partir dela: na plataforma
+         central o piso tem 112px e o "+140" jogava metade da fila em
+         cima do trilho do outro lado. */
+      var e = new Ator(this, PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
         Phaser.Math.Clamp(ey, platY(90), ESC_Y - 30), sorteiaPax());
       e.dir = 'left'; e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
@@ -338,7 +415,7 @@ var EstacaoScene = new Phaser.Class({
     fundo.fillStyle(num(PAL.bg), 1).fillRect(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 16);
 
     texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
-    texturaDeCena(this, 'est_plataforma', GW, PLAT_ALT, function (g) { eu.pintaPlataforma(g, l); });
+    texturaDeCena(this, 'est_plataforma', GW, PLAT_ALT, function (g) { eu.pintaPlataforma(g, l, CENTRAL); });
     texturaDeCena(this, 'est_escada', GW, ESCADA_ALT, function (g) { eu.pintaEscada(g); });
 
     this.add.image(0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
@@ -371,9 +448,18 @@ var EstacaoScene = new Phaser.Class({
     /* o nome repetido na faixa, de 260 em 260: é assim que a estação se
        identifica de qualquer ponto da plataforma, e é o marco que diz
        quanto você já andou */
-    for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
-      var tn = txt(this, 309, platY(ny), GameState.estacaoAtual(), PAL.branco, 8);
-      tn.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+    /* Na central não existe parede: o nome não tem onde morar de pé, e
+       escrito no ar ele ficaria sobre o trilho. Lá ele vira placa
+       pendurada no meio do piso, que é onde ela fica na Sé de verdade. */
+    if (CENTRAL) {
+      for (var nc = 220; nc < PLAT_ALT - 120; nc += 300) {
+        placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 3);
+      }
+    } else {
+      for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
+        var tn = txt(this, 309, platY(ny), GameState.estacaoAtual(), PAL.branco, 8);
+        tn.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+      }
     }
 
     /* ---------- pra que lado este trem vai ----------
@@ -511,84 +597,52 @@ var EstacaoScene = new Phaser.Class({
     for (var px = ESC_X0 - 8; px < ESC_X1 + 8; px += 4) g.fillRect(px, y1 - 5, 2, 5);
   },
 
-  pintaPlataforma: function (g, l) {
-    /* A tela de título usa este mesmo desenho como papel de parede e
-       chama com a linha NULA, porque lá ainda não existe partida. Tudo
-       que depende da cor da linha precisa de um chão: sem isto, a faixa
-       da parede derrubava o jogo antes da primeira tela. */
+  /* ---------- as duas plataformas ----------
+     Lateral: via encostada na parede de um lado, piso do outro, e a
+     faixa da linha correndo a parede com o nome repetido.
+     Central: piso no meio, via dos DOIS lados, sem parede — que é a Sé.
+     As duas usam as mesmas peças (pintaVia, pintaPisoPlat), porque duas
+     cópias da mesma via saem de sincronia na primeira mudança. */
+  pintaPlataforma: function (g, l, central) {
+    /* A tela de título usa este desenho como papel de parede e chama com
+       a linha NULA e sem dizer o tipo: sem chão aqui, a faixa da parede
+       derrubava o jogo antes da primeira tela. */
     l = l || LINHAS.vermelha;
-    /* A plataforma é desenhada na origem da própria textura, então tudo
-       que era HUD_H vira 0 e o resto acompanha. */
-    var GH_ = PLAT_ALT, HUD_H_ = 0;
-    // túnel e via
-    g.fillStyle(num(PAL.brita), 1).fillRect(0, HUD_H_, 108, GH_ - HUD_H_);
-    g.fillStyle(0x1e1e28, 1);
-    for (var y = HUD_H_; y < GH_; y += 24) g.fillRect(24, y, 76, 9);
-    g.fillStyle(num(PAL.dormente), 1);
-    for (var y2 = HUD_H_; y2 < GH_; y2 += 24) g.fillRect(24, y2, 76, 7);
-    pontilhado(g, 0, HUD_H_, 108, GH_, 0x000000, 0.25, 6);
-    // trilhos com brilho
-    g.fillStyle(num(PAL.trilhoSom), 1).fillRect(40, HUD_H_, 8, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.trilho), 1).fillRect(40, HUD_H_, 5, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.trilhoSom), 1).fillRect(84, HUD_H_, 8, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.trilho), 1).fillRect(84, HUD_H_, 5, GH_ - HUD_H_);
-
-    // borda da plataforma
-    g.fillStyle(0x000000, 0.6).fillRect(100, HUD_H_, 8, GH_ - HUD_H_);
-    // faixa amarela tátil
-    g.fillStyle(num(PAL.amareloSom), 1).fillRect(108, HUD_H_, 16, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.amarelo), 1).fillRect(108, HUD_H_, 14, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.amareloSom), 1);
-    for (var yy = HUD_H_ + 4; yy < GH_; yy += 12) g.fillRect(111, yy, 8, 5);
-    g.fillStyle(num(PAL.amareloLuz), 1);
-    for (var yy2 = HUD_H_ + 4; yy2 < GH_; yy2 += 12) g.fillRect(111, yy2, 8, 2);
-
-    // piso da plataforma
-    g.fillStyle(num(PAL.rejunte), 1).fillRect(124, HUD_H_, 172, GH_ - HUD_H_);
-    for (var py = HUD_H_; py < GH_; py += 16) {
-      for (var px = 124; px < 296; px += 16) {
-        g.fillStyle(((px / 16 + py / 16) % 2) ? 0x3f3f52 : 0x494960, 1);
-        g.fillRect(px + 1, py + 1, 14, 14);
-        g.fillStyle(0xffffff, 0.07).fillRect(px + 1, py + 1, 14, 2);
-        g.fillStyle(0x000000, 0.16).fillRect(px + 1, py + 13, 14, 2);
-      }
-    }
-    // reflexo da luz do teto no piso
-    g.fillStyle(0xffffff, 0.05).fillRect(150, HUD_H_, 28, GH_ - HUD_H_);
-    g.fillStyle(0xffffff, 0.03).fillRect(232, HUD_H_, 20, GH_ - HUD_H_);
-
-    /* ---------- as marcas de porta no chão ----------
-       Círculo escuro com seta, pintado no piso onde a porta para. Na
-       estação de verdade ele diz por onde sai quem desce; aqui ele diz,
-       ANTES do trem chegar, onde vale a pena esperar. É informação de
-       jogo escondida dentro de um detalhe que já existe na vida. */
+    var alt = PLAT_ALT;
     var pts = portasDoTrem();
-    for (var pi = 0; pi < pts.length; pi++) {
-      var cy = pts[pi] + 26;
-      g.fillStyle(0x000000, 0.28).fillCircle(150, cy, 15);
-      g.fillStyle(0x000000, 0.4).fillCircle(150, cy, 11);
-      g.lineStyle(2, 0xffffff, 0.3).strokeCircle(150, cy, 13);
-      // a seta apontando pro trilho, que é por onde se entra e se sai
-      g.fillStyle(0xffffff, 0.35);
-      g.fillTriangle(141, cy, 149, cy - 6, 149, cy + 6);
-      g.fillRect(149, cy - 2, 7, 4);
+
+    if (central) {
+      // via esquerda, piso no meio, via direita
+      pintaVia(g, 0, 76, alt, -1);
+      pintaPisoPlat(g, 92, 228, alt);
+      pintaVia(g, 244, 76, alt, 1);
+      /* Marca de porta dos dois lados: numa plataforma central o mesmo
+         chão serve os dois sentidos, e é a seta que diz qual é qual. */
+      for (var i = 0; i < pts.length; i++) {
+        marcaDePorta(g, 112, pts[i] + 26, -1);
+        marcaDePorta(g, 208, pts[i] + 26, 1);
+      }
+      return;
     }
+
+    pintaVia(g, 0, 100, alt, -1);
+    pintaPisoPlat(g, 124, 296, alt);
+    for (var j = 0; j < pts.length; j++) marcaDePorta(g, 150, pts[j] + 26, -1);
 
     // parede da direita
-    g.fillStyle(num(PAL.paredeSom), 1).fillRect(296, HUD_H_, 24, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.parede), 1).fillRect(300, HUD_H_, 20, GH_ - HUD_H_);
-    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(300, HUD_H_, 3, GH_ - HUD_H_);
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(296, 0, 24, alt);
+    g.fillStyle(num(PAL.parede), 1).fillRect(300, 0, 20, alt);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(300, 0, 3, alt);
     /* ---------- a faixa da linha na parede ----------
        Plataforma de metrô não tem uma placa com o nome: tem uma FAIXA da
        cor da linha correndo a parede inteira, com o nome repetido de
-       tantos em tantos metros. É o que você lê da janela do trem antes de
-       decidir se desce, e é também o que dá marco a uma plataforma
-       comprida — sem repetição, andar 900px é andar no mesmo lugar. */
-    g.fillStyle(num(escurecer(l.cor, 0.45)), 1).fillRect(298, HUD_H_, 22, GH_ - HUD_H_);
-    g.fillStyle(l.num, 1).fillRect(300, HUD_H_, 18, GH_ - HUD_H_);
-    g.fillStyle(num(clarear(l.cor, 0.35)), 1).fillRect(300, HUD_H_, 18, 2);
-    g.fillStyle(0x000000, 0.3).fillRect(300, GH_ - 2, 18, 2);
-
+       tantos em tantos metros. É o que se lê da janela do trem antes de
+       decidir se desce, e é o que dá marco a uma plataforma comprida —
+       sem repetição, andar 900px é andar no mesmo lugar. */
+    g.fillStyle(num(escurecer(l.cor, 0.45)), 1).fillRect(298, 0, 22, alt);
+    g.fillStyle(l.num, 1).fillRect(300, 0, 18, alt);
+    g.fillStyle(num(clarear(l.cor, 0.35)), 1).fillRect(300, 0, 18, 2);
+    g.fillStyle(0x000000, 0.3).fillRect(300, alt - 2, 18, 2);
   },
 
   /* ---------- a escada rolante ----------

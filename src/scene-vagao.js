@@ -98,8 +98,29 @@ function fatorModulo(y) {
   }
   return k;
 }
+/* ---------- e a preferencial também é móvel ----------
+   O corredor sabia dos módulos e das portas e NUNCA soube da
+   preferencial. Dava pra encostar nela: o corredor começa em 70, o banco
+   acaba em 58, e o boneco tem 32 de largura com origem no meio — a
+   metade esquerda dele entrava quatro pixels dentro do estofado. Era o
+   bug do cara flutuando em cima do banco.
+
+   Passou despercebido enquanto o banco tinha 44px de altura. Quando ele
+   virou dois lugares e foi pra 88, o mesmo erro passou a acontecer no
+   dobro do caminho, e aí ficou impossível não ver.
+
+   RAMPA_PREF existe pelo mesmo motivo da RAMPA_MODULO: parede que salta
+   de uma vez arranca quem anda rente a ela, e parece teleporte. */
+var CORREDOR_ESQ_PREF = 80, CORREDOR_DIR_PREF = 240, RAMPA_PREF = 26;
+function fatorPref(y) {
+  var yl = yNoCarro(y);
+  var d = Math.max(PREF_Y - yl, yl - (PREF_Y + PREF_ALT), 0);
+  if (d <= 0) return 1;
+  return (d < RAMPA_PREF) ? 1 - d / RAMPA_PREF : 0;
+}
 function bordaEsqVagao(y) {
-  return CORREDOR_ESQ + (CORREDOR_ESQ_MOD - CORREDOR_ESQ) * fatorModulo(y);
+  var x = CORREDOR_ESQ + (CORREDOR_ESQ_MOD - CORREDOR_ESQ) * fatorModulo(y);
+  return Math.max(x, CORREDOR_ESQ + (CORREDOR_ESQ_PREF - CORREDOR_ESQ) * fatorPref(y));
 }
 
 /* Uma janela: caixilho escuro, vidro, e o brilho de cima onde o túnel
@@ -252,7 +273,9 @@ function bordaVagao(y) {
   else if (perto >= meia + RAMPA_VESTIBULO) base = CORREDOR_DIR;
   else base = VESTIBULO_DIR - (VESTIBULO_DIR - CORREDOR_DIR) * (perto - meia) / RAMPA_VESTIBULO;
   // e recua na altura do módulo, que avança 62px pra dentro do carro
-  return base - (base - CORREDOR_DIR_MOD) * fatorModulo(y);
+  var x = base - (base - CORREDOR_DIR_MOD) * fatorModulo(y);
+  // e na altura da preferencial, pelo mesmo motivo
+  return Math.min(x, base - (base - CORREDOR_DIR_PREF) * fatorPref(y));
 }
 function limitaVagao(sp) {
   var k = apertoSanfona(sp.y), dir = bordaVagao(sp.y), esq = bordaEsqVagao(sp.y);
