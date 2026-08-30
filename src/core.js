@@ -73,7 +73,7 @@ var LINHAS = {
    o trajeto. Com destino e relógio existe a perda que a cidade cobra de
    verdade: chegar atrasado. Descer na estação errada, dormir e passar
    da sua, ficar no trem até a ponta da linha — tudo isso custa minutos,
-   e minuto demais vira atraso. Três atrasos e você é mandado embora.
+   e minuto demais vira atraso. Um atraso e você é mandado embora.
 
    A volta não tem hora pra chegar, mas tem preço: quem chega tarde em
    casa dorme menos, e começa o dia seguinte com menos descanso. */
@@ -89,7 +89,9 @@ var LINHAS = {
 var CORACOES_POR_PERNA = 5;
 
 var LIMITE_ATRASO = 68;
-var MAX_ATRASOS = 3;
+/* Um. Era tres, e tres avisos fazem do relogio uma sugestao: dava pra
+   atrasar duas vezes de graca. Agora o primeiro atraso e o ultimo. */
+var MAX_ATRASOS = 1;
 
 /* onde as duas se cruzam, e o par fixo da corrida */
 var BALDEACAO = 'SÉ';
@@ -594,7 +596,14 @@ var GameState = {
       // dormir: quanto mais tarde chega em casa, menos noite sobra
       this.addDescanso(Phaser.Math.Clamp(30 - this.ultimoAtraso * 0.4, 6, 30));
     } else if (this.ultimoAtraso > 0) {
+      /* Chegar atrasado leva TODOS os corações de uma vez.
+         Eram três avisos antes de doer, e três avisos transformam o
+         relógio em sugestão: dava pra atrasar duas vezes de graça e
+         seguir jogando igual. O relógio é o antagonista deste jogo —
+         ele não pode ser o único que não morde. Agora é uma vez só, e
+         cada minuto do letreiro passa a valer o que ele diz que vale. */
       this.atrasos++;
+      this.coracoes = 0;
     }
     if (this.compromisso) { this.stats.compromissos++; this.compromisso = null; }
 
@@ -1678,27 +1687,17 @@ var CONTROLES_VISIVEIS = true;
    muda de cor e o rodapé manda sentar. */
 var LIMIAR_SONO = 0.32;
 
-/* ---------- o preço do sono ----------
-   As pálpebras fechando eram a forma de contar isto sem texto, e a
-   forma custava caro demais: elas tapavam justamente a faixa da tela
-   onde se joga, e no celular a pessoa perdia de vista o que estava
-   fazendo bem na hora em que mais precisava enxergar. Aviso que
-   atrapalha mais que a coisa avisada não é aviso, é castigo dobrado.
+/* ---------- o que o sono cobra, e o que NÃO cobra ----------
+   As pálpebras fechando tapavam justamente a faixa da tela onde se
+   joga: aviso que atrapalha mais do que a coisa avisada não é aviso,
+   é castigo dobrado. Saíram, e ficou a moldura vermelha pulsando.
 
-   Agora o sono cobra onde dói e não onde cega: em coração, um a cada
-   nove segundos abaixo do limiar. O medidor piscando vermelho no topo
-   continua dizendo por quê, e a tela continua inteira. */
-var SONO_INTERVALO = 9000;
-var sonoAcumulado = 0;
-function cobraSono(scene, delta) {
-  if (!GameState.char || !HUD_VISIVEL) { sonoAcumulado = 0; return; }
-  var p = GameState.descanso / GameState.char.descansoMax;
-  if (p >= LIMIAR_SONO) { sonoAcumulado = 0; return; }
-  sonoAcumulado += delta;
-  if (sonoAcumulado < SONO_INTERVALO) return;
-  sonoAcumulado -= SONO_INTERVALO;
-  perdeVida(scene, null, 1);
-}
+   Depois elas viraram dreno de coração, e isso foi pior: coração é a
+   moeda mais cara do jogo e passou a evaporar sozinha, sem ninguém ter
+   errado nada. Coração se perde ERRANDO — nos minigames — e chegando
+   atrasado. O sono cobra no que sempre foi dele: descanso zerado é
+   derrota por dormir, e o caminho até lá já é lento o bastante pra
+   doer. Um eixo, uma cobrança. */
 
 /* A cor do medidor de descanso, numa função só: o topo e a legenda da
    pausa precisam mostrar a mesma coisa, senão a legenda ensina uma cor
@@ -2903,9 +2902,8 @@ var HudScene = new Phaser.Class({
     gs.fillRect(0, base - esp - 3, GW, 3);
   },
 
-  update: function (time, delta) {
+  update: function (time) {
     atualizaManche(time);
-    cobraSono(this, delta);
     if (Ctrl.pausaJust) { Ctrl.pausaJust = false; this.abrePausa(); }
 
     /* o manche só existe enquanto o dedo está arrastando: parado na tela,
