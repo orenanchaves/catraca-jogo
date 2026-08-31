@@ -185,8 +185,16 @@ var EstacaoScene = new Phaser.Class({
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
 
     this.portas = portasDoTrem();
-    this.estado = 'espera';
-    this.t = 0;
+    /* ---------- quem acabou de descer vê o trem ----------
+       Descer trocava de cena na hora, e a plataforma nascia vazia: o
+       trem de onde você saiu no segundo anterior simplesmente não
+       existia mais. Some a sensação de ter descido — parece que você
+       apareceu ali.
+       Agora, quando a entrada é pela plataforma, a estação começa com o
+       trem PARADO e a porta aberta, e ele parte alguns segundos depois.
+       Você vê ele indo embora, que é o que se vê de verdade. */
+    this.estado = (this.entrada === 'plataforma') ? 'aberto' : 'espera';
+    this.t = (this.entrada === 'plataforma') ? 2200 : 0;
     this.perdido = false;
     /* Era PLAT_ALT + 80, e os 80 sobravam POR BAIXO da plataforma: o
        trem parado enfiava oitenta pixels de lata dentro da escada
@@ -194,7 +202,7 @@ var EstacaoScene = new Phaser.Class({
        desenho ainda é recortado nela (ver pintaTrem) pra que nem
        durante a chegada e a partida ele apareça onde não cabe. */
     this.tremAlt = PLAT_ALT;
-    this.tremY = PLAT_Y - this.tremAlt;
+    this.tremY = (this.entrada === 'plataforma') ? PLAT_Y : PLAT_Y - this.tremAlt;
     this.empurrando = false;
     this.pressao = 0;
 
@@ -762,6 +770,87 @@ var EstacaoScene = new Phaser.Class({
     }
   },
 
+  /* ---------- a fila que embarca ----------
+     A plataforma tinha trinta e quatro pessoas paradas olhando o trilho,
+     e elas continuavam paradas com o trem parado na frente delas de porta
+     aberta. Era o detalhe que mais denunciava que aquilo era cenário: o
+     mundo não fazia o que o mundo faz.
+
+     Agora, quando a porta abre, parte da fila anda até a porta mais perto
+     e entra. Some quem entrou — e some de verdade, porque quem embarcou
+     foi embora. Quando o trem parte, chega gente nova pela escada, que é
+     por onde chega gente numa estação.
+
+     Não é rotina de IA: é destino e caminhada. Basta isso pra plataforma
+     parar de parecer uma foto. */
+  andaFila: function (dt) {
+    var abriu = (this.estado === 'aberto');
+    var i, a;
+
+    // quem abre a porta manda: sorteia quem vai entrar, uma vez só
+    if (abriu && !this.mandouEntrar) {
+      this.mandouEntrar = true;
+      for (i = 0; i < this.esperando.length; i++) {
+        a = this.esperando[i];
+        if (!a.sp || !a.sp.active || Math.random() > 0.55) continue;
+        var py = this.portaMaisPerto(a.sp.y);
+        a.indo = { x: PLAT_X0 - 4, y: py };
+      }
+    }
+    if (!abriu) this.mandouEntrar = false;
+
+    for (i = this.esperando.length - 1; i >= 0; i--) {
+      a = this.esperando[i];
+      if (!a.sp || !a.sp.active) { this.esperando.splice(i, 1); continue; }
+      if (!a.indo) { a.anima(dt, false); continue; }
+
+      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 4) {
+        // chegou na porta: entrou, e quem entrou não está mais aqui
+        a.sp.destroy();
+        this.esperando.splice(i, 1);
+        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        continue;
+      }
+      var v = 52 * dt / 1000;
+      a.sp.x += (dx / d) * v;
+      a.sp.y += (dy / d) * v;
+      a.setDir(dx, dy);
+      a.anima(dt, true);
+    }
+  },
+
+  portaMaisPerto: function (y) {
+    var melhor = y, d = 1e9;
+    for (var i = 0; i < this.portas.length; i++) {
+      var py = platY(this.portas[i] + 26);
+      var dd = Math.abs(py - y);
+      if (dd < d) { d = dd; melhor = py; }
+    }
+    return melhor;
+  },
+
+  /* ---------- e chega gente nova ----------
+     Se só saísse gente, a plataforma esvaziava e não voltava. Quem chega
+     numa estação chega pela escada, então é de lá que eles nascem. */
+  chegaNaPlataforma: function (quantos) {
+    for (var i = 0; i < quantos; i++) {
+      var a = new Ator(this, ESC_MEIO + (Math.random() - 0.5) * 60,
+        ESC_Y - 20 - Math.random() * 30, sorteiaPax());
+      a.sp.setDepth(30);
+      a.indo = {
+        x: PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+        y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
+      };
+      /* Eles param ANTES da porta: quem acabou de chegar espera o
+         próximo trem, não entra no que está indo embora. */
+      a.indo.x = Phaser.Math.Clamp(a.indo.x, PLAT_X0 + 12, PLAT_X1 - 12);
+      this.esperando.push(a);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
   /* ---------- áreas caminháveis, nas três faixas ---------- */
   podeIr: function (x, y) {
     // ---- plataforma ----
@@ -1204,7 +1293,7 @@ var EstacaoScene = new Phaser.Class({
         var esp = this.intervalo();
         this.painel.setText('TREM EM ' + Math.max(0, Math.ceil((esp - this.t) / 1000)) + 'S');
         if (this.t > esp) {
-          this.estado = 'chegando'; this.t = 0; sfx('trem');
+          this.estado = 'chegando'; this.t = 0; this.repos = false; sfx('trem');
           GameState.passaTempo(Math.round(esp / 1000));
         }
         break;
@@ -1214,7 +1303,11 @@ var EstacaoScene = new Phaser.Class({
         this.painel.setText('CHEGANDO');
         break;
       case 'aberto':
-        var janela = Math.max(4200, 7400 - dif * 280);
+        /* 10s e não 7,4: com a porta abrindo, a multidão entrando e você
+           tendo que achar uma porta, 7,4s viravam corrida. Embarcar é
+           decisão, não reflexo — a pressa tem que estar no fim da janela,
+           não no começo dela. */
+        var janela = Math.max(6000, 10000 - dif * 300);
         this.painel.setText('EMBARQUE ' + Math.max(0, Math.ceil((janela - this.t) / 1000)) + 'S');
         if (this.t > janela) {
           this.estado = 'partindo'; this.t = 0; sfx('porta');
@@ -1222,6 +1315,10 @@ var EstacaoScene = new Phaser.Class({
         }
         break;
       case 'partindo':
+        if (!this.repos) {
+          this.repos = true;
+          this.chegaNaPlataforma(Math.round(2 + 8 * GameState.lotacao()));
+        }
         this.tremY = PLAT_Y + (this.t / 1400) * this.tremAlt;
         if (this.tremY >= PLAT_Y + this.tremAlt) { this.tremY = PLAT_Y - this.tremAlt; this.estado = 'espera'; this.t = 0; }
         this.painel.setText('PERDEU ESSE');
@@ -1437,7 +1534,7 @@ var EstacaoScene = new Phaser.Class({
       a.dir = a.vx < 0 ? 'left' : 'right';
       a.anima(dt, true);
     }
-    for (i = 0; i < this.esperando.length; i++) this.esperando[i].anima(dt, false);
+    this.andaFila(dt);
     this.andaAmbulante(dt);
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));

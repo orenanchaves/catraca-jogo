@@ -713,16 +713,43 @@ var VagaoScene = new Phaser.Class({
      dissesse que aquele boneco está agarrado em alguma coisa. Ela é a
      única parte da barra que muda de quadro pra quadro, e por isso tem
      gráfico só dela. */
+  /* ---------- o braço na barra ----------
+     Era UMA LINHA RETA do ombro até a barra, e linha reta de ponta a
+     ponta não lê como braço: lê como corda esticada. O que faz um braço
+     parecer braço, mesmo com quatro pixels de largura, é ter COTOVELO —
+     dois segmentos com um ângulo entre eles — e ter uma ponta diferente
+     da outra: ombro grosso, punho fechado.
+
+     O cotovelo cai: braço levantado dobra pra baixo, e é o peso que
+     torna a pose crível. */
   pintaMao: function () {
     var g = this.gMao; g.clear();
     if (!this.segurando) return;
     var m = this.segurando;
-    g.fillStyle(0xf2c14e, 1).fillRect(m.bx - 1, m.y - 3, 11, 6);
-    g.fillStyle(0xffe9a8, 1).fillRect(m.bx - 1, m.y - 3, 11, 2);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 6, 2, 12);
-    // o braço, do ombro até a barra
-    g.lineStyle(3, 0xf2c14e, 0.9);
-    g.beginPath(); g.moveTo(m.px, m.y + 2); g.lineTo(m.bx + 4, m.y); g.strokePath();
+    var lado = (m.bx > m.px) ? 1 : -1;
+
+    var ox = m.px + lado * 6, oy = m.y + 6;      // ombro
+    var hx = m.bx + (lado > 0 ? 3 : 7), hy = m.y; // punho, na barra
+    var ex = (ox + hx) / 2 + lado * 3;            // cotovelo, no meio
+    var ey = Math.max(oy, hy) + 8;                // e caído
+
+    // o braço de cima é manga, o de baixo é pele: a troca de cor no
+    // cotovelo é o que separa os dois segmentos sem precisar de contorno
+    g.lineStyle(5, 0x2a2a3a, 1);
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(ex, ey); g.strokePath();
+    g.lineStyle(4, 0xc99a70, 1);
+    g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.strokePath();
+    g.fillStyle(0x2a2a3a, 1).fillCircle(ex, ey, 3);   // o cotovelo
+
+    // o punho fechado em volta da barra, e o brilho do metal por dentro
+    g.fillStyle(0xa8794f, 1).fillRect(hx - 4, hy - 5, 9, 10);
+    g.fillStyle(0xc99a70, 1).fillRect(hx - 4, hy - 5, 9, 6);
+    g.fillStyle(0x8a5a3c, 1).fillRect(hx - 4, hy - 1, 9, 1);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 9, 2, 5);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y + 5, 2, 5);
+
+    // o ombro, mais grosso que o resto: é o que dá direção ao braço
+    g.fillStyle(0x2a2a3a, 1).fillCircle(ox, oy, 4);
   },
 
   /* A mão só aparece quando há mão: apertando, com barra ao alcance, e
