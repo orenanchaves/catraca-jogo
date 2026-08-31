@@ -926,6 +926,20 @@ var EstacaoScene = new Phaser.Class({
 
       var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
       var d = Math.sqrt(dx * dx + dy * dy);
+      /* ---------- quem sai, sai pela FAIXA e não pelo ponto ----------
+         Chegar a 4px de um alvo exato é fácil sozinho e impossível em
+         quinze: eles se empurram na boca da escada, ninguém encosta no
+         próprio ponto, e a saída entope — dava uma pilha parada no pé
+         da plataforma, que é o oposto de fluir. Quem vai embora some ao
+         cruzar a linha da escada, venha de onde vier no x.
+         Só vale pra quem SAI: quem chega nasce nessa mesma faixa e
+         sobe, e morreria no berço com a regra pelo y sozinha. */
+      if (a.indo.sai && a.sp.y >= ESC_Y - 26) {
+        a.sp.destroy();
+        this.esperando.splice(i, 1);
+        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        continue;
+      }
       if (d < 4) {
         // chegou na porta: entrou, e quem entrou não está mais aqui
         a.sp.destroy();
@@ -933,7 +947,7 @@ var EstacaoScene = new Phaser.Class({
         this.gente = this.plateia.concat(this.esperando, [this.guarda]);
         continue;
       }
-      var v = 52 * dt / 1000;
+      var v = (a.indo.v || 52) * dt / 1000;
       a.sp.x += (dx / d) * v;
       a.sp.y += (dy / d) * v;
       a.setDir(dx, dy);
@@ -949,6 +963,59 @@ var EstacaoScene = new Phaser.Class({
       if (dd < d) { d = dd; melhor = py; }
     }
     return melhor;
+  },
+
+  /* ---------- e desce gente do trem ----------
+     A fila que embarca resolveu metade: a porta abria, parte da
+     plataforma andava até ela e sumia. A outra metade não existia — o
+     trem chegava cheio, ficava dez segundos parado e ia embora com a
+     mesma gente dentro. Ninguém DESCIA.
+
+     E é a descida que faz a plataforma virar problema em vez de foto.
+     Quem desce tem um caminho só, a escada, e ele cruza exatamente o
+     caminho de quem quer chegar na porta. No pico você atravessa uma
+     corrente andando no sentido contrário, e a separação de corpos que
+     já existia — a multidão empurra o jogador com peso 0,4 contra 0,6
+     dele — passa a ter o que fazer. O desafio não é um minigame novo:
+     é a estação finalmente ocupando o mesmo espaço que você.
+
+     Quantos: a lotação decide, que é a mesma conta que enche o vagão,
+     vista do outro lado. De madrugada descem dois; no pico, dezesseis. */
+  desembarca: function (t) {
+    /* Teto de gente na plataforma. Um trem despeja até 16 e quem desce
+       leva até 16s pra atravessar os 900px; no pico vem trem a cada 3s,
+       e sem o teto a plataforma cresceria sem parar — em número e em
+       conta de colisão. 60 é o dobro do que a estação semeia no pico. */
+    if (this.esperando.length > 60) return;
+    /* Metade na central, e a razão é densidade e não quadro por segundo:
+       lá são DOIS trens despejando num piso de 112px, contra um trem num
+       de 152px na lateral. Cheio dos dois lados, a plataforma da Sé
+       recebia o dobro de gente na menor largura do jogo, e atravessar
+       deixava de ser difícil pra ser impossível. Com metade cada, a soma
+       dos dois dá o mesmo tanto que uma lateral recebe.
+       (Cheguei aqui achando que era custo de quadro. Não era: medido em
+       recarga limpa, com e sem desembarque dá 49 contra 46 na Sé, dentro
+       do ruído. O fps desta máquina não serve pra isso — ver CLAUDE.md.) */
+    var quantos = Math.round((2 + 14 * GameState.lotacao()) / (CENTRAL ? 2 : 1));
+    var bx = (t.lado < 0) ? PLAT_X0 + 6 : PLAT_X1 - 6;
+    for (var i = 0; i < quantos; i++) {
+      var py = t.portas[Math.floor(Math.random() * t.portas.length)] + t.y + 26;
+      var a = new Ator(this, bx, py + (Math.random() - 0.5) * 24, sorteiaPax());
+      a.sp.setDepth(30);
+      /* Eles moram na mesma lista de quem espera porque dividem a
+         caminhada e a física de corpo. O que os separa é já nascerem
+         com `indo`, e o sorteio de embarque pular quem já tem destino:
+         quem está saindo não entra de novo no trem que acabou de
+         largá-lo. */
+      /* 74 e não 52: quem desce do trem anda com destino, e quem espera
+         anda à toa. E a 52 a travessia dos 900px levava 17s, mais que o
+         intervalo entre trens no pico — a plataforma acumulava três
+         levas ao mesmo tempo e o rio virava represa. A 74 são 12s, que
+         cabe dentro de um ciclo. */
+      a.indo = { x: ESC_MEIO + (Math.random() - 0.5) * 70, y: ESC_Y - 8, v: 74, sai: true };
+      this.esperando.push(a);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
   },
 
   /* ---------- e chega gente nova ----------
@@ -1491,7 +1558,10 @@ var EstacaoScene = new Phaser.Class({
         break;
       case 'chegando':
         t.y = PLAT_Y - t.alt + (t.t / 1400) * t.alt;
-        if (t.y >= PLAT_Y) { t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta'); }
+        if (t.y >= PLAT_Y) {
+          t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta');
+          this.desembarca(t);
+        }
         t.aviso = 'CHEGANDO';
         break;
       case 'aberto':
