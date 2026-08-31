@@ -2650,36 +2650,37 @@ var VagaoScene = new Phaser.Class({
       return;
     }
 
-    /* A primeira linha do letreiro é a estação — parada, é onde você
-       está; andando, é a próxima. É a informação que saiu do topo da
-       tela, e ela vem antes de tudo. */
+    /* ---------- o letreiro diz a ESTAÇÃO, e só ----------
+       Ele tinha virado uma ficha: nome da estação, quantas faltam pro
+       alvo, o rótulo do compromisso e a hora limite com os minutos
+       restantes. Quatro linhas de painel em cima da faixa do vagão onde
+       se joga — e um painel de metrô de verdade não te conta a sua vida,
+       ele diz onde o trem está.
+
+       O que saiu não sumiu: o relógio mora no HUD, o trajeto mora no
+       painel lateral do desktop e no celular, e o PRAZO virou COR. Forma
+       antes de palavra: vermelho quando aperta o atraso diz a mesma
+       coisa que "(51 MIN)" e não custa uma linha.
+
+       Fica a segunda linha num caso só, e é o caso em que ela não é
+       ficha, é alarme: quando a sua estação é a próxima ou é esta. */
     var aqui = GameState.estacaoAtual();
     var parado = (this.estado === 'parado');
-    txto = (parado ? aqui : '► ' + GameState.proximaEstacaoNome()) + '\n';
+    txto = parado ? aqui : '► ' + GameState.proximaEstacaoNome();
+    cor = PAL.amarelo;
 
-    if (falta <= 0) { txto += 'DESÇA NA ' + alvo; cor = PAL.verde; }
-    else if (falta === 1) { txto += 'PRÓXIMA É A SUA: ' + alvo; cor = PAL.verde; }
-    else { txto += alvo + ' EM ' + falta + ' ESTAÇÕES'; cor = PAL.amarelo; }
-    /* Onde descer não diz o que você vai fazer lá, e agora o destino
-       muda todo dia: a linha do compromisso é o que dá sentido à
-       estação. */
-    if (!GameState.faltaBaldear()) txto += '\n► ' + GameState.rotuloDaPerna();
+    if (falta <= 0) { txto += '\nDESÇA AQUI'; cor = PAL.verde; }
+    else if (falta === 1) { txto += '\nPRÓXIMA É A SUA'; cor = PAL.verde; }
 
-    /* Na ida existe hora de entrada, e atraso que a pessoa não vê
-       chegando é injusto: a hora aparece junto com a rota, com os
-       minutos que sobram, e fica vermelha quando aperta. */
-    if (GameState.perna === 'ida') {
-      var folga = GameState.minutosParaOAtraso();
-      txto += '\nENTRADA ' + GameState.horaLimite() +
-        (folga > 0 ? ' (' + folga + ' MIN)' : ' — ATRASADO');
-      if (folga <= 12) cor = PAL.vermelho;
+    // o prazo é cor, não linha: vermelho é "anda logo"
+    if (GameState.perna === 'ida' && GameState.minutosParaOAtraso() <= 12) {
+      cor = PAL.vermelho;
     }
+
     /* A chave NÃO inclui os minutos que faltam. Eles andam sozinhos, e
-       um painel que desce a cada minuto é metade do que incomodava.
-       Ela guarda só o que é notícia: onde estou, quantas faltam, pra
-       que serve a perna, e se entrei no vermelho do atraso. */
-    var chave = (parado ? 'p' : 'a') + '|' + aqui + '|' + falta +
-      '|' + GameState.rotuloDaPerna() + '|' + (cor === PAL.vermelho ? 1 : 0);
+       um painel que desce a cada minuto é metade do que incomodava. */
+    var chave = (parado ? 'p' : 'a') + '|' + aqui + '|' + Math.min(falta, 2) +
+      '|' + (cor === PAL.vermelho ? 1 : 0);
     this.poeNoLetreiro(cor, txto, chave);
   },
 
