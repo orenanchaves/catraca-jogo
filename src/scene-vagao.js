@@ -25,18 +25,16 @@ var TEMPO_ENTRE_ESTACOES = 18000;
    parada era o DOBRO da viagem, e a viagem é onde o jogo acontece — o
    evento, o dilema, o equilíbrio, atravessar carro. Parada é tempo morto
    pra quem não vai descer, e um dia de trinta estações virava 22 minutos
-   de jogo com metade parado.
+   com metade parado.
 
-   Mas 4,2s também não servia: não dá pra atravessar um carro até a porta
-   nesse tempo, e descer virava reflexo em vez de decisão.
+   Depois tentei duas paradas, uma curta de passagem e uma longa na sua
+   estação. Era pior: parada que muda de tamanho sem o jogador saber por
+   quê é regra invisível, e regra invisível ensina desconfiança, não o
+   jogo. Toda parada dura o mesmo, e ele aprende UM tempo.
 
-   As duas coisas cabem porque a parada longa só faz falta na SUA
-   estação. Nas de passagem são 7s — o bastante pra ver quem entrou e
-   pra mudar de ideia. Na sua (ou na baldeação) são 15, que é o tempo de
-   ler o letreiro, levantar e caminhar. E a viagem, 18, continua maior
-   que qualquer uma das duas. */
-var TEMPO_PARADO = 7000;
-var TEMPO_PARADO_SUA = 15000;
+   12s: quase o dobro dos 7 que ficaram rápidos demais pra reagir a quem
+   entra, e ainda bem abaixo dos 18 da viagem. */
+var TEMPO_PARADO = 12000;
 
 /* As barras saíam de dentro dos módulos agora que eles avançam 62px
    pra dentro do carro: elas recuaram pro corredor, que é onde a mão
@@ -2448,15 +2446,12 @@ var VagaoScene = new Phaser.Class({
          fim, que é o tempo de correr até a porta de onde quer que você
          esteja no carro — é assim que a estação avisa, e é a única
          parte da parada que precisa de pressa. */
-      /* a sua estação ganha o dobro de porta aberta, e é a única em que
-         faz diferença: nas outras você não ia descer mesmo */
-      var espera = this.eraSuaEstacao ? TEMPO_PARADO_SUA : TEMPO_PARADO;
-      if (!this.avisouPorta && this.t > espera - 4000) {
+      if (!this.avisouPorta && this.t > TEMPO_PARADO - 4000) {
         this.avisouPorta = true;
         sfx('apito');
         this.flash('PORTAS FECHANDO');
       }
-      if (this.t > espera) {
+      if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
         this.sorteiaRitmo();
         this.sorteouFalha = false;
