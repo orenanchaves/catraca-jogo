@@ -24,26 +24,42 @@
    responder. Às vezes ele finge, e fingir fica mais comum conforme a
    corrida aperta. */
 
-var DUELO = [
-  {
-    chave: 'firmar', nome: 'FIRMAR', cor: '#0b9fdd',
-    /* o que o corpo dele mostra quando é isto que vem */
-    tel: 'ELE FIRMOU O PÉ.',
-    fez: 'ELE SÓ SEGUROU.'
-  },
-  {
-    chave: 'puxar', nome: 'PUXAR', cor: '#00e676',
-    tel: 'ELE PEGOU A BARRA\nCOM AS DUAS MÃOS.',
-    fez: 'ELE PUXOU A BARRA.'
-  },
-  {
-    chave: 'cotovelo', nome: 'COTOVELO', cor: '#e8362c',
-    tel: 'ELE ARMOU O OMBRO.',
-    fez: 'ELE METEU O COTOVELO.'
+/* ---------- o duelo como dado ----------
+   Os golpes, o triângulo de quem-vence-quem e o preço da vitória são
+   DADO, não código. Isso nasceu de uma briga de porrada que chegou a
+   existir aqui e foi cortada — ela virava um terceiro duelo de três
+   botões com outro vocabulário, e o jogo já lê o corpo do outro na
+   encarada e na disputa da barra. Pele nova, verbo repetido.
+
+   A separação ficou porque é boa por si: quem quiser um duelo novo
+   escreve dados, não uma cópia desta cena. */
+var MODOS = {
+  barra: {
+    rotulo: 'A BARRA',
+    golpes: [
+      {
+        chave: 'firmar', nome: 'FIRMAR', cor: '#0b9fdd',
+        /* o que o corpo dele mostra quando é isto que vem */
+        tel: 'ELE FIRMOU O PÉ.',
+        fez: 'ELE SÓ SEGUROU.'
+      },
+      {
+        chave: 'puxar', nome: 'PUXAR', cor: '#00e676',
+        tel: 'ELE PEGOU A BARRA\nCOM AS DUAS MÃOS.',
+        fez: 'ELE PUXOU A BARRA.'
+      },
+      {
+        chave: 'cotovelo', nome: 'COTOVELO', cor: '#e8362c',
+        tel: 'ELE ARMOU O OMBRO.',
+        fez: 'ELE METEU O COTOVELO.'
+      }
+    ],
+    /* puxar > firmar > cotovelo > puxar */
+    vence: { puxar: 'firmar', firmar: 'cotovelo', cotovelo: 'puxar' },
+    sujo: 'cotovelo',
+    perder: 'VOCÊ SOLTOU A BARRA\nE FOI PRO CHÃO.'
   }
-];
-/* quem ganha de quem: puxar > firmar > cotovelo > puxar */
-var VENCE = { puxar: 'firmar', firmar: 'cotovelo', cotovelo: 'puxar' };
+};
 
 var DIS = {
   arena: { x: 8, y: 60, w: GW - 16, h: 268 },
@@ -78,8 +94,21 @@ var DisputaScene = new Phaser.Class({
       self.scene.pause(k);
     });
 
+    /* o modo é o que separa a briga da disputa de barra, e é a única
+       coisa que quem chama precisa dizer */
+    this.modo = MODOS[d.modo] || MODOS.barra;
+    this.golpes = this.modo.golpes;
+
     var dif = GameState.dificuldade();
     this.pos = 0.5;                 // 1 = a barra é sua, 0 = você foi pro chão
+    /* ---------- descanso É a sua vida na briga ----------
+       Você entra na porrada com o corpo que tem. Quem passou o dia em pé
+       começa a briga já machucado, e é isso que amarra o eixo do
+       descanso ao único lugar do jogo onde ele não fazia diferença
+       nenhuma. Nunca abaixo de um terço: entrar numa briga perdida de
+       antemão não é dificuldade, é castigo. */
+    this.hpVc = Math.max(0.34, GameState.descanso / GameState.char.descansoMax);
+    this.hpEle = 1;
     this.mostra = 0.5;
     /* A janela de resposta fecha conforme a corrida anda, e a chance de
        ele fingir sobe junto. É o mesmo aperto do resto do jogo: não fica
@@ -89,7 +118,7 @@ var DisputaScene = new Phaser.Class({
     this.fase = 'avisa';
     this.t = 0;
     this.rodada = 0;
-    this.cotoveladas = 0;
+    this.sujeira = 0;   // quantas vezes ganhou no golpe feio
     this.acabou = false;
     this.resultado = null;
     this.querSair = false;
@@ -105,12 +134,15 @@ var DisputaScene = new Phaser.Class({
 
     this.tMsg = txt(this, DIS.msg.x + 14, DIS.msg.y + 12, '', PAL.branco, 8).setDepth(2004);
     // o rótulo desce pra não ficar embaixo do cursor do medidor
-    this.tTopo = txtC(this, GW / 2, DIS.medidor.y + 28, 'A BARRA', PAL.cinzaEsc, 8).setDepth(2004);
+    this.tTopo = txtC(this, GW / 2, DIS.medidor.y + 28, this.modo.rotulo, PAL.cinzaEsc, 8).setDepth(2004);
 
     this.tBot = [];
-    for (i = 0; i < DUELO.length; i++) {
+    for (i = 0; i < this.golpes.length; i++) {
       var c = duelaCelula(i);
-      this.tBot.push(txtC(this, c.x + c.w / 2, c.y + c.h - 22, DUELO[i].nome, PAL.cinza, 8).setDepth(2004));
+      /* -34 e não -22: os golpes da briga têm nome de duas linhas ('SOCO /
+         FORTE'), e a 22 do fundo a segunda linha saía por baixo do botão. */
+      this.tBot.push(txtC(this, c.x + c.w / 2, c.y + c.h - 34, this.golpes[i].nome, PAL.cinza, 8)
+        .setMaxWidth(c.w).setAlign('center').setDepth(2004));
       var z = this.add.zone(c.x, c.y, c.w, c.h).setOrigin(0, 0).setInteractive().setDepth(2005);
       (function (idx) { z.on('pointerdown', function () { self.escolhe(idx); }); })(i);
     }
@@ -140,12 +172,12 @@ var DisputaScene = new Phaser.Class({
      solta. */
   novaRodada: function () {
     this.rodada++;
-    this.dele = DUELO[Math.floor(Math.random() * DUELO.length)];
+    this.dele = this.golpes[Math.floor(Math.random() * this.golpes.length)];
     /* A finta é o aviso mentindo. Sem ela o duelo vira tabela: bastava
        decorar três respostas e nunca mais errar. */
     this.vaiFingir = Math.random() < this.finta;
     this.telegrafado = this.vaiFingir
-      ? DUELO[Math.floor(Math.random() * DUELO.length)]
+      ? this.golpes[Math.floor(Math.random() * this.golpes.length)]
       : this.dele;
     this.escolha = null;
     this.fase = 'avisa';
@@ -157,8 +189,8 @@ var DisputaScene = new Phaser.Class({
 
   escolhe: function (i) {
     if (this.fase !== 'avisa' || this.escolha) return;
-    this.escolha = DUELO[i];
-    if (this.escolha.chave === 'cotovelo') this.cotoveladas++;
+    this.escolha = this.golpes[i];
+    if (this.modo.sujo && this.escolha.chave === this.modo.sujo) this.sujeira++;
     this.resolve();
   },
 
@@ -167,18 +199,18 @@ var DisputaScene = new Phaser.Class({
 
     if (!meu) {
       // não respondeu a tempo: na barra, quem hesita solta
-      this.pos -= 0.15;
+      this.leva(0.15);
       txto = dele.fez + '\nVOCÊ NEM REAGIU.';
       sfx('nao');
     } else if (meu.chave === dele.chave) {
       txto = dele.fez + '\nOS DOIS TRAVARAM.';
       sfx('empurra');
-    } else if (VENCE[meu.chave] === dele.chave) {
-      this.pos += 0.17;
+    } else if (this.modo.vence[meu.chave] === dele.chave) {
+      this.acerta(0.17);
       txto = dele.fez + '\nE VOCÊ LEVOU A MELHOR.';
       sfx('ok');
     } else {
-      this.pos -= 0.17;
+      this.leva(0.17);
       txto = dele.fez + '\nE VOCÊ PERDEU O APOIO.';
       sfx('empurra');
     }
@@ -189,18 +221,40 @@ var DisputaScene = new Phaser.Class({
     this.t = 0;
   },
 
+  /* Uma rodada ganha: no cabo de guerra a barra anda pro seu lado; na
+     briga o soco entra nele, e é a vida DELE que desce. */
+  acerta: function (q) {
+    if (this.modo.vida) this.hpEle = Math.max(0, this.hpEle - (this.modo.dano || q));
+    else this.pos += q;
+  },
+  leva: function (q) {
+    if (this.modo.vida) this.hpVc = Math.max(0, this.hpVc - (this.modo.dano || q) * 0.9);
+    else this.pos -= q;
+  },
+
   ganhou: function () {
     this.acabou = true;
     this.resultado = 'ganhou';
     /* Cotovelada ganha rodada e custa reputação: o vagão inteiro vê.
        É o que impede o cotovelo de ser só o botão certo. */
     var pts = GameState.ganhaMinigame(7 + Math.max(0, 6 - this.rodada));
-    GameState.addDescanso(3);
-    GameState.addCarisma(4 - this.cotoveladas * 2);
     GameState.stats.causos++;
-    this.diz('A BARRA É SUA.\n+' + pts + ' PONTOS' +
-      (this.cotoveladas ? '\n(E ' + this.cotoveladas + ' COTOVELADA' +
-        (this.cotoveladas > 1 ? 'S' : '') + ')' : ''));
+    if (this.modo.vida) {
+      /* ---------- ganhar briga também é perder ----------
+         No metrô quem parte pra briga já perdeu: o vagão inteiro viu, e
+         ninguém sai de lá com a razão. Vencer dá ponto e custa carisma
+         do mesmo jeito, e ainda cobra o corpo. Briga que se ganha limpo
+         não é briga de vagão, é jogo de luta. */
+      GameState.addDescanso(-10);
+      GameState.addCarisma(-7);
+      this.diz('VOCÊ GANHOU.\nE O VAGÃO INTEIRO VIU.\n+' + pts + ' PONTOS');
+    } else {
+      GameState.addDescanso(3);
+      GameState.addCarisma(4 - this.sujeira * 2);
+      this.diz('A BARRA É SUA.\n+' + pts + ' PONTOS' +
+        (this.sujeira ? '\n(E ' + this.sujeira + ' COTOVELADA' +
+          (this.sujeira > 1 ? 'S' : '') + ')' : ''));
+    }
     sfx('vitoria');
     this.fase = 'fim';
     this.t = 0;
@@ -209,12 +263,12 @@ var DisputaScene = new Phaser.Class({
   perdeu: function () {
     this.acabou = true;
     this.resultado = 'perdeu';
-    GameState.addDescanso(-6);
-    GameState.addCarisma(-4);
+    GameState.addDescanso(this.modo.vida ? -14 : -6);
+    GameState.addCarisma(this.modo.vida ? -9 : -4);
     GameState.stats.minigamesPerdidos++;
     GameState.stats.causos++;
-    perdeVida(this, this.spVc);
-    this.diz('VOCÊ SOLTOU A BARRA\nE FOI PRO CHÃO.');
+    perdeVida(this, this.spVc, 1);
+    this.diz(this.modo.perder);
     sfx('erro');
     this.fase = 'fim';
     this.t = 0;
@@ -235,7 +289,10 @@ var DisputaScene = new Phaser.Class({
 
     if (this.fase === 'avisa' && this.t > this.janela) { this.resolve(); }
     else if (this.fase === 'mostra' && this.t > 850) {
-      if (this.pos >= 1) this.ganhou();
+      if (this.modo.vida) {
+        if (this.hpEle <= 0) this.ganhou();
+        else if (this.hpVc <= 0) this.perdeu();
+      } else if (this.pos >= 1) this.ganhou();
       else if (this.pos <= 0) this.perdeu();
       else this.novaRodada();
     } else if (this.fase === 'fim' && this.t > 1200) {
@@ -261,18 +318,45 @@ var DisputaScene = new Phaser.Class({
     g.fillStyle(num(PAL.metal), 1).fillRect(bx, a.y + 30, 6, a.h - 50);
     g.fillStyle(num(PAL.metalLuz), 1).fillRect(bx + 1, a.y + 30, 2, a.h - 50);
 
-    // o medidor: quanto da barra é sua
     var m = DIS.medidor;
-    g.fillStyle(0x1e1e2a, 1).fillRect(m.x, m.y, m.w, m.h);
-    var meu = Math.round(m.w * Phaser.Math.Clamp(this.mostra, 0, 1));
-    g.fillStyle(0x00e676, 1).fillRect(m.x, m.y, meu, m.h);
-    g.fillStyle(0xe8362c, 1).fillRect(m.x + meu, m.y, m.w - meu, m.h);
-    g.fillStyle(0xf2f0ff, 1).fillRect(m.x + meu - 1, m.y - 4, 3, m.h + 8);
-    g.lineStyle(2, 0x08080e, 1).strokeRect(m.x + 1, m.y + 1, m.w - 2, m.h - 2);
+    if (this.modo.vida) {
+      /* ---------- duas vidas, e não um cabo de guerra ----------
+         Cabo de guerra é um medidor só, e o que um ganha o outro perde.
+         Numa briga os dois se machucam: dá pra ganhar acabado, e dá pra
+         perder tendo quase ganhado. Isso só aparece com DUAS barras que
+         descem independentes.
+         A sua é verde e cresce da esquerda pra direita; a dele é
+         vermelha e cresce da direita pra esquerda, encostando uma na
+         outra — é como se lê "quem está por cima" sem número nenhum. */
+      var meia = Math.round((m.w - 10) / 2);
+      var hv = Math.round(meia * Phaser.Math.Clamp(this.hpVc, 0, 1));
+      var he = Math.round(meia * Phaser.Math.Clamp(this.hpEle, 0, 1));
+      g.fillStyle(0x1e1e2a, 1).fillRect(m.x, m.y, meia, m.h);
+      g.fillStyle(0x1e1e2a, 1).fillRect(m.x + meia + 10, m.y, meia, m.h);
+      g.fillStyle(0x00e676, 1).fillRect(m.x + meia - hv, m.y, hv, m.h);
+      g.fillStyle(0xffffff, 0.25).fillRect(m.x + meia - hv, m.y + 1, hv, 4);
+      g.fillStyle(0xe8362c, 1).fillRect(m.x + meia + 10, m.y, he, m.h);
+      g.fillStyle(0xffffff, 0.25).fillRect(m.x + meia + 10, m.y + 1, he, 4);
+      g.lineStyle(2, 0x08080e, 1).strokeRect(m.x + 1, m.y + 1, meia - 2, m.h - 2);
+      g.lineStyle(2, 0x08080e, 1).strokeRect(m.x + meia + 11, m.y + 1, meia - 2, m.h - 2);
+      // o VS no vão entre as duas
+      g.fillStyle(0xf2f0ff, 0.8).fillRect(m.x + meia + 4, m.y + 4, 2, m.h - 8);
+    } else {
+      // o medidor: quanto da barra é sua
+      g.fillStyle(0x1e1e2a, 1).fillRect(m.x, m.y, m.w, m.h);
+      var meu = Math.round(m.w * Phaser.Math.Clamp(this.mostra, 0, 1));
+      g.fillStyle(0x00e676, 1).fillRect(m.x, m.y, meu, m.h);
+      g.fillStyle(0xe8362c, 1).fillRect(m.x + meu, m.y, m.w - meu, m.h);
+      g.fillStyle(0xf2f0ff, 1).fillRect(m.x + meu - 1, m.y - 4, 3, m.h + 8);
+      g.lineStyle(2, 0x08080e, 1).strokeRect(m.x + 1, m.y + 1, m.w - 2, m.h - 2);
+    }
 
-    // as duas mãos na barra, uma de cada lado, na altura do ombro
-    g.fillStyle(0xf2c14e, 1).fillRect(bx - 12, DIS.vcSp.y - 40, 14, 7);
-    g.fillStyle(0xc98d63, 1).fillRect(bx + 8, DIS.eleSp.y - 46, 14, 7);
+    // as duas mãos na barra, uma de cada lado, na altura do ombro.
+    // Na briga não existe barra pra segurar: as mãos somem com ela.
+    if (!this.modo.vida) {
+      g.fillStyle(0xf2c14e, 1).fillRect(bx - 12, DIS.vcSp.y - 40, 14, 7);
+      g.fillStyle(0xc98d63, 1).fillRect(bx + 8, DIS.eleSp.y - 46, 14, 7);
+    }
 
     caixa(g, DIS.msg.x, DIS.msg.y, DIS.msg.w, DIS.msg.h, 0xf2f0ff);
 
@@ -280,11 +364,11 @@ var DisputaScene = new Phaser.Class({
        com botão pequeno é sorteio. Enquanto a janela corre, o contorno
        do botão escolhido acende e uma fita embaixo mostra o tempo. */
     var vivo = (this.fase === 'avisa');
-    for (i = 0; i < DUELO.length; i++) {
-      var c = duelaCelula(i), sel = (this.escolha === DUELO[i]);
-      var cor = num(DUELO[i].cor);
+    for (i = 0; i < this.golpes.length; i++) {
+      var c = duelaCelula(i), sel = (this.escolha === this.golpes[i]);
+      var cor = num(this.golpes[i].cor);
       this.tBot[i].setVisible(this.fase !== 'fim')
-        .setColor(sel || vivo ? DUELO[i].cor : PAL.cinzaEsc);
+        .setColor(sel || vivo ? this.golpes[i].cor : PAL.cinzaEsc);
       if (this.fase === 'fim') continue;
       g.fillStyle(sel ? 0x1b2438 : 0x11141d, 1).fillRect(c.x, c.y, c.w, c.h);
       g.lineStyle(2, sel || vivo ? cor : 0x2a2a3a, 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
@@ -300,8 +384,8 @@ var DisputaScene = new Phaser.Class({
         .setText(nomeAgir() + ' PRA SEGUIR')
         .setPosition(GW / 2, DIS.bot.y + 30);
     } else if (this.tBot[1]) {
-      this.tBot[1].setText(DUELO[1].nome)
-        .setPosition(duelaCelula(1).x + DIS.bot.w / 2, DIS.bot.y + DIS.bot.h - 22);
+      this.tBot[1].setText(this.golpes[1].nome)
+        .setPosition(duelaCelula(1).x + DIS.bot.w / 2, DIS.bot.y + DIS.bot.h - 34);
     }
   },
 

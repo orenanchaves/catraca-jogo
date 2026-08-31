@@ -138,7 +138,7 @@ var config = {
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   scene: [BootScene, TitleScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
-    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene]
+    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene, BrigaScene]
 };
 
 window.addEventListener('load', function () {

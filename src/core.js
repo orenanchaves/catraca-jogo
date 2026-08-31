@@ -2257,8 +2257,16 @@ function geraFonte(scene) {
     return this;
   };
   BT.setResolution = function () { return this; };
+  /* Centralizar exige largura máxima definida ANTES: sem ela o Phaser
+     calcula o alinhamento com um limite indefinido e o RENDER quebra
+     (glTexture null) — não o create nem o update, o que faz o erro não
+     aparecer em try/catch nenhum e a tela inteira virar preto. Custou
+     duas cenas pra achar. */
   BT.setAlign = function (a) {
-    if (a === 'center' && this.setCenterAlign) this.setCenterAlign();
+    if (a === 'center' && this.setCenterAlign) {
+      if (!this._maxWidth) this.setMaxWidth(GW - 16);
+      this.setCenterAlign();
+    }
     return this;
   };
   if (!BT.setLineSpacing) BT.setLineSpacing = function () { return this; };
@@ -3041,11 +3049,15 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
      Agora a caixa tem 268 de altura, o ícone é desenhado em dobro e o
      nome tem o corpo da tela de fim. */
   var cel = 56, vao = 6;
-  var alt = 268;
+  /* 290 e não 268: o nome da barraca tem aspas e três produtos — "Jornal,
+     bala, pururuca." dá 24 caracteres, 288px, e quebra em duas linhas. A
+     faixa de cabeçalho tinha 30px de altura e a segunda linha do título
+     saía por baixo dela, em cima dos ícones. Cabeçalho de 44. */
+  var alt = 290;
   var larg = this.itens.length * cel + (this.itens.length - 1) * vao;
   this.x0 = Math.round((GW - larg) / 2);
   this.y = GH - alt - 16;
-  this.yIcones = this.y + 44;
+  this.yIcones = this.y + 56;
   this.cel = cel; this.vao = vao;
 
   this.g = scene.add.graphics().setDepth(900).setScrollFactor(0);
@@ -3053,8 +3065,8 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
   caixa(this.g, 8, this.y, GW - 16, alt, 0xf2c14e);
   /* uma tarja no topo, como as placas do metrô: a caixa passa a ter
      cabeça e corpo em vez de ser um retângulo com texto solto */
-  this.g.fillStyle(0x3a2f14, 1).fillRect(10, this.y + 2, GW - 20, 30);
-  this.g.fillStyle(0xf2c14e, 0.5).fillRect(10, this.y + 32, GW - 20, 1);
+  this.g.fillStyle(0x3a2f14, 1).fillRect(10, this.y + 2, GW - 20, 44);
+  this.g.fillStyle(0xf2c14e, 0.5).fillRect(10, this.y + 46, GW - 20, 1);
 
   this.tTitulo = txtC(scene, GW / 2, this.y + 10, titulo, PAL.amarelo, 8)
     .setDepth(901).setScrollFactor(0);
@@ -3068,11 +3080,11 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
       .setScale(2).setDepth(903).setScrollFactor(0));
   }
 
-  this.tNome = txtC(scene, GW / 2, this.y + 112, '', PAL.branco, 16)
+  this.tNome = txtC(scene, GW / 2, this.y + 124, '', PAL.branco, 16)
     .setDepth(901).setScrollFactor(0);
-  this.tPreco = txtC(scene, GW / 2, this.y + 158, '', PAL.verde, 8)
+  this.tPreco = txtC(scene, GW / 2, this.y + 172, '', PAL.verde, 8)
     .setDepth(901).setScrollFactor(0);
-  this.tEfeito = txtC(scene, GW / 2, this.y + 186, '', PAL.cinza, 8)
+  this.tEfeito = txtC(scene, GW / 2, this.y + 200, '', PAL.cinza, 8)
     .setDepth(901).setScrollFactor(0);
   this.tEfeito.setWordWrapWidth(GW - 24).setAlign('center');
   this.tRodape = txtC(scene, GW / 2, this.y + alt - 34,
@@ -3138,14 +3150,31 @@ MenuComida.prototype.fecha = function () {
   if (!this.ativo) return;
   this.ativo = false;
   this.g.destroy(); this.gSel.destroy();
+  /* Cada objeto criado no construtor tem que morrer aqui. O preco e o
+     rodape nasceram na versao grande do menu e nao entraram nesta lista:
+     a caixa, o titulo, o nome, o efeito e os icones sumiam e esses dois
+     ficavam boiando na tela pra sempre — foi o "R$ 12,00 do dogao" que
+     aparecia numa barraca que nem vende dogao. */
   this.tTitulo.destroy(); this.tNome.destroy(); this.tEfeito.destroy();
+  this.tPreco.destroy(); this.tRodape.destroy();
   for (var i = 0; i < this.sprites.length; i++) this.sprites[i].destroy();
   if (this.scene.dialog === this) this.scene.dialog = null;
+  if (this.scene._menuComida === this) this.scene._menuComida = null;
 };
 
 function abreBarraca(scene, titulo, cardapio, aoFechar) {
+  /* ---------- o preço fantasma ----------
+     Apareceu R$ 12,00 do dogão por cima do R$ 3,00 da água, numa barraca
+     que nem vende dogão: era um menu anterior cujos textos não morreram.
+     Fechar pelo `scene.dialog` não basta, porque entre um menu e outro
+     esse campo passa por um Dialog comum (a fala do "deu uma segurada") e
+     a referência ao menu se perde — os objetos ficam na cena, invisíveis
+     pra quem só olha o `dialog`.
+     Agora a cena guarda o último menu e mata ESSE, sempre. */
   if (scene.dialog) scene.dialog.fecha();
-  scene.dialog = new MenuComida(scene, titulo, cardapio, aoFechar);
+  if (scene._menuComida) scene._menuComida.fecha();
+  scene._menuComida = new MenuComida(scene, titulo, cardapio, aoFechar);
+  scene.dialog = scene._menuComida;
   return scene.dialog;
 }
 

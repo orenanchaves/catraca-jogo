@@ -1366,6 +1366,21 @@ var EstacaoScene = new Phaser.Class({
       },
       function (sp) {
         if (sp.y < ESC_Y) { limitaPlataforma(sp); return; }
+        /* ---------- ninguém anda por cima da barraca ----------
+           O jogador já era barrado por `podeIr`, e a multidão não era
+           barrada por nada: os passageiros atravessavam o carrinho de
+           dogão como se ele fosse chão. Barraca que dá pra atravessar
+           não é barraca, é textura.
+           Empurra pelo lado mais curto, que é o que faz a pessoa
+           contornar em vez de grudar. */
+        for (var b = 0; b < self.barracas.length; b++) {
+          var q = self.barracas[b];
+          if (sp.x > q.x - 10 && sp.x < q.x + q.w + 10 &&
+              sp.y > q.y - 6 && sp.y < q.y + q.h + 6) {
+            var dEsq = sp.x - (q.x - 10), dDir = (q.x + q.w + 10) - sp.x;
+            sp.x = (dEsq < dDir) ? q.x - 10 : q.x + q.w + 10;
+          }
+        }
         sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });

@@ -1961,6 +1961,40 @@ var VagaoScene = new Phaser.Class({
      grandes num triângulo, e ele avisa com o corpo o que vem antes de
      vir. Ler o outro passou a valer mais que a velocidade do polegar,
      que é o que uma disputa de barra é na vida. */
+  /* ---------- a briga ----------
+     Em tempo real, em cena própria (ver scene-briga.js). Só sai briga
+     com quem está em pé e perto: ninguém atravessa o vagão pra brigar
+     com você, e sentado ninguém arruma confusão. */
+  /* DESLIGADA: a cena existe e a mecânica está escrita, mas os sprites
+     dela nascem com a textura errada (`ch_estudante_m` não está no
+     gerenciador na hora em que a cena monta) e o RENDER quebra com
+     glTexture null — o que apaga a tela inteira, porque a briga pausa
+     todo mundo antes de se montar. Enquanto não estiver resolvido, ela
+     não entra no sorteio de situações. Ver HANDOFF.md. */
+  comecaBriga: function () {
+    if (this.duelando || this.sentadoEm) return;
+    var perto = null, dmin = 9999;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active || a.fixo) continue;
+      var d = Math.abs(a.sp.y - this.pl.sp.y) + Math.abs(a.sp.x - this.pl.sp.x);
+      if (d < dmin) { dmin = d; perto = a; }
+    }
+    if (!perto || dmin > 200) return;
+    var eu = this;
+    this.duelando = true;
+    this.flash('O CLIMA VIROU');
+    this.scene.launch('Briga', {
+      sprite: perto.sp.texture.key,
+      aoFechar: function () {
+        eu.duelando = false;
+        perto.fixo = true;
+        var morte = GameState.derrota();
+        if (morte) { GameState.motivoFim = morte; eu.fimDeJogo(); }
+      }
+    });
+  },
+
   comecaDisputa: function (a) {
     if (this.duelando) return;
     var eu = this;
