@@ -2927,7 +2927,201 @@ Dialog.prototype.fecha = function () {
    Barraca de estação, banca ou ambulante andando: muda o cenário e o
    cardápio, não a conversa. Uma função só monta o menu, cobra, e diz o
    que aconteceu — senão cada cena reinventa o troco. */
+/* =========================================================
+   OS ÍCONES DA BARRACA
+   Escolher comida era uma lista de frases — "DOGÃO R$ 12,00" — e lista
+   de frases é o jeito mais lento que existe de escolher entre cinco
+   coisas: você lê as cinco pra decidir. Ícone se reconhece sem ler, e
+   aí o texto passa a servir pra UMA coisa só: descrever o que está
+   selecionado.
+   24x24 porque é o que cabe cinco na largura da tela com moldura e
+   ainda dá pra distinguir um copo de uma garrafa.
+   ========================================================= */
+function pinta(c, cor, x, y, w, h) { c.fillStyle = cor; c.fillRect(x, y, w, h); }
+
+var ICONES_ITEM = {
+  chocolate: function (c) {
+    pinta(c, '#7a2230', 3, 5, 18, 15);
+    pinta(c, '#a8303f', 3, 5, 18, 2);
+    pinta(c, '#5c3a1e', 5, 8, 14, 10);
+    pinta(c, '#7a4f2a', 5, 8, 14, 2);
+    pinta(c, '#3d2614', 9, 8, 1, 10);
+    pinta(c, '#3d2614', 14, 8, 1, 10);
+    pinta(c, '#3d2614', 5, 13, 14, 1);
+  },
+  doce: function (c) {
+    pinta(c, '#d84a8c', 8, 8, 8, 8);
+    pinta(c, '#f07ab0', 9, 9, 4, 3);
+    pinta(c, '#d84a8c', 4, 10, 4, 4);
+    pinta(c, '#d84a8c', 16, 10, 4, 4);
+    pinta(c, '#a02f68', 4, 12, 4, 2);
+    pinta(c, '#a02f68', 16, 12, 4, 2);
+  },
+  pururuca: function (c) {
+    /* A primeira versão era um saco laranja com uma tarja vermelha
+       atravessada no meio, e isso é bacon, não pururuca. O que faz um
+       saquinho de salgadinho ser reconhecível não é a cor: é a CRIMPAGEM
+       — a borda serrilhada em cima e embaixo, onde a máquina sela — e o
+       fato de ele ser estufado, mais largo no meio que nas pontas. */
+    pinta(c, '#8a8fa3', 6, 3, 12, 2);               // a crimpagem de cima
+    pinta(c, '#5a5f74', 7, 4, 2, 1);
+    pinta(c, '#5a5f74', 11, 4, 2, 1);
+    pinta(c, '#5a5f74', 15, 4, 2, 1);
+    pinta(c, '#c9a03a', 6, 5, 12, 2);               // o saco estufando
+    pinta(c, '#e8c14e', 4, 7, 16, 9);
+    pinta(c, '#f5dc8a', 5, 8, 3, 7);                // o brilho do plástico
+    pinta(c, '#c9a03a', 6, 16, 12, 2);
+    pinta(c, '#8a8fa3', 6, 18, 12, 2);              // a crimpagem de baixo
+    pinta(c, '#5a5f74', 8, 18, 2, 1);
+    pinta(c, '#5a5f74', 13, 18, 2, 1);
+    pinta(c, '#7a4a1e', 8, 10, 8, 4);               // o rótulo escuro
+    pinta(c, '#e8c14e', 9, 11, 2, 2);               // as pururucas no rótulo
+    pinta(c, '#e8c14e', 12, 12, 2, 2);
+  },
+  agua: function (c) {
+    pinta(c, '#3a7fd0', 10, 3, 4, 3);
+    pinta(c, '#8fd0f0', 9, 6, 6, 2);
+    pinta(c, '#8fd0f0', 7, 8, 10, 12);
+    pinta(c, '#cdeeff', 8, 9, 3, 10);
+    pinta(c, '#3a7fd0', 7, 16, 10, 4);
+  },
+  cafe: function (c) {
+    pinta(c, '#d8d8e8', 6, 8, 12, 11);
+    pinta(c, '#f2f0ff', 7, 9, 3, 9);
+    pinta(c, '#4a2c18', 7, 9, 10, 3);
+    pinta(c, '#b8b8c8', 6, 18, 12, 2);
+    pinta(c, '#8b90a6', 9, 3, 2, 4);
+    pinta(c, '#8b90a6', 13, 2, 2, 5);
+  },
+  dogao: function (c) {
+    pinta(c, '#c98a4a', 3, 9, 18, 8);
+    pinta(c, '#e0a870', 3, 9, 18, 2);
+    pinta(c, '#a0682e', 3, 15, 18, 2);
+    pinta(c, '#c0402a', 5, 11, 14, 4);
+    pinta(c, '#e05a3a', 5, 11, 14, 1);
+    pinta(c, '#f2c14e', 6, 12, 3, 1);
+    pinta(c, '#f2c14e', 11, 13, 3, 1);
+    pinta(c, '#f2c14e', 15, 12, 3, 1);
+  },
+  jornal: function (c) {
+    pinta(c, '#c8c8d4', 4, 5, 16, 15);
+    pinta(c, '#e0e0ea', 4, 5, 16, 2);
+    pinta(c, '#8b90a6', 6, 8, 12, 2);
+    for (var i = 0; i < 4; i++) pinta(c, '#a0a4b4', 6, 12 + i * 2, 12, 1);
+    pinta(c, '#8b90a6', 11, 5, 1, 15);
+  }
+};
+
+function texturaItem(scene, chave) {
+  var k = 'it_' + chave;
+  if (scene.textures.exists(k)) return k;
+  var tex = scene.textures.createCanvas(k, 24, 24);
+  var pintor = ICONES_ITEM[chave];
+  if (pintor) pintor(tex.getContext());
+  tex.refresh();
+  return k;
+}
+
+/* ---------- o menu de ícones ----------
+   Tem a mesma cara de fora que o Dialog (ativo, update, fecha), porque
+   todas as cenas fazem `if (this.dialog && this.dialog.ativo)` e não
+   deviam precisar saber que existe um segundo tipo de caixa. */
+function MenuComida(scene, titulo, cardapio, aoFechar) {
+  this.scene = scene;
+  this.itens = cardapio.slice(0);
+  this.sel = 0;
+  this.ativo = true;
+  this.aoFechar = aoFechar;
+
+  var cel = 38, vao = 6;
+  var larg = this.itens.length * cel + (this.itens.length - 1) * vao;
+  this.x0 = Math.round((GW - larg) / 2);
+  var alt = 122;
+  this.y = GH - alt - 12;
+  this.yIcones = this.y + 30;
+  this.cel = cel; this.vao = vao;
+
+  this.g = scene.add.graphics().setDepth(900).setScrollFactor(0);
+  this.gSel = scene.add.graphics().setDepth(902).setScrollFactor(0);
+  caixa(this.g, 8, this.y, GW - 16, alt, 0xf2c14e);
+  this.tTitulo = txt(scene, 20, this.y + 8, titulo, PAL.cinza, 8).setDepth(901).setScrollFactor(0);
+  this.tTitulo.setWordWrapWidth(GW - 40);
+
+  this.sprites = [];
+  for (var i = 0; i < this.itens.length; i++) {
+    var cx = this.x0 + i * (cel + vao);
+    this.sprites.push(scene.add.image(cx + cel / 2, this.yIcones + cel / 2,
+      texturaItem(scene, this.itens[i])).setDepth(903).setScrollFactor(0));
+  }
+
+  this.tNome = txtC(scene, GW / 2, this.y + 74, '', PAL.branco, 8).setDepth(901).setScrollFactor(0);
+  this.tEfeito = txtC(scene, GW / 2, this.y + 92, '', PAL.verde, 8).setDepth(901).setScrollFactor(0);
+  this.redesenha();
+}
+MenuComida.prototype.redesenha = function () {
+  var g = this.gSel; g.clear();
+  for (var i = 0; i < this.itens.length; i++) {
+    var cx = this.x0 + i * (this.cel + this.vao);
+    var aceso = (i === this.sel);
+    var it = ITENS[this.itens[i]];
+    var pode = GameState.dinheiro >= it.preco;
+    g.fillStyle(aceso ? 0x3a2f14 : 0x14141f, 1).fillRect(cx, this.yIcones, this.cel, this.cel);
+    g.lineStyle(2, aceso ? 0xf2c14e : 0x39415c, 1);
+    g.strokeRect(cx + 1, this.yIcones + 1, this.cel - 2, this.cel - 2);
+    /* Quem não pode pagar apaga NA GRADE, e não numa mensagem depois de
+       escolher: escolher pra descobrir que não dá é o mesmo erro da
+       lista de frases, só que mais lento. */
+    this.sprites[i].setAlpha(pode ? 1 : 0.3);
+  }
+  var sel = ITENS[this.itens[this.sel]];
+  this.tNome.setText(sel.nome + '   R$ ' + sel.preco.toFixed(2).replace('.', ','));
+  this.tNome.setColor(GameState.dinheiro >= sel.preco ? PAL.branco : PAL.vermelho);
+  var ef = [];
+  if (sel.descanso) {
+    var d = sel.descanso;
+    if (sel.noCalor && estaCalor()) d = Math.round(d * sel.noCalor);
+    ef.push('+' + d + ' DESCANSO');
+  }
+  if (sel.carisma) ef.push('+' + sel.carisma + ' CARISMA');
+  if (sel.coracao) ef.push('+1 CORACAO');
+  this.tEfeito.setText(ef.join('  '));
+};
+MenuComida.prototype.update = function () {
+  if (!this.ativo) return;
+  if (Ctrl.leftJust) { this.sel = (this.sel + this.itens.length - 1) % this.itens.length; sfx('catraca'); this.redesenha(); }
+  if (Ctrl.rightJust) { this.sel = (this.sel + 1) % this.itens.length; sfx('catraca'); this.redesenha(); }
+  if (Ctrl.backJust) { var ao = this.aoFechar; this.fecha(); if (ao) ao(); return; }
+  if (Ctrl.actJust) this.compra();
+};
+MenuComida.prototype.compra = function () {
+  var it = ITENS[this.itens[this.sel]];
+  var r = GameState.consome(this.itens[this.sel]);
+  if (r === 'falta') { sfx('nao'); this.redesenha(); return; }
+  sfx('moeda');
+  var sc = this.scene, ao = this.aoFechar;
+  this.fecha();
+  fala(sc, r === 'coracao'
+    ? it.nome + ' na veia.\nVocê recuperou um coração.'
+    : it.nome + '. Deu uma segurada.', []);
+  sc.time.delayedCall(1300, function () { if (sc.dialog) sc.dialog.fecha(); });
+  if (ao) ao();
+};
+MenuComida.prototype.fecha = function () {
+  if (!this.ativo) return;
+  this.ativo = false;
+  this.g.destroy(); this.gSel.destroy();
+  this.tTitulo.destroy(); this.tNome.destroy(); this.tEfeito.destroy();
+  for (var i = 0; i < this.sprites.length; i++) this.sprites[i].destroy();
+  if (this.scene.dialog === this) this.scene.dialog = null;
+};
+
 function abreBarraca(scene, titulo, cardapio, aoFechar) {
+  if (scene.dialog) scene.dialog.fecha();
+  scene.dialog = new MenuComida(scene, titulo, cardapio, aoFechar);
+  return scene.dialog;
+}
+
+function abreBarracaAntiga(scene, titulo, cardapio, aoFechar) {
   var ops = [], i;
   for (i = 0; i < cardapio.length; i++) {
     (function (chave) {
