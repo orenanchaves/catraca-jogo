@@ -713,16 +713,43 @@ var VagaoScene = new Phaser.Class({
      dissesse que aquele boneco está agarrado em alguma coisa. Ela é a
      única parte da barra que muda de quadro pra quadro, e por isso tem
      gráfico só dela. */
+  /* ---------- o braço na barra ----------
+     Era UMA LINHA RETA do ombro até a barra, e linha reta de ponta a
+     ponta não lê como braço: lê como corda esticada. O que faz um braço
+     parecer braço, mesmo com quatro pixels de largura, é ter COTOVELO —
+     dois segmentos com um ângulo entre eles — e ter uma ponta diferente
+     da outra: ombro grosso, punho fechado.
+
+     O cotovelo cai: braço levantado dobra pra baixo, e é o peso que
+     torna a pose crível. */
   pintaMao: function () {
     var g = this.gMao; g.clear();
     if (!this.segurando) return;
     var m = this.segurando;
-    g.fillStyle(0xf2c14e, 1).fillRect(m.bx - 1, m.y - 3, 11, 6);
-    g.fillStyle(0xffe9a8, 1).fillRect(m.bx - 1, m.y - 3, 11, 2);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 6, 2, 12);
-    // o braço, do ombro até a barra
-    g.lineStyle(3, 0xf2c14e, 0.9);
-    g.beginPath(); g.moveTo(m.px, m.y + 2); g.lineTo(m.bx + 4, m.y); g.strokePath();
+    var lado = (m.bx > m.px) ? 1 : -1;
+
+    var ox = m.px + lado * 6, oy = m.y + 6;      // ombro
+    var hx = m.bx + (lado > 0 ? 3 : 7), hy = m.y; // punho, na barra
+    var ex = (ox + hx) / 2 + lado * 3;            // cotovelo, no meio
+    var ey = Math.max(oy, hy) + 8;                // e caído
+
+    // o braço de cima é manga, o de baixo é pele: a troca de cor no
+    // cotovelo é o que separa os dois segmentos sem precisar de contorno
+    g.lineStyle(5, 0x2a2a3a, 1);
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(ex, ey); g.strokePath();
+    g.lineStyle(4, 0xc99a70, 1);
+    g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.strokePath();
+    g.fillStyle(0x2a2a3a, 1).fillCircle(ex, ey, 3);   // o cotovelo
+
+    // o punho fechado em volta da barra, e o brilho do metal por dentro
+    g.fillStyle(0xa8794f, 1).fillRect(hx - 4, hy - 5, 9, 10);
+    g.fillStyle(0xc99a70, 1).fillRect(hx - 4, hy - 5, 9, 6);
+    g.fillStyle(0x8a5a3c, 1).fillRect(hx - 4, hy - 1, 9, 1);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 9, 2, 5);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y + 5, 2, 5);
+
+    // o ombro, mais grosso que o resto: é o que dá direção ao braço
+    g.fillStyle(0x2a2a3a, 1).fillCircle(ox, oy, 4);
   },
 
   /* A mão só aparece quando há mão: apertando, com barra ao alcance, e
@@ -1961,6 +1988,40 @@ var VagaoScene = new Phaser.Class({
      grandes num triângulo, e ele avisa com o corpo o que vem antes de
      vir. Ler o outro passou a valer mais que a velocidade do polegar,
      que é o que uma disputa de barra é na vida. */
+  /* ---------- a briga ----------
+     Em tempo real, em cena própria (ver scene-briga.js). Só sai briga
+     com quem está em pé e perto: ninguém atravessa o vagão pra brigar
+     com você, e sentado ninguém arruma confusão. */
+  /* DESLIGADA: a cena existe e a mecânica está escrita, mas os sprites
+     dela nascem com a textura errada (`ch_estudante_m` não está no
+     gerenciador na hora em que a cena monta) e o RENDER quebra com
+     glTexture null — o que apaga a tela inteira, porque a briga pausa
+     todo mundo antes de se montar. Enquanto não estiver resolvido, ela
+     não entra no sorteio de situações. Ver HANDOFF.md. */
+  comecaBriga: function () {
+    if (this.duelando || this.sentadoEm) return;
+    var perto = null, dmin = 9999;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active || a.fixo) continue;
+      var d = Math.abs(a.sp.y - this.pl.sp.y) + Math.abs(a.sp.x - this.pl.sp.x);
+      if (d < dmin) { dmin = d; perto = a; }
+    }
+    if (!perto || dmin > 200) return;
+    var eu = this;
+    this.duelando = true;
+    this.flash('O CLIMA VIROU');
+    this.scene.launch('Briga', {
+      sprite: perto.sp.texture.key,
+      aoFechar: function () {
+        eu.duelando = false;
+        perto.fixo = true;
+        var morte = GameState.derrota();
+        if (morte) { GameState.motivoFim = morte; eu.fimDeJogo(); }
+      }
+    });
+  },
+
   comecaDisputa: function (a) {
     if (this.duelando) return;
     var eu = this;
@@ -2650,36 +2711,37 @@ var VagaoScene = new Phaser.Class({
       return;
     }
 
-    /* A primeira linha do letreiro é a estação — parada, é onde você
-       está; andando, é a próxima. É a informação que saiu do topo da
-       tela, e ela vem antes de tudo. */
+    /* ---------- o letreiro diz a ESTAÇÃO, e só ----------
+       Ele tinha virado uma ficha: nome da estação, quantas faltam pro
+       alvo, o rótulo do compromisso e a hora limite com os minutos
+       restantes. Quatro linhas de painel em cima da faixa do vagão onde
+       se joga — e um painel de metrô de verdade não te conta a sua vida,
+       ele diz onde o trem está.
+
+       O que saiu não sumiu: o relógio mora no HUD, o trajeto mora no
+       painel lateral do desktop e no celular, e o PRAZO virou COR. Forma
+       antes de palavra: vermelho quando aperta o atraso diz a mesma
+       coisa que "(51 MIN)" e não custa uma linha.
+
+       Fica a segunda linha num caso só, e é o caso em que ela não é
+       ficha, é alarme: quando a sua estação é a próxima ou é esta. */
     var aqui = GameState.estacaoAtual();
     var parado = (this.estado === 'parado');
-    txto = (parado ? aqui : '► ' + GameState.proximaEstacaoNome()) + '\n';
+    txto = parado ? aqui : '► ' + GameState.proximaEstacaoNome();
+    cor = PAL.amarelo;
 
-    if (falta <= 0) { txto += 'DESÇA NA ' + alvo; cor = PAL.verde; }
-    else if (falta === 1) { txto += 'PRÓXIMA É A SUA: ' + alvo; cor = PAL.verde; }
-    else { txto += alvo + ' EM ' + falta + ' ESTAÇÕES'; cor = PAL.amarelo; }
-    /* Onde descer não diz o que você vai fazer lá, e agora o destino
-       muda todo dia: a linha do compromisso é o que dá sentido à
-       estação. */
-    if (!GameState.faltaBaldear()) txto += '\n► ' + GameState.rotuloDaPerna();
+    if (falta <= 0) { txto += '\nDESÇA AQUI'; cor = PAL.verde; }
+    else if (falta === 1) { txto += '\nPRÓXIMA É A SUA'; cor = PAL.verde; }
 
-    /* Na ida existe hora de entrada, e atraso que a pessoa não vê
-       chegando é injusto: a hora aparece junto com a rota, com os
-       minutos que sobram, e fica vermelha quando aperta. */
-    if (GameState.perna === 'ida') {
-      var folga = GameState.minutosParaOAtraso();
-      txto += '\nENTRADA ' + GameState.horaLimite() +
-        (folga > 0 ? ' (' + folga + ' MIN)' : ' — ATRASADO');
-      if (folga <= 12) cor = PAL.vermelho;
+    // o prazo é cor, não linha: vermelho é "anda logo"
+    if (GameState.perna === 'ida' && GameState.minutosParaOAtraso() <= 12) {
+      cor = PAL.vermelho;
     }
+
     /* A chave NÃO inclui os minutos que faltam. Eles andam sozinhos, e
-       um painel que desce a cada minuto é metade do que incomodava.
-       Ela guarda só o que é notícia: onde estou, quantas faltam, pra
-       que serve a perna, e se entrei no vermelho do atraso. */
-    var chave = (parado ? 'p' : 'a') + '|' + aqui + '|' + falta +
-      '|' + GameState.rotuloDaPerna() + '|' + (cor === PAL.vermelho ? 1 : 0);
+       um painel que desce a cada minuto é metade do que incomodava. */
+    var chave = (parado ? 'p' : 'a') + '|' + aqui + '|' + Math.min(falta, 2) +
+      '|' + (cor === PAL.vermelho ? 1 : 0);
     this.poeNoLetreiro(cor, txto, chave);
   },
 

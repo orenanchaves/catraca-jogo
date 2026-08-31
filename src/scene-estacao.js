@@ -248,11 +248,34 @@ var EstacaoScene = new Phaser.Class({
     this.trens = CENTRAL
       ? [new Trem(this, -1, -1), new Trem(this, 1, 1)]
       : [new Trem(this, -1, GameState.dir)];
+    /* As portas são as mesmas nos dois trens (portasDoTrem é pura), e a
+       fila da plataforma precisa delas sem perguntar de qual trem. */
+    this.portas = portasDoTrem();
     /* Os dois não podem chegar juntos: dois trens parados ao mesmo
        tempo fazem a escolha ser "qual está mais perto", que não é
        escolha. Meia espera de defasagem faz um chegar enquanto o outro
        ainda não veio, e aí esperar o de lá custa perder o de cá. */
     if (CENTRAL) this.trens[1].t = -this.intervalo(this.trens[1]) * 0.5;
+    /* ---------- quem acabou de descer vê o trem ----------
+       Descer trocava de cena na hora, e a plataforma nascia vazia: o
+       trem de onde você saiu no segundo anterior simplesmente não
+       existia mais. Some a sensação de ter descido — parece que você
+       apareceu ali.
+       Agora, quando a entrada é pela plataforma, a estação começa com o
+       trem PARADO e a porta aberta, e ele parte alguns segundos depois.
+       Você vê ele indo embora, que é o que se vê de verdade.
+
+       Numa central é o trem do SEU sentido que fica parado, e não o da
+       esquerda: você desceu dele, e ele é o da via cujo rumo bate com o
+       que você vinha seguindo. */
+    if (this.entrada === 'plataforma') {
+      for (var q = 0; q < this.trens.length; q++) {
+        if (this.trens[q].dir !== GameState.dir) continue;
+        this.trens[q].estado = 'aberto';
+        this.trens[q].t = 2200;
+        this.trens[q].y = PLAT_Y;
+      }
+    }
     this.tremEmpurrado = null;
     this.empurrando = false;
     this.pressao = 0;
@@ -856,6 +879,98 @@ var EstacaoScene = new Phaser.Class({
     }
   },
 
+  /* ---------- a fila que embarca ----------
+     A plataforma tinha trinta e quatro pessoas paradas olhando o trilho,
+     e elas continuavam paradas com o trem parado na frente delas de porta
+     aberta. Era o detalhe que mais denunciava que aquilo era cenário: o
+     mundo não fazia o que o mundo faz.
+
+     Agora, quando a porta abre, parte da fila anda até a porta mais perto
+     e entra. Some quem entrou — e some de verdade, porque quem embarcou
+     foi embora. Quando o trem parte, chega gente nova pela escada, que é
+     por onde chega gente numa estação.
+
+     Não é rotina de IA: é destino e caminhada. Basta isso pra plataforma
+     parar de parecer uma foto. */
+  andaFila: function (dt) {
+    var i, j, a, t;
+
+    /* Cada trem manda na fila do SEU lado. O destino era sempre
+       PLAT_X0 - 4, medido pra plataforma lateral: na Sé isso fazia a
+       plataforma inteira andar pra esquerda quando a porta abria,
+       inclusive quem estava ali esperando o trem da direita. */
+    var meio = (PLAT_X0 + PLAT_X1) / 2;
+    for (j = 0; j < this.trens.length; j++) {
+      t = this.trens[j];
+      var abriu = (t.estado === 'aberto');
+      // quem abre a porta manda: sorteia quem vai entrar, uma vez só
+      if (abriu && !t.mandouEntrar) {
+        t.mandouEntrar = true;
+        for (i = 0; i < this.esperando.length; i++) {
+          a = this.esperando[i];
+          if (!a.sp || !a.sp.active || a.indo) continue;
+          // quem está na outra metade não é passageiro deste trem
+          if (CENTRAL && ((t.lado < 0) !== (a.sp.x < meio))) continue;
+          if (Math.random() > 0.55) continue;
+          a.indo = { x: (t.lado < 0) ? PLAT_X0 - 4 : PLAT_X1 + 4,
+            y: this.portaMaisPerto(a.sp.y) };
+        }
+      }
+      if (!abriu) t.mandouEntrar = false;
+    }
+
+    for (i = this.esperando.length - 1; i >= 0; i--) {
+      a = this.esperando[i];
+      if (!a.sp || !a.sp.active) { this.esperando.splice(i, 1); continue; }
+      if (!a.indo) { a.anima(dt, false); continue; }
+
+      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 4) {
+        // chegou na porta: entrou, e quem entrou não está mais aqui
+        a.sp.destroy();
+        this.esperando.splice(i, 1);
+        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        continue;
+      }
+      var v = 52 * dt / 1000;
+      a.sp.x += (dx / d) * v;
+      a.sp.y += (dy / d) * v;
+      a.setDir(dx, dy);
+      a.anima(dt, true);
+    }
+  },
+
+  portaMaisPerto: function (y) {
+    var melhor = y, d = 1e9;
+    for (var i = 0; i < this.portas.length; i++) {
+      var py = platY(this.portas[i] + 26);
+      var dd = Math.abs(py - y);
+      if (dd < d) { d = dd; melhor = py; }
+    }
+    return melhor;
+  },
+
+  /* ---------- e chega gente nova ----------
+     Se só saísse gente, a plataforma esvaziava e não voltava. Quem chega
+     numa estação chega pela escada, então é de lá que eles nascem. */
+  chegaNaPlataforma: function (quantos) {
+    for (var i = 0; i < quantos; i++) {
+      var a = new Ator(this, ESC_MEIO + (Math.random() - 0.5) * 60,
+        ESC_Y - 20 - Math.random() * 30, sorteiaPax());
+      a.sp.setDepth(30);
+      a.indo = {
+        x: PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+        y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
+      };
+      /* Eles param ANTES da porta: quem acabou de chegar espera o
+         próximo trem, não entra no que está indo embora. */
+      a.indo.x = Phaser.Math.Clamp(a.indo.x, PLAT_X0 + 12, PLAT_X1 - 12);
+      this.esperando.push(a);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
   /* ---------- áreas caminháveis, nas três faixas ---------- */
   podeIr: function (x, y) {
     // ---- plataforma ----
@@ -1366,7 +1481,7 @@ var EstacaoScene = new Phaser.Class({
         t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
           : ('TREM EM ' + t.falta + 'S');
         if (t.t > esp) {
-          t.estado = 'chegando'; t.t = 0; sfx('trem');
+          t.estado = 'chegando'; t.t = 0; t.repos = false; sfx('trem');
           /* O relógio anda uma vez por espera, e não uma por trem: com
              dois trens ele andaria em dobro na Sé e a estação sozinha
              comeria o dia. Quem cobra é o da esquerda, que é o único
@@ -1380,7 +1495,11 @@ var EstacaoScene = new Phaser.Class({
         t.aviso = 'CHEGANDO';
         break;
       case 'aberto':
-        var janela = Math.max(4200, 7400 - dif * 280);
+        /* 10s e não 7,4: com a porta abrindo, a multidão entrando e você
+           tendo que achar uma porta, 7,4s viravam corrida. Embarcar é
+           decisão, não reflexo — a pressa tem que estar no fim da janela,
+           não no começo dela. */
+        var janela = Math.max(6000, 10000 - dif * 300);
         t.falta = Math.max(0, Math.ceil((janela - t.t) / 1000));
         t.aviso = 'EMBARQUE ' + t.falta + 'S';
         if (t.t > janela) {
@@ -1390,6 +1509,14 @@ var EstacaoScene = new Phaser.Class({
         }
         break;
       case 'partindo':
+        /* Chega gente nova pela escada quando o trem parte, que é por
+           onde chega gente numa estação. Só o da esquerda repõe: com os
+           dois repondo, a Sé encheria no dobro da velocidade num piso
+           que tem 112px de largura — mesma razão do relógio. */
+        if (!t.repos && t.lado < 0) {
+          t.repos = true;
+          this.chegaNaPlataforma(Math.round(2 + 8 * GameState.lotacao()));
+        }
         t.y = PLAT_Y + (t.t / 1400) * t.alt;
         if (t.y >= PLAT_Y + t.alt) { t.y = PLAT_Y - t.alt; t.estado = 'espera'; t.t = 0; }
         t.aviso = 'PERDEU ESSE';
@@ -1545,6 +1672,21 @@ var EstacaoScene = new Phaser.Class({
       },
       function (sp) {
         if (sp.y < ESC_Y) { limitaPlataforma(sp); return; }
+        /* ---------- ninguém anda por cima da barraca ----------
+           O jogador já era barrado por `podeIr`, e a multidão não era
+           barrada por nada: os passageiros atravessavam o carrinho de
+           dogão como se ele fosse chão. Barraca que dá pra atravessar
+           não é barraca, é textura.
+           Empurra pelo lado mais curto, que é o que faz a pessoa
+           contornar em vez de grudar. */
+        for (var b = 0; b < self.barracas.length; b++) {
+          var q = self.barracas[b];
+          if (sp.x > q.x - 10 && sp.x < q.x + q.w + 10 &&
+              sp.y > q.y - 6 && sp.y < q.y + q.h + 6) {
+            var dEsq = sp.x - (q.x - 10), dDir = (q.x + q.w + 10) - sp.x;
+            sp.x = (dEsq < dDir) ? q.x - 10 : q.x + q.w + 10;
+          }
+        }
         sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });
@@ -1601,7 +1743,7 @@ var EstacaoScene = new Phaser.Class({
       a.dir = a.vx < 0 ? 'left' : 'right';
       a.anima(dt, true);
     }
-    for (i = 0; i < this.esperando.length; i++) this.esperando[i].anima(dt, false);
+    this.andaFila(dt);
     this.andaAmbulante(dt);
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
