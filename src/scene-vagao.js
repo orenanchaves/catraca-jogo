@@ -333,6 +333,29 @@ var VagaoScene = new Phaser.Class({
     this.encontro = null;
     this.tPasso = 0;
     this.sentadoEm = null;
+    this.indoPara = null;      // o lugar que você tocou, e pra onde está indo
+    this.ondeEstava = '';
+    this.travado = 0;
+
+    /* ---------- tocar o lugar é ir até ele ----------
+       Fica no pointerUP e não no DOWN, e só quando o dedo não arrastou:
+       arrastar é o manche, e é o manche que anda. Tocar é escolher.
+
+       O mesmo dedo acende o Ctrl.act ao soltar — é assim que agir
+       funciona no celular —, e sem engolir esse pulso o toque num banco
+       do outro lado do carro dispararia a ação do lugar onde você ESTÁ:
+       sentar no chão, falar com alguém, o que estivesse ali. */
+    var euT = this;
+    this.input.on('pointerup', function (pt) {
+      if (TOQUE.arrastando || euT.sentadoEm || euT.noChao) return;
+      if (euT.dialog && euT.dialog.ativo) return;
+      var b = euT.lugarSob(pt.worldX, pt.worldY);
+      if (!b) return;
+      euT.indoPara = b;
+      euT.ondeEstava = ''; euT.travado = 0;
+      euT.engoleAct = true;
+      sfx('catraca');
+    });
     this.nivelSono = 0;
     this.noChao = false;      // estudante
     this.cochilo = 0;         // clt: quanto tempo já está cochilando na barra
@@ -1249,6 +1272,56 @@ var VagaoScene = new Phaser.Class({
       // primeiro da lista sentava sempre no de cima, mesmo com o
       // jogador colado no de baixo
       var d = dx + dy * 2;
+      if (d < dist) { dist = d; melhor = b; }
+    }
+    return melhor;
+  },
+
+  /* ---------- ir até o lugar ----------
+     Em dois tempos, e não em linha reta: o corredor do vagão não é
+     retangular — ele aperta na frente do módulo e abre na frente da
+     porta —, então a diagonal esbarra na baia e o boneco fica raspando
+     nela até desistir. Primeiro alinha no corredor pela altura do
+     banco, depois entra de lado. É o caminho que uma pessoa faz.
+
+     Desiste sozinho se o lugar foi ocupado no meio do caminho, ou se o
+     corpo parou de avançar — com o vagão cheio dá pra ficar preso
+     atrás de alguém, e insistir pra sempre seria pior que não ir. */
+  rumoAoLugar: function (dt) {
+    var b = this.indoPara, nada = { dx: 0, dy: 0 };
+    if (!b || b.npc) { this.indoPara = null; return nada; }
+
+    // chegou ao alcance: senta e acabou
+    if (this.bancoLivrePerto() === b) { this.senta(b); this.indoPara = null; return nada; }
+
+    var alvoY = b.y + 24;
+    var d = { dx: 0, dy: 0 };
+    if (Math.abs(this.pl.sp.y - alvoY) > 8) d.dy = (alvoY > this.pl.sp.y) ? 1 : -1;
+    else d.dx = (b.x > this.pl.sp.x) ? 1 : -1;
+
+    /* 420ms parado é desistência. O número é generoso de propósito:
+       encostar em alguém e escorregar de lado leva uns dois quadros, e
+       cancelar nisso faria o toque falhar num vagão cheio, que é
+       justamente quando ele mais serve. */
+    var aqui = Math.round(this.pl.sp.x) + ',' + Math.round(this.pl.sp.y);
+    if (aqui === this.ondeEstava) {
+      this.travado = (this.travado || 0) + dt;
+      if (this.travado > 420) { this.indoPara = null; this.travado = 0; return nada; }
+    } else { this.ondeEstava = aqui; this.travado = 0; }
+    return d;
+  },
+
+  /* qual lugar vago está debaixo do dedo. A margem é de polegar e não
+     de mouse: o alvo desenhado tem 16px de largura, e 16px é menos que
+     a ponta de um dedo. */
+  lugarSob: function (x, y) {
+    var melhor = null, dist = 1e9;
+    for (var i = 0; i < this.bancos.length; i++) {
+      var b = this.bancos[i];
+      if (b.npc) continue;
+      var dx = Math.abs(x - b.x), dy = Math.abs(y - (b.y + 12));
+      if (dx > 26 || dy > 26) continue;
+      var d = dx + dy;
       if (d < dist) { dist = d; melhor = b; }
     }
     return melhor;
@@ -2536,11 +2609,26 @@ var VagaoScene = new Phaser.Class({
     this.eraSuaEstacao = (this.estado === 'parado')
       && GameState.estacaoAtual() === GameState.alvoAtual();
 
+    /* o toque que escolheu o lugar não pode também agir onde você está */
+    if (this.engoleAct) { this.engoleAct = false; Ctrl.actJust = false; }
+
     if (!this.sentadoEm && !this.noChao) {
       var vel = GameState.char.velocidade * (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
       if (Ctrl.act) vel *= 0.35;
       var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
       var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
+      /* Tocar o lugar já é ir até ele. Quem toca um banco do outro lado
+         do carro está dizendo o que quer, e obrigar a pessoa a
+         conduzir o boneco até lá é cobrar duas vezes pela mesma
+         decisão — ainda mais com um polegar só, que é como este jogo
+         vai ser jogado. Direção na mão SEMPRE manda: o primeiro
+         arrasto cancela o destino, senão o jogo estaria dirigindo
+         contra você. */
+      if (dx || dy) this.indoPara = null;
+      else if (this.indoPara) {
+        var r = this.rumoAoLugar(dt);
+        dx = r.dx; dy = r.dy;
+      }
       var mv = (dx !== 0 || dy !== 0);
       // quem anda acorda: o cochilo só conta com o corpo parado
       this.andandoAgora = mv;
