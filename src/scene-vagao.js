@@ -19,13 +19,24 @@
    acontece — a situação do carro, o ambulante, a encarada, o dilema
    do lugar. O jogador chegava antes de decidir qualquer coisa.
    Medido andando de ponta a ponta: 14s dão dois carros e uma decisão. */
-var TEMPO_ENTRE_ESTACOES = 14000;
-/* 30000 e nao 4200: quatro segundos de porta aberta e menos do que se
-   leva pra atravessar um carro ate a porta, e descer virava reflexo em
-   vez de decisao. Trinta segundos e o tempo de olhar o letreiro,
-   decidir, levantar e caminhar. O preco disso esta no relogio do jogo,
-   nao no seu: parada longa tambem faz o horario andar. */
-var TEMPO_PARADO = 30000;
+var TEMPO_ENTRE_ESTACOES = 18000;
+/* ---------- a viagem tem que durar mais que a parada ----------
+   Ficou invertido por um tempo: 14s de viagem e 30s de porta aberta. A
+   parada era o DOBRO da viagem, e a viagem é onde o jogo acontece — o
+   evento, o dilema, o equilíbrio, atravessar carro. Parada é tempo morto
+   pra quem não vai descer, e um dia de trinta estações virava 22 minutos
+   de jogo com metade parado.
+
+   Mas 4,2s também não servia: não dá pra atravessar um carro até a porta
+   nesse tempo, e descer virava reflexo em vez de decisão.
+
+   As duas coisas cabem porque a parada longa só faz falta na SUA
+   estação. Nas de passagem são 7s — o bastante pra ver quem entrou e
+   pra mudar de ideia. Na sua (ou na baldeação) são 15, que é o tempo de
+   ler o letreiro, levantar e caminhar. E a viagem, 18, continua maior
+   que qualquer uma das duas. */
+var TEMPO_PARADO = 7000;
+var TEMPO_PARADO_SUA = 15000;
 
 /* As barras saíam de dentro dos módulos agora que eles avançam 62px
    pra dentro do carro: elas recuaram pro corredor, que é onde a mão
@@ -2437,12 +2448,15 @@ var VagaoScene = new Phaser.Class({
          fim, que é o tempo de correr até a porta de onde quer que você
          esteja no carro — é assim que a estação avisa, e é a única
          parte da parada que precisa de pressa. */
-      if (!this.avisouPorta && this.t > TEMPO_PARADO - 6000) {
+      /* a sua estação ganha o dobro de porta aberta, e é a única em que
+         faz diferença: nas outras você não ia descer mesmo */
+      var espera = this.eraSuaEstacao ? TEMPO_PARADO_SUA : TEMPO_PARADO;
+      if (!this.avisouPorta && this.t > espera - 4000) {
         this.avisouPorta = true;
         sfx('apito');
         this.flash('PORTAS FECHANDO');
       }
-      if (this.t > TEMPO_PARADO) {
+      if (this.t > espera) {
         this.estado = 'andando'; this.t = 0;
         this.sorteiaRitmo();
         this.sorteouFalha = false;
