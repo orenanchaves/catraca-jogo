@@ -41,17 +41,24 @@ var MODOS = {
         chave: 'firmar', nome: 'FIRMAR', cor: '#0b9fdd',
         /* o que o corpo dele mostra quando é isto que vem */
         tel: 'ELE FIRMOU O PÉ.',
-        fez: 'ELE SÓ SEGUROU.'
+        fez: 'ELE SÓ SEGUROU.',
+        /* dx é pra dentro da briga (negativo afasta da barra), esmaga é
+           o corpo agachando. Firmar é baixar o centro de gravidade. */
+        pose: { dx: 0, esmaga: 0.92, marca: 'pe' }
       },
       {
         chave: 'puxar', nome: 'PUXAR', cor: '#00e676',
         tel: 'ELE PEGOU A BARRA\nCOM AS DUAS MÃOS.',
-        fez: 'ELE PUXOU A BARRA.'
+        fez: 'ELE PUXOU A BARRA.',
+        // puxar é ir pra cima da barra: o corpo avança e as mãos aparecem nela
+        pose: { dx: 9, esmaga: 1, marca: 'maos' }
       },
       {
         chave: 'cotovelo', nome: 'COTOVELO', cor: '#e8362c',
         tel: 'ELE ARMOU O OMBRO.',
-        fez: 'ELE METEU O COTOVELO.'
+        fez: 'ELE METEU O COTOVELO.',
+        // armar o ombro é recuar pra ganhar impulso, e a ponta aparece
+        pose: { dx: -7, esmaga: 1, marca: 'ombro' }
       }
     ],
     /* puxar > firmar > cotovelo > puxar */
@@ -126,6 +133,11 @@ var DisputaScene = new Phaser.Class({
     this.dele = null;
 
     this.g = this.add.graphics().setDepth(2000);
+    /* A marca do aviso mora ACIMA dos bonecos (2002). No mesmo Graphics
+       do fundo ela ficava ATRÁS dele: o ombro armado saía como uma
+       lasca branca de dois pixels espiando pelo lado da cabeça, que é o
+       mesmo que não existir. */
+    this.gMarca = this.add.graphics().setDepth(2003);
 
     this.spVc = this.add.sprite(DIS.vcSp.x, DIS.vcSp.y, spriteJogador(), FILEIRA_DIR.right)
       .setOrigin(0.5, 1).setScale(DIS.vcSp.escala).setDepth(2002);
@@ -302,9 +314,65 @@ var DisputaScene = new Phaser.Class({
     this.pinta();
   },
 
+  /* ---------- o aviso vira FORMA ----------
+     O aviso era só a frase. Medido: o boneco dele ficava no quadro 6 em
+     todas as fases, sempre, e o que se pedia era ler até 35 caracteres
+     em duas linhas, decodificar qual golpe é esse, lembrar o triângulo e
+     achar o botão — em 1120ms no primeiro dia e 620ms no fim. Isso não é
+     ler o outro, é prova de leitura com cronômetro; e o CLAUDE.md já
+     tinha a regra que isso quebra, que é forma antes de palavra.
+
+     Agora o corpo dele faz a coisa: firmar agacha, puxar avança pra
+     cima da barra, cotovelo recua pra armar. A frase continua embaixo
+     porque ela ENSINA — na primeira vez você lê, depois só vê.
+
+     A finta continua sendo o aviso mentindo, e agora mente com o corpo,
+     que é o que uma finta é. */
+  poseDoAviso: function () {
+    var mostra = (this.fase === 'avisa') && this.telegrafado && this.telegrafado.pose;
+    var q = mostra ? this.telegrafado.pose : null;
+    // ele está à direita da barra, então avançar é ir pro x menor
+    this.spEle.x = DIS.eleSp.x - (q ? q.dx : 0);
+    this.spEle.setScale(DIS.eleSp.escala, DIS.eleSp.escala * (q ? q.esmaga : 1));
+    return q;
+  },
+
+  /* a marca que o corpo dele deixa: pé plantado, mãos na barra, ombro
+     armado. Desenhada e não escrita — é ela que chega antes da frase. */
+  pintaMarca: function (g, q) {
+    if (!q) return;
+    /* ---------- a marca NÃO tem a cor do golpe ----------
+       Tinha, e era uma armadilha: as mãos na barra saíam verdes, que é a
+       cor do botão PUXAR — só que quem vence PUXAR é COTOVELO, o
+       vermelho. O jogo pintava o aviso com a cor do botão errado, e em
+       620ms o polegar vai na cor antes de a cabeça aplicar o triângulo.
+       A cor pertence à SUA resposta; o corpo dele é só corpo. Quem
+       identifica o golpe aqui é a FORMA — pé plantado, mãos na barra,
+       ombro armado — que é o que se lê num relance. */
+    var c = num(PAL.branco);
+    var ex = this.spEle.x, ey = DIS.eleSp.y;
+    if (q.marca === 'pe') {
+      // os dois pés plantados: uma base larga embaixo dele
+      g.fillStyle(c, 0.9).fillRect(ex - 22, ey - 3, 44, 5);
+      g.fillStyle(c, 0.35).fillRect(ex - 30, ey + 3, 60, 3);
+    } else if (q.marca === 'maos') {
+      // as duas mãos fechadas na barra, uma acima da outra
+      var bx = GW / 2 - 5;
+      g.fillStyle(c, 1).fillRect(bx - 6, ey - 96, 22, 9);
+      g.fillStyle(c, 1).fillRect(bx - 6, ey - 74, 22, 9);
+    } else if (q.marca === 'ombro') {
+      /* A ponta do ombro sai NA FRENTE dele, entre o corpo e a barra:
+         é pra lá que ela vai. Em cima do corpo ela lia como enfeite. */
+      g.fillStyle(c, 0.95);
+      g.fillTriangle(ex - 44, ey - 82, ex - 20, ey - 95, ex - 20, ey - 69);
+      g.fillStyle(c, 0.45).fillRect(ex - 20, ey - 92, 16, 20);
+    }
+  },
+
   pinta: function () {
     var g = this.g; g.clear();
     var i, a = DIS.arena;
+    var pose = this.poseDoAviso();
 
     g.fillStyle(0x05050a, 0.9).fillRect(0, 0, GW, GH);
     caixa(g, a.x, a.y, a.w, a.h, 0x2b3648);
@@ -317,6 +385,8 @@ var DisputaScene = new Phaser.Class({
     g.fillStyle(num(PAL.metalSom), 1).fillRect(bx, a.y + 30, 10, a.h - 50);
     g.fillStyle(num(PAL.metal), 1).fillRect(bx, a.y + 30, 6, a.h - 50);
     g.fillStyle(num(PAL.metalLuz), 1).fillRect(bx + 1, a.y + 30, 2, a.h - 50);
+    this.gMarca.clear();
+    this.pintaMarca(this.gMarca, pose);
 
     var m = DIS.medidor;
     if (this.modo.vida) {
