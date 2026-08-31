@@ -1508,6 +1508,33 @@ function separaCorpos(a, b, pesoA, pesoB) {
   return true;
 }
 
+/* ---------- o quanto a multidão te leva ----------
+   Era 0,4 pra todo mundo: um esbarrão empurrava o idoso e o ambulante
+   exatamente igual. Enquanto a plataforma era uma foto isso não
+   aparecia; agora que desce gente do trem e você atravessa contra a
+   corrente, o corpo passou a ser o que mais se sente — e corpo é
+   justamente o que devia separar um personagem do outro.
+
+   O número sai do `empurraoMult`, que já é "o quanto você empurra
+   gente" e até agora só valia pra enfiar na porta do vagão. Duas contas
+   da mesma coisa saem de sincronia na primeira mudança, então é uma só.
+
+   Ao quadrado porque a faixa crua (0,65 a 1,15) dá uma diferença que
+   não se sente: elevada, o ambulante absorve 0,59 do esbarrão e o idoso
+   0,22 — quase três vezes. É o que faz trocar de personagem trocar o
+   jogo, e não a roupa.
+
+   Quem tem `abremCaminho` fica fora da conta: o verbo dela é a multidão
+   sair da frente, e ser jogada de um lado pro outro seria o contrário
+   do que ela é. */
+function pesoDaMultidao() {
+  var c = GameState.char;
+  if (!c) return 0.4;
+  if (c.abremCaminho) return 0.62;
+  var f = c.empurraoMult / 0.95;      // 0,95 é o meio do elenco
+  return Math.max(0.18, Math.min(0.62, 0.4 * f * f));
+}
+
 /* Resolve o jogador contra a gente em volta, e a gente entre si.
    `gente` são Atores; quem tem .fixo (sentado, encostado, o guardinha)
    não sai do lugar. `limita` é a regra de parede de cada cena, que é
@@ -1523,11 +1550,12 @@ var PERTO_Y = 16;
 
 function resolveCorpos(pl, gente, limitaPl, limitaNpc) {
   var i, j, o, py = pl.sp.y;
+  var meuPeso = pesoDaMultidao();
   for (i = 0; i < gente.length; i++) {
     o = gente[i];
     if (!o || !o.sp || !o.sp.active) continue;
     if (Math.abs(o.sp.y - py) > PERTO_Y) continue;
-    var peso = o.fixo ? 0 : 0.4;
+    var peso = o.fixo ? 0 : meuPeso;
     if (separaCorpos(pl.sp, o.sp, 1 - peso, peso)) {
       if (limitaPl) limitaPl(pl.sp);
       if (!o.fixo && limitaNpc) limitaNpc(o.sp);
