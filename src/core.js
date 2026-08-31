@@ -1776,7 +1776,21 @@ var TOQUE_ATIVO = false;
    virar arrasto e o da direita virar ação — duas regras invisíveis
    pra quem tem teclado e mouse. Fora do celular a divisão não existe:
    clique em qualquer lugar é agir, e quem anda é o WASD. */
-var LADO_ACAO = GW / 2;
+/* ---------- por que não há mais metade de andar e metade de agir ----------
+   A tela era partida em x = 160: esquerda dirigia, direita agia. Medido
+   no toque, três toques curtos na metade esquerda davam ZERO ações e
+   três na metade direita davam três — um polegar só alcançava metade
+   dos verbos do jogo.
+
+   Isso pesa mais aqui do que pesaria em outro jogo, porque quem vai se
+   reconhecer neste é justamente quem joga com uma mão na barra e o
+   celular na outra. O esquema de duas mãos pedia à pessoa exatamente a
+   mão que o assunto do jogo tira dela.
+
+   Agora o papel vem do GESTO e não do lugar: arrastou, é manche; tocou e
+   soltou sem arrastar, é agir; segurou parado, é agir segurando. Duas
+   mãos continuam iguais — o segundo dedo vira o botão na hora, que é o
+   caso do polegar esquerdo dirigindo e o direito agindo. */
 function dividirTela() { return TOQUE_ATIVO; }
 var TOQUE = {
   ativo: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
@@ -1786,6 +1800,7 @@ var MANCHE = {
   zonaMorta: 10,   // menos que isso é dedo tremendo, não direção
   raio: 26,        // passou daqui, o manche desliza junto com o dedo
   espera: 120,     // parado por esse tempo vira "segurando pra agir"
+  esperaAndando: 260,  // onde se anda, o dedo tem direito de hesitar antes
   diagonal: 0.45   // o eixo fraco precisa disso do forte pra também contar
 };
 
@@ -1804,10 +1819,17 @@ function atualizaManche(agora) {
      direção nenhuma: lá o dedo encostado é só o botão de agir */
   if (!CONTROLES_VISIVEIS || d <= MANCHE.zonaMorta) {
     TOQUE.dx = TOQUE.dy = 0;
-    /* Onde não há pra onde andar (título, resultado) a tela inteira é
-       botão, e o dedo parado age. Onde há, agir é coisa da direita: o
-       dedo esquerdo parado é só um dedo parado. */
-    if (!CONTROLES_VISIVEIS && !TOQUE.arrastando && agora - TOQUE.t0 > MANCHE.espera) TOUCH.act = true;
+    /* Dedo parado age em qualquer tela. Era só onde não se anda, e por
+       isso um polegar sozinho não conseguia SEGURAR nada: nem a barra no
+       solavanco, nem o empurrão pra entrar no vagão.
+
+       A espera é maior onde há pra onde andar: quem põe o dedo pra
+       caminhar hesita antes de arrastar, e com 120ms essa hesitação
+       viraria ação sem querer — na catraca isso custa dinheiro. Os 260
+       são chute educado e precisam do polegar num aparelho de verdade.
+       No título e no resultado seguem 120, que lá não se anda. */
+    var esp = CONTROLES_VISIVEIS ? MANCHE.esperaAndando : MANCHE.espera;
+    if (!TOQUE.arrastando && agora - TOQUE.t0 > esp) TOUCH.act = true;
     return;
   }
 
@@ -3054,10 +3076,34 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
   this.tTitulo.setWordWrapWidth(GW - 40);
 
   this.sprites = [];
+  /* ---------- tocar o ícone é escolher o ícone ----------
+     A grade só andava de seta, e o toque em qualquer lugar comprava o
+     que estivesse selecionado: medido, tocar direto no quarto ícone
+     comprava o PRIMEIRO e fechava o menu com o dinheiro já gasto.
+     Numa mão só isso é o caminho normal — o polegar não atravessa a
+     tela pra arrastar, ele toca no que quer. Mesma gramática das cartas
+     do título: no não-selecionado o toque escolhe, no selecionado
+     compra. */
+  this.zonas = [];
+  this.ignora = false;
   for (var i = 0; i < this.itens.length; i++) {
     var cx = this.x0 + i * (cel + vao);
     this.sprites.push(scene.add.image(cx + cel / 2, this.yIcones + cel / 2,
       texturaItem(scene, this.itens[i])).setDepth(903).setScrollFactor(0));
+    var z = scene.add.zone(cx, this.yIcones, cel, cel).setOrigin(0, 0)
+      .setDepth(904).setScrollFactor(0).setInteractive();
+    (function (eu, idx) {
+      z.on('pointerdown', function () {
+        if (eu.sel === idx) return;         // no já escolhido, o toque compra
+        eu.sel = idx;
+        /* o mesmo dedo acende o Ctrl.act ao soltar, e sem isto escolher
+           e comprar sairiam do mesmo toque */
+        eu.ignora = true;
+        sfx('catraca');
+        eu.redesenha();
+      });
+    })(this, i);
+    this.zonas.push(z);
   }
 
   this.tNome = txtC(scene, GW / 2, this.y + 74, '', PAL.branco, 8).setDepth(901).setScrollFactor(0);
@@ -3097,7 +3143,7 @@ MenuComida.prototype.update = function () {
   if (Ctrl.leftJust) { this.sel = (this.sel + this.itens.length - 1) % this.itens.length; sfx('catraca'); this.redesenha(); }
   if (Ctrl.rightJust) { this.sel = (this.sel + 1) % this.itens.length; sfx('catraca'); this.redesenha(); }
   if (Ctrl.backJust) { var ao = this.aoFechar; this.fecha(); if (ao) ao(); return; }
-  if (Ctrl.actJust) this.compra();
+  if (Ctrl.actJust) { if (this.ignora) this.ignora = false; else this.compra(); }
 };
 MenuComida.prototype.compra = function () {
   var it = ITENS[this.itens[this.sel]];
@@ -3118,6 +3164,7 @@ MenuComida.prototype.fecha = function () {
   this.g.destroy(); this.gSel.destroy();
   this.tTitulo.destroy(); this.tNome.destroy(); this.tEfeito.destroy();
   for (var i = 0; i < this.sprites.length; i++) this.sprites[i].destroy();
+  for (i = 0; i < this.zonas.length; i++) this.zonas[i].destroy();
   if (this.scene.dialog === this) this.scene.dialog = null;
 };
 
@@ -3240,7 +3287,10 @@ var HudScene = new Phaser.Class({
     this.input.addPointer(2);
 
     this.input.on('pointerdown', function (p) {
-      if (dividirTela() && CONTROLES_VISIVEIS && p.x >= LADO_ACAO) {
+      /* O SEGUNDO dedo vira o botão, venha de onde vier. Era
+         `p.x >= LADO_ACAO`: o lado da tela mandava, o que de duas mãos
+         dava no mesmo e de uma mão tirava metade do jogo. */
+      if (dividirTela() && CONTROLES_VISIVEIS && TOQUE.ativo) {
         TOQUE_DIR.ativo = true; TOQUE_DIR.id = p.id;
         TOQUE_DIR.x = p.x; TOQUE_DIR.y = p.y; TOQUE_DIR.t0 = self.time.now;
         return;
@@ -3265,8 +3315,10 @@ var HudScene = new Phaser.Class({
         return;
       }
       if (TOQUE.ativo && p.id !== TOQUE.id) return;
-      // sem direcional na tela, o toque solto de qualquer lado é o Z
-      if (TOQUE.ativo && !TOQUE.arrastando && (!CONTROLES_VISIVEIS || !dividirTela())) TOUCH.pulso = true;
+      /* Tocou e soltou sem arrastar é o Z, em qualquer lugar da tela.
+         A condição exigia a metade direita, e era ela que fazia o toque
+         na metade esquerda não valer nada. */
+      if (TOQUE.ativo && !TOQUE.arrastando) TOUCH.pulso = true;
       TOQUE.ativo = false; TOQUE.id = -1; TOQUE.arrastando = false;
       TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = false;
     });
