@@ -2416,7 +2416,13 @@ Plaqueta.prototype.setText = function (txto) {
     this.g.fillStyle(0xffffff, 0.22).fillRect(lx - 6, ly - 5, lw + 12, 3);
     if (rod) {
       // a tarja da linha, mais escura, embaixo do destino
-      this.g.fillStyle(0x000000, 0.42).fillRect(lx - 6, ly + lh + 5, lw + 12, rod);
+      /* Chapa OPACA e depois a cor da linha por cima, e não 42% de preto
+         sobre o que estiver atrás: no piso do saguão, que é claro, os
+         42% davam uma tarja; no piso da plataforma, que é escuro, davam
+         exatamente a cor do piso, e o nome da linha ficava boiando
+         solto embaixo da placa como se fosse legenda de outra coisa. */
+      this.g.fillStyle(0x0d0d14, 1).fillRect(lx - 6, ly + lh + 5, lw + 12, rod);
+      this.g.fillStyle(this.faixaCor, 0.22).fillRect(lx - 6, ly + lh + 5, lw + 12, rod);
       this.g.fillStyle(0xffffff, 0.18).fillRect(lx - 6, ly + lh + 5, lw + 12, 1);
       this.tRod.x = this.x; this.tRod.y = ly + lh + 9;
       this.tRod.setText(this.rodape).setVisible(true);
