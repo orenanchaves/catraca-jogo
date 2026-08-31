@@ -71,6 +71,11 @@ var ACH = { y: 352, h: 62, alcance: 64 };
    duas plataformas lado a lado não caberiam, uma no meio cabe. */
 var PLAT_X0 = 136, PLAT_X1 = 288;          // lateral: piso 124..296
 var PLAT_C_X0 = 104, PLAT_C_X1 = 216;      // central: piso 92..228
+/* Onde o par de placas de sentido se repete na plataforma central. 700
+   é o pé, que é onde a escada desemboca e onde a escolha de lado
+   acontece; 60 é a outra ponta. Os dois fogem do 220 e do 520, que são
+   as chapas com o nome da estação. */
+var DIR_PLACAS = [700, 60];
 var CENTRAL = false;                        // esta estação é de plataforma central?
 
 /* a via, a faixa tátil e a borda de um lado. lado -1 = via à esquerda do
@@ -139,6 +144,57 @@ function portasDoTrem() {
   return out;
 }
 
+/* ---------- um trem por via ----------
+   Era um trem só, e todo x dele estava cravado na faixa da esquerda:
+   corpo em 20..108, porta em 72..108. Numa plataforma LATERAL isso
+   funciona, porque só existe uma via. Na Sé, que é central, existem
+   duas — e a da direita ficava com trilho, brita e faixa tátil e nunca
+   nada em cima. A plataforma era cenário, não escolha.
+
+   Cada trem sabe o LADO em que corre (-1 esquerda, +1 direita) e pra
+   que sentido ele vai. Numa central os dois lados são sentidos opostos,
+   e é isso que faz escolher o lado virar escolher o rumo. */
+function Trem(cena, lado, dir) {
+  this.lado = lado;
+  this.dir = dir;
+  this.portas = portasDoTrem();
+  this.estado = 'espera';
+  this.t = 0;
+  this.perdido = false;
+  this.aviso = '';
+  /* Era PLAT_ALT + 80, e os 80 sobravam POR BAIXO da plataforma: o
+     trem parado enfiava oitenta pixels de lata dentro da escada
+     rolante. Agora ele tem o comprimento exato da plataforma, e o
+     desenho ainda é recortado nela (ver pintaTrem) pra que nem durante
+     a chegada e a partida ele apareça onde não cabe. */
+  this.alt = PLAT_ALT;
+  this.y = PLAT_Y - this.alt;
+  this.g = cena.add.graphics().setDepth(20);
+}
+
+/* A beirada da plataforma deste lado: onde o trem encosta, e de onde
+   toda medida do desenho é contada pra trás.
+
+   Não pode ficar cravada em 108 como estava. A via da lateral tem 100px
+   de largura e a da central tem 76, então a beirada é 108 numa e 84 na
+   outra — e com o número cravado o trem da Sé entrava 24px por cima do
+   piso onde se anda e cobria a faixa tátil inteira, que é justamente a
+   linha que diz onde não pisar. */
+function beiradaDaVia(lado) {
+  var larg = CENTRAL ? 76 : 100;
+  return (lado < 0) ? larg + 8 : GW - larg - 8;
+}
+
+/* Um retângulo do trem, medido em DISTÂNCIA DA BEIRADA em vez de x
+   absoluto: `longe` e `perto` são o quanto ele começa e acaba pra
+   dentro da via. Assim o mesmo desenho serve os dois lados — o da
+   direita é o espelho — e serve as duas larguras de via sem repetir
+   conta nenhuma. Distância negativa é o que avança sobre o piso, que é
+   o caso do brilho da porta aberta. */
+function retTrem(g, b, lado, longe, perto, y, alt) {
+  g.fillRect((lado < 0) ? b - longe : b + perto, y, longe - perto, alt);
+}
+
 /* a plataforma inteira, sem cair no trilho nem entrar na parede */
 function limitaPlataforma(sp) {
   sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
@@ -184,7 +240,22 @@ var EstacaoScene = new Phaser.Class({
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
 
+    /* Numa central a via da esquerda anda pro começo da lista e a da
+       direita pro fim — e como o terminal sai da linha em que você
+       está, os dois lados se anunciam sozinhos. Numa lateral existe uma
+       via só, e ela é a do sentido em que você já está indo: a
+       plataforma do outro sentido é outra obra, a do corredor. */
+    this.trens = CENTRAL
+      ? [new Trem(this, -1, -1), new Trem(this, 1, 1)]
+      : [new Trem(this, -1, GameState.dir)];
+    /* As portas são as mesmas nos dois trens (portasDoTrem é pura), e a
+       fila da plataforma precisa delas sem perguntar de qual trem. */
     this.portas = portasDoTrem();
+    /* Os dois não podem chegar juntos: dois trens parados ao mesmo
+       tempo fazem a escolha ser "qual está mais perto", que não é
+       escolha. Meia espera de defasagem faz um chegar enquanto o outro
+       ainda não veio, e aí esperar o de lá custa perder o de cá. */
+    if (CENTRAL) this.trens[1].t = -this.intervalo(this.trens[1]) * 0.5;
     /* ---------- quem acabou de descer vê o trem ----------
        Descer trocava de cena na hora, e a plataforma nascia vazia: o
        trem de onde você saiu no segundo anterior simplesmente não
@@ -192,17 +263,20 @@ var EstacaoScene = new Phaser.Class({
        apareceu ali.
        Agora, quando a entrada é pela plataforma, a estação começa com o
        trem PARADO e a porta aberta, e ele parte alguns segundos depois.
-       Você vê ele indo embora, que é o que se vê de verdade. */
-    this.estado = (this.entrada === 'plataforma') ? 'aberto' : 'espera';
-    this.t = (this.entrada === 'plataforma') ? 2200 : 0;
-    this.perdido = false;
-    /* Era PLAT_ALT + 80, e os 80 sobravam POR BAIXO da plataforma: o
-       trem parado enfiava oitenta pixels de lata dentro da escada
-       rolante. Agora ele tem o comprimento exato da plataforma, e o
-       desenho ainda é recortado nela (ver pintaTrem) pra que nem
-       durante a chegada e a partida ele apareça onde não cabe. */
-    this.tremAlt = PLAT_ALT;
-    this.tremY = (this.entrada === 'plataforma') ? PLAT_Y : PLAT_Y - this.tremAlt;
+       Você vê ele indo embora, que é o que se vê de verdade.
+
+       Numa central é o trem do SEU sentido que fica parado, e não o da
+       esquerda: você desceu dele, e ele é o da via cujo rumo bate com o
+       que você vinha seguindo. */
+    if (this.entrada === 'plataforma') {
+      for (var q = 0; q < this.trens.length; q++) {
+        if (this.trens[q].dir !== GameState.dir) continue;
+        this.trens[q].estado = 'aberto';
+        this.trens[q].t = 2200;
+        this.trens[q].y = PLAT_Y;
+      }
+    }
+    this.tremEmpurrado = null;
     this.empurrando = false;
     this.pressao = 0;
 
@@ -220,8 +294,6 @@ var EstacaoScene = new Phaser.Class({
     this.gTempo = 0;
     this.gVx = 1;
     this.gOlhando = false;
-
-    this.gTrem = this.add.graphics().setDepth(20);
 
     /* Duas plateias, uma em cada andar: quem está no saguão anda de um
        lado pro outro, quem está na plataforma espera olhando o trilho. */
@@ -247,9 +319,9 @@ var EstacaoScene = new Phaser.Class({
       /* Ninguém espera espalhado por igual: espera-se ONDE A PORTA PARA.
          Dois terços nascem colados numa porta e o resto fica solto, que é
          o que faz a plataforma ter bolo e vão em vez de chuvisco. */
-      var ey;
-      if (Math.random() < 0.66 && this.portas.length) {
-        var pp = this.portas[Math.floor(Math.random() * this.portas.length)];
+      var ey, pts = portasDoTrem();
+      if (Math.random() < 0.66 && pts.length) {
+        var pp = pts[Math.floor(Math.random() * pts.length)];
         ey = platY(pp - HUD_H + 26 + (Math.random() - 0.5) * 90);
       } else {
         ey = platY(100 + Math.random() * (PLAT_ALT - 160));
@@ -259,7 +331,12 @@ var EstacaoScene = new Phaser.Class({
          cima do trilho do outro lado. */
       var e = new Ator(this, PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
         Phaser.Math.Clamp(ey, platY(90), ESC_Y - 30), sorteiaPax());
-      e.dir = 'left'; e.sp.setDepth(30); e.anima(0, false);
+      /* Numa central metade da plataforma espera o OUTRO lado: quem
+         está na metade da direita fica de costas pra via de cá,
+         olhando a de lá. Todo mundo virado pro mesmo lado era a
+         plataforma inteira dizendo que só existe um trem. */
+      e.dir = (CENTRAL && e.sp.x > (PLAT_X0 + PLAT_X1) / 2) ? 'right' : 'left';
+      e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
     }
     this.gente = this.plateia.concat(this.esperando, [this.guarda]);
@@ -461,7 +538,8 @@ var EstacaoScene = new Phaser.Class({
        pendurada no meio do piso, que é onde ela fica na Sé de verdade. */
     if (CENTRAL) {
       for (var nc = 220; nc < PLAT_ALT - 120; nc += 300) {
-        placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 3);
+        // 45 pelo mesmo motivo das placas de sentido: é peça pendurada
+        placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 45);
       }
     } else {
       for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
@@ -479,8 +557,39 @@ var EstacaoScene = new Phaser.Class({
        Sem isso não existe lado errado, porque não existe lado. Ela sai
        da linha em que você está: na Vermelha é Barra Funda ou Itaquera,
        na Azul é Jabaquara ou Tucuruvi. Nunca escrita à mão. */
-    placaSaida(this, GW / 2, platY(26),
-      '► ' + GameState.sentidoAtual(), 3, GameState.linhaAtual().nome);
+    /* Numa central cada via tem o SEU terminal, e uma placa só no meio
+       diz pra onde o trem vai sem dizer de que lado ele encosta — que é
+       exatamente a informação que falta pra escolher. Elas ficam
+       empilhadas e não lado a lado porque a placa tem ~150px de chapa e
+       o piso da central tem 112 de largura: as duas não cabem juntas.
+       72 é a altura da peça inteira medida no navegador (chapa 44 mais
+       tarja 22, mais 6 de respiro), não estimada. */
+    if (CENTRAL) {
+      /* Depth 45 e não 3: a 3 a multidão (30) andava POR CIMA da placa,
+         e placa pendurada com gente andando em cima dela não lê como
+         pendurada, lê como pintada no chão. 45 fica acima da gente e
+         abaixo do véu da hora (65), que precisa cair sobre tudo.
+
+         E o par se repete em dois pontos, não num só: você desemboca da
+         escada no PÉ da plataforma, e uma placa lá em cima no 26 ficava
+         a 800px de onde a escolha acontece — placa que não se vê na
+         hora de escolher é placa que não existe. 700 é o pé, 60 é a
+         outra ponta, e os dois fogem das chapas do nome da estação, que
+         moram no 220 e no 520. */
+      for (var pc = 0; pc < DIR_PLACAS.length; pc++) {
+        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc]),
+          '◄ ' + GameState.terminal(-1), 45, GameState.linhaAtual().nome);
+        /* 72 é a altura da peça inteira medida no navegador — chapa 44,
+           tarja da linha 22, e 6 de respiro entre uma e outra. Empilhado
+           e não lado a lado porque a chapa tem ~150px e o piso da
+           central tem 112 de largura: as duas não cabem na mesma linha. */
+        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc] + 72),
+          GameState.terminal(1) + ' ►', 45, GameState.linhaAtual().nome);
+      }
+    } else {
+      placaSaida(this, GW / 2, platY(26),
+        '► ' + GameState.sentidoAtual(), 3, GameState.linhaAtual().nome);
+    }
 
     this.gCatracas = this.add.graphics().setDepth(2);
     this.pintaCatracas();
@@ -784,20 +893,31 @@ var EstacaoScene = new Phaser.Class({
      Não é rotina de IA: é destino e caminhada. Basta isso pra plataforma
      parar de parecer uma foto. */
   andaFila: function (dt) {
-    var abriu = (this.estado === 'aberto');
-    var i, a;
+    var i, j, a, t;
 
-    // quem abre a porta manda: sorteia quem vai entrar, uma vez só
-    if (abriu && !this.mandouEntrar) {
-      this.mandouEntrar = true;
-      for (i = 0; i < this.esperando.length; i++) {
-        a = this.esperando[i];
-        if (!a.sp || !a.sp.active || Math.random() > 0.55) continue;
-        var py = this.portaMaisPerto(a.sp.y);
-        a.indo = { x: PLAT_X0 - 4, y: py };
+    /* Cada trem manda na fila do SEU lado. O destino era sempre
+       PLAT_X0 - 4, medido pra plataforma lateral: na Sé isso fazia a
+       plataforma inteira andar pra esquerda quando a porta abria,
+       inclusive quem estava ali esperando o trem da direita. */
+    var meio = (PLAT_X0 + PLAT_X1) / 2;
+    for (j = 0; j < this.trens.length; j++) {
+      t = this.trens[j];
+      var abriu = (t.estado === 'aberto');
+      // quem abre a porta manda: sorteia quem vai entrar, uma vez só
+      if (abriu && !t.mandouEntrar) {
+        t.mandouEntrar = true;
+        for (i = 0; i < this.esperando.length; i++) {
+          a = this.esperando[i];
+          if (!a.sp || !a.sp.active || a.indo) continue;
+          // quem está na outra metade não é passageiro deste trem
+          if (CENTRAL && ((t.lado < 0) !== (a.sp.x < meio))) continue;
+          if (Math.random() > 0.55) continue;
+          a.indo = { x: (t.lado < 0) ? PLAT_X0 - 4 : PLAT_X1 + 4,
+            y: this.portaMaisPerto(a.sp.y) };
+        }
       }
+      if (!abriu) t.mandouEntrar = false;
     }
-    if (!abriu) this.mandouEntrar = false;
 
     for (i = this.esperando.length - 1; i >= 0; i--) {
       a = this.esperando[i];
@@ -1205,11 +1325,12 @@ var EstacaoScene = new Phaser.Class({
   },
 
   /* ---------- trem ---------- */
-  pintaTrem: function () {
-    var g = this.gTrem; g.clear();
-    if (this.tremY <= PLAT_Y - this.tremAlt || this.tremY >= PLAT_Y + this.tremAlt) return;
-    var y0 = this.tremY, alt = this.tremAlt;
+  pintaTrem: function (t) {
+    var g = t.g; g.clear();
+    if (t.y <= PLAT_Y - t.alt || t.y >= PLAT_Y + t.alt) return;
+    var y0 = t.y, alt = t.alt, lado = t.lado;
     var l = GameState.linhaAtual();
+    var b = beiradaDaVia(lado);
 
     /* ---------- o recorte ----------
        O trem só existe na faixa da plataforma. Sem isto, na chegada e
@@ -1221,53 +1342,86 @@ var EstacaoScene = new Phaser.Class({
     if (base <= topo) return;
     var ac = base - topo;
 
+    /* A luz do jogo vem sempre de cima e da ESQUERDA, e por isso o
+       volume não espelha junto com a estrutura: no trem da direita o
+       brilho fica na face esquerda e a sombra na direita, ao contrário
+       do de cá. Espelhar tudo poria os dois trens da Sé iluminados de
+       lados opostos, e a cena passaria a brigar consigo mesma. */
+    var luzA = (lado < 0) ? 80 : 10, luzB = (lado < 0) ? 70 : 0;
+    var somA = (lado < 0) ? 16 : 88, somB = (lado < 0) ? 0 : 72;
+    var briA = (lado < 0) ? 66 : 34, briB = (lado < 0) ? 44 : 12;
+
     // corpo com volume
-    g.fillStyle(num(PAL.metalSom), 1).fillRect(20, topo, 88, ac);
-    g.fillStyle(num(PAL.metal), 1).fillRect(24, topo, 78, ac);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(28, topo, 10, ac);
-    g.fillStyle(0x000000, 0.28).fillRect(92, topo, 16, ac);
+    g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 88, 0, topo, ac);
+    g.fillStyle(num(PAL.metal), 1); retTrem(g, b, lado, 84, 6, topo, ac);
+    g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, luzA, luzB, topo, ac);
+    g.fillStyle(0x000000, 0.28); retTrem(g, b, lado, somA, somB, topo, ac);
     // faixa da linha, só se a testeira do trem estiver na plataforma
     if (y0 >= PLAT_Y && y0 + 12 <= ESC_Y) {
-      g.fillStyle(num(escurecer(l.cor, 0.35)), 1).fillRect(24, y0, 78, 12);
-      g.fillStyle(l.num, 1).fillRect(24, y0 + 2, 78, 8);
+      g.fillStyle(num(escurecer(l.cor, 0.35)), 1); retTrem(g, b, lado, 84, 6, y0, 12);
+      g.fillStyle(l.num, 1); retTrem(g, b, lado, 84, 6, y0 + 2, 8);
     }
 
     // janelas: as que caem fora do recorte simplesmente não existem
     for (var y = y0 + 30; y < y0 + alt - 40; y += 80) {
       if (y < topo || y + 48 > base) continue;
-      g.fillStyle(0x11161f, 1).fillRect(38, y, 58, 48);
-      g.fillStyle(0x1f2a3d, 1).fillRect(40, y + 2, 54, 44);
-      g.fillStyle(0x3a4a6a, 0.7).fillRect(42, y + 4, 50, 10);
-      g.fillStyle(0xffffff, 0.09).fillRect(42, y + 4, 22, 40);
+      g.fillStyle(0x11161f, 1); retTrem(g, b, lado, 70, 12, y, 48);
+      g.fillStyle(0x1f2a3d, 1); retTrem(g, b, lado, 68, 14, y + 2, 44);
+      g.fillStyle(0x3a4a6a, 0.7); retTrem(g, b, lado, 66, 16, y + 4, 10);
+      g.fillStyle(0xffffff, 0.09); retTrem(g, b, lado, briA, briB, y + 4, 40);
     }
 
     // portas
-    var ab = (this.estado === 'aberto');
-    for (var i = 0; i < this.portas.length; i++) {
-      var py = this.portas[i] + y0;
+    var ab = (t.estado === 'aberto');
+    for (var i = 0; i < t.portas.length; i++) {
+      var py = t.portas[i] + y0;
       // porta pela metade não é porta: ou cabe inteira, ou não aparece
       if (py < topo || py + 52 > base) continue;
       if (ab) {
-        g.fillStyle(0x07070c, 1).fillRect(76, py, 32, 52);
-        g.fillStyle(0x232d42, 1).fillRect(80, py + 4, 24, 44);
-        g.fillStyle(0x00e676, 1).fillRect(72, py, 4, 52);
-        g.fillStyle(0x00e676, 0.3).fillRect(108, py, 12, 52);
+        g.fillStyle(0x07070c, 1); retTrem(g, b, lado, 32, 0, py, 52);
+        g.fillStyle(0x232d42, 1); retTrem(g, b, lado, 28, 4, py + 4, 44);
+        g.fillStyle(0x00e676, 1); retTrem(g, b, lado, 36, 32, py, 52);
+        // a luz da porta cai NO PISO: distância negativa é o que avança
+        g.fillStyle(0x00e676, 0.3); retTrem(g, b, lado, 0, -12, py, 52);
       } else {
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(72, py, 36, 52);
-        g.fillStyle(0x767c92, 1).fillRect(74, py, 32, 52);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(74, py, 32, 2);
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(88, py, 3, 52);
-        g.fillStyle(num(PAL.amarelo), 1).fillRect(72, py + 24, 36, 4);
+        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 36, 0, py, 52);
+        g.fillStyle(0x767c92, 1); retTrem(g, b, lado, 34, 2, py, 52);
+        g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, 34, 2, py, 2);
+        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 20, 17, py, 52);
+        g.fillStyle(num(PAL.amarelo), 1); retTrem(g, b, lado, 36, 0, py + 24, 4);
       }
     }
   },
 
-  portaPerto: function () {
-    if (this.estado !== 'aberto') return null;
+  /* Qual trem tem uma porta ao seu alcance. Numa central são dois, e é
+     o LADO em que você está parado que decide qual — é essa a escolha
+     que a Sé existe pra cobrar. */
+  tremNaPorta: function () {
+    for (var i = 0; i < this.trens.length; i++) {
+      if (this.portaPerto(this.trens[i]) !== null) return this.trens[i];
+    }
+    return null;
+  },
+
+  // o primeiro trem com a porta aberta, pra dica saber pra onde apontar
+  tremAberto: function () {
+    for (var i = 0; i < this.trens.length; i++) {
+      if (this.trens[i].estado === 'aberto') return this.trens[i];
+    }
+    return null;
+  },
+
+  portaPerto: function (t) {
+    if (t.estado !== 'aberto') return null;
     var y = this.pl.sp.y, x = this.pl.sp.x;
-    if (x > PLAT_X0 + 64) return null;
-    for (var i = 0; i < this.portas.length; i++) {
-      var py = this.portas[i] + this.tremY + 26;
+    /* Distância até a beirada DESTE lado. Era `x > PLAT_X0 + 64`, que
+       só sabia da via da esquerda: na central isso deixava os 48px da
+       metade direita do piso sem embarcar em coisa nenhuma — 43% da
+       plataforma onde a porta aberta na sua frente não era porta. */
+    var d = (t.lado < 0) ? x - PLAT_X0 : PLAT_X1 - x;
+    if (d > 64) return null;
+    for (var i = 0; i < t.portas.length; i++) {
+      var py = t.portas[i] + t.y + 26;
       if (Math.abs(y - py) < 46) return py;
     }
     return null;
@@ -1275,32 +1429,70 @@ var EstacaoScene = new Phaser.Class({
 
   /* intervalo entre trens: no pico vem um atrás do outro, de madrugada
      você espera de verdade. Depois de perder um, o próximo perdoa. */
-  intervalo: function () {
+  intervalo: function (t) {
     /* 5600 e não 3400: no pico a espera caía pra 1,9s, que é menos do
        que a porta demora abrindo — o trem parecia estar sempre ali, e
        perder um não custava nada. Agora vai de 3,1s no pico a 11,8s de
        madrugada, e a faixa de horário volta a ser uma escolha: pico é
        cheio mas passa direto, madrugada é vazio mas você espera. */
     var e = 5600 * GameState.faixa().espera;
-    return this.perdido ? e * 0.6 : e;
+    return t.perdido ? e * 0.6 : e;
+  },
+
+  /* ---------- o painel ----------
+     Numa lateral ele fala do único trem que existe. Numa central ele
+     tem que dizer QUAL LADO, senão só se descobre olhando o trilho — e
+     o lado é a mecânica inteira da Sé. A seta é o lado; o nome é o
+     terminal, que é como plataforma de metrô se anuncia. */
+  avisoDoPainel: function () {
+    /* Aberto manda, depois chegando, depois a próxima espera — e
+       'partindo' fica por ÚLTIMO de propósito. Numa central o trem do
+       outro lado indo embora não é uma perda sua, e 'PERDEU ESSE' pra
+       quem está esperando o de cá é o painel mentindo. Só passa na
+       frente o trem em que você estava de fato tentando entrar.
+       Na lateral nada disso muda, porque lá o único trem que existe é
+       sempre o escolhido. */
+    var ordem = { aberto: 0, chegando: 1, espera: 2, partindo: 3 };
+    var m = null, rm = 9;
+    for (var i = 0; i < this.trens.length; i++) {
+      var t = this.trens[i];
+      var r = (t.estado === 'partindo' && this.tremEmpurrado === t) ? 0 : ordem[t.estado];
+      // o mais adiantado manda; empatou, manda o que chega antes
+      if (!m || r < rm || (r === rm && t.falta < m.falta)) { m = t; rm = r; }
+    }
+    return (CENTRAL ? (m.lado < 0 ? '◄ ' : '► ') : '') + m.aviso;
   },
 
   cicloTrem: function (dt) {
-    this.t += dt;
+    for (var i = 0; i < this.trens.length; i++) this.andaTrem(this.trens[i], dt);
+    this.painel.setText(this.avisoDoPainel());
+  },
+
+  andaTrem: function (t, dt) {
+    t.t += dt;
+    t.falta = 0;
     var dif = GameState.dificuldade();
-    switch (this.estado) {
+    switch (t.estado) {
       case 'espera':
-        var esp = this.intervalo();
-        this.painel.setText('TREM EM ' + Math.max(0, Math.ceil((esp - this.t) / 1000)) + 'S');
-        if (this.t > esp) {
-          this.estado = 'chegando'; this.t = 0; this.repos = false; sfx('trem');
-          GameState.passaTempo(Math.round(esp / 1000));
+        var esp = this.intervalo(t);
+        t.falta = Math.max(0, Math.ceil((esp - t.t) / 1000));
+        /* Na central o painel diz o TERMINAL, não "trem": com duas vias,
+           'TREM EM 6S' não informa qual das duas está contando. */
+        t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
+          : ('TREM EM ' + t.falta + 'S');
+        if (t.t > esp) {
+          t.estado = 'chegando'; t.t = 0; t.repos = false; sfx('trem');
+          /* O relógio anda uma vez por espera, e não uma por trem: com
+             dois trens ele andaria em dobro na Sé e a estação sozinha
+             comeria o dia. Quem cobra é o da esquerda, que é o único
+             que existe nas duas plantas de plataforma. */
+          if (t.lado < 0) GameState.passaTempo(Math.round(esp / 1000));
         }
         break;
       case 'chegando':
-        this.tremY = PLAT_Y - this.tremAlt + (this.t / 1400) * this.tremAlt;
-        if (this.tremY >= PLAT_Y) { this.tremY = PLAT_Y; this.estado = 'aberto'; this.t = 0; sfx('porta'); }
-        this.painel.setText('CHEGANDO');
+        t.y = PLAT_Y - t.alt + (t.t / 1400) * t.alt;
+        if (t.y >= PLAT_Y) { t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta'); }
+        t.aviso = 'CHEGANDO';
         break;
       case 'aberto':
         /* 10s e não 7,4: com a porta abrindo, a multidão entrando e você
@@ -1308,23 +1500,29 @@ var EstacaoScene = new Phaser.Class({
            decisão, não reflexo — a pressa tem que estar no fim da janela,
            não no começo dela. */
         var janela = Math.max(6000, 10000 - dif * 300);
-        this.painel.setText('EMBARQUE ' + Math.max(0, Math.ceil((janela - this.t) / 1000)) + 'S');
-        if (this.t > janela) {
-          this.estado = 'partindo'; this.t = 0; sfx('porta');
-          if (this.empurrando) this.falhouEmbarque();
+        t.falta = Math.max(0, Math.ceil((janela - t.t) / 1000));
+        t.aviso = 'EMBARQUE ' + t.falta + 'S';
+        if (t.t > janela) {
+          t.estado = 'partindo'; t.t = 0; sfx('porta');
+          // só falha o empurrão de quem estava empurrando ESTE trem
+          if (this.empurrando && this.tremEmpurrado === t) this.falhouEmbarque();
         }
         break;
       case 'partindo':
-        if (!this.repos) {
-          this.repos = true;
+        /* Chega gente nova pela escada quando o trem parte, que é por
+           onde chega gente numa estação. Só o da esquerda repõe: com os
+           dois repondo, a Sé encheria no dobro da velocidade num piso
+           que tem 112px de largura — mesma razão do relógio. */
+        if (!t.repos && t.lado < 0) {
+          t.repos = true;
           this.chegaNaPlataforma(Math.round(2 + 8 * GameState.lotacao()));
         }
-        this.tremY = PLAT_Y + (this.t / 1400) * this.tremAlt;
-        if (this.tremY >= PLAT_Y + this.tremAlt) { this.tremY = PLAT_Y - this.tremAlt; this.estado = 'espera'; this.t = 0; }
-        this.painel.setText('PERDEU ESSE');
+        t.y = PLAT_Y + (t.t / 1400) * t.alt;
+        if (t.y >= PLAT_Y + t.alt) { t.y = PLAT_Y - t.alt; t.estado = 'espera'; t.t = 0; }
+        t.aviso = 'PERDEU ESSE';
         break;
     }
-    this.pintaTrem();
+    this.pintaTrem(t);
   },
 
   /* ---------- minigame de entrar ---------- */
@@ -1335,8 +1533,10 @@ var EstacaoScene = new Phaser.Class({
     return 42 + 58 * GameState.lotacao();
   },
 
-  comecaEmpurrao: function () {
+  comecaEmpurrao: function (t) {
     this.empurrando = true;
+    // guardar QUAL trem é o que faz o lado virar sentido lá no entrou()
+    this.tremEmpurrado = t;
     // você não começa do zero: já está com o ombro na porta
     this.pressao = this.metaEmpurrao() * 0.18;
     this.gMini.setVisible(true);
@@ -1359,6 +1559,14 @@ var EstacaoScene = new Phaser.Class({
     this.fimEmpurrao();
     GameState.addDescanso(-4 - 5 * GameState.lotacao() - (espremido ? 4 : 0));
     if (espremido) { GameState.addCarisma(-2); this.cameras.main.shake(200, 0.005); }
+    /* ---------- o lado vira o rumo ----------
+       É aqui que a plataforma central deixa de ser desenho. Até agora
+       `dir` só era escrito pelo apontaPraAlvo(), que aponta pro alvo
+       sozinho — e enquanto ele fosse a única fonte era IMPOSSÍVEL pegar
+       o trem errado, ou seja, escolher o lado não escolhia nada. Agora
+       quem manda é a via em que você embarcou. Na lateral não muda
+       nada, porque lá o trem já nasce com o sentido que você seguia. */
+    GameState.dir = this.tremEmpurrado.dir;
     sfx('ok');
     this.scene.start('Vagao');
   },
@@ -1366,8 +1574,9 @@ var EstacaoScene = new Phaser.Class({
   falhouEmbarque: function () {
     // quase lá conta: a porta fecha nas suas costas e você vai espremido
     if (this.pressao >= this.metaEmpurrao() * 0.62) { this.entrou(true); return; }
+    var t = this.tremEmpurrado;
     this.fimEmpurrao();
-    this.perdido = true;
+    if (t) t.perdido = true;
     GameState.addDescanso(-4);
     GameState.addCarisma(-2);
     GameState.passaTempo(3);
@@ -1566,13 +1775,13 @@ var EstacaoScene = new Phaser.Class({
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
 
     if (y < ESC_Y) {
-      var porta = this.portaPerto();
+      var trem = this.tremNaPorta();
       var vendedor = this.ambulantePerto();
       /* A porta manda: quem está com o trem aberto na frente não vai
          parar pra comprar bala. O ambulante é pra quem está esperando. */
-      if (porta) {
+      if (trem) {
         this.dica.setText(nomeAgir() + ': entrar no vagão', PAL.verde);
-        if (Ctrl.actJust) this.comecaEmpurrao();
+        if (Ctrl.actJust) this.comecaEmpurrao(trem);
       } else if (vendedor) {
         // 'COMPRAR DO AMBULANTE' com o prefixo dá 27 caracteres: quatro a
         // mais do que a faixa aguenta, e o fim sai pela borda
@@ -1582,7 +1791,11 @@ var EstacaoScene = new Phaser.Class({
             estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua']);
         }
       } else {
-        this.dica.setText(this.estado === 'aberto' ? 'chegue na porta ◄' : '', PAL.amarelo);
+        /* A seta aponta pra via de quem está com a porta aberta: numa
+           central ◄ e ► são metades diferentes da plataforma, e mandar
+           ◄ pra quem está do lado direito era mandar pro trem errado. */
+        var ab = this.tremAberto();
+        this.dica.setText(ab ? ('chegue na porta ' + (ab.lado < 0 ? '◄' : '►')) : '', PAL.amarelo);
       }
       return;
     }
