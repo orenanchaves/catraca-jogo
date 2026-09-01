@@ -417,53 +417,57 @@ var ZapScene = new Phaser.Class({
   },
 
   /* ---------- aba 2: o mapa ----------
-     Duas linhas verticais lado a lado, uma bolinha por estação, e a Sé
-     ligando as duas. É o suficiente pra responder as três perguntas que
-     importam: onde estou, pra onde vou, e falta muito. */
+     Eram duas linhas verticais paralelas com a Se ligando as duas por
+     fora. A rede nao e assim e ninguem a tem na cabeca assim: a Azul
+     desce, a Vermelha atravessa, e elas se cruzam na Se. Agora o desenho
+     mora no `desenhaMapaRede`, que a parede da estacao usa igual — mapa
+     em dois lugares com duas geometrias diferentes seria o jogador
+     aprendendo o mesmo desenho duas vezes.
+
+     A caixa: x de 34 a 278 e y de 162 a 420. Sao os numeros que fazem os
+     nomes das pontas caberem — JABAQUARA tem 9 letras, 108px, centrado
+     no tronco Azul que cai em x=106, entao ele comeca em 52 e a tela
+     util comeca em 26. Dois pixels a esquerda e ele encosta na moldura.
+
+     O cabecalho perdeu uma linha. Eram tres, e a do meio dizia o destino
+     — que o mapa agora aponta com o triangulo verde. Texto que repete o
+     desenho logo abaixo dele e texto que cabe cortar. */
   pintaMapa: function (g) {
     if (!GameState.char) return;
-    var linhas = ['azul', 'vermelha'];
-    var topo = ZAP.topo + 34, alt = ZAP.abas - topo - 78;
-    var eu = GameState.estacaoAtual(), alvo = GameState.destinoFinal();
+    var eu = this, n = 2;
 
-    for (var l = 0; l < 2; l++) {
-      var info = LINHAS[linhas[l]], n = info.estacoes.length;
-      var cx = ZAP.tx0 + 48 + l * 120;
-      g.fillStyle(info.num, 0.5).fillRect(cx - 2, topo, 4, alt);
-      for (var i = 0; i < n; i++) {
-        var y = topo + Math.round(i * (alt - 1) / (n - 1));
-        var est = info.estacoes[i];
-        var souEu = (est === eu && GameState.linha === linhas[l]);
-        var ehAlvo = (est === alvo);
-        var ehSe = (est === BALDEACAO);
-        g.fillStyle(ehAlvo ? 0x00e676 : (ehSe ? 0xf2c14e : info.num), 1);
-        g.fillCircle(cx, y, ehAlvo || souEu || ehSe ? 5 : 3);
-        if (souEu) {
-          g.lineStyle(2, 0xffffff, 1).strokeCircle(cx, y, 9);
-          this.linhas[12].setVisible(true).setPosition(cx + 14, y - 9)
-            .setText('VOCÊ').setColor(PAL.branco);
-        }
-        if (ehAlvo) {
-          // só uma marca: o nome não cabe entre as duas linhas e
-          // atravessaria por cima da outra
-          g.lineStyle(2, 0x00e676, 1).strokeCircle(cx, y, 9);
-          g.fillStyle(0x00e676, 1);
-          g.fillTriangle(cx - 16, y - 5, cx - 16, y + 5, cx - 9, y);
-        }
+    /* Os rotulos saem de uma reserva de BitmapText. O indice 0 e 1 sao o
+       cabecalho, entao os do mapa comecam no 2 — e a origem e escrita
+       toda vez, porque a mesma reserva serve a aba da grana, que alinha
+       pela direita, e origem herdada de outro quadro desalinha tudo. */
+    desenhaMapaRede(g, 34, 162, 244, 258, {
+      eu: GameState.estacaoAtual(),
+      linhaEu: GameState.linha,
+      alvo: GameState.destinoFinal(),
+      // o limite e a tela util do aparelho, nao a caixa do desenho: os
+      // nomes das pontas podem passar do tronco, mas nunca da moldura
+      lim: [ZAP.tx0, ZAP.tx1],
+      rotula: function (t, x, y, cor) {
+        if (n >= 14) return;
+        eu.linhas[n++].setVisible(true).setOrigin(0, 0)
+          .setPosition(x, y).setText(t).setColor(cor);
       }
-      this.linhas[l].setVisible(true).setPosition(cx - 30, ZAP.abas - 56)
-        .setText(l ? 'VERMELHA' : 'AZUL').setColor(l ? PAL.vermelho : '#5aa0e0');
-    }
+    });
 
-    this.linha(2, ZAP.topo, '► ' + GameState.rotuloDaPerna(), PAL.amarelo);
-    this.linha(3, ZAP.topo + 18, '  ' + GameState.destinoFinal(), PAL.verde);
-    /* O nome da estação em que você está saiu do topo da tela e passou a
-       morar em dois lugares: o letreiro do vagão e este mapa. Aqui ele
-       fica no rodapé, colado no ponto que pisca — a bolinha diz ONDE, e
-       o rodapé diz o nome do onde. */
-    this.linha(4, ZAP.topo + 36, '  ' + GameState.faltamEstacoes() +
-      ' ATÉ ' + GameState.alvoAtual(), PAL.cinza);
-    this.tRodape.setText(GameState.estacaoAtual());
+    this.linha(0, ZAP.topo, '► ' + GameState.rotuloDaPerna(), PAL.amarelo)
+      .setOrigin(0, 0);
+    this.linha(1, ZAP.topo + 18, '  ' + GameState.faltamEstacoes() +
+      ' ATÉ ' + GameState.alvoAtual(), PAL.cinza).setOrigin(0, 0);
+    /* O rodape diz o NOME do onde: a bolinha e o anel branco dizem o
+       ponto, mas so as quatro pontas tem nome escrito no desenho, e no
+       meio da linha o anel sozinho nao responde "que estacao e esta".
+
+       Com o nome pelado ele parecia mais um rotulo do mapa — ficava logo
+       abaixo de JABAQUARA, na mesma coluna, e lia-se como uma estacao a
+       mais pendurada no fim da linha. O 'AQUI:' resolve por ser legenda
+       e nao topônimo. Curto de proposito: 'VOCÊ ESTÁ EM PÇA. ÁRVORE' da
+       24 caracteres, 288px, e a tela util do aparelho tem 268. */
+    this.tRodape.setText('AQUI: ' + GameState.estacaoAtual());
   },
 
   /* ---------- aba 3: a grana ----------

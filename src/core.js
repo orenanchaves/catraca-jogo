@@ -68,6 +68,140 @@ var LINHAS = {
   }
 };
 
+/* ---------- o mapa da rede, desenhado num lugar so ----------
+   O mapa do celular eram duas linhas verticais paralelas, lado a lado,
+   com a Se ligando as duas por fora. Nao e assim que a rede e, e nao e
+   assim que ninguem em Sao Paulo a tem na cabeca: a Azul desce, a
+   Vermelha atravessa, e elas se CRUZAM na Se. A baldeacao e o assunto
+   do jogo inteiro — a perna de ida troca de linha ali todo dia — e o
+   desenho que estava no bolso escondia justamente isso.
+
+   Em cruz o cruzamento e uma coisa so, e a pergunta "falta muito" passa
+   a ter resposta geometrica: e o quanto falta ate a esquina.
+
+   A funcao desenha e nao escreve. Quem chama e que sabe fazer texto —
+   o celular tem uma reserva de BitmapText, a parede da estacao cria os
+   dela — entao os rotulos saem por um `rotula(txt, x, y, cor)`, com x
+   ja resolvido pela esquerda.
+   O que nao pode se repetir e ONDE cada nome vai, e isso fica aqui.
+
+   Todo rotulo ganha uma chapa escura atras. Nao e enfeite: os nomes das
+   pontas cruzam a outra linha (BARRA FUNDA tem 132px e a Azul passa em
+   79) e letra clara sobre risco colorido nao se le. Chapa atras de
+   texto e a gramatica de placa que o resto do jogo ja usa. */
+function desenhaMapaRede(g, x0, y0, W, H, opts) {
+  opts = opts || {};
+  var rotula = opts.rotula || function () {};
+  var eu = opts.eu, linhaEu = opts.linhaEu, alvo = opts.alvo;
+  var az = LINHAS.azul, vm = LINHAS.vermelha;
+  var nA = az.estacoes.length, nV = vm.estacoes.length;
+
+  /* A Azul do indice 0 e JABAQUARA, que e a ponta SUL: no papel ela vai
+     embaixo. Por isso o y anda ao contrario do indice. A Vermelha do 0 e
+     BARRA FUNDA, oeste, e essa bate com a esquerda direto. */
+  function yAz(i) { return y0 + Math.round(H * (1 - i / (nA - 1))); }
+  function xVm(j) { return x0 + Math.round(W * j / (nV - 1)); }
+
+  var CX = xVm(vm.estacoes.indexOf(BALDEACAO));
+  var CY = yAz(az.estacoes.indexOf(BALDEACAO));
+
+  // o tronco, com a sombra por baixo pra linha nao virar risco de caneta
+  g.fillStyle(0x000000, 0.45).fillRect(CX - 3, y0 + 2, 7, H);
+  g.fillStyle(0x000000, 0.45).fillRect(x0, CY - 3, W, 7);
+  g.fillStyle(az.num, 1).fillRect(CX - 2, y0, 5, H);
+  g.fillStyle(vm.num, 1).fillRect(x0, CY - 2, W, 5);
+
+  /* A chapa do rotulo. O texto do jogo tem 12px por caractere e a tinta
+     mora de y+5 a y+19 dentro de uma caixa de 24 — a chapa acompanha a
+     TINTA, senao ela sobra por cima e por baixo e vira retangulo solto.
+
+     E o rotulo e PRESO no limite. O primeiro que escapou foi o VOCÊ de
+     quem esta em ITAQUERA: a ponta leste mora na borda direita do
+     desenho, o nome ia 14px a direita dela e saia pela lateral do
+     aparelho — justamente na estacao onde o jogador COMECA todo dia.
+     Preso, ele volta pra dentro e encosta na borda, que e o que uma
+     placa faz quando o espaco acaba.
+
+     Por isso a ancora nao sai daqui: quem chama recebe a x ja resolvida,
+     sempre pela esquerda. Duas contas da mesma coisa saem de sincronia
+     na primeira mudanca. */
+  var lim0 = (opts.lim && opts.lim[0] !== undefined) ? opts.lim[0] : x0 - 8;
+  var lim1 = (opts.lim && opts.lim[1] !== undefined) ? opts.lim[1] : x0 + W + 8;
+  function poe(t, x, y, ancora, cor) {
+    var w = t.length * 12 + 8;
+    var px = Math.round(x - w * ancora);
+    if (px + w > lim1) px = lim1 - w;
+    if (px < lim0) px = lim0;
+    g.fillStyle(0x05050c, 0.88).fillRect(px, y + 2, w, 20);
+    rotula(t, px + 4, y, cor);
+  }
+
+  var i, x, y, est, souEu, ehAlvo;
+  // as bolinhas das duas linhas, e as marcas por cima delas
+  for (i = 0; i < nA + nV; i++) {
+    var naAzul = (i < nA);
+    var k = naAzul ? i : i - nA;
+    est = (naAzul ? az : vm).estacoes[k];
+    x = naAzul ? CX : xVm(k);
+    y = naAzul ? yAz(k) : CY;
+    if (est === BALDEACAO) continue;      // a Se e desenhada uma vez so, depois
+    souEu = (est === eu && linhaEu === (naAzul ? 'azul' : 'vermelha'));
+    ehAlvo = (est === alvo);
+    /* ---------- a estacao e CLARA, o tronco e que tem cor ----------
+       Primeira versao: bolinha da cor da linha com um halo preto atras.
+       O tronco tem 5px e a bolinha 6, quase o mesmo — o que se via na
+       tela nao era uma linha com estacoes, era uma linha TRACEJADA, com
+       o halo preto abrindo um corte a cada 12px. O olho lia interrupcao
+       onde o mapa queria dizer parada.
+       Estacao clara sobre tronco colorido e como todo diagrama de metro
+       resolve isso, e resolve porque inverte o contraste em vez de
+       cortar o traco. O halo escuro sobrou so pra quem precisa saltar do
+       desenho: voce e o destino. */
+    if (souEu || ehAlvo) {
+      g.fillStyle(0x05050c, 1).fillCircle(x, y, 7);
+      g.fillStyle(ehAlvo ? 0x00e676 : 0xf2f0ff, 1).fillCircle(x, y, 5);
+    } else {
+      g.fillStyle(0xcdd6f0, 1).fillCircle(x, y, 2);
+    }
+    /* ---------- por que o anel nao vem escrito ----------
+       Ele vinha: um VOCÊ ao lado do ponto. Em LIBERDADE, que e a estacao
+       colada na Se, esse rotulo caiu exatamente em cima do SÉ — os dois
+       a direita do tronco, com quatro pixels de diferenca na altura. E
+       nao era um caso: qualquer vizinha do cruzamento fazia igual, e o
+       cruzamento e onde o jogador mais olha.
+       Dava pra empurrar o rotulo pro outro lado, e ai ele bateria na
+       ponta oeste. A saida foi perguntar quem ja responde: o anel branco
+       e o unico do mapa e diz ONDE, o rodape diz o NOME, e o cabecalho
+       diz quanto falta. O texto no meio do desenho nao acrescentava
+       nada — so ocupava o unico lugar apertado que o mapa tem. */
+    if (souEu) g.lineStyle(2, 0xf2f0ff, 1).strokeCircle(x, y, 9);
+    if (ehAlvo) {
+      g.lineStyle(2, 0x00e676, 1).strokeCircle(x, y, 9);
+      g.fillStyle(0x00e676, 1).fillTriangle(x - 18, y - 6, x - 18, y + 6, x - 10, y);
+    }
+  }
+
+  /* A Se e a esquina, e por isso ela e a unica que ganha nome no meio do
+     desenho: e o ponto onde o jogador troca de linha. Amarela porque no
+     resto do jogo amarelo ja e a cor da baldeacao. */
+  g.fillStyle(0x05050c, 1).fillCircle(CX, CY, 9);
+  g.fillStyle(0xf2c14e, 1).fillCircle(CX, CY, 6);
+  /* O laco das bolinhas pula a Se — ela pertence as duas linhas e sairia
+     desenhada duas vezes — e por isso o anel dela tem que ser feito aqui.
+     Sem isto o mapa perdia o "onde estou" exatamente na estacao em que o
+     jogador mais precisa dele, que e a da baldeacao. */
+  if (eu === BALDEACAO) g.lineStyle(2, 0xf2f0ff, 1).strokeCircle(CX, CY, 11);
+  poe('SÉ', CX + 16, CY + 4, 0, PAL.amarelo);
+
+  /* As quatro pontas. Sao elas que dizem o SENTIDO — o letreiro do trem
+     fala em "sentido Itaquera" e "sentido Barra Funda", e sem os nomes
+     nas pontas o mapa nao responde a mesma pergunta que o letreiro faz. */
+  poe(az.estacoes[nA - 1], CX, y0 - 24, 0.5, '#5aa0e0');
+  poe(az.estacoes[0], CX, y0 + H + 6, 0.5, '#5aa0e0');
+  poe(vm.estacoes[0], x0, CY - 28, 0, PAL.vermelho);
+  poe(vm.estacoes[nV - 1], x0 + W, CY + 10, 1, PAL.vermelho);
+}
+
 /* ---------- o que faz perder ----------
    Carisma e descanso zerados já matavam, mas nenhum dos dois falava com
    o trajeto. Com destino e relógio existe a perda que a cidade cobra de
@@ -3242,6 +3376,92 @@ MenuComida.prototype.fecha = function () {
   if (this.scene.dialog === this) this.scene.dialog = null;
   if (this.scene._menuComida === this) this.scene._menuComida = null;
 };
+
+/* ---------- o quadro de mapa da parede ----------
+   Toda estacao de verdade tem um: um quadro grande com a rede inteira,
+   parado na parede, que ninguem olha andando e todo mundo para pra ler
+   quando esta perdido. E isso que ele e aqui — o mapa do bolso responde
+   a mesma pergunta, mas o celular custa tempo e atencao, e o quadro esta
+   ali de graca pra quem passa do lado.
+
+   O desenho e o MESMO `desenhaMapaRede` do celular. Duas geometrias
+   diferentes pro mesmo mapa seria o jogador aprendendo o desenho duas
+   vezes, e o quadro da parede e justamente onde ele aprende primeiro.
+
+   A caixa: x de 40 a 280 e y de 150 a 450. Sao os numeros que fazem os
+   nomes caberem sem prender — BARRA FUNDA tem 132px comecando em 40, e
+   JABAQUARA tem 108 centrado no tronco Azul, que cai em x=110.
+
+   O quadro se fecha no mesmo botao que abriu. Sem o `ignora` o pulso do
+   dedo que o abriu chegava no primeiro update e fechava na cara. */
+function MapaParede(scene) {
+  this.scene = scene;
+  this.ativo = true;
+  this.ignora = true;
+  var l = GameState.linhaAtual();
+  var g = scene.add.graphics().setDepth(3200).setScrollFactor(0);
+  this.g = g;
+  this.textos = [];
+  var eu = this;
+  function poeTxt(t, x, y, cor, tam) {
+    var o = txt(scene, x, y, t, cor, tam || 8).setDepth(3201).setScrollFactor(0);
+    eu.textos.push(o);
+    return o;
+  }
+
+  // o veu: parar pra ler o mapa e parar de olhar pra frente
+  g.fillStyle(0x05050a, 0.88).fillRect(0, 0, GW, GH);
+
+  /* A chapa, com a tarja da linha no alto. E a gramatica de placa do
+     resto do jogo: chapa escura, tarja da cor em cima. */
+  g.fillStyle(0x0d1018, 1).fillRect(16, 56, GW - 32, 470);
+  g.lineStyle(2, 0x2a3550, 1).strokeRect(16, 56, GW - 32, 470);
+  g.fillStyle(l.num, 1).fillRect(16, 56, GW - 32, 26);
+  poeTxt('MAPA DA REDE', 160, 60, PAL.branco).setOrigin(0.5, 0);
+
+  /* 272 de altura e nao 300: com 300 a ponta sul caia em y=450 e o
+     JABAQUARA saia em 456, quatro pixels acima do AQUI: — os dois textos
+     encostavam e liam-se como uma linha so. Encolher o desenho e o certo
+     aqui: o rodape diz onde voce esta, e nao da pra empurrar pra baixo
+     sem sair da chapa. */
+  desenhaMapaRede(g, 40, 146, 240, 272, {
+    eu: GameState.estacaoAtual(),
+    linhaEu: GameState.linha,
+    alvo: GameState.destinoFinal(),
+    lim: [22, GW - 22],
+    rotula: function (t, x, y, cor) { poeTxt(t, x, y, cor); }
+  });
+
+  /* O rodape do quadro diz as duas coisas que o desenho nao escreve: o
+     nome de onde voce esta (o anel branco marca o ponto e nao o nomeia)
+     e o que falta pro proximo alvo. */
+  poeTxt('AQUI: ' + GameState.estacaoAtual(), 160, 462, PAL.branco).setOrigin(0.5, 0);
+  poeTxt(GameState.faltamEstacoes() + ' ATÉ ' + GameState.alvoAtual(), 160, 484, PAL.verde)
+    .setOrigin(0.5, 0);
+  // dentro da chapa: solto no veu ele parecia texto perdido na tela
+  poeTxt(nomeAgir() + ' PRA SAIR', 160, 504, PAL.cinzaEsc).setOrigin(0.5, 0);
+}
+
+MapaParede.prototype.update = function () {
+  if (!this.ativo) return;
+  if (Ctrl.backJust) { this.fecha(); return; }
+  if (Ctrl.actJust) { if (this.ignora) this.ignora = false; else this.fecha(); }
+};
+
+MapaParede.prototype.fecha = function () {
+  if (!this.ativo) return;
+  this.ativo = false;
+  this.g.destroy();
+  for (var i = 0; i < this.textos.length; i++) this.textos[i].destroy();
+  if (this.scene.dialog === this) this.scene.dialog = null;
+};
+
+function abreMapaParede(scene) {
+  if (scene.dialog) scene.dialog.fecha();
+  scene.dialog = new MapaParede(scene);
+  sfx('ok');
+  return scene.dialog;
+}
 
 function abreBarraca(scene, titulo, cardapio, aoFechar) {
   /* ---------- o preço fantasma ----------

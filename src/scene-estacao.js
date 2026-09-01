@@ -195,6 +195,38 @@ function retTrem(g, b, lado, longe, perto, y, alt) {
   g.fillRect((lado < 0) ? b - longe : b + perto, y, longe - perto, alt);
 }
 
+/* ---------- os quadros de mapa da parede ----------
+   Toda estacao de verdade tem um: um quadro grande com a rede inteira,
+   parado na parede, que ninguem olha andando e todo mundo para pra ler
+   quando esta perdido. O celular responde a mesma pergunta, mas custa
+   tempo e atencao; o quadro esta ali de graca pra quem passa do lado.
+
+   Na plataforma sao DOIS, a 240 e a 660 dos 900 — pelo mesmo motivo do
+   nome repetido na faixa: com um so, metade da plataforma nao tem mapa,
+   e andar 400px pra consultar um mapa e o oposto de consultar um mapa.
+
+   No saguao e um, na parede da ENTRADA. E onde ele fica na estacao de
+   verdade, e faz sentido de jogo: e a parede que voce encara chegando da
+   rua, antes da catraca, que e exatamente quando ainda da pra mudar de
+   ideia sobre o caminho. */
+var MAPAS_PLAT = [240, 660];
+var MAPA_PLAT = { x: 298, w: 20, h: 56 };
+var MAPA_SAG = { x: 196, y: 546, w: 84, h: 28 };
+
+function quadroDeMapa(g, x, y, w, h) {
+  g.fillStyle(0x000000, 0.4).fillRect(x + 2, y + 3, w, h);
+  g.fillStyle(0x0d1018, 1).fillRect(x, y, w, h);
+  g.fillStyle(0x2a3550, 1).fillRect(x, y, w, 2);
+  g.fillStyle(0x2a3550, 1).fillRect(x, y + h - 2, w, 2);
+  /* A cruz la dentro e o que faz o quadro ser um MAPA de longe. Sem ela
+     e um retangulo escuro na parede, indistinguivel de porta de servico
+     — e o jogador nao chega perto do que nao parece nada. */
+  var cx = x + Math.round(w * 0.42), cy = y + Math.round(h * 0.5);
+  g.fillStyle(LINHAS.azul.num, 1).fillRect(cx - 1, y + 6, 2, h - 12);
+  g.fillStyle(LINHAS.vermelha.num, 1).fillRect(x + 4, cy - 1, w - 8, 2);
+  g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy - 2, 4, 4);
+}
+
 /* a plataforma inteira, sem cair no trilho nem entrar na parede */
 function limitaPlataforma(sp) {
   sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
@@ -622,6 +654,9 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(l.num, 1).fillRect(0, 536, GW, 5);
     g.fillStyle(0x000000, 0.3).fillRect(0, 541, GW, 2);
 
+    // o quadro da rede na parede da entrada, abaixo da faixa da linha
+    quadroDeMapa(g, MAPA_SAG.x, MAPA_SAG.y, MAPA_SAG.w, MAPA_SAG.h);
+
     /* A parede da esquerda: o saguão sempre teve um limite invisível em
        x=28 e nada desenhado ali. Agora ela existe, e é onde mora o nome
        da estação — de pé, como na plataforma, porque deitado ele não
@@ -760,6 +795,17 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(l.num, 1).fillRect(300, 0, 18, alt);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1).fillRect(300, 0, 18, 2);
     g.fillStyle(0x000000, 0.3).fillRect(300, alt - 2, 18, 2);
+
+    /* Os quadros de mapa vao POR CIMA da faixa: numa estacao eles sao
+       pregados na parede, e a faixa passa atras. A tela de titulo pinta
+       esta mesma plataforma com altura menor, entao cada um so entra se
+       couber — sem isto o papel de parede do titulo ganhava um quadro
+       flutuando no vazio embaixo do desenho. */
+    for (var q = 0; q < MAPAS_PLAT.length; q++) {
+      if (MAPAS_PLAT[q] + MAPA_PLAT.h < alt) {
+        quadroDeMapa(g, MAPA_PLAT.x, MAPAS_PLAT[q], MAPA_PLAT.w, MAPA_PLAT.h);
+      }
+    }
   },
 
   /* ---------- a escada rolante ----------
@@ -1014,6 +1060,26 @@ var EstacaoScene = new Phaser.Class({
       a.indo = null;
       this.plateia.push(a);
     }
+  },
+
+  /* ---------- de frente pro quadro ----------
+     Encostar e o gesto: nao ha botao no mundo, ha uma parede e voce perto
+     dela. Na plataforma o quadro fica na parede da direita e voce so
+     chega ate PLAT_X1, entao o alcance no x e a distancia do piso ate a
+     parede — nao da pra pedir que ele encoste de verdade.
+
+     Na central nao existe quadro porque nao existe parede: a Se tem via
+     dos dois lados, e o que sobra ali e a placa pendurada. */
+  mapaPerto: function (x, y) {
+    var i;
+    if (y < ESC_Y) {
+      if (CENTRAL || x < PLAT_X1 - 18) return false;
+      for (i = 0; i < MAPAS_PLAT.length; i++) {
+        if (Math.abs(y - platY(MAPAS_PLAT[i] + MAPA_PLAT.h / 2)) < 34) return true;
+      }
+      return false;
+    }
+    return (y > 492 && x > MAPA_SAG.x - 16 && x < MAPA_SAG.x + MAPA_SAG.w + 16);
   },
 
   portaMaisPerto: function (y) {
@@ -1912,6 +1978,9 @@ var EstacaoScene = new Phaser.Class({
           abreBarraca(this, '"Olha o chocolate, a água\ngeladinha, a pururuca!"',
             estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua']);
         }
+      } else if (this.mapaPerto(x, y)) {
+        this.dica.setText(nomeAgir() + ': OLHAR O MAPA', PAL.amarelo);
+        if (Ctrl.actJust) abreMapaParede(this);
       } else {
         /* A seta aponta pra via de quem está com a porta aberta: numa
            central ◄ e ► são metades diferentes da plataforma, e mandar
@@ -1933,8 +2002,10 @@ var EstacaoScene = new Phaser.Class({
        pego. Fora dele, o risco é ele virar no meio do pulo. */
     var seguro = naCatraca && !vendo;
 
+    var noMapa = this.mapaPerto(x, y);
     var barraca = this.barracaPerto(x, y);
     if (barraca) dica = nomeAgir() + ': ' + barraca.nome;
+    else if (noMapa) dica = nomeAgir() + ': OLHAR O MAPA';
     /* 'TOQUE: ACHADOS E PERDIDOS' dá 25 caracteres com o prefixo, e a
        faixa cabe 26 justos. O preço é a informação que decide. */
     // sem a placa em cima do guichê, é a dica que diz o que ele é
@@ -1951,6 +2022,7 @@ var EstacaoScene = new Phaser.Class({
 
     if (Ctrl.actJust) {
       if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
+      else if (noMapa) abreMapaParede(this);
       else if (noGuiche) this.abreAchados();
       else if (naBilheteria) this.abreMenuBilheteria();
       else if (naCatraca) this.comecaPulo(gate);
