@@ -955,6 +955,67 @@ var EstacaoScene = new Phaser.Class({
     }
   },
 
+  /* ---------- a fila da catraca ----------
+     O saguão tinha gente andando de um lado pro outro e voltando, pra
+     sempre. Isso não é gente indo pra algum lugar, é vaivém — e vaivém
+     denuncia cenário mais rápido do que ninguém andar.
+
+     Numa estação as pessoas do saguão estão fazendo UMA coisa: passando
+     na catraca. Então elas escolhem uma porta, andam até ela, passam, e
+     somem escada acima. Quem some é reposto pela entrada da rua, que é
+     por onde entra gente numa estação.
+
+     Elas param na frente da catraca antes de passar. Sem essa parada o
+     bloqueio não parece bloqueio: parece um risco no chão. */
+  andaSaguao: function (dt) {
+    for (var i = this.plateia.length - 1; i >= 0; i--) {
+      var a = this.plateia[i];
+      if (!a.sp || !a.sp.active) { this.plateia.splice(i, 1); continue; }
+
+      if (!a.indo) {
+        // escolhe uma porta aberta e vai
+        var abertas = [];
+        for (var g = 0; g < this.gates.length; g++) {
+          if (!this.gates[g].fechada) abertas.push(this.gates[g]);
+        }
+        if (!abertas.length) { a.anima(dt, false); continue; }
+        var t = abertas[Math.floor(Math.random() * abertas.length)];
+        a.indo = { x: (t.x0 + t.x1) / 2, y: 262, fase: 'fila' };
+      }
+
+      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 4) {
+        if (a.indo.fase === 'fila') {
+          // passou a catraca: o giro do braço e o caminho pra escada
+          a.indo = { x: a.indo.x, y: 150, fase: 'passou' };
+          if (Math.abs(a.sp.x - this.pl.sp.x) < 90) sfx('catraca');
+        } else {
+          a.sp.destroy();
+          this.plateia.splice(i, 1);
+          this.chegaNoSaguao(1);
+          continue;
+        }
+      }
+      var v = 46 * dt / 1000;
+      a.sp.x += (dx / d) * v;
+      a.sp.y += (dy / d) * v;
+      a.setDir(dx, dy);
+      a.anima(dt, true);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
+  /* quem entra na estação entra pela rua, que é embaixo */
+  chegaNoSaguao: function (quantos) {
+    for (var i = 0; i < quantos; i++) {
+      var a = new Ator(this, 60 + Math.random() * 200, 520 + Math.random() * 30, sorteiaPax());
+      a.sp.setDepth(40);
+      a.indo = null;
+      this.plateia.push(a);
+    }
+  },
+
   portaMaisPerto: function (y) {
     var melhor = y, d = 1e9;
     for (var i = 0; i < this.portas.length; i++) {
@@ -1803,16 +1864,7 @@ var EstacaoScene = new Phaser.Class({
     var vendo = this.pintaCone();
 
     var i;
-    for (i = 0; i < this.plateia.length; i++) {
-      var a = this.plateia[i];
-      a.t += dt;
-      if (a.t > 2400) { a.t = 0; a.vx = -a.vx; }
-      var nx = a.sp.x + a.vx * dt / 1000;
-      if (nx < 40 || nx > 280) { a.vx = -a.vx; nx = a.sp.x; }
-      a.sp.x = nx;
-      a.dir = a.vx < 0 ? 'left' : 'right';
-      a.anima(dt, true);
-    }
+    this.andaSaguao(dt);
     this.andaFila(dt);
     this.andaAmbulante(dt);
 
