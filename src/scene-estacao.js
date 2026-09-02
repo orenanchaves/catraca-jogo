@@ -1,0 +1,2038 @@
+/* global Phaser */
+/* Catraca — a estação inteira, de uma ponta à outra
+
+   Ela era duas telas. Você andava até o alto do saguão e o jogo CORTAVA
+   pra plataforma; da plataforma não dava pra voltar. Era a mesma queixa
+   que gerou o trem de oito carros: o lugar acabava na borda da tela, e o
+   que estava do outro lado era outra cena, não outro lugar.
+
+   Agora é um mundo só, e a câmera anda com você. Embaixo o saguão, com a
+   bilheteria, as barracas e o bloqueio; em cima a plataforma, com o
+   trilho e o trem; e no meio a ESCADA ROLANTE, que é o que emenda os
+   dois — o mesmo papel que o fole faz entre dois vagões. Ela é estreita
+   de propósito: é onde a estação afunila, e é onde se sente que se está
+   passando de um lugar pro outro.
+
+   O saguão ficou exatamente onde estava, nas mesmas coordenadas de
+   sempre. Quem se mudou foi a plataforma, que subiu pra cima dele — em y
+   negativo, que não custa nada e evitou reescrever a geometria do
+   saguão inteiro pra ganhar um zero de presente.
+
+   E tem uma consequência de jogo que não é detalhe: o trem passa a
+   chegar e partir ENQUANTO você está lá embaixo comprando bilhete. Dá
+   pra ouvir, ver o letreiro contando, e subir correndo. Perder o trem
+   por estar na fila da bilheteria é a coisa mais verdadeira que esta
+   estação podia fazer. */
+
+/* ---------- a planta da estação ---------- */
+/* 900 e não 524. Uma tela de altura fazia a plataforma caber inteira na
+   vista: você via a ponta de cima e a de baixo ao mesmo tempo, e andar
+   nela não levava a lugar nenhum — era sempre o mesmo trecho. Com 900
+   ela tem uma tela e meia larga, a câmera precisa acompanhar, e as duas
+   pontas viram lugares diferentes: perto da escada e longe dela. */
+var PLAT_ALT = 900;
+var ESCADA_ALT = 148;            // a escada rolante entre ela e o saguão
+var PLAT_Y = HUD_H - ESCADA_ALT - PLAT_ALT;   // topo da plataforma (negativo)
+var ESC_Y = PLAT_Y + PLAT_ALT;                // onde a escada começa
+/* o que a escada deixa passar: uma boca estreita no meio da parede do
+   fundo do saguão */
+/* ---------- a escada rolante ----------
+   Era UMA, servindo de subida e descida ao mesmo tempo, o que nenhuma
+   estação tem: escada rolante anda pra um lado só. Agora são duas lado
+   a lado, a da esquerda subindo e a da direita descendo, separadas pela
+   balaustrada do meio.
+
+   O vão passou de 64 pra 96 porque duas pistas de 44 precisam caber um
+   boneco de 32 cada uma. De quebra isso alivia o gargalo que obrigou a
+   existir o funil: 96 numa parede de 320 ainda é aperto, mas é aperto
+   de estação, não de porta de armário. */
+var ESC_X0 = 112, ESC_X1 = 208;
+var ESC_DIV = 8;                                  // a balaustrada do meio
+var ESC_MEIO = (ESC_X0 + ESC_X1) / 2;
+var ESC_PISTA = [
+  { x0: ESC_X0, x1: ESC_MEIO - ESC_DIV / 2, sobe: true },
+  { x0: ESC_MEIO + ESC_DIV / 2, x1: ESC_X1, sobe: false }
+];
+/* o guichê de achados e perdidos, na parede da esquerda do saguão */
+/* Desceu de 296 pra 352 depois de medido na tela: a placa dele batia na
+   do DOG DO CÃO, que fica na parede de frente na mesma altura. */
+var ACH = { y: 352, h: 62, alcance: 64 };
+
+/* a plataforma em coordenadas do mundo: o piso vai da faixa tátil à
+   parede da direita */
+/* ---------- as duas plantas de plataforma ----------
+   A maioria das estações é LATERAL: uma via encostada na parede de um
+   lado e a plataforma do outro. A Sé não: ela é CENTRAL, você fica no
+   meio e o trem vem dos dois lados. Não é enfeite — é o que torna a
+   baldeação uma escolha de onde ficar em pé, e é por isso que ela é a
+   estação que todo mundo reconhece de olho fechado.
+
+   Central cabe em 320px justamente porque a plataforma some das bordas:
+   duas plataformas lado a lado não caberiam, uma no meio cabe. */
+var PLAT_X0 = 136, PLAT_X1 = 288;          // lateral: piso 124..296
+var PLAT_C_X0 = 104, PLAT_C_X1 = 216;      // central: piso 92..228
+/* Onde o par de placas de sentido se repete na plataforma central. 700
+   é o pé, que é onde a escada desemboca e onde a escolha de lado
+   acontece; 60 é a outra ponta. Os dois fogem do 220 e do 520, que são
+   as chapas com o nome da estação. */
+var DIR_PLACAS = [700, 60];
+var CENTRAL = false;                        // esta estação é de plataforma central?
+
+/* a via, a faixa tátil e a borda de um lado. lado -1 = via à esquerda do
+   piso, lado +1 = via à direita. Uma função só porque a central desenha
+   as duas e a lateral desenha uma: duas cópias sairiam de sincronia. */
+function pintaVia(g, x0, larg, alt, lado) {
+  g.fillStyle(num(PAL.brita), 1).fillRect(x0, 0, larg, alt);
+  g.fillStyle(0x1e1e28, 1);
+  var d0 = x0 + 16, dw = larg - 32;
+  for (var y = 0; y < alt; y += 24) g.fillRect(d0, y, dw, 9);
+  g.fillStyle(num(PAL.dormente), 1);
+  for (var y2 = 0; y2 < alt; y2 += 24) g.fillRect(d0, y2, dw, 7);
+  pontilhado(g, x0, 0, larg, alt, 0x000000, 0.25, 6);
+  // dois trilhos, com o brilho de cima
+  var t1 = x0 + Math.round(larg * 0.3), t2 = x0 + Math.round(larg * 0.72);
+  [t1, t2].forEach(function (tx) {
+    g.fillStyle(num(PAL.trilhoSom), 1).fillRect(tx, 0, 8, alt);
+    g.fillStyle(num(PAL.trilho), 1).fillRect(tx, 0, 5, alt);
+  });
+  // a borda escura da plataforma e a faixa tátil, do lado do piso
+  var bx = (lado < 0) ? x0 + larg : x0 - 8;
+  g.fillStyle(0x000000, 0.6).fillRect(bx, 0, 8, alt);
+  var fx = (lado < 0) ? bx + 8 : bx - 16;
+  g.fillStyle(num(PAL.amareloSom), 1).fillRect(fx, 0, 16, alt);
+  g.fillStyle(num(PAL.amarelo), 1).fillRect(fx + (lado < 0 ? 0 : 2), 0, 14, alt);
+  g.fillStyle(num(PAL.amareloSom), 1);
+  for (var yy = 4; yy < alt; yy += 12) g.fillRect(fx + 3, yy, 8, 5);
+  g.fillStyle(num(PAL.amareloLuz), 1);
+  for (var y3 = 4; y3 < alt; y3 += 12) g.fillRect(fx + 3, y3, 8, 2);
+}
+
+/* o piso quadriculado com o reflexo do teto */
+function pintaPisoPlat(g, x0, x1, alt) {
+  g.fillStyle(num(PAL.rejunte), 1).fillRect(x0, 0, x1 - x0, alt);
+  for (var py = 0; py < alt; py += 16) {
+    for (var px = x0; px < x1; px += 16) {
+      g.fillStyle(((px / 16 + py / 16) % 2) ? 0x3f3f52 : 0x494960, 1);
+      g.fillRect(px + 1, py + 1, 14, 14);
+      g.fillStyle(0xffffff, 0.07).fillRect(px + 1, py + 1, 14, 2);
+      g.fillStyle(0x000000, 0.16).fillRect(px + 1, py + 13, 14, 2);
+    }
+  }
+  g.fillStyle(0xffffff, 0.05).fillRect(x0 + 26, 0, 28, alt);
+  g.fillStyle(0xffffff, 0.03).fillRect(x1 - 64, 0, 20, alt);
+}
+
+/* o círculo de porta pintado no chão, com a seta apontando pra via */
+function marcaDePorta(g, cx, cy, lado) {
+  g.fillStyle(0x000000, 0.28).fillCircle(cx, cy, 15);
+  g.fillStyle(0x000000, 0.4).fillCircle(cx, cy, 11);
+  g.lineStyle(2, 0xffffff, 0.3).strokeCircle(cx, cy, 13);
+  g.fillStyle(0xffffff, 0.35);
+  var p = (lado < 0) ? -1 : 1;
+  g.fillTriangle(cx + p * 9, cy, cx + p, cy - 6, cx + p, cy + 6);
+  g.fillRect(Math.min(cx + p, cx - p * 7), cy - 2, 7, 4);
+}
+function platY(y) { return y + PLAT_Y - HUD_H; }   // y de tela da plataforma → mundo
+
+/* Onde as portas do trem param, de 118 em 118. É função pura de propósito:
+   a pintura da plataforma precisa das mesmas posições pra marcar o chão, e
+   ela é chamada com `this` nulo pela tela de título. Duas contas da mesma
+   coisa saem de sincronia na primeira mudança. */
+function portasDoTrem() {
+  var out = [];
+  for (var p = 76; p + 52 <= PLAT_ALT - 24; p += 118) out.push(p);
+  return out;
+}
+
+/* ---------- um trem por via ----------
+   Era um trem só, e todo x dele estava cravado na faixa da esquerda:
+   corpo em 20..108, porta em 72..108. Numa plataforma LATERAL isso
+   funciona, porque só existe uma via. Na Sé, que é central, existem
+   duas — e a da direita ficava com trilho, brita e faixa tátil e nunca
+   nada em cima. A plataforma era cenário, não escolha.
+
+   Cada trem sabe o LADO em que corre (-1 esquerda, +1 direita) e pra
+   que sentido ele vai. Numa central os dois lados são sentidos opostos,
+   e é isso que faz escolher o lado virar escolher o rumo. */
+function Trem(cena, lado, dir) {
+  this.lado = lado;
+  this.dir = dir;
+  this.portas = portasDoTrem();
+  this.estado = 'espera';
+  this.t = 0;
+  this.perdido = false;
+  this.aviso = '';
+  /* Era PLAT_ALT + 80, e os 80 sobravam POR BAIXO da plataforma: o
+     trem parado enfiava oitenta pixels de lata dentro da escada
+     rolante. Agora ele tem o comprimento exato da plataforma, e o
+     desenho ainda é recortado nela (ver pintaTrem) pra que nem durante
+     a chegada e a partida ele apareça onde não cabe. */
+  this.alt = PLAT_ALT;
+  this.y = PLAT_Y - this.alt;
+  this.g = cena.add.graphics().setDepth(20);
+}
+
+/* A beirada da plataforma deste lado: onde o trem encosta, e de onde
+   toda medida do desenho é contada pra trás.
+
+   Não pode ficar cravada em 108 como estava. A via da lateral tem 100px
+   de largura e a da central tem 76, então a beirada é 108 numa e 84 na
+   outra — e com o número cravado o trem da Sé entrava 24px por cima do
+   piso onde se anda e cobria a faixa tátil inteira, que é justamente a
+   linha que diz onde não pisar. */
+function beiradaDaVia(lado) {
+  var larg = CENTRAL ? 76 : 100;
+  return (lado < 0) ? larg + 8 : GW - larg - 8;
+}
+
+/* Um retângulo do trem, medido em DISTÂNCIA DA BEIRADA em vez de x
+   absoluto: `longe` e `perto` são o quanto ele começa e acaba pra
+   dentro da via. Assim o mesmo desenho serve os dois lados — o da
+   direita é o espelho — e serve as duas larguras de via sem repetir
+   conta nenhuma. Distância negativa é o que avança sobre o piso, que é
+   o caso do brilho da porta aberta. */
+function retTrem(g, b, lado, longe, perto, y, alt) {
+  g.fillRect((lado < 0) ? b - longe : b + perto, y, longe - perto, alt);
+}
+
+/* ---------- os quadros de mapa da parede ----------
+   Toda estacao de verdade tem um: um quadro grande com a rede inteira,
+   parado na parede, que ninguem olha andando e todo mundo para pra ler
+   quando esta perdido. O celular responde a mesma pergunta, mas custa
+   tempo e atencao; o quadro esta ali de graca pra quem passa do lado.
+
+   Na plataforma sao DOIS, a 240 e a 660 dos 900 — pelo mesmo motivo do
+   nome repetido na faixa: com um so, metade da plataforma nao tem mapa,
+   e andar 400px pra consultar um mapa e o oposto de consultar um mapa.
+
+   No saguao e um, na parede da ENTRADA. E onde ele fica na estacao de
+   verdade, e faz sentido de jogo: e a parede que voce encara chegando da
+   rua, antes da catraca, que e exatamente quando ainda da pra mudar de
+   ideia sobre o caminho. */
+var MAPAS_PLAT = [240, 660];
+var MAPA_PLAT = { x: 298, w: 20, h: 56 };
+var MAPA_SAG = { x: 196, y: 546, w: 84, h: 28 };
+
+function quadroDeMapa(g, x, y, w, h) {
+  g.fillStyle(0x000000, 0.4).fillRect(x + 2, y + 3, w, h);
+  g.fillStyle(0x0d1018, 1).fillRect(x, y, w, h);
+  g.fillStyle(0x2a3550, 1).fillRect(x, y, w, 2);
+  g.fillStyle(0x2a3550, 1).fillRect(x, y + h - 2, w, 2);
+  /* A cruz la dentro e o que faz o quadro ser um MAPA de longe. Sem ela
+     e um retangulo escuro na parede, indistinguivel de porta de servico
+     — e o jogador nao chega perto do que nao parece nada. */
+  var cx = x + Math.round(w * 0.42), cy = y + Math.round(h * 0.5);
+  g.fillStyle(LINHAS.azul.num, 1).fillRect(cx - 1, y + 6, 2, h - 12);
+  g.fillStyle(LINHAS.vermelha.num, 1).fillRect(x + 4, cy - 1, w - 8, 2);
+  g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy - 2, 4, 4);
+}
+
+/* a plataforma inteira, sem cair no trilho nem entrar na parede */
+function limitaPlataforma(sp) {
+  sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
+  sp.y = Phaser.Math.Clamp(sp.y, platY(80), ESC_Y - 16);
+}
+
+var EstacaoScene = new Phaser.Class({
+  Extends: Phaser.Scene,
+  initialize: function EstacaoScene() { Phaser.Scene.call(this, { key: 'Estacao' }); },
+
+  /* Dá pra chegar por baixo (da rua, passando pela catraca) ou por cima
+     (da baldeação, ou descendo de um trem na estação errada) — e quem
+     chega por cima já está dentro do sistema. */
+  init: function (dados) {
+    this.entrada = (dados && dados.onde) || 'saguao';
+  },
+
+  create: function () {
+    areaDeJogo();
+    Ctrl.liga(this);
+    HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
+    this.dialog = null;
+    this.fim = false;
+
+    /* ---------- o saguão ---------- */
+    this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
+    this.montaBarracas();
+    this.montaGates();
+    /* Cada passagem pela estacao redecide: quem pagou hoje nao carrega o
+       pulo de ontem. */
+    GameState.pulouCatraca = false;
+    this.pulo = null;      // o pulo em andamento, que é o que ele pode ver
+    this.flagra = null;    // ele te pegou e está vindo falar com você
+    this.pulou = false;
+
+    /* ---------- a plataforma ---------- */
+    // cinco portas ao longo do trem: sempre tem uma perto de onde você está
+    /* As portas nascem do comprimento do trem, de 118 em 118: com a
+       plataforma mudando de tamanho, lista fixa deixava metade dela
+       sem porta nenhuma. */
+    /* ---------- que planta é esta estação ----------
+       A Sé é central: você fica no meio e o trem vem dos dois lados.
+       Isso muda o piso caminhável, e por isso é decidido ANTES de
+       qualquer coisa ser desenhada ou posicionada. */
+    CENTRAL = (GameState.estacaoAtual() === BALDEACAO);
+    PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
+    PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
+
+    /* Numa central a via da esquerda anda pro começo da lista e a da
+       direita pro fim — e como o terminal sai da linha em que você
+       está, os dois lados se anunciam sozinhos. Numa lateral existe uma
+       via só, e ela é a do sentido em que você já está indo: a
+       plataforma do outro sentido é outra obra, a do corredor. */
+    this.trens = CENTRAL
+      ? [new Trem(this, -1, -1), new Trem(this, 1, 1)]
+      : [new Trem(this, -1, GameState.dir)];
+    /* As portas são as mesmas nos dois trens (portasDoTrem é pura), e a
+       fila da plataforma precisa delas sem perguntar de qual trem. */
+    this.portas = portasDoTrem();
+    /* Os dois não podem chegar juntos: dois trens parados ao mesmo
+       tempo fazem a escolha ser "qual está mais perto", que não é
+       escolha. Meia espera de defasagem faz um chegar enquanto o outro
+       ainda não veio, e aí esperar o de lá custa perder o de cá. */
+    if (CENTRAL) this.trens[1].t = -this.intervalo(this.trens[1]) * 0.5;
+    /* ---------- quem acabou de descer vê o trem ----------
+       Descer trocava de cena na hora, e a plataforma nascia vazia: o
+       trem de onde você saiu no segundo anterior simplesmente não
+       existia mais. Some a sensação de ter descido — parece que você
+       apareceu ali.
+       Agora, quando a entrada é pela plataforma, a estação começa com o
+       trem PARADO e a porta aberta, e ele parte alguns segundos depois.
+       Você vê ele indo embora, que é o que se vê de verdade.
+
+       Numa central é o trem do SEU sentido que fica parado, e não o da
+       esquerda: você desceu dele, e ele é o da via cujo rumo bate com o
+       que você vinha seguindo. */
+    if (this.entrada === 'plataforma') {
+      for (var q = 0; q < this.trens.length; q++) {
+        if (this.trens[q].dir !== GameState.dir) continue;
+        this.trens[q].estado = 'aberto';
+        this.trens[q].t = 2200;
+        this.trens[q].y = PLAT_Y;
+      }
+    }
+    this.tremEmpurrado = null;
+    this.empurrando = false;
+    this.pressao = 0;
+
+    this.desenhaCenario();
+
+    /* Quem está de plantão muda a partida inteira: o menorzinho tira
+       meio coração, o do meio um, o grandão dois. A roupa avisa antes
+       do número, e o tamanho avisa antes da roupa. */
+    this.patente = sorteiaGuarda();
+    this.guarda = new Ator(this, 80, 194, this.patente.sprite);
+    this.guarda.sp.setDepth(50);
+    this.guarda.sp.setScale(this.patente.escala);
+    this.guarda.fixo = true;          // ninguém empurra o guardinha
+    this.gEstado = 'anda';
+    this.gTempo = 0;
+    this.gVx = 1;
+    this.gOlhando = false;
+
+    /* Duas plateias, uma em cada andar: quem está no saguão anda de um
+       lado pro outro, quem está na plataforma espera olhando o trilho. */
+    this.plateia = [];
+    /* ---------- quanta gente ----------
+       Eram 9 no saguão e 10 na plataforma no pico, espalhadas por 900px:
+       dava uma pessoa a cada noventa pixels, que é o oposto de pico. Pico
+       na Sé é parede de gente com uma canaleta livre na faixa amarela,
+       e é essa densidade que faz o horário significar alguma coisa —
+       sem ela, escolher a madrugada não é escolha, é preferência. */
+    var quantos = Math.round(2 + 16 * GameState.lotacao()), i;
+    for (i = 0; i < quantos; i++) {
+      var a = new Ator(this, 40 + Math.random() * 240,
+        280 + Math.random() * 230, sorteiaPax());
+      a.sp.setDepth(40);
+      a.vx = (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 28);
+      a.t = Math.random() * 2000;
+      this.plateia.push(a);
+    }
+    this.esperando = [];
+    quantos = Math.round(2 + 34 * GameState.lotacao());
+    for (i = 0; i < quantos; i++) {
+      /* Ninguém espera espalhado por igual: espera-se ONDE A PORTA PARA.
+         Dois terços nascem colados numa porta e o resto fica solto, que é
+         o que faz a plataforma ter bolo e vão em vez de chuvisco. */
+      var ey, pts = portasDoTrem();
+      if (Math.random() < 0.66 && pts.length) {
+        var pp = pts[Math.floor(Math.random() * pts.length)];
+        ey = platY(pp - HUD_H + 26 + (Math.random() - 0.5) * 90);
+      } else {
+        ey = platY(100 + Math.random() * (PLAT_ALT - 160));
+      }
+      /* Dentro da faixa caminhável, e não a partir dela: na plataforma
+         central o piso tem 112px e o "+140" jogava metade da fila em
+         cima do trilho do outro lado. */
+      var e = new Ator(this, PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+        Phaser.Math.Clamp(ey, platY(90), ESC_Y - 30), sorteiaPax());
+      /* Numa central metade da plataforma espera o OUTRO lado: quem
+         está na metade da direita fica de costas pra via de cá,
+         olhando a de lá. Todo mundo virado pro mesmo lado era a
+         plataforma inteira dizendo que só existe um trem. */
+      e.dir = (CENTRAL && e.sp.x > (PLAT_X0 + PLAT_X1) / 2) ? 'right' : 'left';
+      e.sp.setDepth(30); e.anima(0, false);
+      this.esperando.push(e);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+
+    /* quem fica. De madrugada e no vazio eles aparecem mais:
+       menos gente passando, mais gente que não vai a lugar nenhum */
+    var chance = 0.75 - 0.45 * GameState.lotacao();
+    for (var q = 0; q < 2; q++) {
+      if (Math.random() > chance) continue;
+      var pd = new Ator(this, q ? 286 : 34, 300 + Math.random() * 130,
+        PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
+      pd.sp.setDepth(38); pd.anima(0, false);
+      pd.fixo = true;                 // quem está agachado não se mexe
+      this.gente.push(pd);
+    }
+    if (Math.random() < 0.6 - 0.35 * GameState.lotacao()) {
+      var pp = new Ator(this, 280, platY(120 + Math.random() * (PLAT_ALT - 200)),
+        PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
+      pp.sp.setDepth(28); pp.anima(0, false);
+      pp.fixo = true;
+      this.gente.push(pp);
+    }
+
+    this.montaAmbulante();
+
+    /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
+       baldeação ou desceu na estação errada já está lá em cima. */
+    var noAlto = (this.entrada === 'plataforma');
+    this.pl = new Ator(this, noAlto ? 200 : 160,
+      noAlto ? platY(PLAT_ALT - 140) : 500, spriteJogador());
+    this.pl.sp.setDepth(60);
+    this.pl.dir = noAlto ? 'left' : 'up';
+
+    /* ---------- a câmera ----------
+       A estação tem 1144 pixels de altura e a tela tem 576. Mesma regra
+       do trem: zona morta alta, porque câmera que corrige cada passo
+       embrulha o estômago. */
+    var cam = this.cameras.main;
+    cam.setBounds(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 8);
+    cam.setDeadzone(GW, 200);
+    cam.startFollow(this.pl.sp, true, 0.16, 0.16);
+    cam.setFollowOffset(0, -Math.round(HUD_H / 2));
+    cam.centerOn(GW / 2, this.pl.sp.y);
+
+    /* ---------- o que ficou caído no chão ----------
+       Os dois andares inteiros, saguão e plataforma, porque é justamente
+       o canto pra onde você não ia que tem que pagar alguma coisa. */
+    this.chao = new Chao(this, 24);
+    var eu2 = this;
+    this.chao.semeia(quantoCaiNoChao(4), function () { return eu2.pontoDoChao(); });
+
+    /* ---------- o que fica preso na tela ---------- */
+    this.gAviso = this.add.graphics().setDepth(70);   // o cone é do mundo
+    this.dica = new FaixaDica(this);
+    this.alerta = new Plaqueta(this, GW / 2, 320, { cor: PAL.vermelho, filete: 0xe8362c, depth: 82 });
+    /* O letreiro do embarque acompanha você pela estação inteira: é ele
+       que faz valer a pena subir correndo. Fica rente ao rodapé porque
+       o alto da tela é da placa da estação, que é do mundo — e as duas
+       empilhadas viravam uma tarja só. */
+    this.painel = new Plaqueta(this, GW / 2, GH - 98, { cor: PAL.branco, filete: num(GameState.faixa().cor), depth: 80 });
+    this.gMini = this.add.graphics().setDepth(500).setScrollFactor(0).setVisible(false);
+    this.tMini = txtC(this, GW / 2, GH / 2 - 54, '', PAL.branco, 8).setDepth(501).setScrollFactor(0).setVisible(false);
+    this.tMini2 = txtC(this, GW / 2, GH / 2 + 24, '', PAL.amarelo, 8).setDepth(501).setScrollFactor(0).setVisible(false);
+
+    /* O tutorial é uma camada por cima da primeira partida, e a estação
+       é onde toda partida começa. Quem já viu (ou pulou) não vê de
+       novo; o botão de rever mora no título. */
+    if (GameState.dia === 1 && !GameState.dentroDoSistema && !tutorialFeito()
+      && !this.scene.isActive('Tutorial')) {
+      this.scene.launch('Tutorial');
+    }
+
+    if (!noAlto) {
+      var f = GameState.faixa();
+      var cabec = GameState.hora() + ', ' + f.nome.toLowerCase() + '.\n';
+      var msg = GameState.char.gratuidade
+        ? cabec + 'Gratuidade. Você passa, e ninguém discute.'
+        : (GameState.valeRestante > 0
+          ? cabec + 'Vale-transporte: ' + GameState.valeRestante
+            + (GameState.valeRestante > 1 ? ' passagens.' : ' passagem.')
+          : cabec + 'Tarifa R$ '
+            + GameState.char.tarifa.toFixed(2).replace('.', ',') + '.');
+      fala(this, msg + '\n' + fraseDaFaixa(f), []);
+      var self = this;
+      this.time.delayedCall(2400, function () { if (self.dialog) self.dialog.fecha(); });
+    }
+  },
+
+  /* ---------- as barracas do saguão ----------
+     Toda estação de São Paulo tem as mesmas duas coisas: uma banca e um
+     carrinho de dogão. O carrinho é o ponto de encontro da estação, e
+     aqui ele se chama DOG DO CÃO — que é como se fala de coisa
+     monstruosa por aqui, e não é marca de ninguém.
+
+     As duas encostam na parede DIREITA, e isso não é enfeite: a
+     bilheteria fica no canto de cima à esquerda, e o caminho até ela é
+     a coluna esquerda do saguão. Barraca ali estrangulava justamente a
+     passagem de quem vai comprar passagem. */
+  montaBarracas: function () {
+    this.barracas = [
+      {
+        chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
+        x: 242, y: 300, w: 50, h: 58, lado: -1,
+        titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."',
+        cardapio: ['dogao', 'agua', 'chocolate']
+      },
+      {
+        chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0,
+        x: 242, y: 430, w: 50, h: 54, lado: -1,
+        titulo: '"Jornal, bala, pururuca."',
+        cardapio: ['pururuca', 'doce', 'jornal', 'agua']
+      }
+    ];
+  },
+
+  /* está na frente do balcão de alguma? o balcão é o lado que dá pro
+     corredor, não a parede */
+  barracaPerto: function (x, y) {
+    for (var i = 0; i < this.barracas.length; i++) {
+      var b = this.barracas[i];
+      var bx = b.lado > 0 ? b.x + b.w : b.x;          // onde fica o balcão
+      if (Math.abs(x - bx) < 34 && y > b.y - 10 && y < b.y + b.h + 10) return b;
+    }
+    return null;
+  },
+
+  pintaBarracas: function (g) {
+    for (var i = 0; i < this.barracas.length; i++) {
+      var b = this.barracas[i];
+      g.fillStyle(0x000000, 0.35).fillRect(b.x + 3, b.y + b.h, b.w, 4);
+      // o corpo
+      g.fillStyle(0x2b2b3a, 1).fillRect(b.x, b.y, b.w, b.h);
+      g.fillStyle(0x3d3d50, 1).fillRect(b.x, b.y, b.w, 3);
+      // o toldo listrado, virado pro corredor
+      var tx = b.lado > 0 ? b.x + b.w - 10 : b.x;
+      for (var f = 0; f < b.h; f += 8) {
+        g.fillStyle(((f / 8) % 2) ? b.cor : 0xf2f0ff, 1).fillRect(tx, b.y + f, 10, Math.min(8, b.h - f));
+      }
+      // o balcão, e a luz por cima dele
+      var cx = b.lado > 0 ? b.x + b.w : b.x - 4;
+      g.fillStyle(0x8a6b3a, 1).fillRect(cx - (b.lado > 0 ? 0 : 0), b.y + 8, 4, b.h - 16);
+      g.fillStyle(0xf2c14e, 0.14).fillRect(b.lado > 0 ? cx : cx - 24, b.y + 4, 28, b.h - 8);
+      // as caixas na bancada
+      g.fillStyle(0xe8a33c, 1).fillRect(b.x + 8, b.y + 12, 10, 8);
+      g.fillStyle(0x6ac06a, 1).fillRect(b.x + 8, b.y + 26, 10, 8);
+      g.fillStyle(0xd05a8a, 1).fillRect(b.x + 8, b.y + 40, 10, 8);
+    }
+  },
+
+  /* ---------- o cenário, em três faixas ----------
+     Saguão embaixo, plataforma em cima, escada rolante entre os dois.
+     Cada faixa é desenhada UMA vez e vira textura: o piso quadriculado
+     sozinho são mais de mil retângulos, e num mundo de duas telas de
+     altura isso seria repassado ao motor sessenta vezes por segundo por
+     nada — foi essa conta que derrubou o trem pra 18 quadros antes de
+     virar imagem também. */
+  desenhaCenario: function () {
+    var eu = this, l = GameState.linhaAtual();
+
+    var fundo = this.add.graphics().setDepth(-1);
+    fundo.fillStyle(num(PAL.bg), 1).fillRect(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 16);
+
+    texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
+    texturaDeCena(this, 'est_plataforma', GW, PLAT_ALT, function (g) { eu.pintaPlataforma(g, l, CENTRAL); });
+    texturaDeCena(this, 'est_escada', GW, ESCADA_ALT, function (g) { eu.pintaEscada(g); });
+
+    this.add.image(0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
+    this.add.image(0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
+    this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
+
+    /* Os letreiros são texto, e texto não entra em textura: eles ficam
+       no mundo, cada um na parede a que pertence. */
+    /* ---------- por que o saguão não tem mais placa ----------
+       Eram sete chapas de texto numa tela só: PLATAFORMA, BILHETES,
+       ACHADOS E PERDIDOS, DOG DO CÃO, BANCA, o nome da estação e a
+       faixa de baixo. Chapa preta com letra grande é o objeto mais
+       pesado que este jogo desenha, e cinco delas empilhadas cobriam
+       justamente o caminho por onde se anda.
+
+       E não diziam nada de novo: a faixa de dica JÁ nomeia o que está
+       na sua frente quando você chega perto — 'CLIQUE: DOG DO CÃO',
+       'CLIQUE: COMPRAR PASSAGEM'. A placa repetia de longe uma coisa
+       que o jogo diz de perto, e cobrava a tela inteira por isso.
+
+       Ficou só a da escada: essa não nomeia, ela APONTA, e é a única
+       informação do saguão que você precisa ter antes de chegar perto. */
+
+    // o nome da estação desceu: o guichê ocupou a altura em que ele morava
+    var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
+    tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+    /* A placa da escada fica NO PISO, rente à boca: pendurada no vão
+       ela virava parede na frente de quem sobe. */
+    placaSaida(this, GW / 2, 126, '▲ PLATAFORMA', 3);
+    /* o nome repetido na faixa, de 260 em 260: é assim que a estação se
+       identifica de qualquer ponto da plataforma, e é o marco que diz
+       quanto você já andou */
+    /* Na central não existe parede: o nome não tem onde morar de pé, e
+       escrito no ar ele ficaria sobre o trilho. Lá ele vira placa
+       pendurada no meio do piso, que é onde ela fica na Sé de verdade. */
+    if (CENTRAL) {
+      for (var nc = 220; nc < PLAT_ALT - 120; nc += 300) {
+        // 45 pelo mesmo motivo das placas de sentido: é peça pendurada
+        placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 45);
+      }
+    } else {
+      for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
+        var tn = txt(this, 309, platY(ny), GameState.estacaoAtual(), PAL.branco, 8);
+        tn.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+      }
+    }
+
+    /* ---------- pra que lado este trem vai ----------
+       A plataforma dizia só onde VOCÊ está, que é a informação que menos
+       falta: o nome da estação já está no alto da tela e no letreiro do
+       vagão. O que faltava é a que toda plataforma de metrô grita antes
+       de qualquer outra — o TERMINAL pra onde o trem sai daqui.
+
+       Sem isso não existe lado errado, porque não existe lado. Ela sai
+       da linha em que você está: na Vermelha é Barra Funda ou Itaquera,
+       na Azul é Jabaquara ou Tucuruvi. Nunca escrita à mão. */
+    /* Numa central cada via tem o SEU terminal, e uma placa só no meio
+       diz pra onde o trem vai sem dizer de que lado ele encosta — que é
+       exatamente a informação que falta pra escolher. Elas ficam
+       empilhadas e não lado a lado porque a placa tem ~150px de chapa e
+       o piso da central tem 112 de largura: as duas não cabem juntas.
+       72 é a altura da peça inteira medida no navegador (chapa 44 mais
+       tarja 22, mais 6 de respiro), não estimada. */
+    if (CENTRAL) {
+      /* Depth 45 e não 3: a 3 a multidão (30) andava POR CIMA da placa,
+         e placa pendurada com gente andando em cima dela não lê como
+         pendurada, lê como pintada no chão. 45 fica acima da gente e
+         abaixo do véu da hora (65), que precisa cair sobre tudo.
+
+         E o par se repete em dois pontos, não num só: você desemboca da
+         escada no PÉ da plataforma, e uma placa lá em cima no 26 ficava
+         a 800px de onde a escolha acontece — placa que não se vê na
+         hora de escolher é placa que não existe. 700 é o pé, 60 é a
+         outra ponta, e os dois fogem das chapas do nome da estação, que
+         moram no 220 e no 520. */
+      for (var pc = 0; pc < DIR_PLACAS.length; pc++) {
+        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc]),
+          '◄ ' + GameState.terminal(-1), 45, GameState.linhaAtual().nome);
+        /* 72 é a altura da peça inteira medida no navegador — chapa 44,
+           tarja da linha 22, e 6 de respiro entre uma e outra. Empilhado
+           e não lado a lado porque a chapa tem ~150px e o piso da
+           central tem 112 de largura: as duas não cabem na mesma linha. */
+        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc] + 72),
+          GameState.terminal(1) + ' ►', 45, GameState.linhaAtual().nome);
+      }
+    } else {
+      placaSaida(this, GW / 2, platY(26),
+        '► ' + GameState.sentidoAtual(), 3, GameState.linhaAtual().nome);
+    }
+
+    this.gCatracas = this.add.graphics().setDepth(2);
+    this.pintaCatracas();
+
+    veuDaHora(this, 65);
+  },
+
+  pintaSaguao: function (g, l) {
+    var eu = this;
+    var l = GameState.linhaAtual();
+
+    /* O alto do saguão era parede, porque o jogo cortava pra plataforma
+       quando você encostava nela. Agora a escada é caminhável e o que
+       fica ali é o VÃO dela: a parede sobrou dos dois lados, e os
+       degraus descem até o piso. Sem isto o letreiro e a placa ficavam
+       pendurados no meio do corredor e dava pra andar por cima da
+       parede. */
+    eu.azulejo(g, 0, HUD_H, GW, 72);
+    g.fillStyle(l.num, 1).fillRect(0, 98, ESC_X0 - 10, 5);
+    g.fillStyle(l.num, 1).fillRect(ESC_X1 + 10, 98, GW - ESC_X1 - 10, 5);
+    g.fillStyle(0x000000, 0.3).fillRect(0, 103, ESC_X0 - 10, 2);
+    g.fillStyle(0x000000, 0.3).fillRect(ESC_X1 + 10, 103, GW - ESC_X1 - 10, 2);
+    eu.bocaDaEscada(g, HUD_H, 116);
+
+    eu.piso(g, 0, 116, GW, 92, 0x4a4a60, 0x565670);
+    eu.piso(g, 0, 240, GW, 280, 0x3f3f52, 0x494960);
+    eu.azulejo(g, 0, 520, GW, 56);
+
+    // a cor da linha também na parede da entrada, atrás de quem chega
+    g.fillStyle(l.num, 1).fillRect(0, 536, GW, 5);
+    g.fillStyle(0x000000, 0.3).fillRect(0, 541, GW, 2);
+
+    // o quadro da rede na parede da entrada, abaixo da faixa da linha
+    quadroDeMapa(g, MAPA_SAG.x, MAPA_SAG.y, MAPA_SAG.w, MAPA_SAG.h);
+
+    /* A parede da esquerda: o saguão sempre teve um limite invisível em
+       x=28 e nada desenhado ali. Agora ela existe, e é onde mora o nome
+       da estação — de pé, como na plataforma, porque deitado ele não
+       cabe em parede nenhuma que sobrou. */
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(0, 240, 26, 280);
+    g.fillStyle(num(PAL.parede), 1).fillRect(0, 240, 22, 280);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(0, 240, 3, 280);
+    g.fillStyle(0x000000, 0.35).fillRect(22, 240, 4, 280);
+
+    /* o guichê de achados e perdidos: um vão iluminado na parede, com
+       balcão de metal e a prateleira do que ninguém veio buscar */
+    g.fillStyle(0x0a0a12, 1).fillRect(0, ACH.y, 30, ACH.h);
+    g.fillStyle(0x1c2436, 1).fillRect(2, ACH.y + 4, 26, ACH.h - 12);
+    g.fillStyle(0x2a3550, 1).fillRect(2, ACH.y + 4, 26, 2);
+    // as coisas na prateleira, cada uma de uma cor
+    var coisas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0x7fd6a0];
+    for (var ci = 0; ci < coisas.length; ci++) {
+      g.fillStyle(coisas[ci], 0.85).fillRect(5 + (ci % 2) * 12, ACH.y + 12 + Math.floor(ci / 2) * 16, 9, 11);
+      g.fillStyle(0x000000, 0.3).fillRect(5 + (ci % 2) * 12, ACH.y + 21 + Math.floor(ci / 2) * 16, 9, 2);
+    }
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(0, ACH.y + ACH.h - 10, 34, 10);
+    g.fillStyle(num(PAL.metal), 1).fillRect(0, ACH.y + ACH.h - 10, 34, 7);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(0, ACH.y + ACH.h - 10, 34, 2);
+    g.fillStyle(num(PAL.amarelo), 0.5).fillRect(0, ACH.y + ACH.h, 40, 3);
+
+    g.fillStyle(0xffffff, 0.05).fillRect(0, 240, GW, 26);
+    g.fillStyle(0xffffff, 0.03).fillRect(0, 266, GW, 26);
+    pontilhado(g, 0, 240, GW, 280, 0x000000, 0.07, 8);
+
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(0, 208, GW, 32);
+    g.fillStyle(num(PAL.metal), 1).fillRect(0, 208, GW, 22);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(0, 208, GW, 3);
+    g.fillStyle(0x000000, 0.35).fillRect(0, 240, GW, 6);
+
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(8, 176, 88, 64);
+    g.fillStyle(num(PAL.parede), 1).fillRect(8, 176, 88, 48);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(8, 176, 88, 4);
+    g.fillStyle(0x0a0a12, 1).fillRect(20, 196, 64, 26);
+    g.fillStyle(0x1c2436, 1).fillRect(22, 198, 60, 22);
+    g.fillStyle(num(PAL.amarelo), 1).fillRect(20, 226, 64, 5);
+    g.fillStyle(num(PAL.amareloSom), 1).fillRect(20, 231, 64, 2);
+
+    eu.pintaBarracas(g);
+  },
+
+  /* o vão por onde a escada entra no saguão: mesmo desenho da escada,
+     continuado pra baixo até o piso, pra emenda não aparecer */
+  /* Os degraus das duas pistas, a balaustrada do meio e os corrimãos.
+     Está numa função só porque a escada e a boca dela no saguão são o
+     mesmo desenho continuado — duas cópias da mesma conta saem de
+     sincronia na primeira mudança. */
+  pintaDegraus: function (g, y0, y1) {
+    var alt = y1 - y0, p, i;
+    g.fillStyle(0x22252f, 1).fillRect(ESC_X0 - 10, y0, ESC_X1 - ESC_X0 + 20, alt);
+    for (i = 0; i < ESC_PISTA.length; i++) {
+      p = ESC_PISTA[i];
+      var larg = p.x1 - p.x0;
+      for (var y = y0; y < y1; y += 10) {
+        g.fillStyle(0x3d4152, 1).fillRect(p.x0, y, larg, 7);
+        g.fillStyle(0x4a4f63, 1).fillRect(p.x0, y, larg, 2);
+        g.fillStyle(0x16181f, 1).fillRect(p.x0, y + 7, larg, 3);
+      }
+      /* A seta é o que diz o sentido, e ela mora NA pista: seta no meio
+         do vão não pertence a lado nenhum e não informa nada. */
+      var cx = (p.x0 + p.x1) / 2;
+      g.fillStyle(p.sobe ? 0x00e676 : 0xe8a33c, 0.32);
+      for (var sy = y0 + 22; sy < y1 - 20; sy += 44) {
+        if (p.sobe) g.fillTriangle(cx, sy, cx - 11, sy + 13, cx + 11, sy + 13);
+        else g.fillTriangle(cx, sy + 13, cx - 11, sy, cx + 11, sy);
+      }
+    }
+    // a balaustrada entre as duas, que é o que faz serem duas
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_MEIO - ESC_DIV / 2, y0, ESC_DIV, alt);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(ESC_MEIO - ESC_DIV / 2, y0, 2, alt);
+    g.fillStyle(0x000000, 0.35).fillRect(ESC_MEIO + ESC_DIV / 2 - 2, y0, 2, alt);
+    // corrimão de fora, dos dois lados
+    for (var d = 0; d < 2; d++) {
+      var hx = d ? ESC_X1 : ESC_X0 - 6;
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 6, alt);
+      g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx, y0, 2, alt);
+    }
+  },
+
+  bocaDaEscada: function (g, y0, y1) {
+    this.pintaDegraus(g, y0, y1);
+    // o pente de metal onde o degrau some no piso
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_X0 - 10, y1 - 8, ESC_X1 - ESC_X0 + 20, 8);
+    g.fillStyle(num(PAL.amareloSom), 1).fillRect(ESC_X0 - 10, y1 - 8, ESC_X1 - ESC_X0 + 20, 3);
+    g.fillStyle(num(PAL.metal), 1);
+    for (var px = ESC_X0 - 8; px < ESC_X1 + 8; px += 4) g.fillRect(px, y1 - 5, 2, 5);
+  },
+
+  /* ---------- as duas plataformas ----------
+     Lateral: via encostada na parede de um lado, piso do outro, e a
+     faixa da linha correndo a parede com o nome repetido.
+     Central: piso no meio, via dos DOIS lados, sem parede — que é a Sé.
+     As duas usam as mesmas peças (pintaVia, pintaPisoPlat), porque duas
+     cópias da mesma via saem de sincronia na primeira mudança. */
+  pintaPlataforma: function (g, l, central) {
+    /* A tela de título usa este desenho como papel de parede e chama com
+       a linha NULA e sem dizer o tipo: sem chão aqui, a faixa da parede
+       derrubava o jogo antes da primeira tela. */
+    l = l || LINHAS.vermelha;
+    var alt = PLAT_ALT;
+    var pts = portasDoTrem();
+
+    if (central) {
+      // via esquerda, piso no meio, via direita
+      pintaVia(g, 0, 76, alt, -1);
+      pintaPisoPlat(g, 92, 228, alt);
+      pintaVia(g, 244, 76, alt, 1);
+      /* Marca de porta dos dois lados: numa plataforma central o mesmo
+         chão serve os dois sentidos, e é a seta que diz qual é qual. */
+      for (var i = 0; i < pts.length; i++) {
+        marcaDePorta(g, 112, pts[i] + 26, -1);
+        marcaDePorta(g, 208, pts[i] + 26, 1);
+      }
+      return;
+    }
+
+    pintaVia(g, 0, 100, alt, -1);
+    pintaPisoPlat(g, 124, 296, alt);
+    for (var j = 0; j < pts.length; j++) marcaDePorta(g, 150, pts[j] + 26, -1);
+
+    // parede da direita
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(296, 0, 24, alt);
+    g.fillStyle(num(PAL.parede), 1).fillRect(300, 0, 20, alt);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(300, 0, 3, alt);
+    /* ---------- a faixa da linha na parede ----------
+       Plataforma de metrô não tem uma placa com o nome: tem uma FAIXA da
+       cor da linha correndo a parede inteira, com o nome repetido de
+       tantos em tantos metros. É o que se lê da janela do trem antes de
+       decidir se desce, e é o que dá marco a uma plataforma comprida —
+       sem repetição, andar 900px é andar no mesmo lugar. */
+    g.fillStyle(num(escurecer(l.cor, 0.45)), 1).fillRect(298, 0, 22, alt);
+    g.fillStyle(l.num, 1).fillRect(300, 0, 18, alt);
+    g.fillStyle(num(clarear(l.cor, 0.35)), 1).fillRect(300, 0, 18, 2);
+    g.fillStyle(0x000000, 0.3).fillRect(300, alt - 2, 18, 2);
+
+    /* Os quadros de mapa vao POR CIMA da faixa: numa estacao eles sao
+       pregados na parede, e a faixa passa atras. A tela de titulo pinta
+       esta mesma plataforma com altura menor, entao cada um so entra se
+       couber — sem isto o papel de parede do titulo ganhava um quadro
+       flutuando no vazio embaixo do desenho. */
+    for (var q = 0; q < MAPAS_PLAT.length; q++) {
+      if (MAPAS_PLAT[q] + MAPA_PLAT.h < alt) {
+        quadroDeMapa(g, MAPA_PLAT.x, MAPAS_PLAT[q], MAPA_PLAT.w, MAPA_PLAT.h);
+      }
+    }
+  },
+
+  /* ---------- a escada rolante ----------
+     O que emenda os dois andares, e o que faz a estação ser um lugar em
+     vez de duas telas. Dois degraus correndo, corrimão dos dois lados e
+     a parede fechando o resto: ela é estreita porque é a única passagem,
+     e é isso que dá a sensação de estar atravessando. */
+  pintaEscada: function (g) {
+    // a parede dos dois lados da passagem
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(0, 0, GW, ESCADA_ALT);
+    g.fillStyle(num(PAL.parede), 1).fillRect(0, 0, ESC_X0 - 10, ESCADA_ALT);
+    g.fillStyle(num(PAL.parede), 1).fillRect(ESC_X1 + 10, 0, GW - ESC_X1 - 10, ESCADA_ALT);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(0, 0, ESC_X0 - 10, 3);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(ESC_X1 + 10, 0, GW - ESC_X1 - 10, 3);
+
+    // as duas pistas: sobe pela esquerda, desce pela direita
+    this.pintaDegraus(g, 0, ESCADA_ALT);
+  },
+
+  /* ---------- bloqueio ----------
+     Cinco portas lado a lado, como em estação de verdade: uma delas é a
+     porta larga (bagagem e cadeirante), e quantas ficam abertas depende
+     da hora. De madrugada sobra quase nada; no pico abre tudo. */
+  montaGates: function () {
+    var f = GameState.faixa();
+    // o bloqueio começa depois da bilheteria e vai até a parede da direita
+    var X0 = 100, X1 = 292, TOTAL = 4, POSTE = 12, VAO = 30, VAO_LARGO = 38;
+    var larga = Math.floor(Math.random() * TOTAL);
+
+    var largura = POSTE;
+    for (var k = 0; k < TOTAL; k++) largura += (k === larga ? VAO_LARGO : VAO) + POSTE;
+    var x = X0 + Math.round(((X1 - X0) - largura) / 2) + POSTE;
+
+    this.gates = [];
+    for (var i = 0; i < TOTAL; i++) {
+      var vao = (i === larga) ? VAO_LARGO : VAO;
+      this.gates.push({ x0: x, x1: x + vao, larga: (i === larga), fechada: false });
+      x += vao + POSTE;
+    }
+
+    // fora de serviço: a porta larga é a última a fechar
+    var abertas = Phaser.Math.Clamp(Math.round(TOTAL * f.catracas), 2, TOTAL);
+    var ordem = Phaser.Utils.Array.Shuffle([0, 1, 2, 3]).sort(function (a, b) {
+      return (a === larga ? 1 : 0) - (b === larga ? 1 : 0);
+    });
+    for (var j = 0; j < TOTAL - abertas; j++) this.gates[ordem[j]].fechada = true;
+    this.abertas = abertas;
+  },
+
+  pintaCatracas: function () {
+    var g = this.gCatracas; g.clear();
+    for (var i = 0; i < this.gates.length; i++) {
+      var t = this.gates[i];
+      var w = t.x1 - t.x0;
+      var passa = this.liberado && !t.fechada;
+      var postes = [t.x0 - 14, t.x1];
+      for (var p = 0; p < 2; p++) {
+        var px = postes[p];
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(px, 198, 14, 48);
+        g.fillStyle(num(PAL.metal), 1).fillRect(px, 198, 10, 48);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(px + 2, 198, 3, 48);
+        // lâmpada do painel: verde passa, vermelho barra, apagado fora de serviço
+        g.fillStyle(t.fechada ? 0x4f5468 : (passa ? 0x00e676 : 0xe8362c), 1);
+        g.fillRect(px + 2, 204, 7, 6);
+        g.fillStyle(0xffffff, 0.5).fillRect(px + 2, 204, 7, 2);
+      }
+
+      if (t.fechada) {
+        // corrente e placa de fora de serviço
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(t.x0, 214, w, 16);
+        g.fillStyle(0x2a2a3a, 1).fillRect(t.x0, 216, w, 12);
+        g.fillStyle(num(PAL.amareloSom), 1);
+        for (var d = 0; d < w; d += 8) g.fillRect(t.x0 + d, 216, 4, 12);
+        g.fillStyle(0x000000, 0.45).fillRect(t.x0, 230, w, 4);
+        continue;
+      }
+
+      if (t.larga) {
+        // faixa azul no chão marcando a porta larga
+        g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
+        g.fillStyle(0x3a7fd0, 0.6).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
+      }
+
+      if (!this.liberado) {
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(t.x0, 218, w, 8);
+        g.fillStyle(num(PAL.metal), 1).fillRect(t.x0, 218, w, 5);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(t.x0, 218, w, 2);
+      } else {
+        g.fillStyle(0x00e676, 0.22).fillRect(t.x0, 208, w, 32);
+        g.fillStyle(0x00e676, 0.5).fillRect(t.x0, 236, w, 2);
+      }
+    }
+  },
+
+  azulejo: function (g, x, y, w, h) {
+    g.fillStyle(num(PAL.parede), 1).fillRect(x, y, w, h);
+    for (var yy = y; yy < y + h; yy += 16) {
+      var off = ((yy - y) / 16) % 2 ? 0 : 16;
+      for (var xx = x - 32; xx < x + w; xx += 32) {
+        g.fillStyle(num(PAL.paredeLuz), 1).fillRect(xx + off + 2, yy + 2, 28, 3);
+        g.fillStyle(num(PAL.parede), 1).fillRect(xx + off + 2, yy + 5, 28, 8);
+        g.fillStyle(num(PAL.paredeSom), 1).fillRect(xx + off + 2, yy + 13, 28, 2);
+      }
+    }
+    g.fillStyle(0x000000, 0.3).fillRect(x, y + h - 6, w, 6);
+  },
+
+  piso: function (g, x, y, w, h, c1, c2) {
+    g.fillStyle(num(PAL.rejunte), 1).fillRect(x, y, w, h);
+    for (var yy = y; yy < y + h; yy += 16) {
+      for (var xx = x; xx < x + w; xx += 16) {
+        var c = ((xx / 16 + yy / 16) % 2) ? c1 : c2;
+        g.fillStyle(c, 1).fillRect(xx + 1, yy + 1, 14, 14);
+        g.fillStyle(0xffffff, 0.07).fillRect(xx + 1, yy + 1, 14, 2);
+        g.fillStyle(0x000000, 0.16).fillRect(xx + 1, yy + 13, 14, 2);
+      }
+    }
+  },
+
+  /* ---------- a fila que embarca ----------
+     A plataforma tinha trinta e quatro pessoas paradas olhando o trilho,
+     e elas continuavam paradas com o trem parado na frente delas de porta
+     aberta. Era o detalhe que mais denunciava que aquilo era cenário: o
+     mundo não fazia o que o mundo faz.
+
+     Agora, quando a porta abre, parte da fila anda até a porta mais perto
+     e entra. Some quem entrou — e some de verdade, porque quem embarcou
+     foi embora. Quando o trem parte, chega gente nova pela escada, que é
+     por onde chega gente numa estação.
+
+     Não é rotina de IA: é destino e caminhada. Basta isso pra plataforma
+     parar de parecer uma foto. */
+  andaFila: function (dt) {
+    var i, j, a, t;
+
+    /* Cada trem manda na fila do SEU lado. O destino era sempre
+       PLAT_X0 - 4, medido pra plataforma lateral: na Sé isso fazia a
+       plataforma inteira andar pra esquerda quando a porta abria,
+       inclusive quem estava ali esperando o trem da direita. */
+    var meio = (PLAT_X0 + PLAT_X1) / 2;
+    for (j = 0; j < this.trens.length; j++) {
+      t = this.trens[j];
+      var abriu = (t.estado === 'aberto');
+      // quem abre a porta manda: sorteia quem vai entrar, uma vez só
+      if (abriu && !t.mandouEntrar) {
+        t.mandouEntrar = true;
+        for (i = 0; i < this.esperando.length; i++) {
+          a = this.esperando[i];
+          if (!a.sp || !a.sp.active || a.indo) continue;
+          // quem está na outra metade não é passageiro deste trem
+          if (CENTRAL && ((t.lado < 0) !== (a.sp.x < meio))) continue;
+          if (Math.random() > 0.55) continue;
+          a.indo = { x: (t.lado < 0) ? PLAT_X0 - 4 : PLAT_X1 + 4,
+            y: this.portaMaisPerto(a.sp.y) };
+        }
+      }
+      if (!abriu) t.mandouEntrar = false;
+    }
+
+    for (i = this.esperando.length - 1; i >= 0; i--) {
+      a = this.esperando[i];
+      if (!a.sp || !a.sp.active) { this.esperando.splice(i, 1); continue; }
+      if (!a.indo) { a.anima(dt, false); continue; }
+
+      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      /* ---------- quem sai, sai pela FAIXA e não pelo ponto ----------
+         Chegar a 4px de um alvo exato é fácil sozinho e impossível em
+         quinze: eles se empurram na boca da escada, ninguém encosta no
+         próprio ponto, e a saída entope — dava uma pilha parada no pé
+         da plataforma, que é o oposto de fluir. Quem vai embora some ao
+         cruzar a linha da escada, venha de onde vier no x.
+         Só vale pra quem SAI: quem chega nasce nessa mesma faixa e
+         sobe, e morreria no berço com a regra pelo y sozinha. */
+      if (a.indo.sai && a.sp.y >= ESC_Y - 26) {
+        a.sp.destroy();
+        this.esperando.splice(i, 1);
+        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        continue;
+      }
+      if (d < 4) {
+        // chegou na porta: entrou, e quem entrou não está mais aqui
+        a.sp.destroy();
+        this.esperando.splice(i, 1);
+        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        continue;
+      }
+      var v = (a.indo.v || 52) * dt / 1000;
+      a.sp.x += (dx / d) * v;
+      a.sp.y += (dy / d) * v;
+      a.setDir(dx, dy);
+      a.anima(dt, true);
+    }
+  },
+
+  /* ---------- a fila da catraca ----------
+     O saguão tinha gente andando de um lado pro outro e voltando, pra
+     sempre. Isso não é gente indo pra algum lugar, é vaivém — e vaivém
+     denuncia cenário mais rápido do que ninguém andar.
+
+     Numa estação as pessoas do saguão estão fazendo UMA coisa: passando
+     na catraca. Então elas escolhem uma porta, andam até ela, passam, e
+     somem escada acima. Quem some é reposto pela entrada da rua, que é
+     por onde entra gente numa estação.
+
+     Elas param na frente da catraca antes de passar. Sem essa parada o
+     bloqueio não parece bloqueio: parece um risco no chão. */
+  andaSaguao: function (dt) {
+    for (var i = this.plateia.length - 1; i >= 0; i--) {
+      var a = this.plateia[i];
+      if (!a.sp || !a.sp.active) { this.plateia.splice(i, 1); continue; }
+
+      if (!a.indo) {
+        // escolhe uma porta aberta e vai
+        var abertas = [];
+        for (var g = 0; g < this.gates.length; g++) {
+          if (!this.gates[g].fechada) abertas.push(this.gates[g]);
+        }
+        if (!abertas.length) { a.anima(dt, false); continue; }
+        var t = abertas[Math.floor(Math.random() * abertas.length)];
+        a.indo = { x: (t.x0 + t.x1) / 2, y: 262, fase: 'fila' };
+      }
+
+      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 4) {
+        if (a.indo.fase === 'fila') {
+          // passou a catraca: o giro do braço e o caminho pra escada
+          a.indo = { x: a.indo.x, y: 150, fase: 'passou' };
+          if (Math.abs(a.sp.x - this.pl.sp.x) < 90) sfx('catraca');
+        } else {
+          a.sp.destroy();
+          this.plateia.splice(i, 1);
+          this.chegaNoSaguao(1);
+          continue;
+        }
+      }
+      var v = 46 * dt / 1000;
+      a.sp.x += (dx / d) * v;
+      a.sp.y += (dy / d) * v;
+      a.setDir(dx, dy);
+      a.anima(dt, true);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
+  /* quem entra na estação entra pela rua, que é embaixo */
+  chegaNoSaguao: function (quantos) {
+    for (var i = 0; i < quantos; i++) {
+      var a = new Ator(this, 60 + Math.random() * 200, 520 + Math.random() * 30, sorteiaPax());
+      a.sp.setDepth(40);
+      a.indo = null;
+      this.plateia.push(a);
+    }
+  },
+
+  /* ---------- de frente pro quadro ----------
+     Encostar e o gesto: nao ha botao no mundo, ha uma parede e voce perto
+     dela. Na plataforma o quadro fica na parede da direita e voce so
+     chega ate PLAT_X1, entao o alcance no x e a distancia do piso ate a
+     parede — nao da pra pedir que ele encoste de verdade.
+
+     Na central nao existe quadro porque nao existe parede: a Se tem via
+     dos dois lados, e o que sobra ali e a placa pendurada. */
+  mapaPerto: function (x, y) {
+    var i;
+    if (y < ESC_Y) {
+      if (CENTRAL || x < PLAT_X1 - 18) return false;
+      for (i = 0; i < MAPAS_PLAT.length; i++) {
+        if (Math.abs(y - platY(MAPAS_PLAT[i] + MAPA_PLAT.h / 2)) < 34) return true;
+      }
+      return false;
+    }
+    return (y > 492 && x > MAPA_SAG.x - 16 && x < MAPA_SAG.x + MAPA_SAG.w + 16);
+  },
+
+  portaMaisPerto: function (y) {
+    var melhor = y, d = 1e9;
+    for (var i = 0; i < this.portas.length; i++) {
+      var py = platY(this.portas[i] + 26);
+      var dd = Math.abs(py - y);
+      if (dd < d) { d = dd; melhor = py; }
+    }
+    return melhor;
+  },
+
+  /* ---------- e desce gente do trem ----------
+     A fila que embarca resolveu metade: a porta abria, parte da
+     plataforma andava até ela e sumia. A outra metade não existia — o
+     trem chegava cheio, ficava dez segundos parado e ia embora com a
+     mesma gente dentro. Ninguém DESCIA.
+
+     E é a descida que faz a plataforma virar problema em vez de foto.
+     Quem desce tem um caminho só, a escada, e ele cruza exatamente o
+     caminho de quem quer chegar na porta. No pico você atravessa uma
+     corrente andando no sentido contrário, e a separação de corpos que
+     já existia — a multidão empurra o jogador com peso 0,4 contra 0,6
+     dele — passa a ter o que fazer. O desafio não é um minigame novo:
+     é a estação finalmente ocupando o mesmo espaço que você.
+
+     Quantos: a lotação decide, que é a mesma conta que enche o vagão,
+     vista do outro lado. De madrugada descem dois; no pico, dezesseis. */
+  desembarca: function (t) {
+    /* Teto de gente na plataforma. Um trem despeja até 16 e quem desce
+       leva até 16s pra atravessar os 900px; no pico vem trem a cada 3s,
+       e sem o teto a plataforma cresceria sem parar — em número e em
+       conta de colisão. 60 é o dobro do que a estação semeia no pico. */
+    if (this.esperando.length > 60) return;
+    /* Metade na central, e a razão é densidade e não quadro por segundo:
+       lá são DOIS trens despejando num piso de 112px, contra um trem num
+       de 152px na lateral. Cheio dos dois lados, a plataforma da Sé
+       recebia o dobro de gente na menor largura do jogo, e atravessar
+       deixava de ser difícil pra ser impossível. Com metade cada, a soma
+       dos dois dá o mesmo tanto que uma lateral recebe.
+       (Cheguei aqui achando que era custo de quadro. Não era: medido em
+       recarga limpa, com e sem desembarque dá 49 contra 46 na Sé, dentro
+       do ruído. O fps desta máquina não serve pra isso — ver CLAUDE.md.) */
+    var quantos = Math.round((2 + 14 * GameState.lotacao()) / (CENTRAL ? 2 : 1));
+    var bx = (t.lado < 0) ? PLAT_X0 + 6 : PLAT_X1 - 6;
+    for (var i = 0; i < quantos; i++) {
+      var py = t.portas[Math.floor(Math.random() * t.portas.length)] + t.y + 26;
+      var a = new Ator(this, bx, py + (Math.random() - 0.5) * 24, sorteiaPax());
+      a.sp.setDepth(30);
+      /* Eles moram na mesma lista de quem espera porque dividem a
+         caminhada e a física de corpo. O que os separa é já nascerem
+         com `indo`, e o sorteio de embarque pular quem já tem destino:
+         quem está saindo não entra de novo no trem que acabou de
+         largá-lo. */
+      /* 74 e não 52: quem desce do trem anda com destino, e quem espera
+         anda à toa. E a 52 a travessia dos 900px levava 17s, mais que o
+         intervalo entre trens no pico — a plataforma acumulava três
+         levas ao mesmo tempo e o rio virava represa. A 74 são 12s, que
+         cabe dentro de um ciclo. */
+      a.indo = { x: ESC_MEIO + (Math.random() - 0.5) * 70, y: ESC_Y - 8, v: 74, sai: true };
+      this.esperando.push(a);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
+  /* ---------- e chega gente nova ----------
+     Se só saísse gente, a plataforma esvaziava e não voltava. Quem chega
+     numa estação chega pela escada, então é de lá que eles nascem. */
+  chegaNaPlataforma: function (quantos) {
+    for (var i = 0; i < quantos; i++) {
+      var a = new Ator(this, ESC_MEIO + (Math.random() - 0.5) * 60,
+        ESC_Y - 20 - Math.random() * 30, sorteiaPax());
+      a.sp.setDepth(30);
+      a.indo = {
+        x: PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+        y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
+      };
+      /* Eles param ANTES da porta: quem acabou de chegar espera o
+         próximo trem, não entra no que está indo embora. */
+      a.indo.x = Phaser.Math.Clamp(a.indo.x, PLAT_X0 + 12, PLAT_X1 - 12);
+      this.esperando.push(a);
+    }
+    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+  },
+
+  /* ---------- áreas caminháveis, nas três faixas ---------- */
+  podeIr: function (x, y) {
+    // ---- plataforma ----
+    if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80);
+    // ---- escada rolante: a única passagem entre os dois andares ----
+    if (y < 116) return x > ESC_X0 && x < ESC_X1;
+    // ---- saguão ----
+    /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
+       saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
+       são o único jeito de contornar — cada pixel de beirada é caminho. */
+    if (x < 22 || x > 298) return false;
+    // o corpo da barraca é parede; o balcão é onde se atende
+    for (var b = 0; b < this.barracas.length; b++) {
+      var q = this.barracas[b];
+      if (x > q.x - 6 && x < q.x + q.w + 6 && y > q.y - 4 && y < q.y + q.h + 4) return false;
+    }
+    if (y >= 244 && y <= 516) return true;
+    if (y >= 116 && y <= 204) return true;
+    if (y > 204 && y < 244) {
+      if (!this.liberado) return false;
+      for (var i = 0; i < this.gates.length; i++) {
+        var t = this.gates[i];
+        if (t.fechada) continue;
+        if (x > t.x0 + 2 && x < t.x1 - 2) return true;
+      }
+      return false;
+    }
+    return false;
+  },
+
+  /* Um ponto pisável qualquer da estação, dos dois andares. Sorteia e
+     confere em vez de calcular a área livre: a planta tem barraca,
+     bilheteria, catraca e trilho, e listar tudo isso de novo aqui seria
+     uma segunda verdade pra sair de sincronia com a primeira. */
+  pontoDoChao: function () {
+    var naPlataforma = Math.random() < 0.42;
+    var x, y;
+    if (naPlataforma) {
+      x = Phaser.Math.Between(PLAT_X0 + 10, PLAT_X1 - 10);
+      y = Phaser.Math.Between(platY(96), ESC_Y - 30);
+    } else {
+      x = Phaser.Math.Between(36, 286);
+      y = Phaser.Math.Between(128, 508);
+      // longe do bloqueio: moeda em cima da catraca não dá pra pegar
+      if (y > 196 && y < 292) y += 110;
+    }
+    return this.podeIr(x, y) ? { x: x, y: y } : null;
+  },
+
+  /* ---------- o funil ----------
+     A estação tem dois gargalos: o bloqueio, que são quatro portas de 30
+     pixels numa parede de 320, e a boca da escada, que são 64 numa de
+     320. Andar pra cima em qualquer outro lugar batia numa parede
+     invisível e parava ali — medido: subindo em linha reta, NOVE de onze
+     colunas do saguão morriam sem aviso, e descendo da plataforma,
+     quatro de sete. O jogo virava "adivinhe onde é a passagem".
+
+     Agora o corpo procura a porta sozinho: quem empurra na direção do
+     gargalo e bate escorrega de lado até a abertura mais próxima, que é
+     o que qualquer um faz numa estação que conhece de cor. Escorrega na
+     velocidade de andar, e só enquanto você está empurrando — soltar
+     para na hora.
+
+     Não é um atalho: onde a linha inteira é parede — a catraca fechada
+     de quem não pagou, o fim da plataforma — não existe abertura pra
+     achar, e o funil não faz nada. */
+  ALCANCE_FUNIL: 132,
+  afunila: function (py, dx, passo) {
+    var sp = this.pl.sp;
+    var alvo = this.aberturaMaisPerto(sp.x, py);
+    if (alvo === null) return;
+    var d = alvo - sp.x;
+    if (Math.abs(d) < 1) return;
+    // quem está virando pro outro lado sabe o que quer: o volante é dele
+    if (dx !== 0 && (dx > 0) !== (d > 0)) return;
+    var nx = sp.x + (d > 0 ? 1 : -1) * Math.min(passo, Math.abs(d));
+    if (this.podeIr(nx, sp.y)) sp.x = nx;
+  },
+
+  /* o x pisável mais próximo na altura pra onde você está empurrando */
+  aberturaMaisPerto: function (x, py) {
+    for (var d = 4; d <= this.ALCANCE_FUNIL; d += 4) {
+      if (this.podeIr(x + d, py)) return x + d;
+      if (this.podeIr(x - d, py)) return x - d;
+    }
+    return null;
+  },
+
+  /* ---------- o guichê ----------
+     Comprar personagem era escolher um cadeado numa tabela de preços. A
+     máquina é outra coisa: você paga pra ver, e o que sai pode ser a
+     mochila de alguém — ou um guarda-chuva quebrado, que é metade da
+     graça. */
+  abreAchados: function () {
+    var eu = this;
+    if (lePontos() < ACHADOS_PRECO) {
+      sfx('nao');
+      fala(this, '"Só com ' + ACHADOS_PRECO + ' pontos, meu querido."\n\nVocê tem ' + lePontos() + '.', []);
+      this.time.delayedCall(1600, function () { if (eu.dialog) eu.dialog.fecha(); });
+      return;
+    }
+    fala(this, '"Perdeu alguma coisa?"\n\nO guichê deixa você levar uma\ncaixa fechada por '
+      + ACHADOS_PRECO + ' pontos.', [
+      { label: 'Pagar ' + ACHADOS_PRECO + ' e ver', cb: function () { eu.puxa(); } },
+      { label: 'Deixa pra lá', cb: function () { } }
+    ]);
+  },
+
+  puxa: function () {
+    var eu = this;
+    var r = puxaAchados();
+    var corpo = r.nome + '.\n' + (r.fala || '');
+    if (r.personagem) {
+      sfx('vitoria');
+      corpo += '\n\n' + r.nomePersonagem + ' DESTRAVADO';
+    } else {
+      sfx(r.grana || r.pontos || r.descanso || r.carisma ? 'moeda' : 'catraca');
+    }
+    if (r.grana) corpo += '\n+R$ ' + r.grana.toFixed(2).replace('.', ',');
+    if (r.pontos) corpo += '\n+' + r.pontos + ' PONTOS';
+    if (r.descanso) corpo += '\n+DESCANSO';
+    if (r.carisma) corpo += '\n+CARISMA';
+    GameState.passaTempo(2);
+    fala(this, corpo, []);
+    this.time.delayedCall(r.personagem ? 2800 : 1900, function () { if (eu.dialog) eu.dialog.fecha(); });
+  },
+
+  /* a porta que está debaixo do jogador; a larga tem alcance maior */
+  gateSob: function (x) {
+    var melhor = null, dist = 1e9;
+    for (var i = 0; i < this.gates.length; i++) {
+      var t = this.gates[i];
+      if (x < t.x0 - 7 || x > t.x1 + 7) continue;
+      var d = Math.abs(x - (t.x0 + t.x1) / 2);
+      if (d < dist) { dist = d; melhor = t; }
+    }
+    return melhor;
+  },
+
+  /* ---------- guardinha ----------
+     O guardinha existia, andava e parava — mas nada disso importava. A
+     decisão de te pegar era um sorteio no instante do aperto: se ele
+     estivesse parado ou perto demais, flagrado; senão, passou. Pular
+     não era um ato que ele pudesse ver, era um número comparado com o
+     x dele.
+
+     Agora ele tem campo de visão, e o campo é desenhado na tela do
+     jeito exato em que é testado — o que está pintado de vermelho é o
+     que ele enxerga, nem um pixel a mais. Pular leva quase um segundo,
+     com você em cima da catraca o tempo todo: se o cone passar por
+     você nesse meio tempo, ele apita, vem falar com você, custa um
+     coração e te devolve pro fim do saguão. */
+
+  /* O que ele enxerga: um trapézio que sai dos olhos dele e abre pro
+     lado pra onde ele está virado. Parado, o cone aponta pra frente e
+     abre mais — é por isso que parar pra olhar é o momento perigoso. */
+  cone: function () {
+    var g = this.guarda, dif = GameState.dificuldade();
+    var o = this.gOlhando;
+    // o grandão enxerga mais longe, e o menorzinho menos
+    var k = this.patente.cone;
+    return {
+      ax: g.sp.x,
+      ay: g.sp.y - 8,
+      cx: g.sp.x + (o ? 0 : this.gVx * 54),
+      meia: ((o ? 62 : 38) + dif * 3) * k,
+      alc: ((o ? 116 : 94) + dif * 5) * k
+    };
+  },
+
+  /* O mesmo trapézio, em conta: o meio anda do apex pro alvo e a
+     largura abre junto. Desenho e teste saem daqui, senão o jogador
+     aprende uma regra e o jogo cobra outra. */
+  guardaVe: function (x, y) {
+    var c = this.cone();
+    if (y < c.ay || y > c.ay + c.alc) return false;
+    var k = (y - c.ay) / c.alc;
+    var meio = c.ax + (c.cx - c.ax) * k;
+    return Math.abs(x - meio) <= c.meia * (0.3 + 0.7 * k);
+  },
+
+  pintaCone: function () {
+    var av = this.gAviso; av.clear();
+    var c = this.cone(), P = Phaser.Geom.Point;
+    var vendo = this.guardaVe(this.pl.sp.x, this.pl.sp.y);
+    var topo = c.meia * 0.3;
+    var pontos = [
+      new P(c.ax - topo, c.ay), new P(c.ax + topo, c.ay),
+      new P(c.cx + c.meia, c.ay + c.alc), new P(c.cx - c.meia, c.ay + c.alc)
+    ];
+    av.fillStyle(0xe8362c, (this.gOlhando ? 0.17 : 0.09) + (vendo ? 0.12 : 0));
+    av.fillPoints(pontos, true);
+    av.lineStyle(1, 0xe8362c, vendo ? 0.85 : 0.3);
+    av.strokePoints(pontos, true);
+    return vendo;
+  },
+
+  atualizaGuarda: function (dt) {
+    var dif = GameState.dificuldade();
+    var vig = GameState.faixa().guarda;   // no pico ele tem mais o que fazer
+    this.gTempo += dt;
+    var g = this.guarda;
+
+    if (this.gEstado === 'anda') {
+      var v = (52 + dif * 16) * this.patente.vel * this.gVx * (dt / 1000);
+      var nx = g.sp.x + v;
+      if (nx < 60) { nx = 60; this.gVx = 1; }
+      if (nx > 286) { nx = 286; this.gVx = -1; }
+      g.sp.x = nx;
+      g.dir = this.gVx < 0 ? 'left' : 'right';
+      g.anima(dt, true);
+      this.gOlhando = false;
+      var limite = Math.max(700, (2200 - dif * 260) / vig);
+      if (this.gTempo > limite) {
+        this.gEstado = 'olha'; this.gTempo = 0;
+        if (Math.random() < 0.5) this.gVx *= -1;
+      }
+    } else {
+      g.dir = 'down';
+      g.anima(dt, false);
+      this.gOlhando = true;
+      var dur = Math.max(500, (1300 - dif * 90) * vig);
+      if (this.gTempo > dur) { this.gEstado = 'anda'; this.gTempo = 0; }
+    }
+
+    if (this.gEstado === 'anda' && Math.random() < 0.0006 * dif * vig * dt) {
+      this.gEstado = 'olha'; this.gTempo = 0;
+    }
+
+  },
+
+  /* ---------- ações ---------- */
+  abreMenuBilheteria: function () {
+    var self = this, c = GameState.char;
+    var ops = [];
+    if (GameState.valeRestante > 0) {
+      ops.push({
+        label: 'Usar vale-transporte', cb: function () {
+          GameState.valeRestante--;
+          self.libera('Passou no vale.\nSobra ' + GameState.valeRestante + '.');
+        }
+      });
+    }
+    ops.push({
+      label: 'Pagar R$ ' + c.tarifa.toFixed(2).replace('.', ','), cb: function () {
+        if (GameState.dinheiro < c.tarifa) {
+          sfx('erro');
+          fala(self, 'Não dá. Você não tem o valor\nda passagem. Ou pula, ou fica.', []);
+          return;
+        }
+        GameState.gastar(c.tarifa);
+        GameState.stats.catracasPagas++;
+        GameState.passaTempo(3 + Math.round(4 * GameState.lotacao()));
+        self.libera('Bilhete na mão.\nCaro, mas legal.');
+      }
+    });
+    ops.push({ label: 'Deixa pra lá', cb: function () { } });
+    fala(this, 'Bilheteria. Quanto custa hoje\njá não importa.', ops);
+  },
+
+  libera: function (msg) {
+    this.liberado = true;
+    this.pintaCatracas();
+    sfx('catraca');
+    fala(this, msg, []);
+    var self = this;
+    this.time.delayedCall(1400, function () { if (self.dialog) self.dialog.fecha(); });
+  },
+
+  /* ---------- o pulo ----------
+     Um segundo em cima da catraca, sem poder desistir. É esse tempo
+     que dá ao guardinha a chance de virar e ver — antes, pular era um
+     aperto instantâneo e o guardinha era só uma condição no if. */
+  comecaPulo: function (gate) {
+    if (this.pulo || this.flagra) return;
+    GameState.addDescanso(gate.larga ? -4 : -6);
+    GameState.passaTempo(2);
+    this.pulo = {
+      t: 0,
+      dur: Math.max(560, 880 - GameState.dificuldade() * 45),
+      x: Phaser.Math.Clamp(this.pl.sp.x, gate.x0 + 4, gate.x1 - 4),
+      y0: this.pl.sp.y, y1: 196
+    };
+    this.pl.dir = 'up';
+    sfx('empurra');
+  },
+
+  atualizaPulo: function (dt) {
+    var p = this.pulo;
+    p.t += dt;
+    var k = Math.min(1, p.t / p.dur);
+    // o arco: sobe por cima do bloqueio, não atravessa por dentro
+    this.pl.sp.x = p.x;
+    this.pl.sp.y = p.y0 + (p.y1 - p.y0) * k - Math.sin(k * Math.PI) * 12;
+    this.pl.anima(dt, true);
+
+    if (this.guardaVe(this.pl.sp.x, this.pl.sp.y)) { this.pega(); return; }
+
+    if (k < 1) return;
+    this.pulo = null;
+    this.pulou = true;
+    /* Quem entrou sem pagar entra devendo, e a divida viaja junto: e o
+       guardinha em ronda no vagao que vai cobrar. Sem isto, pular a
+       catraca era decisao de graca depois de dar certo. */
+    GameState.pulouCatraca = true;
+    this.pl.sp.y = p.y1;
+    GameState.stats.catracasPuladas++;
+    GameState.addCarisma(-2);
+    sfx('ok');
+    var self = this;
+    fala(this, 'Passou.\nO coração bateu, mas passou.', []);
+    this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
+  },
+
+  /* Ele apita, larga a ronda e vem falar com você. O castigo é o que
+     dói na corrida inteira: um coração a menos e de volta pro fim do
+     saguão, com a catraca ainda fechada. */
+  pega: function () {
+    this.pulo = null;
+    this.pl.sp.y = 252;
+    this.pl.dir = 'down';
+    this.flagra = { t: 0 };
+    sfx('apito');
+    perdeVida(this, this.pl.sp, this.patente.custo);
+    GameState.addCarisma(-6 * this.patente.custo);
+    GameState.passaTempo(3);
+    this.gEstado = 'olha'; this.gTempo = 0; this.gOlhando = true;
+    this.alerta.setText('! ' + this.patente.nome + ' TE VIU !');
+  },
+
+  atualizaFlagra: function (dt) {
+    var f = this.flagra, g = this.guarda;
+    f.t += dt;
+    var dx = this.pl.sp.x - g.sp.x;
+    if (Math.abs(dx) > 8) {
+      g.sp.x += (dx < 0 ? -1 : 1) * 0.15 * dt;
+      g.dir = dx < 0 ? 'left' : 'right';
+      g.anima(dt, true);
+    } else {
+      g.dir = 'down';
+      g.anima(dt, false);
+    }
+    this.pl.anima(dt, false);
+    if (f.t < 950) return;
+
+    this.flagra = null;
+    this.alerta.setText('');
+    var self = this;
+    fala(this, this.patente.fala, [
+      {
+        label: 'Voltar pro começo', cb: function () {
+          self.pl.sp.x = 160; self.pl.sp.y = 512; self.pl.dir = 'up';
+        }
+      }
+    ]);
+  },
+
+  /* ---------- trem ---------- */
+  pintaTrem: function (t) {
+    var g = t.g; g.clear();
+    if (t.y <= PLAT_Y - t.alt || t.y >= PLAT_Y + t.alt) return;
+    var y0 = t.y, alt = t.alt, lado = t.lado;
+    var l = GameState.linhaAtual();
+    var b = beiradaDaVia(lado);
+
+    /* ---------- o recorte ----------
+       O trem só existe na faixa da plataforma. Sem isto, na chegada e
+       na partida ele desliza por cima da escada rolante e do saguão,
+       que é o andar de baixo: aparecia lata de trem atravessando a
+       estação inteira. Recortar é mais simples que máscara e não custa
+       nada, porque tudo aqui é retângulo. */
+    var topo = Math.max(y0, PLAT_Y), base = Math.min(y0 + alt, ESC_Y);
+    if (base <= topo) return;
+    var ac = base - topo;
+
+    /* A luz do jogo vem sempre de cima e da ESQUERDA, e por isso o
+       volume não espelha junto com a estrutura: no trem da direita o
+       brilho fica na face esquerda e a sombra na direita, ao contrário
+       do de cá. Espelhar tudo poria os dois trens da Sé iluminados de
+       lados opostos, e a cena passaria a brigar consigo mesma. */
+    var luzA = (lado < 0) ? 80 : 10, luzB = (lado < 0) ? 70 : 0;
+    var somA = (lado < 0) ? 16 : 88, somB = (lado < 0) ? 0 : 72;
+    var briA = (lado < 0) ? 66 : 34, briB = (lado < 0) ? 44 : 12;
+
+    // corpo com volume
+    g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 88, 0, topo, ac);
+    g.fillStyle(num(PAL.metal), 1); retTrem(g, b, lado, 84, 6, topo, ac);
+    g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, luzA, luzB, topo, ac);
+    g.fillStyle(0x000000, 0.28); retTrem(g, b, lado, somA, somB, topo, ac);
+    // faixa da linha, só se a testeira do trem estiver na plataforma
+    if (y0 >= PLAT_Y && y0 + 12 <= ESC_Y) {
+      g.fillStyle(num(escurecer(l.cor, 0.35)), 1); retTrem(g, b, lado, 84, 6, y0, 12);
+      g.fillStyle(l.num, 1); retTrem(g, b, lado, 84, 6, y0 + 2, 8);
+    }
+
+    // janelas: as que caem fora do recorte simplesmente não existem
+    for (var y = y0 + 30; y < y0 + alt - 40; y += 80) {
+      if (y < topo || y + 48 > base) continue;
+      g.fillStyle(0x11161f, 1); retTrem(g, b, lado, 70, 12, y, 48);
+      g.fillStyle(0x1f2a3d, 1); retTrem(g, b, lado, 68, 14, y + 2, 44);
+      g.fillStyle(0x3a4a6a, 0.7); retTrem(g, b, lado, 66, 16, y + 4, 10);
+      g.fillStyle(0xffffff, 0.09); retTrem(g, b, lado, briA, briB, y + 4, 40);
+    }
+
+    // portas
+    var ab = (t.estado === 'aberto');
+    for (var i = 0; i < t.portas.length; i++) {
+      var py = t.portas[i] + y0;
+      // porta pela metade não é porta: ou cabe inteira, ou não aparece
+      if (py < topo || py + 52 > base) continue;
+      if (ab) {
+        g.fillStyle(0x07070c, 1); retTrem(g, b, lado, 32, 0, py, 52);
+        g.fillStyle(0x232d42, 1); retTrem(g, b, lado, 28, 4, py + 4, 44);
+        g.fillStyle(0x00e676, 1); retTrem(g, b, lado, 36, 32, py, 52);
+        // a luz da porta cai NO PISO: distância negativa é o que avança
+        g.fillStyle(0x00e676, 0.3); retTrem(g, b, lado, 0, -12, py, 52);
+      } else {
+        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 36, 0, py, 52);
+        g.fillStyle(0x767c92, 1); retTrem(g, b, lado, 34, 2, py, 52);
+        g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, 34, 2, py, 2);
+        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 20, 17, py, 52);
+        g.fillStyle(num(PAL.amarelo), 1); retTrem(g, b, lado, 36, 0, py + 24, 4);
+      }
+    }
+  },
+
+  /* Qual trem tem uma porta ao seu alcance. Numa central são dois, e é
+     o LADO em que você está parado que decide qual — é essa a escolha
+     que a Sé existe pra cobrar. */
+  tremNaPorta: function () {
+    for (var i = 0; i < this.trens.length; i++) {
+      if (this.portaPerto(this.trens[i]) !== null) return this.trens[i];
+    }
+    return null;
+  },
+
+  // o primeiro trem com a porta aberta, pra dica saber pra onde apontar
+  tremAberto: function () {
+    for (var i = 0; i < this.trens.length; i++) {
+      if (this.trens[i].estado === 'aberto') return this.trens[i];
+    }
+    return null;
+  },
+
+  portaPerto: function (t) {
+    if (t.estado !== 'aberto') return null;
+    var y = this.pl.sp.y, x = this.pl.sp.x;
+    /* Distância até a beirada DESTE lado. Era `x > PLAT_X0 + 64`, que
+       só sabia da via da esquerda: na central isso deixava os 48px da
+       metade direita do piso sem embarcar em coisa nenhuma — 43% da
+       plataforma onde a porta aberta na sua frente não era porta. */
+    var d = (t.lado < 0) ? x - PLAT_X0 : PLAT_X1 - x;
+    if (d > 64) return null;
+    for (var i = 0; i < t.portas.length; i++) {
+      var py = t.portas[i] + t.y + 26;
+      if (Math.abs(y - py) < 46) return py;
+    }
+    return null;
+  },
+
+  /* intervalo entre trens: no pico vem um atrás do outro, de madrugada
+     você espera de verdade. Depois de perder um, o próximo perdoa. */
+  intervalo: function (t) {
+    /* 5600 e não 3400: no pico a espera caía pra 1,9s, que é menos do
+       que a porta demora abrindo — o trem parecia estar sempre ali, e
+       perder um não custava nada. Agora vai de 3,1s no pico a 11,8s de
+       madrugada, e a faixa de horário volta a ser uma escolha: pico é
+       cheio mas passa direto, madrugada é vazio mas você espera. */
+    var e = 5600 * GameState.faixa().espera;
+    return t.perdido ? e * 0.6 : e;
+  },
+
+  /* ---------- o painel ----------
+     Numa lateral ele fala do único trem que existe. Numa central ele
+     tem que dizer QUAL LADO, senão só se descobre olhando o trilho — e
+     o lado é a mecânica inteira da Sé. A seta é o lado; o nome é o
+     terminal, que é como plataforma de metrô se anuncia. */
+  avisoDoPainel: function () {
+    /* Aberto manda, depois chegando, depois a próxima espera — e
+       'partindo' fica por ÚLTIMO de propósito. Numa central o trem do
+       outro lado indo embora não é uma perda sua, e 'PERDEU ESSE' pra
+       quem está esperando o de cá é o painel mentindo. Só passa na
+       frente o trem em que você estava de fato tentando entrar.
+       Na lateral nada disso muda, porque lá o único trem que existe é
+       sempre o escolhido. */
+    var ordem = { aberto: 0, chegando: 1, espera: 2, partindo: 3 };
+    var m = null, rm = 9;
+    for (var i = 0; i < this.trens.length; i++) {
+      var t = this.trens[i];
+      var r = (t.estado === 'partindo' && this.tremEmpurrado === t) ? 0 : ordem[t.estado];
+      // o mais adiantado manda; empatou, manda o que chega antes
+      if (!m || r < rm || (r === rm && t.falta < m.falta)) { m = t; rm = r; }
+    }
+    return (CENTRAL ? (m.lado < 0 ? '◄ ' : '► ') : '') + m.aviso;
+  },
+
+  cicloTrem: function (dt) {
+    for (var i = 0; i < this.trens.length; i++) this.andaTrem(this.trens[i], dt);
+    this.painel.setText(this.avisoDoPainel());
+  },
+
+  andaTrem: function (t, dt) {
+    t.t += dt;
+    t.falta = 0;
+    var dif = GameState.dificuldade();
+    switch (t.estado) {
+      case 'espera':
+        var esp = this.intervalo(t);
+        t.falta = Math.max(0, Math.ceil((esp - t.t) / 1000));
+        /* Na central o painel diz o TERMINAL, não "trem": com duas vias,
+           'TREM EM 6S' não informa qual das duas está contando. */
+        t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
+          : ('TREM EM ' + t.falta + 'S');
+        if (t.t > esp) {
+          t.estado = 'chegando'; t.t = 0; t.repos = false; sfx('trem');
+          /* O relógio anda uma vez por espera, e não uma por trem: com
+             dois trens ele andaria em dobro na Sé e a estação sozinha
+             comeria o dia. Quem cobra é o da esquerda, que é o único
+             que existe nas duas plantas de plataforma. */
+          if (t.lado < 0) GameState.passaTempo(Math.round(esp / 1000));
+        }
+        break;
+      case 'chegando':
+        t.y = PLAT_Y - t.alt + (t.t / 1400) * t.alt;
+        if (t.y >= PLAT_Y) {
+          t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta');
+          this.desembarca(t);
+        }
+        t.aviso = 'CHEGANDO';
+        break;
+      case 'aberto':
+        /* 10s e não 7,4: com a porta abrindo, a multidão entrando e você
+           tendo que achar uma porta, 7,4s viravam corrida. Embarcar é
+           decisão, não reflexo — a pressa tem que estar no fim da janela,
+           não no começo dela. */
+        var janela = Math.max(6000, 10000 - dif * 300);
+        t.falta = Math.max(0, Math.ceil((janela - t.t) / 1000));
+        t.aviso = 'EMBARQUE ' + t.falta + 'S';
+        if (t.t > janela) {
+          t.estado = 'partindo'; t.t = 0; sfx('porta');
+          // só falha o empurrão de quem estava empurrando ESTE trem
+          if (this.empurrando && this.tremEmpurrado === t) this.falhouEmbarque();
+        }
+        break;
+      case 'partindo':
+        /* Chega gente nova pela escada quando o trem parte, que é por
+           onde chega gente numa estação. Só o da esquerda repõe: com os
+           dois repondo, a Sé encheria no dobro da velocidade num piso
+           que tem 112px de largura — mesma razão do relógio. */
+        if (!t.repos && t.lado < 0) {
+          t.repos = true;
+          this.chegaNaPlataforma(Math.round(2 + 8 * GameState.lotacao()));
+        }
+        t.y = PLAT_Y + (t.t / 1400) * t.alt;
+        if (t.y >= PLAT_Y + t.alt) { t.y = PLAT_Y - t.alt; t.estado = 'espera'; t.t = 0; }
+        t.aviso = 'PERDEU ESSE';
+        break;
+    }
+    this.pintaTrem(t);
+  },
+
+  /* ---------- minigame de entrar ---------- */
+
+  /* quanto de pressão o vagão exige: no pico é uma parede de gente,
+     fora do pico é quase só entrar */
+  metaEmpurrao: function () {
+    return 42 + 58 * GameState.lotacao();
+  },
+
+  comecaEmpurrao: function (t) {
+    this.empurrando = true;
+    // guardar QUAL trem é o que faz o lado virar sentido lá no entrou()
+    this.tremEmpurrado = t;
+    // você não começa do zero: já está com o ombro na porta
+    this.pressao = this.metaEmpurrao() * 0.18;
+    this.gMini.setVisible(true);
+    var lot = GameState.lotacao();
+    this.tMini.setVisible(true).setText(
+      lot > 0.8 ? 'VAGÃO LOTADO' : (lot > 0.45 ? 'VAGÃO CHEIO' : 'DÁ PRA ENTRAR'));
+    this.tMini2.setVisible(true).setText(nomeAgir() + ' SEM PARAR');
+    sfx('empurra');
+  },
+
+  fimEmpurrao: function () {
+    this.empurrando = false;
+    this.gMini.setVisible(false).clear();
+    this.tMini.setVisible(false);
+    this.tMini2.setVisible(false);
+  },
+
+  /* entrou: no talo ou espremido na porta fechando */
+  entrou: function (espremido) {
+    this.fimEmpurrao();
+    GameState.addDescanso(-4 - 5 * GameState.lotacao() - (espremido ? 4 : 0));
+    if (espremido) { GameState.addCarisma(-2); this.cameras.main.shake(200, 0.005); }
+    /* ---------- o lado vira o rumo ----------
+       É aqui que a plataforma central deixa de ser desenho. Até agora
+       `dir` só era escrito pelo apontaPraAlvo(), que aponta pro alvo
+       sozinho — e enquanto ele fosse a única fonte era IMPOSSÍVEL pegar
+       o trem errado, ou seja, escolher o lado não escolhia nada. Agora
+       quem manda é a via em que você embarcou. Na lateral não muda
+       nada, porque lá o trem já nasce com o sentido que você seguia. */
+    GameState.dir = this.tremEmpurrado.dir;
+    sfx('ok');
+    this.scene.start('Vagao');
+  },
+
+  falhouEmbarque: function () {
+    // quase lá conta: a porta fecha nas suas costas e você vai espremido
+    if (this.pressao >= this.metaEmpurrao() * 0.62) { this.entrou(true); return; }
+    var t = this.tremEmpurrado;
+    this.fimEmpurrao();
+    if (t) t.perdido = true;
+    GameState.addDescanso(-4);
+    GameState.addCarisma(-2);
+    GameState.passaTempo(3);
+    sfx('nao');
+    fala(this, 'A porta fechou na sua cara.\nO próximo vem logo.', []);
+    var self = this;
+    this.time.delayedCall(1500, function () { if (self.dialog) self.dialog.fecha(); });
+  },
+
+  atualizaEmpurrao: function (dt) {
+    var dif = GameState.dificuldade();
+    var c = GameState.char;
+    var lot = GameState.lotacao();
+    var meta = this.metaEmpurrao();
+
+    var forca = 13 * c.empurraoMult
+      * (0.7 + 0.3 * (GameState.descanso / c.descansoMax))
+      * (0.9 + GameState.carisma / 400);
+    // a multidão empurra de volta, mas só com força de multidão
+    var quedaS = (6 + dif * 1.8) * (0.5 + 0.7 * lot);
+    this.pressao = Math.max(0, this.pressao - quedaS * (dt / 1000));
+    // segurar rende pouco; quem martela entra
+    if (Ctrl.act) this.pressao += quedaS * 0.5 * (dt / 1000);
+    if (Ctrl.actJust) { this.pressao += forca; sfx('empurra'); this.cameras.main.shake(60, 0.003); }
+
+    var g = this.gMini; g.clear();
+    caixa(g, 32, GH / 2 - 68, GW - 64, 124, 0xe8362c);
+    barra(g, 48, GH / 2 - 12, GW - 96, 24, this.pressao / meta, 0x00e676, 0x1e1e2a);
+
+    if (this.pressao >= meta) this.entrou(false);
+  },
+
+  /* ---------- loop ---------- */
+
+  /* ---------- o ambulante da plataforma ----------
+     O carrinho de dogão fica parado no saguão; na plataforma quem vende
+     anda. É a figura mais constante do metrô de São Paulo: a caixa de
+     isopor, o preço cantado, e o passo que não para nunca.
+
+     Ele carrega o que dá pra carregar andando — bala, chocolate,
+     pururuca e água. E a água é o que ele mais vende quando aperta o
+     calor, que é quando ela também vale mais pra quem compra. */
+  montaAmbulante: function () {
+    this.ambulante = null;
+    // de madrugada não tem ninguém vendendo; no movimento, quase sempre
+    if (Math.random() > 0.35 + GameState.lotacao() * 0.55) return;
+    var a = new Ator(this, 180, platY(200 + Math.random() * (PLAT_ALT - 340)),
+      ['np_ambulante_a', 'np_ambulante_b', 'np_ambulante_c'][Math.floor(Math.random() * 3)]);
+    a.sp.setDepth(39);
+    a.vy = (Math.random() < 0.5 ? -1 : 1) * 26;
+    this.ambulante = a;
+    this.gente.push(a);
+  },
+
+  andaAmbulante: function (dt) {
+    var a = this.ambulante;
+    if (!a || !a.sp || !a.sp.active) return;
+    var ny = a.sp.y + a.vy * dt / 1000;
+    if (ny < platY(150) || ny > platY(PLAT_ALT - 40)) { a.vy = -a.vy; ny = a.sp.y; }
+    a.sp.y = ny;
+    a.dir = a.vy < 0 ? 'up' : 'down';
+    a.anima(dt, true);
+  },
+
+  ambulantePerto: function () {
+    var a = this.ambulante;
+    if (!a || !a.sp || !a.sp.active) return null;
+    return Math.hypot(this.pl.sp.x - a.sp.x, this.pl.sp.y - a.sp.y) < 46 ? a : null;
+  },
+
+  /* ninguém atravessa ninguém, e cada andar tem os seus limites: o
+     empurrão não pode jogar quem está no saguão pra dentro da parede nem
+     quem está na plataforma pra dentro do trilho. */
+  resolveCorpos: function () {
+    var antes = { x: this.pl.sp.x, y: this.pl.sp.y };
+    var self = this;
+    /* ---------- só quem está na janela ----------
+       A separação de corpos compara todo mundo com todo mundo. Com a
+       plataforma cheia de pico — mais de trinta pessoas, mais o saguão —
+       isso é pár a pár num mundo de 1572px de altura, sendo que a tela
+       mostra 576. Quem está seiscentos pixels acima não pode esbarrar em
+       ninguém aqui embaixo, e conferir isso custou 25 quadros por
+       segundo. A peneira é O(n) e mata a conta quadrática. */
+    var topo = this.cameras.main.scrollY - 80, base = topo + GH + 160;
+    var perto = [];
+    for (var q = 0; q < this.gente.length; q++) {
+      var g = this.gente[q];
+      if (g && g.sp && g.sp.y > topo && g.sp.y < base) perto.push(g);
+    }
+    resolveCorpos(this.pl, perto,
+      function (sp) {
+        if (!self.podeIr(sp.x, sp.y)) { sp.x = antes.x; sp.y = antes.y; }
+      },
+      function (sp) {
+        if (sp.y < ESC_Y) { limitaPlataforma(sp); return; }
+        /* ---------- ninguém anda por cima da barraca ----------
+           O jogador já era barrado por `podeIr`, e a multidão não era
+           barrada por nada: os passageiros atravessavam o carrinho de
+           dogão como se ele fosse chão. Barraca que dá pra atravessar
+           não é barraca, é textura.
+           Empurra pelo lado mais curto, que é o que faz a pessoa
+           contornar em vez de grudar. */
+        for (var b = 0; b < self.barracas.length; b++) {
+          var q = self.barracas[b];
+          if (sp.x > q.x - 10 && sp.x < q.x + q.w + 10 &&
+              sp.y > q.y - 6 && sp.y < q.y + q.h + 6) {
+            var dEsq = sp.x - (q.x - 10), dDir = (q.x + q.w + 10) - sp.x;
+            sp.x = (dEsq < dDir) ? q.x - 10 : q.x + q.w + 10;
+          }
+        }
+        sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
+        sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
+      });
+  },
+
+  terminaJogo: function () {
+    GameState.salvarRecorde();
+    vaiPraOFim(this);
+  },
+  fimDeJogo: function () {
+    GameState.salvarRecorde();
+    vaiPraOFim(this);
+  },
+
+  /* ---------- loop ----------
+     Um loop só pra estação inteira, e a ordem importa: o trem anda
+     SEMPRE, esteja você em cima ou embaixo. É o que faz o letreiro
+     contando lá do saguão significar alguma coisa. */
+  update: function (time, delta) {
+    Ctrl.update();
+    var dt = Math.min(delta, 50);
+
+    if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
+    if (this.fim) return;
+
+    /* A estação é a primeira cena de cada perna, e é aqui que chega quem
+       acabou de ser mandado embora ou de dormir no ponto. Sem esta
+       checagem dava pra jogar uma cena inteira já demitido. */
+    var morte = GameState.derrota();
+    if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); vaiPraOFim(this); return; }
+
+    this.cicloTrem(dt);
+    if (this.empurrando) { this.atualizaEmpurrao(dt); return; }
+
+    // esperar na estação cansa, esteja você onde estiver dentro dela
+    GameState.addDescanso(-0.0004 * GameState.char.dreno * dt);
+
+    /* Flagrado: a ronda para, ele vem até você, e o resto da cena
+       espera. Pulando: você não controla mais nada até cair de um dos
+       dois lados — é isso que faz o pulo ser uma aposta. */
+    if (this.flagra) { this.atualizaFlagra(dt); this.pintaCone(); return; }
+    this.atualizaGuarda(dt);
+    if (this.pulo) { this.atualizaPulo(dt); if (this.pulo || this.flagra) this.pintaCone(); return; }
+    var vendo = this.pintaCone();
+
+    var i;
+    this.andaSaguao(dt);
+    this.andaFila(dt);
+    this.andaAmbulante(dt);
+
+    var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
+    var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
+    var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
+    var mv = (dx !== 0 || dy !== 0);
+    if (mv) {
+      var n = Math.sqrt(dx * dx + dy * dy);
+      var px = this.pl.sp.x + (dx / n) * vel * dt / 1000;
+      var py = this.pl.sp.y + (dy / n) * vel * dt / 1000;
+      if (this.podeIr(px, this.pl.sp.y)) this.pl.sp.x = px;
+      if (this.podeIr(this.pl.sp.x, py)) this.pl.sp.y = py;
+      else if (dy !== 0) this.afunila(py, dx, vel * dt / 1000);
+      this.pl.setDir(dx, dy);
+    }
+    this.pl.anima(dt, mv);
+    this.resolveCorpos();
+    this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+
+    // passar do bloqueio é entrar no sistema, e isso não se desfaz
+    if (this.pl.sp.y <= 204) GameState.dentroDoSistema = true;
+
+    this.contexto(vendo);
+  },
+
+  /* O rodapé fala do andar em que você está: em cima é porta de trem e
+     ambulante, embaixo é bilheteria, barraca e catraca. */
+  contexto: function (vendo) {
+    var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
+
+    if (y < ESC_Y) {
+      var trem = this.tremNaPorta();
+      var vendedor = this.ambulantePerto();
+      /* A porta manda: quem está com o trem aberto na frente não vai
+         parar pra comprar bala. O ambulante é pra quem está esperando. */
+      if (trem) {
+        this.dica.setText(nomeAgir() + ': entrar no vagão', PAL.verde);
+        if (Ctrl.actJust) this.comecaEmpurrao(trem);
+      } else if (vendedor) {
+        // 'COMPRAR DO AMBULANTE' com o prefixo dá 27 caracteres: quatro a
+        // mais do que a faixa aguenta, e o fim sai pela borda
+        this.dica.setText(nomeAgir() + ': COMPRAR', PAL.amarelo);
+        if (Ctrl.actJust) {
+          abreBarraca(this, '"Olha o chocolate, a água\ngeladinha, a pururuca!"',
+            estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua']);
+        }
+      } else if (this.mapaPerto(x, y)) {
+        this.dica.setText(nomeAgir() + ': OLHAR O MAPA', PAL.amarelo);
+        if (Ctrl.actJust) abreMapaParede(this);
+      } else {
+        /* A seta aponta pra via de quem está com a porta aberta: numa
+           central ◄ e ► são metades diferentes da plataforma, e mandar
+           ◄ pra quem está do lado direito era mandar pro trem errado. */
+        var ab = this.tremAberto();
+        this.dica.setText(ab ? ('chegue na porta ' + (ab.lado < 0 ? '◄' : '►')) : '', PAL.amarelo);
+      }
+      return;
+    }
+
+    if (y < 116) { this.dica.setText('▲ PLATAFORMA', PAL.cinza); return; }
+
+    var noGuiche = (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
+    var naBilheteria = (x < 96 && y > 244 && y < 288 && !this.liberado);
+    var gate = this.gateSob(x);
+    var perto = (gate && y > 244 && y < 284);
+    var naCatraca = (perto && !this.liberado && !gate.fechada);
+    /* O cone é a regra inteira: se você está dentro dele, pular é ser
+       pego. Fora dele, o risco é ele virar no meio do pulo. */
+    var seguro = naCatraca && !vendo;
+
+    var noMapa = this.mapaPerto(x, y);
+    var barraca = this.barracaPerto(x, y);
+    if (barraca) dica = nomeAgir() + ': ' + barraca.nome;
+    else if (noMapa) dica = nomeAgir() + ': OLHAR O MAPA';
+    /* 'TOQUE: ACHADOS E PERDIDOS' dá 25 caracteres com o prefixo, e a
+       faixa cabe 26 justos. O preço é a informação que decide. */
+    // sem a placa em cima do guichê, é a dica que diz o que ele é
+    else if (noGuiche) dica = nomeAgir() + ': ACHADOS (' + ACHADOS_PRECO + ')';
+    else if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
+    else if (perto && gate.fechada) dica = 'catraca fora de serviço';
+    else if (naCatraca) {
+      dica = vendo
+        ? 'ELE TÁ TE VENDO — ESPERE'
+        : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA');
+    } else if (vendo) dica = 'sai da frente dele';
+    else if (this.liberado || this.pulou) dica = 'suba pela escada ▲';
+    this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
+
+    if (Ctrl.actJust) {
+      if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
+      else if (noMapa) abreMapaParede(this);
+      else if (noGuiche) this.abreAchados();
+      else if (naBilheteria) this.abreMenuBilheteria();
+      else if (naCatraca) this.comecaPulo(gate);
+    }
+  }
+});

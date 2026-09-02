@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catraca</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#07070c;overflow:hidden;
+    font-family:"Courier New",monospace;color:#8a8fa3}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+
+  /* o jogo no meio, o resto nas beiradas */
+  #palco{height:100%;display:flex;align-items:center;justify-content:center;gap:28px}
+  /* sem painel (celular, janela estreita) o jogo toma a tela toda;
+     com painel ele vira uma coluna com a proporção do canvas */
+  #game{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  body.comPainel #game{width:auto;aspect-ratio:320/576}
+
+  /* painéis: escondidos por padrão, aparecem só quando há tela sobrando */
+  .painel{display:none;width:236px;max-height:100%;overflow:auto;
+    flex-direction:column;gap:14px;font-size:12px;letter-spacing:1px}
+  body.comPainel .painel{display:flex}
+
+  .marca{font-size:30px;letter-spacing:6px;color:#f2f0ff;font-weight:bold}
+  .sub{font-size:10px;letter-spacing:3px;color:#5a5f74;margin-top:-4px}
+
+  .bloco{background:#0e0e18;border:1px solid #1c1c2c;border-radius:2px;padding:12px 14px}
+  .bloco h2{margin:0 0 10px;font-size:10px;letter-spacing:3px;color:#5a5f74;font-weight:normal}
+
+  .linha{display:flex;justify-content:space-between;gap:10px;padding:3px 0;align-items:baseline}
+  .rot{color:#5a5f74;font-size:10px;letter-spacing:2px;flex:0 0 auto}
+  .val{color:#f2f0ff;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frase{margin-top:10px;color:#6a6f84;font-size:11px;line-height:1.5;letter-spacing:0}
+
+  .dica .dicaTxt{color:#f2c14e;font-size:13px;line-height:1.4;letter-spacing:0;min-height:2.8em}
+
+  .tecla{display:flex;align-items:baseline;gap:10px;padding:3px 0}
+  .tecla b{color:#f2f0ff;flex:0 0 78px;font-size:11px;letter-spacing:1px}
+  .tecla span{color:#6a6f84;font-size:11px;letter-spacing:0}
+  .obs{margin-top:8px;color:#4a4f62;font-size:10px;letter-spacing:0}
+
+  .bt{display:block;width:100%;margin-bottom:8px;padding:8px 10px;cursor:pointer;
+    background:#14141f;border:1px solid #2a2a3c;border-radius:2px;color:#8a8fa3;
+    font-family:inherit;font-size:11px;letter-spacing:2px;text-align:left}
+  .bt:hover{border-color:#3d3d55;color:#f2f0ff}
+  .bt.on{color:#00e676;border-color:#1e5c3c}
+</style>
+</head>
+<body>
+<div id="palco">
+  <aside id="esq" class="painel"></aside>
+  <div id="game"></div>
+  <aside id="dir" class="painel"></aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script src="src/core.js"></script>
+<script src="src/zipzap.js"></script>
+<script src="src/scene-title.js"></script>
+<script src="src/scene-estacao.js"></script>
+<script src="src/scene-vagao.js"></script>
+<script src="src/scene-baldeacao.js"></script>
+<script src="src/scene-fim.js"></script>
+<script src="src/scene-pausa.js"></script>
+<script src="src/scene-zap.js"></script>
+<script src="src/scene-encarada.js"></script>
+<script src="src/scene-disputa.js"></script>
+<script src="src/scene-briga.js"></script>
+<script src="src/scene-tutorial.js"></script>
+<script src="src/main.js"></script>
+<script src="src/painel.js"></script>
+</body>
+</html>
