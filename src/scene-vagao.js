@@ -309,6 +309,8 @@ var SITUACOES = [
   { nome: 'ALGUÉM QUER SUA BARRA', roda: function (v) { v.desafioDeBarra(); } },
   { nome: 'DESAFIO DE RIMA', roda: function (v) { v.desafioDeRima(); } },
   { nome: 'TEM GENTE TE ENCARANDO', roda: function (v) { v.comecaEncarada(); } },
+  { nome: 'VAI DAR TRETA', roda: function (v) { v.comecaBriga(); } },
+  { nome: 'GUARDA NA RONDA', roda: function (v) { v.comecaRonda(); } },
   { nome: 'ALGUMA COISA ROLANDO', roda: function (v) { v.sorteiaEvento(); } },
   { nome: 'ALGUMA COISA ROLANDO', roda: function (v) { v.sorteiaEvento(); } }
 ];
@@ -326,6 +328,8 @@ var VagaoScene = new Phaser.Class({
     this.duracao = TEMPO_ENTRE_ESTACOES;
     this.eventoPendente = false;
     this.dilemaPendente = false;
+    this.ronda = null;
+    this.brigando = false;
     this.tEvento = 0; this.tDilema = 0;
     this.falha = null;
     this.sorteouFalha = false;
@@ -1080,6 +1084,192 @@ var VagaoScene = new Phaser.Class({
     sfx('apito');
   },
 
+  /* ---------- o guardinha em ronda ----------
+     O guardinha existia no jogo como CAIXA DE TEXTO: "o guardinha entra
+     no vagao e passa devagar olhando todo mundo", com um botao "Ficar
+     quieto". Ninguem entrava, ninguem passava e ninguem olhava — era uma
+     frase descrevendo uma cena que o jogo nao encenava, e a regra da
+     casa e forma antes de palavra.
+
+     Agora ele ENTRA. Pela porta mais longe de voce, que e a mesma regra
+     do rimador e do fiscal: dar tempo de ver antes de ter que reagir. E
+     atravessa o carro devagar, olhando. A ronda nao persegue — quem
+     persegue e o fiscal do ambulante, que ja existia e continua sendo
+     outra coisa.
+
+     O que ele procura e o que VOCE fez. Se voce pulou a catraca la
+     atras, ele para em voce; se voce pagou, passa reto e o que sobra e o
+     susto. Era isso que faltava pra pular a catraca ser uma decisao: ate
+     agora, depois de dar certo, ela nao custava mais nada.
+
+     E da pra escapar de duas formas, as duas ja no vocabulario do jogo:
+     trocar de carro, ou SENTAR — quem esta sentado com cara de quem
+     sempre esteve ali nao e quem ele procura. */
+  comecaRonda: function () {
+    if (this.ronda || this.fuga || this.brigando) return;
+    var patente = sorteiaGuarda();
+    var c = carroDe(this.pl.sp.y);
+    var portas = this.portasDoCarro(c);
+    var porta = portas[0], melhor = -1, i;
+    for (i = 0; i < portas.length; i++) {
+      var d = Math.abs(portas[i] + PORTA_ALT / 2 - this.pl.sp.y);
+      if (d > melhor) { melhor = d; porta = portas[i]; }
+    }
+    var y0 = porta + PORTA_ALT / 2;
+    var a = new Ator(this, 160, y0, patente.sprite);
+    a.sp.setScale(patente.escala).setDepth(58);
+    a.fixo = true;
+    this.gente.push(a);
+    /* Ele atravessa pro outro extremo do carro. Nao e ida e volta: ronda
+       que volta pelo mesmo lugar vira vaivem, e vaivem denuncia cenario
+       — a mesma coisa que ja foi corrigida no saguao. */
+    /* `yDoCarro(i, y0)` soma, nao devolve o topo: chamado com um
+       argumento so ele da NaN, e o guarda ficava plantado na porta com o
+       alvo indefinido — entrava, anunciava e nao andava um pixel. O topo
+       do carro e `yDoCarro(c, HUD_H)`, que e o inverso do `carroDe`. */
+    var topo = yDoCarro(c, HUD_H);
+    var meio = topo + CARRO_ALT / 2;
+    this.ronda = {
+      a: a, patente: patente, t: 0, revistou: false,
+      alvoY: (y0 > meio) ? topo + 40 : topo + CARRO_ALT - 40
+    };
+    this.flash(patente.nome + ' ENTROU\nOLHANDO TODO MUNDO.');
+    sfx('apito');
+  },
+
+  atualizaRonda: function (dt) {
+    var r = this.ronda;
+    if (!r) return;
+    if (!r.a || !r.a.sp || !r.a.sp.active) { this.ronda = null; return; }
+    r.t += dt;
+
+    var dy = r.alvoY - r.a.sp.y;
+    var passo = 46 * r.patente.vel * dt / 1000;
+    if (Math.abs(dy) > 2) r.a.sp.y += (dy > 0 ? 1 : -1) * Math.min(passo, Math.abs(dy));
+    r.a.setDir(0, dy);
+    r.a.anima(dt, true);
+
+    var ddx = this.pl.sp.x - r.a.sp.x, ddy = this.pl.sp.y - r.a.sp.y;
+    var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+    var mesmoCarro = carroDe(r.a.sp.y) === carroDe(this.pl.sp.y);
+
+    if (!r.revistou && mesmoCarro && dist < 44) {
+      r.revistou = true;
+      this.revista(r);
+      return;
+    }
+    if (Math.abs(dy) <= 2 || r.t > 26000) this.terminaRonda();
+  },
+
+  /* ---------- ele para em voce ---------- */
+  revista: function (r) {
+    var eu = this;
+    /* Sentado voce e passageiro. Nao e truque: e a mesma regra pela qual
+       o ambulante escapa do fiscal sentando, e vale aqui pelo mesmo
+       motivo — o que ele procura e quem esta em pe sem ter passado. */
+    if (this.sentadoEm || !GameState.pulouCatraca) {
+      /* Ele NAO some aqui. Sumia: a ronda acabava no instante em que ele
+         chegava do seu lado, e o guarda evaporava no meio do corredor —
+         o que se via era um sujeito entrando, dando quatro passos e
+         desaparecendo. Passar reto e continuar andando ate o fim do
+         carro, e e a caminhada inteira que faz o susto valer. */
+      this.flash(r.patente.nome + ' PASSOU RETO.');
+      GameState.stats.causos++;
+      return;
+    }
+    var multa = 12;
+    fala(this, '"Passagem, por favor."\nEle parou na sua frente.', [
+      {
+        /* 'Pagar a multa (R$ 12,00)' da 24 caracteres, 288px, e o
+           parenteses de fechar saia pela borda do balao — na tela lia-se
+           '(R$ 12,00'. Vinte e um cabem. */
+        label: 'Pagar a multa (R$ 12)', cb: function () {
+          if (GameState.dinheiro < multa) {
+            /* Sem dinheiro nao ha saida limpa, e e por isso que a grana
+               importa: o preco vira coracao. */
+            sfx('erro');
+            perdeVida(eu, eu.pl.sp, 1);
+            GameState.addCarisma(-6);
+            eu.flash('VOCÊ NÃO TEM.\nDESCEU ESCOLTADO.');
+          } else {
+            GameState.gastar(multa);
+            sfx('moeda');
+            eu.flash('PAGOU E FICOU.');
+          }
+          GameState.stats.causos++;
+          eu.terminaRonda();
+        }
+      },
+      {
+        label: 'Correr pro outro vagão', cb: function () {
+          /* Correr e o caminho do ambulante: a perseguicao ja existe
+             inteira, com fole, banco e cansaco. Aqui ela so ganha outro
+             motivo pra comecar. */
+          eu.terminaRonda();
+          eu.chamaFiscal();
+          GameState.stats.causos++;
+        }
+      }
+    ]);
+  },
+
+  terminaRonda: function () {
+    var r = this.ronda;
+    if (!r) return;
+    this.ronda = null;
+    var k = this.gente.indexOf(r.a);
+    if (k >= 0) this.gente.splice(k, 1);
+    if (r.a && r.a.destroy) r.a.destroy();
+  },
+
+  /* ---------- a briga ----------
+     Ela estava escrita e desligada: a cena travava a tela preta, e o que
+     travava era um `setAlign('center')` sem largura maxima — que morre
+     no RENDER, onde nenhum try/catch da cena alcanca. Isso ja foi
+     blindado no core, e a cena voltou inteira.
+
+     Quem briga com voce e a pessoa mais perto no seu carro, a mesma
+     regra da encarada: briga de vagao e com quem esta encostado em voce,
+     nao com um desconhecido teleportado. Se voce ganha, ela desce na
+     proxima — ninguem fica no mesmo vagao depois. */
+  /* Havia DUAS `comecaBriga` neste objeto. A antiga estava aqui desde
+     que a briga foi desligada, sem ninguem chamar, e como literal de
+     objeto repetido a ultima chave vence: assim que a situacao de carro
+     passou a chamar `comecaBriga`, quem respondia era a morta. Ela
+     desistia silenciosamente quando o vizinho mais perto estava a mais
+     de 200 de distancia — e o sintoma foi uma briga que "nao acontecia"
+     sem erro nenhum no console.
+     Ficou uma so. Duas contas da mesma coisa saem de sincronia na
+     primeira mudanca; duas com o MESMO NOME nem esperam a mudanca. */
+  comecaBriga: function () {
+    if (this.encarando || this.batalha || this.duelando || this.brigando) return;
+    var meu = carroDe(this.pl.sp.y), perto = null, dist = 1e9;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a || !a.sp || !a.sp.active) continue;
+      if (carroDe(a.sp.y) !== meu) continue;
+      var d = Math.abs(a.sp.y - this.pl.sp.y) + Math.abs(a.sp.x - this.pl.sp.x);
+      if (d < dist) { dist = d; perto = a; }
+    }
+    var eu = this;
+    this.brigando = true;
+    this.flash('O CLIMA VIROU');
+    this.scene.launch('Briga', {
+      sprite: perto ? perto.sp.texture.key : sorteiaPax(),
+      aoFechar: function (r) {
+        eu.brigando = false;
+        if (r === 'ganhou' && perto) {
+          var k = eu.gente.indexOf(perto); if (k >= 0) eu.gente.splice(k, 1);
+          var j = eu.npcExtra.indexOf(perto); if (j >= 0) eu.npcExtra.splice(j, 1);
+          perto.destroy();
+        }
+        var morte = GameState.derrota();
+        if (morte) { GameState.motivoFim = morte; eu.fimDeJogo(); }
+      }
+    });
+    sfx('nao');
+  },
+
   /* ---------- o fiscal entra no vagão ----------
      Ele entra pela porta mais longe de você — a mesma regra do rimador,
      e pelo mesmo motivo: dar tempo de ver antes de ter que reagir. Daí
@@ -1677,32 +1867,54 @@ var VagaoScene = new Phaser.Class({
     var dif = GameState.dificuldade();
     /* Quantos carros têm coisa acontecendo. Nunca todos: um trem sem
        nenhum carro sossegado tira do jogo a decisão de andar. */
-    var quantos = Phaser.Math.Clamp(Math.round(1.5 + dif * 1.6), 2, CARROS - 1);
+    /* 3,2 e nao 1,5: no primeiro dia eram TRES carros de oito com alguma
+       coisa, e nunca o seu. Medido numa corrida inteira parado no carro
+       em que embarquei: zero minigames em duas estacoes. O trem era um
+       corredor bonito e vazio, e o pouco que existia estava atras de uma
+       caminhada que o jogo nunca pede. */
+    var quantos = Phaser.Math.Clamp(Math.round(3.2 + dif * 1.6), 4, CARROS - 1);
     var idx = [], i;
     for (i = 0; i < CARROS; i++) idx.push(i);
     Phaser.Utils.Array.Shuffle(idx);
     this.situacoes = [];
     for (i = 0; i < CARROS; i++) this.situacoes.push(null);
     for (i = 0; i < quantos; i++) {
-      // o carro em que você embarcou fica de fora: você acabou de entrar
-      if (idx[i] === this.carroEntrada) continue;
       this.situacoes[idx[i]] = SITUACOES[Math.floor(Math.random() * SITUACOES.length)];
     }
+    /* ---------- o carro em que voce ESTA tambem entrega ----------
+       Antes o carro de embarque ficava de fora "porque voce acabou de
+       entrar", e a situacao de um carro so disparava no `entraNoCarro`.
+       Somados, os dois davam a regra que quebrava o vagao: quem nao
+       ANDA nunca ve nada. E andar oito carros nao e uma coisa que o jogo
+       peca — e o que ele oferece a quem esta fugindo de alguma coisa.
+       Agora o seu carro entrega tambem, so que depois de um respiro:
+       cinco segundos e o tempo de o trem sair da estacao e voce olhar em
+       volta antes de o metro te apresentar o problema do dia. */
+    this.tCarroAtual = 5000 + Math.random() * 3000;
   },
 
   /* Passou a emenda: o carro novo se apresenta. O número do vagão é o
      que dá tamanho ao trem — sem ele, andar oito telas parece andar em
      círculo no mesmo lugar. */
   entraNoCarro: function (c) {
-    var s = this.situacoes[c], eu = this;
-    this.flash('VAGÃO ' + (c + 1) + ' DE ' + CARROS + (s ? '\n' + s.nome : ''));
+    this.flash('VAGÃO ' + (c + 1) + ' DE ' + CARROS +
+      (this.situacoes[c] ? '\n' + this.situacoes[c].nome : ''));
     sfx('porta');
+    this.entregaDoCarro(c);
+  },
+
+  /* O que o carro tem guardado, entregue com um respiro. Uma rotina so
+     pra quem ACABOU de entrar e pra quem ja estava aqui: eram duas
+     portas pro mesmo quarto, e so uma delas estava destrancada. */
+  entregaDoCarro: function (c) {
+    var s = this.situacoes[c], eu = this;
     if (!s) return;
     this.situacoes[c] = null;                 // cada carro entrega a sua uma vez
     this.time.delayedCall(800, function () {
       if (!eu.scene.isActive()) return;
       // nada por cima de coisa já acontecendo
-      if (eu.dialog || eu.encontro || eu.rimador || eu.batalha || eu.duelando || eu.disfarce) return;
+      if (eu.dialog || eu.encontro || eu.rimador || eu.batalha || eu.duelando ||
+        eu.disfarce || eu.brigando || eu.ronda || eu.fuga) return;
       if (carroDe(eu.pl.sp.y) !== c) return;  // já foi embora, deixa quieto
       s.roda(eu);
     });
@@ -1736,19 +1948,9 @@ var VagaoScene = new Phaser.Class({
           { label: 'Olhar o celular', cb: function () { GameState.addCarisma(-5); GameState.stats.causos++; } }
         ]);
       },
-      function () {
-        fala(self, 'O guardinha entra no vagão e passa\ndevagar olhando todo mundo.', [
-          {
-            label: 'Ficar quieto', cb: function () {
-              if (GameState.charKey === 'ambulante' && Math.random() < 0.4) {
-                GameState.gastar(10); GameState.addCarisma(-5);
-                self.flash('Te viu vendendo. R$ 10 de multa.');
-              } else { self.flash('Passou reto.'); }
-              GameState.stats.causos++;
-            }
-          }
-        ]);
-      },
+      /* Era uma caixa de texto DESCREVENDO o guardinha passando.
+         Agora ele passa. */
+      function () { self.comecaRonda(); },
       function () {
         fala(self, 'O ar-condicionado do vagão\nparou de funcionar.', [
           {
@@ -2071,30 +2273,6 @@ var VagaoScene = new Phaser.Class({
      glTexture null — o que apaga a tela inteira, porque a briga pausa
      todo mundo antes de se montar. Enquanto não estiver resolvido, ela
      não entra no sorteio de situações. Ver HANDOFF.md. */
-  comecaBriga: function () {
-    if (this.duelando || this.sentadoEm) return;
-    var perto = null, dmin = 9999;
-    for (var i = 0; i < this.npcExtra.length; i++) {
-      var a = this.npcExtra[i];
-      if (!a.sp || !a.sp.active || a.fixo) continue;
-      var d = Math.abs(a.sp.y - this.pl.sp.y) + Math.abs(a.sp.x - this.pl.sp.x);
-      if (d < dmin) { dmin = d; perto = a; }
-    }
-    if (!perto || dmin > 200) return;
-    var eu = this;
-    this.duelando = true;
-    this.flash('O CLIMA VIROU');
-    this.scene.launch('Briga', {
-      sprite: perto.sp.texture.key,
-      aoFechar: function () {
-        eu.duelando = false;
-        perto.fixo = true;
-        var morte = GameState.derrota();
-        if (morte) { GameState.motivoFim = morte; eu.fimDeJogo(); }
-      }
-    });
-  },
-
   comecaDisputa: function (a) {
     if (this.duelando) return;
     var eu = this;
@@ -2303,10 +2481,26 @@ var VagaoScene = new Phaser.Class({
      você está sentado, porque é aí que ele dói. */
   sorteiaRitmo: function () {
     this.sorteiaEncontro();
-    this.eventoPendente = Math.random() < 0.28;
-    this.dilemaPendente = Math.random() < (this.sentadoEm ? 0.45 : 0.10);
+    /* 0,50 e 0,22 (eram 0,28 e 0,10). Com os numeros antigos, dois tercos
+       dos trechos nao tinham NADA: nem evento, nem dilema, e a situacao
+       do carro so aparecia pra quem andasse. Dezoito segundos de janela
+       vazia, uma atras da outra. O metro de Sao Paulo nao e assim, e o
+       jogo tambem nao devia ser. */
+    this.eventoPendente = Math.random() < 0.50;
+    /* O dilema NAO se perde. Ele espera o trecho inteiro por uma brecha
+       (`!this.encena`), e com o vagao mais cheio de coisa essa brecha
+       muitas vezes nao vem — medido: 534 quadros com o dilema armado,
+       vencido e bloqueado por outra cena. Ai a estacao seguinte
+       sorteava por cima e ele sumia sem nunca ter acontecido.
+       Agora ele fica pendente ate acontecer. E o coracao do jogo: e a
+       ultima coisa que pode ser atropelada pelo resto. */
+    this.dilemaPendente = this.dilemaPendente ||
+      Math.random() < (this.sentadoEm ? 0.55 : 0.22);
     this.tEvento = 2200 + Math.random() * 1400;
-    this.tDilema = 4600 + Math.random() * 1400;
+    this.tDilema = 8000 + Math.random() * 2400;
+    /* Cada parada rearma o carro em que voce esta: sem isto, quem fica no
+       mesmo lugar a perna inteira via UMA situacao de carro e mais nada. */
+    if (!this.tCarroAtual) this.tCarroAtual = 12000 + Math.random() * 3000;
   },
 
   /* ---------- o dilema do lugar ---------- */
@@ -2567,10 +2761,16 @@ var VagaoScene = new Phaser.Class({
     var morte = GameState.derrota();
     if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
 
+    if (this.ronda) this.atualizaRonda(dt);
+
     if (this.estado === 'andando') {
       this.atualizaSolavanco(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }
+      if (this.tCarroAtual && this.t > this.tCarroAtual) {
+        this.tCarroAtual = 0;
+        this.entregaDoCarro(carroDe(this.pl.sp.y));
+      }
       if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
       if (this.dilemaPendente && !this.encena && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();

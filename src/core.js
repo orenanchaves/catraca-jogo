@@ -618,6 +618,10 @@ var GameState = {
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
     this.dentroDoSistema = false;
+    /* Pular a catraca era uma decisao sem consequencia depois do
+       saguao: passou, passou. Agora o trem sabe, porque e no trem que
+       existe quem pergunte. */
+    this.pulouCatraca = false;
     this.sentado = false;
     this.motivoFim = '';
     this.stats = {
@@ -780,6 +784,10 @@ var GameState = {
     this.minutos = this.minutoSaida;
     this.coracoes = CORACOES_POR_PERNA;
     this.dentroDoSistema = false;
+    /* Pular a catraca era uma decisao sem consequencia depois do
+       saguao: passou, passou. Agora o trem sabe, porque e no trem que
+       existe quem pergunte. */
+    this.pulouCatraca = false;
     this.sentado = false;
     this.poeNoTrajeto(this.origemDaPerna());
     this.faixaAnterior = this.faixa().key;
@@ -791,6 +799,10 @@ var GameState = {
   chegouNoDestino: function () {
     this.pernasFeitas++;
     this.dentroDoSistema = false;
+    /* Pular a catraca era uma decisao sem consequencia depois do
+       saguao: passou, passou. Agora o trem sabe, porque e no trem que
+       existe quem pergunte. */
+    this.pulouCatraca = false;
     this.coracoes = CORACOES_POR_PERNA;      // trajeto novo, fôlego novo
     this.ultimoAtraso = Math.max(0, this.minutosNaPerna() - LIMITE_ATRASO);
     var eraUltima = this.ultimaPerna();

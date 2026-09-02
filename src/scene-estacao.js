@@ -255,6 +255,9 @@ var EstacaoScene = new Phaser.Class({
     this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
     this.montaBarracas();
     this.montaGates();
+    /* Cada passagem pela estacao redecide: quem pagou hoje nao carrega o
+       pulo de ontem. */
+    GameState.pulouCatraca = false;
     this.pulo = null;      // o pulo em andamento, que é o que ele pode ver
     this.flagra = null;    // ele te pegou e está vindo falar com você
     this.pulou = false;
@@ -1466,6 +1469,10 @@ var EstacaoScene = new Phaser.Class({
     if (k < 1) return;
     this.pulo = null;
     this.pulou = true;
+    /* Quem entrou sem pagar entra devendo, e a divida viaja junto: e o
+       guardinha em ronda no vagao que vai cobrar. Sem isto, pular a
+       catraca era decisao de graca depois de dar certo. */
+    GameState.pulouCatraca = true;
     this.pl.sp.y = p.y1;
     GameState.stats.catracasPuladas++;
     GameState.addCarisma(-2);

@@ -85,7 +85,13 @@ var BrigaScene = new Phaser.Class({
        anda. É o mesmo aperto do resto do jogo — não fica mais forte,
        fica mais rápido. */
     this.pensa = 0;
-    this.cadencia = Math.max(240, 620 - dif * 60);
+    /* 380 e nao 620. Medido: com 620 ele soca a cada 560ms e voce a cada
+       300 (espera 90 + trava 210) — quase o dobro. Socar sem parar
+       ganhava cinco em cinco. A briga nao precisava que ele batesse mais
+       forte, precisava que ele batesse no MESMO ritmo: quem apanha na
+       mesma cadencia em que bate tem que escolher a hora, e escolher a
+       hora e a briga. */
+    this.cadencia = Math.max(200, 380 - dif * 40);
 
     this.g = this.add.graphics().setDepth(2000);
 
@@ -129,8 +135,29 @@ var BrigaScene = new Phaser.Class({
     if (apertando) this.soca(chave);
   },
 
+  /* ---------- o soco ANDA com voce ----------
+     Medido antes de mexer: numa briga inteira, 70 socos meus e 70 vezes
+     'PASSOU LONGE'. A distancia estabilizava em 48 e o soco rapido
+     alcanca 46 — dois pixels, pra sempre. Ele parava a 52 porque so
+     andava pra frente acima disso, e a 52 o forte DELE (56) alcanca e o
+     rapido SEU (46) nao. A briga nao era dificil, era impossivel.
+
+     E no celular nao havia conserto possivel: os tres botoes sao defesa,
+     rapido e forte. Nao existe botao de andar. O jogo pedia uma
+     aproximacao que o dedo nao tinha como fazer.
+
+     Agora o soco carrega o corpo: se ele esta a ate 26px alem do
+     alcance, voce entra junto com o braco. E o que um soco de briga e —
+     ninguem soca parado no lugar — e resolve o alcance sem inventar um
+     quarto botao. Alem de 26 continua passando longe, e ai a mensagem
+     'PASSOU LONGE' vira informacao de verdade em vez de sentenca. */
   soca: function (chave) {
     if (this.travaVc > 0 || this.golpeVc || this.defendendo) return;
+    var g = GOLPES[chave];
+    var dist = Math.abs(this.xEle - this.xVc);
+    if (dist > g.alcance && dist <= g.alcance + 26) {
+      this.xVc = Phaser.Math.Clamp(this.xEle - (g.alcance - 4), BRG.x0, this.xEle - 26);
+    }
     this.golpeVc = chave;
     this.tGolpeVc = 0;
     sfx('empurra');
@@ -143,6 +170,21 @@ var BrigaScene = new Phaser.Class({
     if (deQuem === 'vc') {
       g = GOLPES[this.golpeVc];
       alvoLonge = Math.abs(this.xEle - this.xVc) > g.alcance;
+      /* ---------- a guarda dele e REACAO, nao plano ----------
+         Ela morava no `pensaEle`, que roda a cada 560ms. O soco rapido
+         sai em 90. As duas janelas praticamente nunca se cruzavam, e o
+         resultado medido foi que socar sem parar ganhava tres em tres,
+         em seis segundos, sem o outro encostar. Botao unico apertado no
+         talo nao pode ser a resposta certa de uma briga.
+
+         Agora ele decide no instante em que a mao chega, que e quando um
+         corpo decide de verdade. E so decide se estiver com as maos
+         livres: braco fora ou travado, ele COME. E essa a janela que o
+         jogo pede pra voce ler — bater quando ele se comprometeu. */
+      if (!alvoLonge) {
+        var livre = !(this.golpeEle || this.travaEle > 0);
+        this.eleDefende = livre && Math.random() < (this.golpeVc === 'forte' ? 0.5 : 0.34);
+      }
       defende = this.eleDefende;
       if (alvoLonge) { this.diz('PASSOU LONGE.'); }
       else {
@@ -152,14 +194,22 @@ var BrigaScene = new Phaser.Class({
         if (!defende) { this.tremor = 200; this.xEle = Math.min(BRG.x1, this.xEle + 10); }
         sfx(defende ? 'catraca' : 'batida');
       }
-      this.travaVc = g.trava;
+      /* Bater na guarda custa 70% mais tempo parado. Sem isso o soco na
+         guarda saia de graca e insistir continuava sendo o certo — a
+         guarda tem que doer em QUEM BATE, senao ela nao e guarda. */
+      this.travaVc = g.trava * (defende && !alvoLonge ? 1.7 : 1);
       this.golpeVc = null;
     } else {
       g = GOLPES[this.golpeEle];
       alvoLonge = Math.abs(this.xEle - this.xVc) > g.alcance;
       defende = this.defendendo;
       if (!alvoLonge) {
-        var d2 = g.dano * (defende ? 0.18 : 1);
+        /* 0,30 no forte e nao 0,18: segurar a guarda o tempo todo era
+           empate eterno — ele nao te tirava e voce nao podia socar de
+           guarda erguida. Agora o forte atravessa o suficiente pra
+           turtle perder devagar, que e o que faz baixar a guarda ser
+           uma decisao em vez de um descuido. */
+        var d2 = g.dano * (defende ? (this.golpeEle === 'forte' ? 0.30 : 0.18) : 1);
         this.hpVc = Math.max(0, this.hpVc - d2 / 100);
         this.diz(defende ? 'VOCÊ SEGUROU.' : 'ELE TE PEGOU.');
         if (!defende) {
@@ -182,16 +232,25 @@ var BrigaScene = new Phaser.Class({
      quando já está ganhando. E ele defende quando te vê armar. */
   pensaEle: function () {
     var dist = Math.abs(this.xEle - this.xVc);
-    var meuForte = (this.golpeVc === 'forte');
+    // a guarda dele agora e decidida no impacto, no `resolveGolpe`
 
-    if (meuForte && Math.random() < 0.5) { this.eleDefende = true; return; }
-    this.eleDefende = false;
+    /* Ele fecha ate 40, que e DENTRO do rapido dos dois (46). O limite
+       era `alcance + 6` = 52, e ali so o forte dele alcancava: ele
+       estacionava num ponto em que batia e nao apanhava. Briga em que um
+       dos dois escolhe a distancia nao e briga, e cerco.
 
-    if (dist > GOLPES.rapido.alcance + 6) {
-      this.xEle = Math.max(this.xVc + 30, this.xEle - 14);
-      return;
+       E andar nao pode mais custar o pensamento inteiro. Media anterior:
+       socar sem parar ganhava OITO em oito, e o motivo nao era dano —
+       era que cada soco seu empurra ele 10px pra fora do alcance, o seu
+       proximo soco entra de graca (o soco anda com voce) e o dele gasta
+       um ciclo so voltando. Um lado pagava o deslocamento e o outro nao.
+       Agora ele anda E soca no mesmo pensamento, se o passo bastar. */
+    if (dist > GOLPES.rapido.alcance - 6) {
+      this.xEle = Math.max(this.xVc + 30, this.xEle - 22);
+      dist = Math.abs(this.xEle - this.xVc);
     }
     if (this.travaEle > 0 || this.golpeEle) return;
+    if (dist > GOLPES.rapido.alcance) return;
     var podeForte = (this.travaVc > 0) || (this.hpEle > this.hpVc);
     this.golpeEle = (podeForte && Math.random() < 0.4) ? 'forte' : 'rapido';
     this.tGolpeEle = 0;
@@ -224,6 +283,28 @@ var BrigaScene = new Phaser.Class({
     perdeVida(this, this.spVc, 1);
     this.diz('VOCÊ FOI PRO CHÃO\nNO MEIO DO VAGÃO.');
     sfx('erro');
+  },
+
+  /* ---------- o vagao aparta ----------
+     Medido: quem segura a guarda e nao larga fica ali PRA SEMPRE. Aos 48
+     segundos de teste a briga continuava — ele nao atravessa a guarda
+     rapido o bastante e voce, de guarda erguida, nao pode socar. Empate
+     eterno com o jogo inteiro pausado atras.
+
+     A saida nao e mexer no dano: e lembrar onde isso acontece. Briga de
+     vagao dura vinte segundos porque o vagao APARTA — sempre teve gente
+     em volta, e gente em volta separa. Aos 22s alguem mete o braco no
+     meio, e ninguem ganha: os dois pagam o carisma de ter dado o
+     espetaculo, ninguem perde coracao. E o unico dos tres fins que nao
+     custa vida, porque nao houve nem vitoria nem chao. */
+  apartaram: function () {
+    this.acabou = true;
+    this.resultado = 'apartou';
+    GameState.addCarisma(-5);
+    GameState.addDescanso(-8);
+    GameState.stats.causos++;
+    this.diz('O VAGÃO METEU O BRAÇO\nNO MEIO E SEPAROU OS DOIS.');
+    sfx('apito');
   },
 
   fecha: function () {
@@ -278,6 +359,7 @@ var BrigaScene = new Phaser.Class({
 
     if (this.hpEle <= 0) this.ganhou();
     else if (this.hpVc <= 0) this.perdeu();
+    else if (this.t > 22000) this.apartaram();
 
     this.pinta();
   },
