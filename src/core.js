@@ -1788,8 +1788,7 @@ function ligaSom(v) {
      próprio e só olhava pra `MUSICA_LIGADA`, então o baixo do metrô
      continuava tocando com o som "desligado". O botão do painel é um
      só — ele tem que calar tudo. */
-  paraMusica();
-  suspendeAudio();
+  fechaAudio();
 }
 
 /* ---------- música ----------
@@ -1837,11 +1836,37 @@ function paraMusica() {
 }
 
 var AC = null;
+/* Declarado junto do contexto porque a vida dele e a mesma: o buffer de
+   ruido pertence ao AudioContext que o criou. */
+var bufRuido = null;
 
 function suspendeAudio() {
   if (AC && AC.state === 'running' && AC.suspend) {
     try { AC.suspend(); } catch (e) { }
   }
+}
+
+/* ---------- desligar o som DESTROI o audio, nao adormece ----------
+   Suspender basta pra quem trocou de janela e vai voltar. Nao basta pra
+   quem DESLIGOU o som: ali o jogo tem que ficar sem nada capaz de
+   emitir, e isso tem que dar pra provar. Contexto fechado nao tem
+   estado intermediario — ou existe ou nao existe.
+
+   Serve tambem de resposta a uma duvida que so o aparelho do jogador
+   responde: com o som desligado, `AC` e nulo. Se ainda houver barulho,
+   ele nao esta saindo desta pagina, e da pra parar de procurar aqui.
+
+   O `bufRuido` morre junto, e isso nao e detalhe: ele e um AudioBuffer
+   criado A PARTIR do contexto. Sobrevivendo a um contexto fechado, ele
+   seria reusado no contexto novo e estouraria no primeiro freio de
+   trem. */
+function fechaAudio() {
+  paraMusica();
+  bufRuido = null;
+  if (AC && AC.close) {
+    try { AC.close(); } catch (e) { }
+  }
+  AC = null;
 }
 
 /* ---------- o som para junto com a tela ----------
@@ -1904,7 +1929,10 @@ if (typeof document !== 'undefined') {
   window.addEventListener('keydown', voltaOSom, true);
   /* `pagehide` cobre fechar a aba, navegar pra fora e o app esconder a
      pagina; `pageshow` traz de volta quem voltou pelo historico. */
-  window.addEventListener('pagehide', calaOSom);
+  /* Fechar a aba, navegar pra fora, o app matar a pagina: nao ha volta
+     esperada, entao aqui e fechar mesmo. `blur` e `visibilitychange`
+     seguem suspendendo, porque desses o jogador volta. */
+  window.addEventListener('pagehide', fechaAudio);
   window.addEventListener('pageshow', somSegueAJanela);
 }
 
@@ -1933,7 +1961,6 @@ function tom(f, d, tipo, vol) {
    filtro estreito que desce de tom, e chiado de ar é ruído agudo sem
    altura nenhuma: as duas coisas são impossíveis com onda periódica,
    por mais camada que se empilhe. O buffer é gerado uma vez e reusado. */
-var bufRuido = null;
 function ruido(dur, vol, f0, f1, q, tipo, atraso) {
   if (!AC) return;
   if (!bufRuido) {
