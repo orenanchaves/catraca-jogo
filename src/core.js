@@ -1808,6 +1808,11 @@ var _musicaT = null, _musicaI = 0;
 
 function passoDaMusica() {
   if (!MUSICA_LIGADA || !SOM_LIGADO || !AC) return;
+  /* Rede de seguranca: se por algum motivo nenhum evento avisou que a
+     janela saiu de cena, o proprio relogio da musica percebe e se
+     desliga. Um `setInterval` continua rodando em aba de fundo — so
+     mais devagar — entao ele e o ultimo lugar em que da pra checar. */
+  if (document.hidden) { paraMusica(); suspendeAudio(); return; }
   var f = BAIXO_METRO[_musicaI % BAIXO_METRO.length];
   _musicaI++;
   tom(f, 0.55, 'triangle', 0.028);
@@ -1853,31 +1858,62 @@ function suspendeAudio() {
    Suspender e não fechar: fechar é definitivo, e a página pode voltar do
    cache de histórico (o botão voltar). Suspenso, ela acorda no
    `pageshow` e o som volta como estava. */
-function somSegueAJanela() {
-  if (document.hidden) {
-    paraMusica();
-    suspendeAudio();
-    return;
-  }
-  if (!SOM_LIGADO) return;
+function calaOSom() {
+  paraMusica();
+  suspendeAudio();
+}
+
+function voltaOSom() {
+  if (!SOM_LIGADO || document.hidden) return;
   if (AC && AC.state === 'suspended' && AC.resume) {
     try { AC.resume(); } catch (e) { }
   }
   comecaMusica();
 }
 
+function somSegueAJanela() {
+  if (document.hidden) calaOSom();
+  else voltaOSom();
+}
+
+/* ---------- por que NAO basta o visibilitychange ----------
+   A primeira versao disto so ouvia `visibilitychange`, e nao resolveu:
+   o som continuou tocando em segundo plano. O motivo e que
+   `visibilityState` responde a pergunta errada. Ele muda quando a ABA
+   vai pro fundo ou a janela e minimizada — e nao muda quando voce
+   troca de programa com alt-tab ou poe outra janela na frente. Pro
+   navegador a pagina continua "visivel"; pra pessoa o jogo sumiu e
+   ficou tocando atras de tudo. Que e exatamente a queixa.
+
+   Quem responde a pergunta certa e o FOCO da janela. Entao os dois
+   entram, e nenhum depende do outro estar certo.
+
+   Eu tinha deixado o `blur` de fora achando que clicar num painel
+   lateral tiraria o foco da janela. Nao tira: os paineis sao DOM da
+   mesma janela, e foco que anda dentro da pagina nao dispara `blur` de
+   window. A justificativa estava errada e o buraco era esse.
+
+   E a volta tem tres portas, nao uma. Se algum ambiente nunca mandar
+   `focus`, o primeiro toque ou tecla ja religa — porque quem esta
+   clicando no jogo esta, sem duvida nenhuma, olhando pra ele. */
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', somSegueAJanela);
+  window.addEventListener('blur', calaOSom);
+  window.addEventListener('focus', voltaOSom);
+  window.addEventListener('pointerdown', voltaOSom, true);
+  window.addEventListener('keydown', voltaOSom, true);
   /* `pagehide` cobre fechar a aba, navegar pra fora e o app esconder a
-     página — os três casos em que o jogo sumia da tela e continuava
-     tocando. `blur` fica de fora de propósito: clicar num painel de
-     fora do canvas tira o foco da janela e calar aí seria calar o jogo
-     no meio de uma partida que está na sua frente. */
-  window.addEventListener('pagehide', function () { paraMusica(); suspendeAudio(); });
+     pagina; `pageshow` traz de volta quem voltou pelo historico. */
+  window.addEventListener('pagehide', calaOSom);
   window.addEventListener('pageshow', somSegueAJanela);
 }
 
 function audioOn() {
+  /* Chamado por pausa, celular e pelos botoes de comecar. Sem esta
+     guarda ele RESSUSCITAVA o contexto que o proprio `SOM: DESLIGADO`
+     tinha acabado de suspender: abrir a pausa com o som desligado
+     religava tudo. */
+  if (!SOM_LIGADO) return;
   if (!AC && (window.AudioContext || window.webkitAudioContext)) {
     AC = new (window.AudioContext || window.webkitAudioContext)();
   }
