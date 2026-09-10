@@ -1783,7 +1783,13 @@ try {
 function ligaSom(v) {
   SOM_LIGADO = !!v;
   try { localStorage.setItem('metrosp_som', SOM_LIGADO ? '1' : '0'); } catch (e) { }
-  if (SOM_LIGADO) audioOn();
+  if (SOM_LIGADO) { audioOn(); return; }
+  /* SOM: DESLIGADO desligava só o `sfx`: a música roda num relógio
+     próprio e só olhava pra `MUSICA_LIGADA`, então o baixo do metrô
+     continuava tocando com o som "desligado". O botão do painel é um
+     só — ele tem que calar tudo. */
+  paraMusica();
+  suspendeAudio();
 }
 
 /* ---------- música ----------
@@ -1801,7 +1807,7 @@ var BAIXO_METRO = [49.0, 49.0, 58.3, 49.0, 43.7, 43.7, 51.9, 43.7];
 var _musicaT = null, _musicaI = 0;
 
 function passoDaMusica() {
-  if (!MUSICA_LIGADA || !AC) return;
+  if (!MUSICA_LIGADA || !SOM_LIGADO || !AC) return;
   var f = BAIXO_METRO[_musicaI % BAIXO_METRO.length];
   _musicaI++;
   tom(f, 0.55, 'triangle', 0.028);
@@ -1812,15 +1818,65 @@ function ligaMusica(v) {
   MUSICA_LIGADA = !!v;
   try { localStorage.setItem('metrosp_musica', MUSICA_LIGADA ? '1' : '0'); } catch (e) { }
   if (MUSICA_LIGADA) { audioOn(); comecaMusica(); }
-  else if (_musicaT) { clearInterval(_musicaT); _musicaT = null; }
+  else paraMusica();
 }
 
 function comecaMusica() {
-  if (_musicaT || !MUSICA_LIGADA) return;
+  if (_musicaT || !MUSICA_LIGADA || !SOM_LIGADO) return;
+  if (typeof document !== 'undefined' && document.hidden) return;
   _musicaT = setInterval(passoDaMusica, 640);
 }
 
+function paraMusica() {
+  if (_musicaT) { clearInterval(_musicaT); _musicaT = null; }
+}
+
 var AC = null;
+
+function suspendeAudio() {
+  if (AC && AC.state === 'running' && AC.suspend) {
+    try { AC.suspend(); } catch (e) { }
+  }
+}
+
+/* ---------- o som para junto com a tela ----------
+   A música anda num `setInterval` e o WebAudio não liga a mínima pra
+   aba estar em segundo plano: navegador nenhum silencia sozinho uma aba
+   que JÁ estava fazendo som. Quem trocava de aba, minimizava a janela ou
+   fechava o jogo continuava ouvindo o metrô tocar atrás de tudo.
+
+   Parar o relógio da música não basta, porque o WebAudio agenda nota
+   com antecedência e o que já está na fila toca do mesmo jeito.
+   Suspender o CONTEXTO cala inclusive o que já foi agendado — é a única
+   coisa que silencia de verdade.
+
+   Suspender e não fechar: fechar é definitivo, e a página pode voltar do
+   cache de histórico (o botão voltar). Suspenso, ela acorda no
+   `pageshow` e o som volta como estava. */
+function somSegueAJanela() {
+  if (document.hidden) {
+    paraMusica();
+    suspendeAudio();
+    return;
+  }
+  if (!SOM_LIGADO) return;
+  if (AC && AC.state === 'suspended' && AC.resume) {
+    try { AC.resume(); } catch (e) { }
+  }
+  comecaMusica();
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', somSegueAJanela);
+  /* `pagehide` cobre fechar a aba, navegar pra fora e o app esconder a
+     página — os três casos em que o jogo sumia da tela e continuava
+     tocando. `blur` fica de fora de propósito: clicar num painel de
+     fora do canvas tira o foco da janela e calar aí seria calar o jogo
+     no meio de uma partida que está na sua frente. */
+  window.addEventListener('pagehide', function () { paraMusica(); suspendeAudio(); });
+  window.addEventListener('pageshow', somSegueAJanela);
+}
+
 function audioOn() {
   if (!AC && (window.AudioContext || window.webkitAudioContext)) {
     AC = new (window.AudioContext || window.webkitAudioContext)();

@@ -15,6 +15,8 @@
 
 (function painelLateral() {
   var LARGURA_MINIMA = 1000;   // menos que isso, o painel não cabe sem apertar o jogo
+  var LARGURA_PAINEL = 236;    // igual ao CSS: os dois não podem divergir
+  var VAO = 28;                // o `gap` do #palco, também igual ao CSS
   var el = {};
   var ligado = false;
 
@@ -113,9 +115,63 @@
   var nitido = false;
   try { nitido = (localStorage.getItem('metrosp_nitido') === '1'); } catch (e) { }
 
+  /* Quanto sobra pro jogo depois dos dois painéis e dos dois vãos. */
+  function sobraDaJanela() {
+    return window.innerWidth - (LARGURA_PAINEL + VAO) * 2;
+  }
+
   function zoomInteiro() {
-    var alt = window.innerHeight;
-    return Math.max(1, Math.floor(alt / 576));
+    var z = Math.floor(window.innerHeight / 576);
+    /* Com o painel ligado a largura também limita: sem isto o zoom 3x
+       numa janela baixa e estreita fazia um canvas de 960px numa coluna
+       de 400 e o jogo saía por baixo dos painéis. */
+    if (ligado) z = Math.min(z, Math.floor(sobraDaJanela() / 320));
+    return Math.max(1, z);
+  }
+
+  /* ---------- pixel exato só quando cabe ----------
+     O zoom inteiro mínimo é 1, e 1 já são 576px de altura. Numa janela
+     de 540 o canvas ficava mais alto que a tela e o jogo saía por baixo
+     — medido: coluna de 576 numa janela de 540. Não dá pra resolver com
+     número: em tela mais baixa que 576, pixel exato e caber são coisas
+     que se excluem. Então ele cai pra ajustada sozinho e o painel diz o
+     porquê, em vez de entregar um jogo cortado. */
+  function cabeNitido() {
+    return 576 * zoomInteiro() <= window.innerHeight;
+  }
+
+  function usaNitido() {
+    return nitido && cabeNitido();
+  }
+
+  /* ---------- o tamanho da coluna do jogo ----------
+     Este é o conserto do jogo que "ficava mexendo no tamanho" no
+     desktop. A coluna era dimensionada pelo conteúdo (o canvas) e o
+     canvas era dimensionado pela coluna: cada `refresh` do Phaser movia
+     os dois. Medido a 1280×720, a coluna pedia 894px pra um canvas de
+     400 e os painéis encolhiam de 236 pra 165 pra pagar a conta.
+
+     Agora a conta sai da JANELA e vai numa direção só. Uma medida por
+     resize, em pixel inteiro — o Phaser lê um número que não depende
+     dele, e ninguém realimenta ninguém. */
+  function dimensiona() {
+    var g = $('game');
+    if (!g) return;
+    if (!ligado) { g.style.width = ''; g.style.height = ''; return; }
+    var larg, alt;
+    if (usaNitido()) {
+      var z = zoomInteiro();
+      larg = 320 * z; alt = 576 * z;
+    } else {
+      alt = window.innerHeight;
+      larg = Math.floor(alt * 320 / 576);
+      /* Monitor em pé: a altura daria uma coluna mais larga do que a que
+         cabe entre os painéis. Aí quem manda é a largura. */
+      var sobra = sobraDaJanela();
+      if (larg > sobra) { larg = Math.max(160, sobra); alt = Math.floor(larg * 576 / 320); }
+    }
+    g.style.width = larg + 'px';
+    g.style.height = alt + 'px';
   }
 
   function trocaEscala(v) {
@@ -126,9 +182,12 @@
   }
 
   function aplicaEscala() {
+    /* A coluna primeiro, o canvas depois: o Phaser mede o pai, então o
+       pai tem que já estar do tamanho certo quando ele medir. */
+    dimensiona();
     if (!window.jogo || !window.jogo.scale) return;
     var s = window.jogo.scale;
-    if (ligado && nitido) {
+    if (ligado && usaNitido()) {
       s.scaleMode = Phaser.Scale.NONE;
       s.setZoom(zoomInteiro());
     } else {
@@ -140,10 +199,12 @@
 
   function pintaNitido() {
     el.btNitido.textContent = nitido ? 'TELA: PIXEL EXATO' : 'TELA: AJUSTADA';
-    el.btNitido.className = 'bt' + (nitido ? ' on' : '');
-    el.obsNitido.textContent = nitido
-      ? ('escala ' + zoomInteiro() + 'x, sem pixel torto')
-      : 'preenche a altura da janela';
+    el.btNitido.className = 'bt' + (usaNitido() ? ' on' : '');
+    el.obsNitido.textContent = !nitido
+      ? 'preenche a altura da janela'
+      : (cabeNitido()
+        ? ('escala ' + zoomInteiro() + 'x, sem pixel torto')
+        : 'janela baixa demais: usando ajustada');
   }
 
   var faixaNoPainel = null;   // qual faixa ja tem frase escrita no painel
@@ -216,7 +277,10 @@
   function confere() {
     var cabe = window.innerWidth >= LARGURA_MINIMA
       && window.matchMedia('(pointer: fine)').matches;
-    if (cabe === ligado) { if (ligado) aplicaEscala(); return; }
+    /* O rótulo do botão depende do tamanho da janela (o pixel exato
+       pode deixar de caber), então ele é repintado a cada resize e não
+       só quando o painel liga ou desliga. */
+    if (cabe === ligado) { aplicaEscala(); pintaNitido(); return; }
     ligado = cabe;
     document.body.classList.toggle('comPainel', ligado);
     PAINEL = ligado ? ponte : null;
