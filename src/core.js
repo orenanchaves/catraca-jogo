@@ -2368,6 +2368,19 @@ var Ctrl = {
     TOUCH.pulso = false;
     this._pa = true;
     this.actJust = false;
+    /* ---------- e a soltura do mesmo dedo, que o _pa não pegava ----------
+       O _pa = true só protege se o dedo encostado já contar como "agir".
+       No toque curto não conta: quem vira agir é a SOLTURA (TOUCH.pulso,
+       no pointerup). A tela nova via nada apertado no primeiro quadro,
+       zerava o _pa, e a soltura do dedo que trocou de tela chegava como
+       um toque novinho.
+       Medido no TREINO do título: o botão troca de tela ao encostar, e a
+       soltura abria sozinha a primeira da lista — toda vez, a briga. O
+       mesmo vazamento, no treino da catraca, pularia a catraca sozinho, e
+       no VOLTAR da lista começaria uma partida no título.
+       Agora a tela lembra que chegou com dedo encostado e engole a
+       soltura DESSE dedo. É a promessa do comentário acima, cumprida. */
+    this._engoleSoltura = !!(TOQUE.ativo || TOQUE_DIR.ativo);
 
     /* WASD e espaço são o controle principal; setas, Z e enter continuam
        valendo pra quem já pegou o costume. enableCapture segura o espaço
@@ -2396,7 +2409,13 @@ var Ctrl = {
     this.down = k.S.isDown || k.DOWN.isDown || TOUCH.down;
     this.left = k.A.isDown || k.LEFT.isDown || TOUCH.left;
     this.right = k.D.isDown || k.RIGHT.isDown || TOUCH.right;
-    var a = k.SPACE.isDown || k.Z.isDown || k.ENTER.isDown || TOUCH.act || TOUCH.pulso;
+    var pulso = TOUCH.pulso;
+    if (this._engoleSoltura) {
+      pulso = false;
+      // o dedo que atravessou a troca de tela soltou: dali pra frente vale tudo
+      if (!TOQUE.ativo && !TOQUE_DIR.ativo) this._engoleSoltura = false;
+    }
+    var a = k.SPACE.isDown || k.Z.isDown || k.ENTER.isDown || TOUCH.act || pulso;
     this.actJust = a && !this._pa; this._pa = a; this.act = a;
     TOUCH.pulso = false;
     var b = k.X.isDown;
