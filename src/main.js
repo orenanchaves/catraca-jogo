@@ -137,7 +137,10 @@ var config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
+  /* A ordem aqui é a ordem de DESENHO, e cena pausada continua sendo
+     desenhada: o treino fica logo depois do título, senão a lista dele
+     aparece por cima da briga que ela mesma abriu. */
+  scene: [BootScene, TitleScene, TreinoScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
     HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene, BrigaScene]
 };
 

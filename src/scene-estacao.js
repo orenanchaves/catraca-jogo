@@ -242,6 +242,8 @@ var EstacaoScene = new Phaser.Class({
      chega por cima já está dentro do sistema. */
   init: function (dados) {
     this.entrada = (dados && dados.onde) || 'saguao';
+    // aberta pela tela de minigames: 'empurrao' ou 'catraca'
+    this.treino = (dados && dados.treino) || null;
   },
 
   create: function () {
@@ -439,7 +441,9 @@ var EstacaoScene = new Phaser.Class({
     /* O tutorial é uma camada por cima da primeira partida, e a estação
        é onde toda partida começa. Quem já viu (ou pulou) não vê de
        novo; o botão de rever mora no título. */
-    if (GameState.dia === 1 && !GameState.dentroDoSistema && !tutorialFeito()
+    if (this.treino) this.montaTreino();
+    // treino não abre tutorial: quem veio ver um minigame já sabe andar
+    if (!this.treino && GameState.dia === 1 && !GameState.dentroDoSistema && !tutorialFeito()
       && !this.scene.isActive('Tutorial')) {
       this.scene.launch('Tutorial');
     }
@@ -1063,6 +1067,56 @@ var EstacaoScene = new Phaser.Class({
       a.indo = null;
       this.plateia.push(a);
     }
+  },
+
+  /* ---------- o treino, na estação ----------
+     O EMPURRÃO precisa de um trem parado de porta aberta: a estação
+     aberta 'na plataforma' já nasce com ele assim. A janela da porta é
+     zerada na hora de começar — o trem chegou 2,2s antes, e treinar com
+     a janela pela metade seria treinar outro minigame.
+
+     A CATRACA não é disparada: o minigame É escolher a hora, com o
+     guarda virando o cone. O jogador nasce na frente de uma catraca
+     aberta e o resto é com ele. */
+  montaTreino: function () {
+    this.treinoFase = 'esperando';
+    var eu = this, i;
+    if (this.treino === 'catraca') {
+      for (i = 0; i < this.gates.length; i++) {
+        var g = this.gates[i];
+        if (g.fechada) continue;
+        this.pl.sp.x = (g.x0 + g.x1) / 2;
+        this.pl.sp.y = 266;
+        this.pl.dir = 'up';
+        break;
+      }
+      return;
+    }
+    if (this.treino === 'empurrao') {
+      this.time.delayedCall(1600, function () {
+        if (!eu.scene.isActive()) return;
+        if (eu.dialog) eu.dialog.fecha();
+        for (var q = 0; q < eu.trens.length; q++) {
+          var t = eu.trens[q];
+          if (t.estado !== 'aberto') continue;
+          t.t = 0;
+          eu.comecaEmpurrao(t);
+          eu.treinoFase = 'rodando';
+          return;
+        }
+      });
+    }
+  },
+
+  /* O diálogo só conta depois que o minigame começou. A fala de chegada
+     da estação também é um diálogo, e contá-la devolvia o jogador pra
+     lista antes de ele encostar em nada. */
+  treinoEmCurso: function () {
+    var ativo = false;
+    if (this.treino === 'empurrao') ativo = !!this.empurrando;
+    else if (this.treino === 'catraca') ativo = !!(this.pulo || this.flagra);
+    if (!ativo && this.treinoFase !== 'esperando' && this.dialog && this.dialog.ativo) ativo = true;
+    return ativo;
   },
 
   /* ---------- de frente pro quadro ----------
@@ -1761,6 +1815,15 @@ var EstacaoScene = new Phaser.Class({
   /* entrou: no talo ou espremido na porta fechando */
   entrou: function (espremido) {
     this.fimEmpurrao();
+    /* No treino, entrar é o fim do minigame e não o começo do vagão:
+       sem isto o treino do empurrão te despachava pra uma viagem de
+       verdade depois de você só querer ver o empurrão. */
+    if (this.treino) {
+      var eu = this;
+      fala(this, espremido ? 'Espremido na porta,\nmas entrou.' : 'Entrou no vagão.', []);
+      this.time.delayedCall(1400, function () { if (eu.dialog) eu.dialog.fecha(); });
+      return;
+    }
     GameState.addDescanso(-4 - 5 * GameState.lotacao() - (espremido ? 4 : 0));
     if (espremido) { GameState.addCarisma(-2); this.cameras.main.shake(200, 0.005); }
     /* ---------- o lado vira o rumo ----------
@@ -1912,6 +1975,10 @@ var EstacaoScene = new Phaser.Class({
   update: function (time, delta) {
     Ctrl.update();
     var dt = Math.min(delta, 50);
+    /* A vigia do treino roda ANTES das saídas antecipadas: o diálogo que
+       fecha o minigame é justamente uma delas, e vigiado depois dele o
+       fim nunca seria visto. */
+    if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.fim) return;

@@ -589,6 +589,11 @@ var GameState = {
     var c = CHARS[charKey];
     this.charKey = charKey;
     this.char = c;
+    /* A tela de minigames liga isto DEPOIS de chamar o init. Zerar aqui
+       é o que garante que o JOGAR do título nunca herda o treino: sem
+       ponto, sem derrota e sem recorde numa partida de verdade seria um
+       jogo que não conta nada. */
+    this.treino = null;
     /* Gênero é arte e nome, não número: nada abaixo desta linha olha
        pra ele. Sem argumento, vale o que ficou gravado da última vez. */
     this.genero = genero ? generoValido(charKey, genero) : leGenero(charKey);
@@ -769,6 +774,11 @@ var GameState = {
   /* Ganhar dá ponto, e o ponto é gravado na hora: quem morre no minuto
      seguinte não perde o que acabou de ganhar. */
   ganhaMinigame: function (pontos) {
+    /* Treino não grava ponto, e devolve ZERO pra quem mostra o prêmio:
+       a briga escreve '+0 PONTOS', que é a regra dita na tela em vez de
+       um número que não aconteceu. Sem isto a tela de minigames virava
+       fazenda de ponto pra destravar o elenco. */
+    if (this.treino) { this.stats.minigamesGanhos++; return 0; }
     this.stats.minigamesGanhos++;
     var n = pontos || 5;
     this.pontosDaCorrida = (this.pontosDaCorrida || 0) + n;
@@ -909,6 +919,10 @@ var GameState = {
      linhas e entravam por cima do placar. Cada linha aqui cabe medida —
      e motivo de derrota é melhor curto de qualquer jeito. */
   derrota: function () {
+    /* No treino ninguém perde a partida: perder a briga custa o coração
+       e o recado, e a tela volta pra lista. Mandar pro placar de fim de
+       jogo quem só queria ver um minigame seria punir a curiosidade. */
+    if (this.treino) return null;
     /* O atraso vem PRIMEIRO porque ele zera os corações: se a conta do
        coração respondesse antes, quem perdeu por chegar tarde leria que
        o trajeto o moeu, e nunca saberia que quem o matou foi o relógio. */
@@ -931,6 +945,7 @@ var GameState = {
     return r;
   },
   salvarRecorde: function () {
+    if (this.treino) return;
     try {
       if (this.diasInteiros() > this.recorde()) {
         localStorage.setItem('metrosp_dias', String(this.diasInteiros()));
@@ -3592,6 +3607,38 @@ function abreMapaParede(scene) {
   scene.dialog = new MapaParede(scene);
   sfx('ok');
   return scene.dialog;
+}
+
+/* ---------- o treino: saber quando o minigame acabou ----------
+   Estação e vagão, abertos pela tela de minigames, montam o minigame e
+   vigiam três fases: esperando (armado, ninguém encostou), rodando e
+   acabou. Acabou por 1,8s, eles devolvem o jogador pra lista. O 1,8s é
+   o tempo de ler o resultado: voltar no mesmo quadro em que o minigame
+   fecha apagava o "ENTROU" antes de alguém ler.
+
+   Se durante o "acabou" alguma coisa voltar a rodar — o flagra da
+   catraca termina num diálogo depois da animação — a vigia volta pra
+   "rodando". O fim é o fim de tudo, não do primeiro pedaço.
+
+   Uma função só pras duas cenas: duas contas da mesma coisa saem de
+   sincronia na primeira mudança. */
+function vigiaTreino(cena, dt, emCurso) {
+  if (!cena.treino || cena.treinoFase === 'voltando') return;
+  var rodando = !!emCurso.call(cena);
+  if (cena.treinoFase === 'esperando') {
+    if (rodando) cena.treinoFase = 'rodando';
+  } else if (cena.treinoFase === 'rodando') {
+    if (!rodando) { cena.treinoFase = 'acabou'; cena.treinoT = 0; }
+  } else if (cena.treinoFase === 'acabou') {
+    if (rodando) { cena.treinoFase = 'rodando'; return; }
+    cena.treinoT += dt;
+    if (cena.treinoT > 1800) voltaProTreino(cena);
+  }
+}
+
+function voltaProTreino(cena) {
+  cena.treinoFase = 'voltando';
+  cena.scene.start('Treino', { volta: GameState.treino });
 }
 
 function abreBarraca(scene, titulo, cardapio, aoFechar) {

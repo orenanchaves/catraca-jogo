@@ -13,8 +13,10 @@ var ITENS_PAUSA = [
   { chave: 'voltar', rotulo: function () { return 'CONTINUAR'; } },
   { chave: 'efeitos', rotulo: function () { return 'EFEITOS: ' + (SOM_LIGADO ? 'LIGADO' : 'DESLIGADO'); } },
   { chave: 'musica', rotulo: function () { return 'MÚSICA: ' + (MUSICA_LIGADA ? 'LIGADA' : 'DESLIGADA'); } },
-  { chave: 'reiniciar', rotulo: function () { return 'REINICIAR TRAJETO'; } },
-  { chave: 'sair', rotulo: function () { return 'SAIR PRO MENU'; } }
+  /* No treino não há trajeto pra reiniciar nem menu pra onde sair: os
+     dois botões falam a língua do treino e levam de volta pra lista. */
+  { chave: 'reiniciar', rotulo: function () { return GameState.treino ? 'REPETIR' : 'REINICIAR TRAJETO'; } },
+  { chave: 'sair', rotulo: function () { return GameState.treino ? 'SAIR DO TREINO' : 'SAIR PRO MENU'; } }
 ];
 
 var PausaScene = new Phaser.Class({
@@ -117,6 +119,13 @@ var PausaScene = new Phaser.Class({
     if (it.chave === 'musica') { ligaMusica(!MUSICA_LIGADA); this.pinta(); return; }
     if (it.chave === 'reiniciar') {
       if (!GameState.char) return;
+      if (GameState.treino) {
+        sfx('ok');
+        this.desmonta();
+        this.scene.stop('Pausa');
+        this.scene.start('Treino', { repete: GameState.treino });
+        return;
+      }
       sfx('nao');
       GameState.reiniciaPerna();
       this.desmonta();
@@ -128,7 +137,8 @@ var PausaScene = new Phaser.Class({
       sfx('nao');
       this.desmonta();
       this.scene.stop('Pausa');
-      this.scene.start('Title');
+      if (GameState.treino) this.scene.start('Treino', { volta: GameState.treino });
+      else this.scene.start('Title');
     }
   },
 

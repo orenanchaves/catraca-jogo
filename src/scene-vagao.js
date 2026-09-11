@@ -319,6 +319,11 @@ var VagaoScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function VagaoScene() { Phaser.Scene.call(this, { key: 'Vagao' }); },
 
+  // aberto pela tela de minigames: 'rima', 'ronda' ou 'lugar'
+  init: function (dados) {
+    this.treino = (dados && dados.treino) || null;
+  },
+
   create: function () {
     Ctrl.liga(this);
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
@@ -498,6 +503,7 @@ var VagaoScene = new Phaser.Class({
     var self = this;
     fala(this, GameState.hora() + '. Próxima:\n' + GameState.proximaEstacaoNome(), []);
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
+    if (this.treino) this.montaTreino();
   },
 
   /* ---------- cenário ---------- */
@@ -1082,6 +1088,59 @@ var VagaoScene = new Phaser.Class({
       }
     });
     sfx('apito');
+  },
+
+  /* ---------- o treino, no vagão ----------
+     Espera a fala de chegada fechar (1,3s) e dispara. Disparar É o
+     começo, então a fase vira 'rodando' na mesma hora — sem isso o
+     dilema do lugar, que é só um diálogo, ficaria 'esperando' pra
+     sempre, porque diálogo não conta enquanto nada começou.
+
+     O dilema precisa de você SENTADO: é aí que ele dói. O lugar é o
+     mais perto no seu carro, e se o carro estiver cheio alguém levanta
+     — a mesma regra que o próprio dilema usa quando oferecem lugar. */
+  montaTreino: function () {
+    this.treinoFase = 'esperando';
+    var eu = this;
+    this.time.delayedCall(1600, function () {
+      if (!eu.scene.isActive()) return;
+      if (eu.dialog) eu.dialog.fecha();
+      if (eu.treino === 'rima') {
+        eu.comecaBatalha();
+      } else if (eu.treino === 'ronda') {
+        GameState.pulouCatraca = true;     // senão ele passa reto e não há minigame
+        eu.comecaRonda();
+      } else if (eu.treino === 'lugar') {
+        var b = null, meu = carroDe(eu.pl.sp.y), dist = 1e9, i;
+        for (i = 0; i < eu.bancos.length; i++) {
+          var cand = eu.bancos[i];
+          if (cand.npc || cand.carro !== meu) continue;
+          var dd = Math.abs(cand.y + 24 - eu.pl.sp.y);
+          if (dd < dist) { dist = dd; b = cand; }
+        }
+        if (!b) {
+          for (i = 0; i < eu.bancos.length; i++) {
+            var oc = eu.bancos[i];
+            if (oc.carro !== meu || oc.npc === 'player') continue;
+            var od = Math.abs(oc.y + 24 - eu.pl.sp.y);
+            if (od < dist) { dist = od; b = oc; }
+          }
+          if (b && b.npc) { b.npc.destroy(); b.npc = null; }
+        }
+        if (b) eu.senta(b);
+        eu.dilemaDoLugar();
+      }
+      eu.treinoFase = 'rodando';
+    });
+  },
+
+  treinoEmCurso: function () {
+    var ativo = false;
+    if (this.treino === 'rima') ativo = !!this.batalha;
+    else if (this.treino === 'ronda') ativo = !!(this.ronda || this.fuga);
+    else if (this.treino === 'lugar') ativo = !!this.disfarce;
+    if (!ativo && this.treinoFase !== 'esperando' && this.dialog && this.dialog.ativo) ativo = true;
+    return ativo;
   },
 
   /* ---------- o guardinha em ronda ----------
@@ -2480,6 +2539,15 @@ var VagaoScene = new Phaser.Class({
      o dilema do lugar, que é o coração do jogo, pesa muito mais quando
      você está sentado, porque é aí que ele dói. */
   sorteiaRitmo: function () {
+    /* No treino o vagão fica quieto: acontece o minigame escolhido e
+       mais nada. Com o sorteio normal ligado, o treino da rima podia
+       começar com um rimador E um guarda E o dilema na mesma tela. */
+    if (this.treino) {
+      this.eventoPendente = false; this.dilemaPendente = false; this.tCarroAtual = 0;
+      this.situacoes = [];
+      for (var sq = 0; sq < CARROS; sq++) this.situacoes.push(null);
+      return;
+    }
     this.sorteiaEncontro();
     /* 0,50 e 0,22 (eram 0,28 e 0,10). Com os numeros antigos, dois tercos
        dos trechos nao tinham NADA: nem evento, nem dilema, e a situacao
@@ -2741,6 +2809,8 @@ var VagaoScene = new Phaser.Class({
     // a descida roda antes de qualquer saída antecipada, senão o painel
     // congela no meio do caminho durante um diálogo ou uma briga
     this.aplicaRota(dt);
+    // antes das saídas antecipadas, pelo mesmo motivo da estação
+    if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }

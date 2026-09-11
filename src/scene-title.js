@@ -16,10 +16,24 @@ var GEN_ABA = { w: 88, h: 24 };
    O ladrilho do meio é o único que muda de assunto: personagem aberto
    diz JOGAR, personagem travado diz o preço, e o aviso de um instante
    toma o lugar dos dois. */
-var BOT = { h: 42, y: GH - 50, gr: 168, pq: 46, vao: 8 };
-BOT.x0 = Math.round((GW - (BOT.pq * 2 + BOT.gr + BOT.vao * 2)) / 2);
-BOT.xGr = BOT.x0 + BOT.pq + BOT.vao;
-BOT.xDir = BOT.xGr + BOT.gr + BOT.vao;
+/* ---------- a fileira de baixo ----------
+   Eram três ladrilhos (? | JOGAR | SOM) e entrou um quarto, o TREINO,
+   que abre a tela de minigames. Não coube em linha nova: medido, entre a
+   ficha do personagem e esta fileira sobram 4 pixels. Então a fileira
+   repartiu. O "?" tem uma letra e desceu de 46 pra 30; o SOM tem três,
+   36px de tinta, e ficou com 44; o TREINO tem seis, 72px, e ganhou 80.
+   Quem pagou foi o JOGAR: de 168 pra 128, dez letras em vez de treze.
+   Os textos dele foram medidos pra caber — FALTAM e ABRIR vão até o
+   preço mais caro (150), dez letras cravadas, e os três recados da loja
+   foram encurtados pra no máximo dez.
+
+   TREINO e não JOGOS: "JOGOS" do lado de "► JOGAR" é o mesmo verbo duas
+   vezes, e o polegar erra entre os dois. */
+var BOT = { h: 42, y: GH - 50, gr: 128, tut: 30, tre: 80, som: 44, vao: 6 };
+BOT.x0 = Math.round((GW - (BOT.tut + BOT.gr + BOT.tre + BOT.som + BOT.vao * 3)) / 2);
+BOT.xGr = BOT.x0 + BOT.tut + BOT.vao;
+BOT.xTre = BOT.xGr + BOT.gr + BOT.vao;
+BOT.xDir = BOT.xTre + BOT.tre + BOT.vao;
 
 var TitleScene = new Phaser.Class({
   Extends: Phaser.Scene,
@@ -202,27 +216,41 @@ var TitleScene = new Phaser.Class({
 
     /* ---------- os três ladrilhos ---------- */
     this.gBot = this.add.graphics().setDepth(1);
-    this.tTut = txtC(this, BOT.x0 + BOT.pq / 2, BOT.y + 10, '?', PAL.branco, 8).setDepth(3);
+    this.tTut = txtC(this, BOT.x0 + BOT.tut / 2, BOT.y + 10, '?', PAL.branco, 8).setDepth(3);
     this.tStart = txtC(this, BOT.xGr + BOT.gr / 2, BOT.y + 10, '', PAL.branco, 8).setDepth(3);
-    this.tSom = txtC(this, BOT.xDir + BOT.pq / 2, BOT.y + 10, 'SOM', PAL.branco, 8).setDepth(3);
+    this.tTre = txtC(this, BOT.xTre + BOT.tre / 2, BOT.y + 10, 'TREINO', PAL.branco, 8).setDepth(3);
+    this.tSom = txtC(this, BOT.xDir + BOT.som / 2, BOT.y + 10, 'SOM', PAL.branco, 8).setDepth(3);
 
-    this.zonaTut = this.add.zone(BOT.x0, BOT.y, BOT.pq, BOT.h).setOrigin(0, 0).setInteractive();
+    this.zonaTut = this.add.zone(BOT.x0, BOT.y, BOT.tut, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaTut.on('pointerdown', function () {
       try { localStorage.removeItem('metrosp_tutorial'); } catch (e) { }
-      eu.flashLoja('COM TUTORIAL');
+      eu.flashLoja('TUTORIAL');
       sfx('ok');
       /* Sem isto o mesmo toque religava o tutorial E começava a partida:
          quem só queria saber o que aquilo fazia já estava na catraca. */
       eu.ignoraAct = true;
       eu.atualiza();
     });
-    this.zonaSom = this.add.zone(BOT.xDir, BOT.y, BOT.pq, BOT.h).setOrigin(0, 0).setInteractive();
+    this.zonaSom = this.add.zone(BOT.xDir, BOT.y, BOT.som, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaSom.on('pointerdown', function () {
       var liga = !SOM_LIGADO;
       ligaSom(liga); ligaMusica(liga);
       if (liga) sfx('ok');
       eu.ignoraAct = true;
       eu.atualiza();
+    });
+    /* O TREINO leva quem estiver escolhido. Carta travada não entra: o
+       treino viraria o jeito de jogar de graça com quem ainda não foi
+       comprado — aí vai o estudante, que é de todo mundo. */
+    this.zonaTre = this.add.zone(BOT.xTre, BOT.y, BOT.tre, BOT.h).setOrigin(0, 0).setInteractive();
+    this.zonaTre.on('pointerdown', function () {
+      eu.ignoraAct = true;
+      var kt = eu.ordem[eu.sel];
+      if (!destravado(kt)) kt = 'estudante';
+      TREINO_QUEM.k = kt;
+      TREINO_QUEM.g = eu.gen[kt];
+      audioOn(); sfx('ok');
+      eu.scene.start('Treino');
     });
     /* O ladrilho do meio é o botão de jogar, e no travado é o de
        comprar: é o mesmo comando que o teclado já dava. */
@@ -270,8 +298,8 @@ var TitleScene = new Phaser.Class({
     var k = this.ordem[this.sel];
     if (destravado(k)) return false;
     var r = compraPersonagem(k);
-    if (r === 'ok') { sfx('vitoria'); this.flashLoja('DESTRAVADO!'); }
-    else { sfx('nao'); this.flashLoja('NÃO DÁ AINDA'); }
+    if (r === 'ok') { sfx('vitoria'); this.flashLoja('DESTRAVOU!'); }
+    else { sfx('nao'); this.flashLoja('AINDA NÃO'); }
     this.ignoraAct = true;
     this.atualiza();
     return true;
@@ -366,7 +394,9 @@ var TitleScene = new Phaser.Class({
        e sumiu uma vez nesta tela, e some justamente pra quem procura;
        além disso três ladrilhos com um buraco no meio não parecem uma
        fileira, parecem um erro. */
-    tile(BOT.x0, BOT.pq, 0x1b2438, 0x2b3a58, 0x3d5180);
+    tile(BOT.x0, BOT.tut, 0x1b2438, 0x2b3a58, 0x3d5180);
+    // azul como o "?" e o SOM: é ferramenta, não é jogar nem comprar
+    tile(BOT.xTre, BOT.tre, 0x1b2438, 0x2b3a58, 0x3d5180);
 
     /* Verde é jogar, amarelo é comprar, e vermelho é o preço que você
        ainda não tem. A cor diz o que o toque vai fazer antes de a
@@ -383,10 +413,12 @@ var TitleScene = new Phaser.Class({
       rotulo = 'ABRIR: ' + precoDe(k); corpo = 0x3a3410; aba = 0x5c5320; borda = 0xf2c14e; cor = PAL.amarelo;
     }
     tile(BOT.xGr, BOT.gr, corpo, aba, borda);
-    /* O ladrilho grande tem 168 pixels e a fonte gasta 12 por letra:
-       são 14 letras cravadas, 13 com folga. Recado maior que isso
-       quebra em duas linhas e sai por cima da moldura. */
-    this.tStart.setText(rotulo.length > 13 ? rotulo.slice(0, 13) : rotulo).setColor(cor);
+    /* O ladrilho grande tem 128 pixels (eram 168 antes do TREINO) e a
+       fonte gasta 12 por letra: dez letras com folga. Recado maior que
+       isso quebra em duas linhas e sai por cima da moldura — e cortado
+       é pior: 'FALTAM 1500' viraria 'FALTAM 150', um preço que não
+       existe. Todo recado foi medido pra caber; o corte é só rede. */
+    this.tStart.setText(rotulo.length > 10 ? rotulo.slice(0, 10) : rotulo).setColor(cor);
     // só o de jogar pisca: piscar é o convite, e convite só tem um
     this.tStart.setAlpha(1);
     if (this.piscaStart) { this.piscaStart.stop(); this.piscaStart = null; }
@@ -395,7 +427,7 @@ var TitleScene = new Phaser.Class({
         duration: 700, yoyo: true, repeat: -1 });
     }
 
-    tile(BOT.xDir, BOT.pq, SOM_LIGADO ? 0x1b2438 : 0x14141e,
+    tile(BOT.xDir, BOT.som, SOM_LIGADO ? 0x1b2438 : 0x14141e,
       SOM_LIGADO ? 0x2b3a58 : 0x1f1f2c, SOM_LIGADO ? 0x3d5180 : 0x2a2a3a);
     this.tSom.setColor(SOM_LIGADO ? PAL.branco : PAL.cinzaEsc);
     if (!SOM_LIGADO) {
@@ -403,7 +435,7 @@ var TitleScene = new Phaser.Class({
       g.lineStyle(2, 0xe8362c, 1);
       g.beginPath();
       g.moveTo(BOT.xDir + 9, BOT.y + 9);
-      g.lineTo(BOT.xDir + BOT.pq - 9, BOT.y + BOT.h - 9);
+      g.lineTo(BOT.xDir + BOT.som - 9, BOT.y + BOT.h - 9);
       g.strokePath();
     }
   },
