@@ -315,6 +315,21 @@ var SITUACOES = [
   { nome: 'ALGUMA COISA ROLANDO', roda: function (v) { v.sorteiaEvento(); } }
 ];
 
+/* ---------- o lugar, no mundo: os números ----------
+   6s com a pessoa parada na sua frente. O dilema de caixa de texto tinha
+   um cronômetro de 6s e o DESIGN.md pedia "uns 5": ficou o que já estava
+   calibrado, só que agora o tempo é ela em pé olhando pra você, e não
+   uma barra num balão. */
+var LUGAR_ESPERA = 6000;
+/* Virar a cara pra janela é trocar o lado em que o boneco sentado olha:
+   quem está no banco da esquerda olha pro corredor (sentadoR) e, virado,
+   olha pro vidro (sentadoL). É o mesmo quadro espelhado, então o disfarce
+   não pede arte nova. */
+var VIRA_JANELA = { sentadoR: 'sentadoL', sentadoL: 'sentadoR', sentadoFrente: 'sentadoCostas', sentadoCostas: 'sentadoFrente' };
+/* O azul da moldura é o da placa de assento preferencial, clareado: o
+   #0b5fae da placa some em cima do piso escuro do vagão. */
+var COR_LUGAR = 0x3a8ee8;
+
 var VagaoScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function VagaoScene() { Phaser.Scene.call(this, { key: 'Vagao' }); },
@@ -335,6 +350,7 @@ var VagaoScene = new Phaser.Class({
     this.dilemaPendente = false;
     this.ronda = null;
     this.brigando = false;
+    this.lugar = null;
     this.tEvento = 0; this.tDilema = 0;
     this.falha = null;
     this.sorteouFalha = false;
@@ -1138,7 +1154,7 @@ var VagaoScene = new Phaser.Class({
     var ativo = false;
     if (this.treino === 'rima') ativo = !!this.batalha;
     else if (this.treino === 'ronda') ativo = !!(this.ronda || this.fuga);
-    else if (this.treino === 'lugar') ativo = !!this.disfarce;
+    else if (this.treino === 'lugar') ativo = !!(this.lugar || this.disfarce);
     if (!ativo && this.treinoFase !== 'esperando' && this.dialog && this.dialog.ativo) ativo = true;
     return ativo;
   },
@@ -1973,7 +1989,7 @@ var VagaoScene = new Phaser.Class({
       if (!eu.scene.isActive()) return;
       // nada por cima de coisa já acontecendo
       if (eu.dialog || eu.encontro || eu.rimador || eu.batalha || eu.duelando ||
-        eu.disfarce || eu.brigando || eu.ronda || eu.fuga) return;
+        eu.disfarce || eu.brigando || eu.ronda || eu.fuga || eu.lugar) return;
       if (carroDe(eu.pl.sp.y) !== c) return;  // já foi embora, deixa quieto
       s.roda(eu);
     });
@@ -2617,52 +2633,289 @@ var VagaoScene = new Phaser.Class({
     }
 
     if (!this.sentadoEm) return;
+    /* ---------- o dilema saiu da caixa de texto ----------
+       Era: o idoso aparecia TELETRANSPORTADO do lado do seu banco e
+       abria um balão com três botões e um cronômetro. A escolha mais
+       importante do jogo era a única que não acontecia no mundo — e o
+       jogador estava sentado olhando o vagão, que é justamente o lugar
+       onde a decisão devia morar.
 
-    var yD = this.sentadoEm.y + 24;
-    this.idoso = new Ator(this, this.sentadoEm.x < 160 ? bordaEsqVagao(yD) + 6 : bordaVagao(yD) - 6,
-      yD, 'np_idoso');
-    this.idoso.dir = this.sentadoEm.x < 160 ? 'left' : 'right';
-    this.idoso.anima(0, false);
-    this.idoso.sp.setDepth(55);
-    this.idoso.fixo = true;
-    this.gente.push(this.idoso);
+       Agora quem precisa do lugar entra pela porta mais longe e desce o
+       corredor até você; ver ela vindo já é parte da escolha. Ela para
+       na sua frente e o vagão começa a olhar. Você responde com o corpo:
+       levantar é ceder, virar a cara pra janela é disfarçar, ficar
+       parado é não ceder. O que acontece aparece na tela — ela senta, ou
+       vai segurar na barra — e o número vem depois.
+
+       O disfarce antigo (comecaDisfarce, a barra de suspeita) ficou sem
+       ninguém chamando. Não foi apagado porque isto é protótipo: se o
+       lugar no mundo ficar, ele sai junto com o resto do balão. */
+    this.comecaLugar();
+  },
+
+  /* ---------- o lugar, no mundo ----------
+     Quem precisa sentar vem pelo corredor com moldura azul — o azul da
+     placa de preferencial — e "PRECISA SENTAR" em cima da cabeça, no
+     mesmo traço de quem te aborda pra rima ou pra barra. Entra pela
+     porta mais longe pelo mesmo motivo deles: dar tempo de ver antes de
+     ter que reagir. E ver antes vale: levantar enquanto ela ainda vem
+     rende mais do que levantar depois que o vagão inteiro olhou. */
+  comecaLugar: function () {
+    if (this.lugar || !this.sentadoEm) return;
+    var bnc = this.sentadoEm, c = carroDe(this.pl.sp.y);
+    var tipos = [
+      { sprite: 'np_idoso', vel: 30, pro: 'ELE', dele: 'DELE' },
+      { sprite: 'np_gestante', vel: 38, pro: 'ELA', dele: 'DELA' },
+      { sprite: 'np_mae_bebe', vel: 36, pro: 'ELA', dele: 'DELA' }
+    ];
+    var t = tipos[Math.floor(Math.random() * tipos.length)];
+    var portas = this.portasDoCarro(c), porta = portas[0], melhor = -1, i;
+    for (i = 0; i < portas.length; i++) {
+      var d = Math.abs(portas[i] + PORTA_ALT / 2 - this.pl.sp.y);
+      if (d > melhor) { melhor = d; porta = portas[i]; }
+    }
+    var yD = bnc.y + 24;
+    var a = new Ator(this, 160, porta + PORTA_ALT / 2, t.sprite);
+    a.sp.setDepth(55);
+    a.fixo = true;
+    a.olhaT = 0; a.proxOlhada = 3000;
+    this.gente.push(a);
+    this.lugar = {
+      a: a, banco: bnc, pref: !!bnc.pref, vel: t.vel, pro: t.pro, dele: t.dele,
+      fase: 'vem', t: 0, pressao: 0, tJanela: 0, olhandoJanela: false, olhadores: [],
+      alvo: { x: bnc.x < 160 ? bordaEsqVagao(yD) + 6 : bordaVagao(yD) - 6, y: yD },
+      tag: txtC(this, 0, 0, 'PRECISA SENTAR', PAL.branco, 8).setDepth(530).setVisible(false)
+    };
     sfx('porta');
+  },
 
-    /* Na preferencial não é o mesmo dilema. Ali o lugar não é seu, é
-       de quem precisa — e o vagão inteiro sabe disso, porque está
-       escrito no encosto. Ceder rende mais, e não ceder custa o dobro:
-       recusar num banco comum é ser grosso, recusar na preferencial é
-       estar errado na frente de todo mundo. */
-    var pref = !!this.sentadoEm.pref;
-    var bonus = pref ? 14 : 9, perda = pref ? -18 : -9;
-    fala(this, pref
-      ? 'Entra ' + quem + '.\nVocê está na preferencial.'
-      : 'Entra ' + quem + '\ne para bem na sua frente.', [
-      {
-        label: 'Dar o lugar', cb: function () {
-          GameState.addCarisma(bonus); GameState.addDescanso(-9);
-          GameState.stats.cedidos++; GameState.stats.causos++;
-          self.levanta(); sfx('ok');
-          self.flash(pref ? 'Era o lugar dele mesmo.' : 'O vagão inteiro viu.');
-        }
-      },
-      { label: 'Disfarçar', cb: function () { self.comecaDisfarce(); } },
-      {
-        label: 'Não dar', cb: function () {
-          GameState.addCarisma(perda); GameState.addDescanso(5);
-          GameState.stats.recusas++; GameState.stats.causos++;
-          sfx('nao');
-          self.flash(pref ? 'Na preferencial. Todo mundo viu.' : 'Todo mundo te encarou.');
-        }
+  atualizaLugar: function (dt) {
+    var L = this.lugar;
+    if (!L) return;
+    var a = L.a;
+    if (!a || !a.sp || !a.sp.active) { this.fechaLugar(null); return; }
+    /* Levantar por qualquer caminho, com ela vindo ou esperando, é ceder:
+       o corpo já disse o que o botão diria. */
+    if (!this.sentadoEm) { this.cedeLugar(); return; }
+    L.t += dt;
+
+    if (L.fase === 'vem') {
+      /* Em dois tempos, e não em linha reta: o corredor aperta na frente
+         do módulo e a diagonal raspava no banco. Primeiro desce pelo meio,
+         depois encosta. */
+      var passo = L.vel * dt / 1000;
+      var dy = L.alvo.y - a.sp.y;
+      if (Math.abs(dy) > 2) {
+        a.sp.y += (dy > 0 ? 1 : -1) * Math.min(passo, Math.abs(dy));
+        a.sp.x += (160 - a.sp.x) * Math.min(1, dt / 200);
+        a.setDir(0, dy);
+      } else {
+        var dx = L.alvo.x - a.sp.x;
+        if (Math.abs(dx) <= 1.5) { this.chegouNoLugar(); return; }
+        a.sp.x += (dx > 0 ? 1 : -1) * Math.min(passo, Math.abs(dx));
+        a.setDir(dx, 0);
       }
-    ], {
-      tempo: 6,
-      cor: pref ? 0xe8362c : 0xe8a33c,
-      aoExpirar: function () {
-        GameState.addCarisma(pref ? -12 : -6); GameState.stats.recusas++;
-        self.flash('Você travou. Isso conta como não.');
-      }
+      a.anima(dt, true);
+      // rede: preso atrás de alguém no corredor, ele não fica pra sempre
+      if (L.t > 14000) { a.pos(L.alvo.x, L.alvo.y); this.chegouNoLugar(); }
+      return;
+    }
+
+    if (L.fase !== 'espera') return;
+    /* O disfarce é segurar ◄ ou ►: sentado, direção não anda — o
+       movimento inteiro mora num `if (!this.sentadoEm)` —, então a mesma
+       mão que andaria vira a cara pro vidro. */
+    var janela = !!(Ctrl.left || Ctrl.right);
+    if (janela !== L.olhandoJanela) {
+      L.olhandoJanela = janela;
+      var pose = this.sentadoEm.pose;
+      this.pl.dir = janela ? (VIRA_JANELA[pose] || pose) : pose;
+      this.pl.anima(0, false);
+    }
+    if (janela) L.tJanela += dt;
+    L.pressao = Math.min(1, L.t / LUGAR_ESPERA);
+    if (L.pressao >= 1) {
+      /* Disfarçou quem passou a maior parte da espera olhando o vidro, e
+         não quem virou no último quadro: disfarce é sustentar. */
+      this.fechaLugar(L.tJanela >= LUGAR_ESPERA * 0.6 ? 'disfarce' : 'recusa');
+    }
+  },
+
+  chegouNoLugar: function () {
+    var L = this.lugar, a = L.a;
+    L.fase = 'espera'; L.t = 0;
+    a.pos(L.alvo.x, L.alvo.y);
+    a.dir = L.banco.x < 160 ? 'left' : 'right';     // de frente pra você
+    a.anima(0, false);
+    /* O vagão te olha: os mais perto, até seis, um de cada vez conforme a
+       espera passa. É a pressão social desenhada e não escrita — o
+       balão dizia "todo mundo te encarou" depois; agora dá pra ver
+       acontecendo enquanto ainda dá pra mudar de ideia. */
+    var c = carroDe(this.pl.sp.y), cand = [], i, o;
+    for (i = 0; i < this.bancos.length; i++) {
+      o = this.bancos[i].npc;
+      if (!o || o === 'player' || o === a || !o.sp || !o.sp.active) continue;
+      if (this.bancos[i].carro !== c) continue;
+      cand.push(o);
+    }
+    for (i = 0; i < this.npcExtra.length; i++) {
+      o = this.npcExtra[i];
+      if (!o || o === a || !o.sp || !o.sp.active || carroDe(o.sp.y) !== c) continue;
+      cand.push(o);
+    }
+    var px = this.pl.sp.x, py = this.pl.sp.y;
+    cand.sort(function (p, q) {
+      return (Math.abs(p.sp.y - py) + Math.abs(p.sp.x - px)) - (Math.abs(q.sp.y - py) + Math.abs(q.sp.x - px));
     });
+    L.olhadores = cand.slice(0, 6);
+    sfx('caixa');
+  },
+
+  cedeLugar: function () {
+    var L = this.lugar;
+    if (!L) return;
+    var cedo = (L.fase === 'vem');
+    var bonus = L.pref ? 14 : 9;
+    var ganho = cedo ? bonus + 3 : (L.pressao < 0.35 ? bonus : Math.round(bonus * 0.5));
+    if (this.sentadoEm) this.levanta();
+    GameState.addCarisma(ganho); GameState.addDescanso(-9);
+    GameState.stats.cedidos++; GameState.stats.causos++;
+    sfx('ok');
+    this.flash(cedo ? 'LEVANTOU ANTES DE\n' + L.pro + ' CHEGAR.'
+      : (L.pressao < 0.35 ? (L.pref ? 'ERA O LUGAR ' + L.dele + '\nMESMO.' : 'O VAGÃO INTEIRO VIU.')
+        : 'LEVANTOU PORQUE\nTODO MUNDO OLHOU.'));
+    this.sentaNoLugar(L);
+    this.fechaLugar('cedeu');
+  },
+
+  /* Senta de uma vez, sem animação de passo: o banco balança quem está
+     nele pelo `bx`/`by`, e um banco com dono e sem `bx` jogava o boneco
+     pra NaN no quadro seguinte. Ela está a um passo do banco, e um passo
+     não precisa de animação pra ser lido. */
+  sentaNoLugar: function (L) {
+    var a = L.a, bnc = L.banco;
+    if (!a || !a.sp || !a.sp.active) return;
+    a.pos(bnc.x, bnc.y + 24);
+    a.dir = bnc.pose; a.anima(0, false);
+    a.sp.setDepth(30); a.fixo = true;
+    sentaAnimado(a);
+    bnc.npc = a;
+    var k = this.npcExtra.indexOf(a); if (k >= 0) this.npcExtra.splice(k, 1);
+  },
+
+  /* Não ganhou o lugar: vai segurar na barra mais perto, um pouco adiante
+     de você, e fica ali o resto da viagem — em pé, balançando, na sua
+     frente. O custo de não ceder é também ter que olhar pra isso. */
+  vaiPraBarra: function (a) {
+    if (!a || !a.sp || !a.sp.active) return;
+    var bx = Math.abs(a.sp.x - BARRAS_X[0]) < Math.abs(a.sp.x - BARRAS_X[1]) ? BARRAS_X[0] : BARRAS_X[1];
+    a.pos(bx + (bx < 160 ? 10 : -10), a.sp.y + 34);
+    limitaVagao(a.sp);
+    a.dir = 'up'; a.anima(0, false); a.fixo = true;
+    if (this.npcExtra.indexOf(a) < 0) this.npcExtra.push(a);
+  },
+
+  fechaLugar: function (res) {
+    var L = this.lugar;
+    if (!L) return;
+    this.lugar = null;
+    if (res === 'recusa') {
+      GameState.addCarisma(L.pref ? -18 : -9); GameState.addDescanso(5);
+      GameState.stats.recusas++; GameState.stats.causos++;
+      sfx('nao');
+      this.flash(L.pref ? 'NA PREFERENCIAL.\nTODO MUNDO VIU.' : 'TODO MUNDO\nTE ENCAROU.');
+      this.vaiPraBarra(L.a);
+    } else if (res === 'disfarce') {
+      GameState.stats.disfarces++; GameState.stats.causos++;
+      /* Flagrado perde o carisma E o lugar, que é o que o DESIGN.md
+         sempre pediu pro disfarce: aguentou, custa pouco; pego, custa
+         muito e não serviu de nada. Na preferencial pegam mais. */
+      if (Math.random() < (L.pref ? 0.5 : 0.3)) {
+        GameState.addCarisma(L.pref ? -22 : -12); GameState.stats.recusas++;
+        sfx('apito');
+        this.flash('"NÃO VAI LEVANTAR,\nNÃO?"');
+        if (this.sentadoEm) this.levanta();
+        this.sentaNoLugar(L);
+        res = 'flagrado';
+      } else {
+        GameState.addCarisma(-3); GameState.stats.disfarcesOk++;
+        sfx('ok');
+        this.flash('NINGUÉM\nPROVOU NADA.');
+        this.vaiPraBarra(L.a);
+      }
+    }
+    if (this.sentadoEm) { this.pl.dir = this.sentadoEm.pose; this.pl.anima(0, false); }
+    if (L.tag) L.tag.destroy();
+    /* Os olhares não desgrudam na hora: ficam mais um pouco em quem não
+       cedeu. Em quem cedeu, somem — o vagão perdoa rápido quem levanta. */
+    if (res && res !== 'cedeu' && L.olhadores.length) {
+      this.olharesFicam = L.olhadores;
+      this.olharesAte = this.time.now + 2200;
+    }
+  },
+
+  dicaDoLugar: function () {
+    var L = this.lugar;
+    if (L.fase === 'vem') return nomeAgir() + ': DAR O LUGAR';
+    if (L.olhandoJanela) return 'FINGINDO QUE NÃO VIU';
+    // a dica alterna entre as duas saídas: não cabem juntas em 26 letras
+    return (Math.floor(this.time.now / 1400) % 2) ? '◄ ► OLHAR PRA JANELA' : nomeAgir() + ': DAR O LUGAR';
+  },
+
+  pintaLugar: function (g) {
+    var L = this.lugar, i;
+    if (L && L.a && L.a.sp && L.a.sp.active) {
+      var a = L.a, x = Math.round(a.sp.x), py = a.sp.y;
+      var topo = py - 50, alt = 54;
+      var pulso = 0.55 + 0.45 * Math.sin(this.time.now / 190);
+      g.fillStyle(COR_LUGAR, 0.14 + 0.1 * pulso).fillRect(x - 14, topo, 28, alt);
+      g.lineStyle(2, COR_LUGAR, 0.55 + 0.45 * pulso);
+      g.strokeRect(x - 14, topo, 28, alt);
+      g.fillStyle(COR_LUGAR, 1);
+      for (var c = 0; c < 4; c++) {
+        var cx = x - 15 + (c % 2) * 28, cy = topo - 1 + (c > 1 ? alt : 0);
+        g.fillRect(cx, cy, 2, 6); g.fillRect(cx, cy, 6, 2);
+        if (c % 2) g.fillRect(cx - 4, cy, 6, 2);
+        if (c > 1) g.fillRect(cx, cy - 4, 2, 6);
+      }
+      var acima = (py - 82 >= 140);
+      var ty = acima ? py - 82 : py + 6;
+      var tx = Phaser.Math.Clamp(x, 60, GW - 60);
+      L.tag.setVisible(true).setPosition(tx, ty);
+      var lw = Math.round(L.tag.width) + 8, lh = Math.round(L.tag.height) + 4;
+      g.fillStyle(0x08080e, 0.85).fillRect(tx - lw / 2, ty - 2, lw, lh);
+      g.fillStyle(COR_LUGAR, 1).fillRect(tx - lw / 2, ty + lh - 4, lw, 2);
+      if (L.fase === 'espera') {
+        // o tempo que sobra, encolhendo: a mesma carga do encontro
+        var by = acima ? ty - 12 : ty + lh + 4;
+        g.fillStyle(0x08080e, 0.7).fillRect(x - 20, by, 40, 7);
+        g.fillStyle(COR_LUGAR, 1).fillRect(x - 19, by + 1, Math.round(38 * (1 - L.pressao)), 5);
+      }
+    }
+
+    var lista = null, n = 0;
+    if (L && L.fase === 'espera') {
+      lista = L.olhadores;
+      n = Math.min(lista.length, Math.floor(L.pressao * lista.length) + 1);
+    } else if (this.olharesFicam && this.time.now < this.olharesAte) {
+      lista = this.olharesFicam; n = lista.length;
+    } else this.olharesFicam = null;
+    if (!lista) return;
+    /* Os olhos: plaquinha escura com dois brancos e as pupilas puxadas
+       pro seu lado. Forma antes de palavra — ninguém precisa ler "o
+       vagão te encara" pra entender seis pares de olhos virados pra você. */
+    var px = this.pl.sp.x;
+    for (i = 0; i < n; i++) {
+      var o = lista[i];
+      if (!o || !o.sp || !o.sp.active) continue;
+      var ox = Math.round(o.sp.x), oy = Math.round(o.sp.y) - 60;
+      var p = (px < ox) ? 0 : 2;
+      g.fillStyle(0x08080e, 0.9).fillRect(ox - 8, oy - 1, 16, 8);
+      g.fillStyle(0xf2f0ff, 1).fillRect(ox - 6, oy + 1, 5, 4);
+      g.fillRect(ox + 1, oy + 1, 5, 4);
+      g.fillStyle(0x08080e, 1).fillRect(ox - 6 + p + 1, oy + 2, 2, 2);
+      g.fillRect(ox + 1 + p + 1, oy + 2, 2, 2);
+    }
   },
 
   /* ---------- minigame do disfarce ---------- */
@@ -2832,6 +3085,7 @@ var VagaoScene = new Phaser.Class({
     if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
 
     if (this.ronda) this.atualizaRonda(dt);
+    if (this.lugar) this.atualizaLugar(dt);
 
     if (this.estado === 'andando') {
       this.atualizaSolavanco(dt);
@@ -2842,7 +3096,7 @@ var VagaoScene = new Phaser.Class({
         this.entregaDoCarro(carroDe(this.pl.sp.y));
       }
       if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
-      if (this.dilemaPendente && !this.encena && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
+      if (this.dilemaPendente && !this.encena && !this.lugar && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
       /* Trinta segundos de porta aberta sem aviso viram trinta segundos
@@ -2997,7 +3251,11 @@ var VagaoScene = new Phaser.Class({
       dica = this.fuga.patente.nome + ' ' + (df < 0 ? '▲' : '▼') + ' CORRA!';
     }
     if (!dica) {
-      if (this.sentadoEm) {
+      if (this.sentadoEm && this.lugar) {
+        // alguém precisa do lugar: agir é ceder, e a direção vira a cara
+        dica = this.dicaDoLugar();
+        if (Ctrl.backJust || Ctrl.actJust) this.cedeLugar();
+      } else if (this.sentadoEm) {
         // no celular não existe tecla X: agir de novo levanta
         dica = this.sentadoEm.pref && !temPoder('pedeLugar')
           ? 'NA PREFERENCIAL ▲'
@@ -3197,6 +3455,15 @@ var VagaoScene = new Phaser.Class({
     }
 
     if (this.batalha) this.pintaBatalha(g);
-    if (this.encontro) this.pintaEncontro(g); else this.tagEncontro.setVisible(false);
+    /* ---------- a moldura mora no MUNDO, não na tela ----------
+       Ela vinha desenhada no `gUI`, que é camada de TELA
+       (setScrollFactor 0), com coordenadas do MUNDO: a pessoa está em
+       y=3968 no carro 7, e 3968 na tela é muito abaixo da borda. Com um
+       carro só isso não aparecia — no carro 0 mundo e tela coincidem —,
+       e desde os oito carros a moldura de quem te aborda (rimador, "quer
+       a barra") só existia no primeiro. Quem pegou foi o protótipo do
+       lugar: a etiqueta aparecia, a moldura e os olhos não. */
+    if (this.encontro) this.pintaEncontro(gm); else this.tagEncontro.setVisible(false);
+    this.pintaLugar(gm);
   }
 });
