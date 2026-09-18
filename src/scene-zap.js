@@ -14,7 +14,23 @@
    Como a cena de jogo fica pausada por baixo, aqui o teclado é ouvido
    direto por evento — cena pausada não atualiza tecla nenhuma. */
 
-var ABAS_ZAP = ['ZAP', 'MAPA', 'GRANA'];
+var ABAS_ZAP = ['ZAP', 'MAPA', 'GRANA', 'MISSÕES'];
+
+/* As abas têm a largura do NOME, e não uma divisão igual: com quatro
+   iguais cada uma teria 67px, e MISSÕES tem 84. Os quatro nomes somam
+   228px e sobram 40 dos 268 da tela, 10 pra cada. A última fecha a conta
+   pra nenhum pixel sobrar solto na borda. */
+function abasZap() {
+  var out = [], x = ZAP.tx0, soma = 0, i;
+  for (i = 0; i < ABAS_ZAP.length; i++) soma += ABAS_ZAP[i].length * 12;
+  var folga = Math.floor(((ZAP.tx1 - ZAP.tx0) - soma) / ABAS_ZAP.length);
+  for (i = 0; i < ABAS_ZAP.length; i++) {
+    var w = (i === ABAS_ZAP.length - 1) ? ZAP.tx1 - x : ABAS_ZAP[i].length * 12 + folga;
+    out.push({ x: x, w: w });
+    x += w;
+  }
+  return out;
+}
 
 /* a moldura e as faixas: tudo medido uma vez só, e todo mundo lê daqui */
 /* O botão da resposta ocupa quase toda a largura útil da tela do
@@ -74,7 +90,8 @@ var ZapScene = new Phaser.Class({
        celular aparece como engasgo. Dezoito é o maior uso: a aba da
        grana gasta duas por item. */
     this.linhas = [];
-    for (var i = 0; i < 18; i++) {
+    // 0..13 conteúdo das abas, 14..17 os nomes das quatro abas, 18 o badge
+    for (var i = 0; i < 20; i++) {
       this.linhas.push(txt(this, ZAP.tx0 + 10, 0, '', PAL.branco, 8).setDepth(2402).setVisible(false));
     }
     this.tRodape = txtC(this, GW / 2, ZAP.abas - 26, '', PAL.cinzaEsc, 8).setDepth(2402);
@@ -120,11 +137,11 @@ var ZapScene = new Phaser.Class({
         .on('pointerdown', function () { self.fecha(); });
     }
 
-    // as três abas são zonas de toque
+    // as quatro abas são zonas de toque
     this.zonas = [];
     for (i = 0; i < ABAS_ZAP.length; i++) {
-      var largura = Math.floor((ZAP.tx1 - ZAP.tx0) / ABAS_ZAP.length);
-      var z = this.add.zone(ZAP.tx0 + i * largura, ZAP.abas, largura, 40).setOrigin(0, 0).setInteractive();
+      var ab = abasZap()[i];
+      var z = this.add.zone(ab.x, ZAP.abas, ab.w, 40).setOrigin(0, 0).setInteractive();
       (function (idx) {
         z.on('pointerdown', function () { self.aba = idx; self.fio = null; self.sel = 0; sfx('catraca'); self.pinta(); });
       })(i);
@@ -259,7 +276,8 @@ var ZapScene = new Phaser.Class({
     var i;
     // âncora de volta ao padrão: as mesmas linhas são reusadas em abas
     // que alinham à esquerda, à direita e ao centro
-    for (i = 0; i < this.linhas.length; i++) this.linhas[i].setVisible(false).setOrigin(0, 0);
+    // a largura de quebra também volta: a aba das missões quebra linha, as outras não
+    for (i = 0; i < this.linhas.length; i++) this.linhas[i].setVisible(false).setOrigin(0, 0).setMaxWidth(0);
 
     // o mundo lá fora, escurecido: você parou de olhar pra frente
     g.fillStyle(0x05050a, 0.82).fillRect(0, 0, GW, GH);
@@ -299,7 +317,8 @@ var ZapScene = new Phaser.Class({
 
     if (this.aba === 0) this.pintaZap(g);
     else if (this.aba === 1) this.pintaMapa(g);
-    else this.pintaGrana(g);
+    else if (this.aba === 2) this.pintaGrana(g);
+    else this.pintaMissoes(g);
 
     this.pintaAbas(g);
   },
@@ -507,11 +526,51 @@ var ZapScene = new Phaser.Class({
     this.tRodape.setText('');
   },
 
+  /* ---------- aba 4: as missões ----------
+     O Alto põe as três metas na tela de pausa; aqui elas moram no
+     celular, que é onde mora a vida de quem anda de metrô. Cada uma é um
+     cartão com a caixinha, o texto em até duas linhas e o quanto falta.
+     "NUMA CORRIDA" marca as que zeram se você perder. O rodapé diz o que
+     subir de nível dá. */
+  pintaMissoes: function (g) {
+    var e = Missoes.le(), n = NIVEIS[e.nivel];
+    var x0 = ZAP.tx0, w = ZAP.tx1 - ZAP.tx0;
+    if (!n) {
+      this.linha(0, ZAP.topo, 'TODOS OS NÍVEIS', PAL.amarelo);
+      this.linha(1, ZAP.topo + 24, 'FEITOS. VOCÊ JÁ', PAL.cinza);
+      this.linha(2, ZAP.topo + 44, 'É PAULISTANO.', PAL.cinza);
+      this.tRodape.setText('');
+      return;
+    }
+    this.linha(0, ZAP.topo, 'NÍVEL ' + (e.nivel + 1) + ': ' + n.nome, PAL.amarelo);
+    for (var i = 0; i < 3; i++) {
+      var m = n.missoes[i], feita = !!e.feitas[i];
+      var y = ZAP.topo + 30 + i * 104;
+      g.fillStyle(feita ? 0x10241a : 0x121820, 1).fillRect(x0, y, w, 96);
+      var cx = x0 + 10, cy = y + 10;
+      g.lineStyle(2, feita ? 0x00e676 : 0x4f5468, 1).strokeRect(cx, cy, 14, 14);
+      if (feita) {
+        g.lineStyle(3, 0x00e676, 1);
+        g.beginPath(); g.moveTo(cx + 3, cy + 7); g.lineTo(cx + 6, cy + 11); g.lineTo(cx + 12, cy + 3); g.strokePath();
+      }
+      this.linhas[1 + i * 3].setVisible(true).setOrigin(0, 0).setPosition(x0 + 32, y + 4)
+        .setMaxWidth(w - 42).setText(m.txt).setColor(feita ? PAL.verde : PAL.branco);
+      this.linhas[2 + i * 3].setVisible(true).setOrigin(1, 0).setPosition(x0 + w - 10, y + 68)
+        .setText(Math.min(e.prog[i], m.meta) + '/' + m.meta).setColor(feita ? PAL.verde : PAL.amarelo);
+      if (m.corrida && !feita) {
+        this.linhas[3 + i * 3].setVisible(true).setOrigin(0, 0).setPosition(x0 + 32, y + 68)
+          .setText('NUMA CORRIDA').setColor(PAL.cinzaEsc);
+      }
+    }
+    var quem = PREMIO_NIVEL[e.nivel + 2];
+    this.tRodape.setText('SUBINDO: +' + (10 * (e.nivel + 2)) + (quem ? ' E ' + nomeDoChar(quem) : ' PONTOS'));
+  },
+
   pintaAbas: function (g) {
-    var largura = Math.floor((ZAP.tx1 - ZAP.tx0) / ABAS_ZAP.length);
+    var abs = abasZap();
     g.fillStyle(0x111119, 1).fillRect(ZAP.tx0, ZAP.abas, ZAP.tx1 - ZAP.tx0, 40);
     for (var i = 0; i < ABAS_ZAP.length; i++) {
-      var x = ZAP.tx0 + i * largura, sel = (i === this.aba);
+      var largura = abs[i].w, x = abs[i].x, sel = (i === this.aba);
       if (sel) {
         g.fillStyle(0x1b2a22, 1).fillRect(x, ZAP.abas, largura, 40);
         g.fillStyle(0x00e676, 1).fillRect(x, ZAP.abas, largura, 3);
@@ -523,10 +582,13 @@ var ZapScene = new Phaser.Class({
       if (i === 0) {
         var n = naoLidas(GameState.zap);
         if (n) {
-          // no canto de cima da aba, como em aparelho de verdade
-          g.fillStyle(0xe8362c, 1).fillCircle(x + largura - 12, ZAP.abas + 10, 8);
-          this.linhas[17].setVisible(true).setOrigin(0.5, 0)
-            .setPosition(x + largura - 12, ZAP.abas + 3).setText(String(n)).setColor(PAL.branco);
+          /* no canto de cima da aba, como em aparelho de verdade. Com a aba
+             das missões a do ZAP encolheu pra 46px e o badge antigo (raio 8,
+             centro 12 pra dentro) mordia o P: agora fica no alto do canto,
+             y 0..14, e a tinta do nome só começa em y+17 */
+          g.fillStyle(0xe8362c, 1).fillCircle(x + largura - 7, ZAP.abas + 7, 7);
+          this.linhas[18].setVisible(true).setOrigin(0.5, 0)
+            .setPosition(x + largura - 7, ZAP.abas - 5).setText(String(n)).setColor(PAL.branco);
         }
       }
     }

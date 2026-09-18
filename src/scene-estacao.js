@@ -444,6 +444,10 @@ var EstacaoScene = new Phaser.Class({
     /* O tutorial é uma camada por cima da primeira partida, e a estação
        é onde toda partida começa. Quem já viu (ou pulou) não vê de
        novo; o botão de rever mora no título. */
+    /* Chegou de trem é "desceu aqui"; chegou da rua é perna nova, e a
+       missão de chegar na Sé sem sentar começa a contar de novo. */
+    if (this.entrada === 'plataforma') Missoes.conta('desceu', { estacao: GameState.estacaoAtual() });
+    else GameState.sentouNaPerna = false;
     if (this.treino) this.montaTreino();
     // treino não abre tutorial: quem veio ver um minigame já sabe andar
     if (!this.treino && GameState.dia === 1 && !GameState.dentroDoSistema && !tutorialFeito()
@@ -1384,7 +1388,7 @@ var EstacaoScene = new Phaser.Class({
     }
     fala(this, '"Perdeu alguma coisa?"\n\nO guichê deixa você levar uma\ncaixa fechada por '
       + ACHADOS_PRECO + ' pontos.', [
-      { label: 'Pagar ' + ACHADOS_PRECO + ' e ver', cb: function () { eu.puxa(); } },
+      { label: 'Pagar ' + ACHADOS_PRECO + ' e ver', cb: function () { eu.puxa(); Missoes.conta('achados'); } },
       { label: 'Deixa pra lá', cb: function () { } }
     ]);
   },
@@ -1588,6 +1592,7 @@ var EstacaoScene = new Phaser.Class({
     GameState.pulouCatraca = true;
     this.pl.sp.y = p.y1;
     GameState.stats.catracasPuladas++;
+    Missoes.conta('pulouCatraca'); Missoes.conta('catraca');
     GameState.addCarisma(-2);
     sfx('ok');
     var self = this;
@@ -1599,6 +1604,7 @@ var EstacaoScene = new Phaser.Class({
      dói na corrida inteira: um coração a menos e de volta pro fim do
      saguão, com a catraca ainda fechada. */
   pega: function () {
+    GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
     this.pulo = null;
     this.pl.sp.y = 252;
     this.pl.dir = 'down';
@@ -1893,6 +1899,7 @@ var EstacaoScene = new Phaser.Class({
        quem manda é a via em que você embarcou. Na lateral não muda
        nada, porque lá o trem já nasce com o sentido que você seguia. */
     GameState.dir = this.tremEmpurrado.dir;
+    Missoes.conta('embarcou', { faixa: GameState.faixa().key, estacao: GameState.estacaoAtual() });
     sfx('ok');
     this.scene.start('Vagao');
   },
@@ -2094,6 +2101,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.liberado && !this.pulo &&
       ((yAntes > CATRACA_Y && yAgora <= CATRACA_Y) || (yAntes < CATRACA_Y && yAgora >= CATRACA_Y))) {
       this.giraCatracaEm(this.pl.sp.x, yAgora < yAntes ? 1 : -1, true);
+      if (yAgora < yAntes) Missoes.conta('catraca');
     }
     this.yCatraca = yAgora;
 
@@ -2121,7 +2129,8 @@ var EstacaoScene = new Phaser.Class({
         this.dica.setText(nomeAgir() + ': COMPRAR', PAL.amarelo);
         if (Ctrl.actJust) {
           abreBarraca(this, '"Olha o chocolate, a água\ngeladinha, a pururuca!"',
-            estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua']);
+            estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua'],
+            null, true);
         }
       } else if (this.mapaPerto(x, y)) {
         this.dica.setText(nomeAgir() + ': OLHAR O MAPA', PAL.amarelo);

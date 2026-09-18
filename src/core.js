@@ -594,6 +594,7 @@ var GameState = {
        ponto, sem derrota e sem recorde numa partida de verdade seria um
        jogo que não conta nada. */
     this.treino = null;
+    this.gastoNoDia = 0; this.multasNoDia = 0; this.sentouNaPerna = false;
     /* Gênero é arte e nome, não número: nada abaixo desta linha olha
        pra ele. Sem argumento, vale o que ficou gravado da última vez. */
     this.genero = genero ? generoValido(charKey, genero) : leGenero(charKey);
@@ -807,6 +808,8 @@ var GameState = {
      próxima, o compromisso é dado por cumprido, e a caixa do ZipZap é
      nova: cada trecho traz a sua própria confusão. */
   chegouNoDestino: function () {
+    // guardado antes de o fôlego novo zerar a conta: é a missão dos 5 corações
+    var coracoesAoChegar = this.coracoes;
     this.pernasFeitas++;
     this.dentroDoSistema = false;
     /* Pular a catraca era uma decisao sem consequencia depois do
@@ -816,6 +819,14 @@ var GameState = {
     this.coracoes = CORACOES_POR_PERNA;      // trajeto novo, fôlego novo
     this.ultimoAtraso = Math.max(0, this.minutosNaPerna() - LIMITE_ATRASO);
     var eraUltima = this.ultimaPerna();
+    /* As missões ouvem a chegada: no horário (toda perna que tem prazo, ou
+       seja, todas menos a volta) e o dia fechado, com o que ele custou. */
+    if (!eraUltima && this.ultimoAtraso === 0) Missoes.conta('noHorario');
+    if (eraUltima) {
+      Missoes.conta('diaCompleto', { gasto: this.gastoNoDia || 0, multas: this.multasNoDia || 0,
+        carisma: this.carisma, coracoes: coracoesAoChegar });
+      this.gastoNoDia = 0; this.multasNoDia = 0;
+    }
 
     if (eraUltima) {
       /* ---------- a noite ----------
@@ -912,7 +923,10 @@ var GameState = {
   dificuldade: function () { return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1; },
   addCarisma: function (n) { this.carisma = Phaser.Math.Clamp(this.carisma + n, 0, 100); },
   addDescanso: function (n) { this.descanso = Phaser.Math.Clamp(this.descanso + n, 0, this.char.descansoMax); },
-  gastar: function (n) { this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100); },
+  gastar: function (n) {
+    this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100);
+    if (n > 0) this.gastoNoDia = (this.gastoNoDia || 0) + n;     // a missão do fim do mês
+  },
   ganhar: function (n) { this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100; },
   /* A tela de fim reserva TRÊS linhas pro motivo, e a caixa quebra a 22
      caracteres. Estes textos tinham linha de 24 e de 29: viravam cinco
@@ -3180,7 +3194,7 @@ Chao.prototype.pega = function (i) {
   var grana = c.grana[1] > 0
     ? Math.round(Phaser.Math.FloatBetween(c.grana[0], c.grana[1]) * 4) / 4
     : 0;
-  if (grana > 0) GameState.ganhar(grana);
+  if (grana > 0) { GameState.ganhar(grana); Missoes.conta('moedaDoChao'); }
   if (c.pontos > 0) gravaPontos(lePontos() + c.pontos);
   GameState.stats.caidos = (GameState.stats.caidos || 0) + 1;
 
@@ -3517,6 +3531,7 @@ MenuComida.prototype.compra = function () {
   var r = GameState.consome(this.itens[this.sel]);
   if (r === 'falta') { sfx('nao'); this.redesenha(); return; }
   sfx('moeda');
+  if (this.scene._deAmbulante) Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
   var sc = this.scene, ao = this.aoFechar;
   this.fecha();
   fala(sc, r === 'coracao'
@@ -3624,6 +3639,7 @@ MapaParede.prototype.fecha = function () {
 function abreMapaParede(scene) {
   if (scene.dialog) scene.dialog.fecha();
   scene.dialog = new MapaParede(scene);
+  Missoes.conta('mapaParede');
   sfx('ok');
   return scene.dialog;
 }
@@ -3707,7 +3723,9 @@ function celularNoMundo(cena, ator, sobe, aoFim) {
   desenha();
 }
 
-function abreBarraca(scene, titulo, cardapio, aoFechar) {
+function abreBarraca(scene, titulo, cardapio, aoFechar, deAmbulante) {
+  // quem vende importa pras missões: barraca é barraca, ambulante é ambulante
+  scene._deAmbulante = !!deAmbulante;
   /* ---------- o preço fantasma ----------
      Apareceu R$ 12,00 do dogão por cima do R$ 3,00 da água, numa barraca
      que nem vende dogão: era um menu anterior cujos textos não morreram.

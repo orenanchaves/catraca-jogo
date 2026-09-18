@@ -1092,6 +1092,7 @@ var VagaoScene = new Phaser.Class({
       nome: 'QUEM TAVA AÍ',
       aoFechar: function (r) {
         eu.encarando = false;
+        if (r === 'ganhou') Missoes.conta('encaradaGanha');
         /* Ganhar tira essa pessoa do vagão: ela desce na próxima, e o
            lugar dela no corredor abre. Perder deixa ela aí. */
         if (r === 'ganhou' && perto) {
@@ -1233,7 +1234,11 @@ var VagaoScene = new Phaser.Class({
       this.revista(r);
       return;
     }
-    if (Math.abs(dy) <= 2 || r.t > 26000) this.terminaRonda();
+    if (Math.abs(dy) <= 2 || r.t > 26000) {
+      // ele atravessou o carro e não te achou: você estava em outro
+      if (!r.revistou && GameState.pulouCatraca) Missoes.conta('escapouGuarda');
+      this.terminaRonda();
+    }
   },
 
   /* ---------- ele para em voce ---------- */
@@ -1249,6 +1254,8 @@ var VagaoScene = new Phaser.Class({
          desaparecendo. Passar reto e continuar andando ate o fim do
          carro, e e a caminhada inteira que faz o susto valer. */
       this.flash(r.patente.nome + ' PASSOU RETO.');
+      // passou reto por quem devia: sentado, com cara de passageiro
+      if (GameState.pulouCatraca) Missoes.conta('escapouGuarda');
       GameState.stats.causos++;
       return;
     }
@@ -1265,9 +1272,11 @@ var VagaoScene = new Phaser.Class({
             sfx('erro');
             perdeVida(eu, eu.pl.sp, 1);
             GameState.addCarisma(-6);
+            GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
             eu.flash('VOCÊ NÃO TEM.\nDESCEU ESCOLTADO.');
           } else {
             GameState.gastar(multa);
+            GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
             sfx('moeda');
             eu.flash('PAGOU E FICOU.');
           }
@@ -1422,6 +1431,7 @@ var VagaoScene = new Phaser.Class({
   escapouDoFiscal: function (como) {
     var f = this.fuga;
     if (!f) return;
+    Missoes.conta('escapouGuarda');
     this.fuga = null;
     var k = this.gente.indexOf(f.a);
     if (k >= 0) this.gente.splice(k, 1);
@@ -1436,6 +1446,7 @@ var VagaoScene = new Phaser.Class({
   },
 
   fiscalPegou: function () {
+    GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
     var f = this.fuga;
     if (!f) return;
     this.fuga = null;
@@ -1600,6 +1611,8 @@ var VagaoScene = new Phaser.Class({
     this.pl.dir = b.pose;
     this.pl.anima(0, false);
     GameState.sentado = true;
+    GameState.sentouNaPerna = true;
+    Missoes.conta('sentou');
     sfx('ok');
     // a primeira vez que senta é quando dá pra ensinar pra que serve
     if (this.comSono()) this.flash('SENTOU — O SONO PASSA ▲');
@@ -1635,6 +1648,7 @@ var VagaoScene = new Phaser.Class({
            corredor, agarrado no ar. */
         if (Ctrl.act && this.barraPerto().d <= ALCANCE_BARRA) {
           sfx('catraca');
+          Missoes.conta('segurouSolavanco');
         } else {
           GameState.addCarisma(-3);
           GameState.addDescanso(-3);
@@ -2006,6 +2020,7 @@ var VagaoScene = new Phaser.Class({
               if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); return; }
               GameState.gastar(2); GameState.addCarisma(4); GameState.addDescanso(2);
               GameState.stats.causos++; sfx('moeda'); self.flash('O chocolate salva.');
+              Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
             }
           },
           { label: 'Fazer que não ouviu', cb: function () { GameState.addCarisma(-2); GameState.stats.causos++; } }
@@ -2018,6 +2033,7 @@ var VagaoScene = new Phaser.Class({
             label: 'Ajudar (R$ 2,00)', cb: function () {
               if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Você não tem.'); return; }
               GameState.gastar(2); GameState.addCarisma(7); GameState.stats.causos++; sfx('moeda');
+              Missoes.conta('ajudou');
             }
           },
           { label: 'Olhar o celular', cb: function () { GameState.addCarisma(-5); GameState.stats.causos++; } }
@@ -2269,6 +2285,7 @@ var VagaoScene = new Phaser.Class({
 
     var texto, cor;
     if (taxa >= 0.62) {
+      Missoes.conta('rimaGanha');
       var troco = 2 + Math.round(b.maiorCombo / 6);
       GameState.addCarisma(12); GameState.ganhar(troco);
       // rima boa vale mais ponto: é o minigame mais difícil dos três
@@ -2357,6 +2374,7 @@ var VagaoScene = new Phaser.Class({
       aoFechar: function (r) {
         eu.duelando = false;
         if (a) a.fixo = true;
+        if (r === 'ganhou') Missoes.conta('disputaGanha');
         /* Ganhou, ele desencosta e vai pra outra ponta do vagão. Não é
            prêmio: é o que acontece quando alguém perde a barra. */
         if (r === 'ganhou' && a && a.sp && a.sp.active) {
@@ -2780,6 +2798,8 @@ var VagaoScene = new Phaser.Class({
     if (this.sentadoEm) this.levanta();
     GameState.addCarisma(ganho); GameState.addDescanso(-9);
     GameState.stats.cedidos++; GameState.stats.causos++;
+    Missoes.conta('cedeu');
+    if (cedo) Missoes.conta('cedeuCedo');
     sfx('ok');
     this.flash(cedo ? 'LEVANTOU ANTES DE\n' + L.pro + ' CHEGAR.'
       : (L.pressao < 0.35 ? (L.pref ? 'ERA O LUGAR ' + L.dele + '\nMESMO.' : 'O VAGÃO INTEIRO VIU.')

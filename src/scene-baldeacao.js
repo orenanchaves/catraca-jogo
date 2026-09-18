@@ -19,6 +19,8 @@ var BaldeacaoScene = new Phaser.Class({
   initialize: function BaldeacaoScene() { Phaser.Scene.call(this, { key: 'Baldeacao' }); },
 
   create: function () {
+    // chegou na Sé pra baldear: se não sentou nenhuma vez desde a rua, conta
+    if (!GameState.sentouNaPerna) Missoes.conta('seSemSentar');
     areaDeJogo();
     Ctrl.liga(this);
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
@@ -222,6 +224,7 @@ var BaldeacaoScene = new Phaser.Class({
         if (morte) { GameState.motivoFim = morte; GameState.salvarRecorde(); vaiPraOFim(self); return; }
         /* Sai da baldeação direto na plataforma: quem baldeia já está
            dentro do sistema, e não passa por catraca nenhuma. */
+        Missoes.conta('baldeacao');
         self.scene.start('Estacao', { onde: 'plataforma' });
       }
     }]);

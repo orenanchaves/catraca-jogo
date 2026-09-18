@@ -452,6 +452,7 @@ var TitleScene = new Phaser.Class({
     this.saindo = true;
     audioOn(); sfx('ok');
     GameState.init(this.ordem[this.sel], this.gen[this.ordem[this.sel]]);
+    Missoes.novaCorrida();   // partida de verdade: zera o que era "numa corrida"
     this.scene.start('Estacao');
   },
 
