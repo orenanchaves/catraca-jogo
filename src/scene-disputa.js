@@ -156,7 +156,14 @@ var DisputaScene = new Phaser.Class({
       this.tBot.push(txtC(this, c.x + c.w / 2, c.y + c.h - 34, this.golpes[i].nome, PAL.cinza, 8)
         .setMaxWidth(c.w).setAlign('center').setDepth(2004));
       var z = this.add.zone(c.x, c.y, c.w, c.h).setOrigin(0, 0).setInteractive().setDepth(2005);
-      (function (idx) { z.on('pointerdown', function () { self.escolhe(idx); }); })(i);
+      /* no fim o botão do meio diz PRA SEGUIR, e por estar por cima da
+         zona de sair era só ele que ouvia o toque: tem que seguir também */
+      (function (idx) {
+        z.on('pointerdown', function () {
+          if (self.fase === 'fim') { if (self.t >= 1200) self.querSair = true; return; }
+          self.escolhe(idx);
+        });
+      })(i);
     }
 
     this.input.keyboard.on('keydown', function (ev) {
@@ -259,11 +266,11 @@ var DisputaScene = new Phaser.Class({
          não é briga de vagão, é jogo de luta. */
       GameState.addDescanso(-10);
       GameState.addCarisma(-7);
-      this.diz('VOCÊ GANHOU.\nE O VAGÃO INTEIRO VIU.\n+' + pts + ' PONTOS');
+      this.diz('VOCÊ GANHOU.\nE O VAGÃO INTEIRO VIU.' + (pts ? '\n+' + pts + ' PONTOS' : ''));
     } else {
       GameState.addDescanso(3);
       GameState.addCarisma(4 - this.sujeira * 2);
-      this.diz('A BARRA É SUA.\n+' + pts + ' PONTOS' +
+      this.diz('A BARRA É SUA.' + (pts ? '\n+' + pts + ' PONTOS' : '') +
         (this.sujeira ? '\n(E ' + this.sujeira + ' COTOVELADA' +
           (this.sujeira > 1 ? 'S' : '') + ')' : ''));
     }
@@ -287,8 +294,7 @@ var DisputaScene = new Phaser.Class({
   },
 
   fecha: function () {
-    var self = this;
-    this.congeladas.forEach(function (k) { self.scene.resume(k); });
+    devolveCenas(this, this.congeladas);   // volta sem o toque que fechou isto
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Disputa');
     if (cb) cb(r);
@@ -428,7 +434,11 @@ var DisputaScene = new Phaser.Class({
       g.fillStyle(0xc98d63, 1).fillRect(bx + 8, DIS.eleSp.y - 46, 14, 7);
     }
 
-    caixa(g, DIS.msg.x, DIS.msg.y, DIS.msg.w, DIS.msg.h, 0xf2f0ff);
+    /* A caixa cresce com o texto. Tinha 58, duas linhas, e o fim chega a
+       três ('A BARRA É SUA. / +8 PONTOS / (E 2 COTOVELADAS)'): a terceira
+       saía por baixo, em cima dos botões. */
+    var hMsg = Math.max(DIS.msg.h, Math.round(this.tMsg.height) + 22);
+    caixa(g, DIS.msg.x, DIS.msg.y, DIS.msg.w, hMsg, 0xf2f0ff);
 
     /* Os três botões. Grandes de propósito: é duelo de reação, e reação
        com botão pequeno é sorteio. Enquanto a janela corre, o contorno
@@ -451,10 +461,10 @@ var DisputaScene = new Phaser.Class({
     }
     if (this.fase === 'fim' && this.t > 1200) {
       this.tBot[1].setVisible(true).setColor(PAL.cinzaEsc)
-        .setText(nomeAgir() + ' PRA SEGUIR')
-        .setPosition(GW / 2, DIS.bot.y + 30);
+        .setText(nomeAgir() + ' PRA SEGUIR').setMaxWidth(GW - 40)
+        .setPosition(GW / 2, Math.max(DIS.bot.y + 30, DIS.msg.y + hMsg + 12));
     } else if (this.tBot[1]) {
-      this.tBot[1].setText(this.golpes[1].nome)
+      this.tBot[1].setText(this.golpes[1].nome).setMaxWidth(duelaCelula(1).w)
         .setPosition(duelaCelula(1).x + DIS.bot.w / 2, DIS.bot.y + DIS.bot.h - 34);
     }
   },

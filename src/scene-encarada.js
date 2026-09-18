@@ -31,7 +31,13 @@
    que RESPIRAR vale: quem se preparou leva metade. Sem esse aviso a
    briga virava apertar o mesmo botão até acabar, que é o defeito de
    todo combate por turnos mal feito. */
-var GOLPES = [
+/* GOLPES_ENCARADA e não GOLPES: a briga também tinha um `var GOLPES`,
+   carregada DEPOIS desta, e todo `var` de arquivo é global. O dela
+   vencia, esta lista virava {rapido, forte, defesa}, o menu nascia vazio
+   e o primeiro `pinta` morria em tGolpes[0] — erro dentro do quadro, e o
+   Phaser para de pedir quadro: o jogo inteiro congelava na encarada,
+   desde 31/08, sem ninguém tocar em nada. */
+var GOLPES_ENCARADA = [
   {
     nome: 'ENCARAR', cor: '#e8362c',
     txt: 'VOCÊ ENCAROU DE VOLTA,\nSEM PISCAR.',
@@ -171,12 +177,17 @@ var EncaradaScene = new Phaser.Class({
     this.tMsg = txt(this, ENC.msg.x + 14, ENC.msg.y + 14, '', PAL.branco, 8).setDepth(2004);
 
     this.tGolpes = [];
-    for (i = 0; i < GOLPES.length; i++) {
+    for (i = 0; i < GOLPES_ENCARADA.length; i++) {
       var c = menuCelula(i);
-      this.tGolpes.push(txt(this, c.x + 22, c.y + 12, GOLPES[i].nome, PAL.branco, 8).setDepth(2004));
+      this.tGolpes.push(txt(this, c.x + 22, c.y + 12, GOLPES_ENCARADA[i].nome, PAL.branco, 8).setDepth(2004));
       var z = this.add.zone(c.x, c.y, c.w, c.h).setOrigin(0, 0).setInteractive().setDepth(2005);
       (function (idx) {
         z.on('pointerdown', function () {
+          /* No fim, o primeiro botão vira "TOQUE PRA SEGUIR". Ele fica
+             POR CIMA da zona de sair, e com topOnly só ele ouvia o toque:
+             tocar onde a tela manda tocar não fazia nada até o relógio
+             fechar sozinho, 4,2 segundos depois. */
+          if (self.fase === 'fim') { if (self.t >= 1600) self.querSair = true; return; }
           if (self.fase !== 'menu') return;
           self.sel = idx;
           self.usa(idx);
@@ -209,7 +220,7 @@ var EncaradaScene = new Phaser.Class({
   },
 
   move: function (d) {
-    this.sel = (this.sel + d + GOLPES.length) % GOLPES.length;
+    this.sel = (this.sel + d + GOLPES_ENCARADA.length) % GOLPES_ENCARADA.length;
     sfx('catraca');
     this.pinta();
   },
@@ -222,7 +233,7 @@ var EncaradaScene = new Phaser.Class({
      golpes viram um só. */
   usa: function (i) {
     if (this.fase !== 'menu' || this.acabou) return;
-    var g = GOLPES[i];
+    var g = GOLPES_ENCARADA[i];
     this.turnos++;
 
     if (g.fuga) {
@@ -311,7 +322,8 @@ var EncaradaScene = new Phaser.Class({
     var pts = GameState.ganhaMinigame(7 + Math.max(0, 8 - this.turnos));
     GameState.addCarisma(10);
     GameState.stats.causos++;
-    this.diz('ELE DESVIOU O OLHO\nE FOI PRO OUTRO VAGÃO.\n+' + pts + ' PONTOS');
+    // no treino o ponto é zero, e "+0 PONTOS" não diz nada
+    this.diz('ELE DESVIOU O OLHO\nE FOI PRO OUTRO VAGÃO.' + (pts ? '\n+' + pts + ' PONTOS' : ''));
     sfx('vitoria');
     this.fase = 'fim';
     this.t = 0;
@@ -344,8 +356,7 @@ var EncaradaScene = new Phaser.Class({
   },
 
   fecha: function () {
-    var self = this;
-    this.congeladas.forEach(function (k) { self.scene.resume(k); });
+    devolveCenas(this, this.congeladas);   // volta sem o toque que fechou isto
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Encarada');
     if (cb) cb(r);
@@ -400,30 +411,35 @@ var EncaradaScene = new Phaser.Class({
     this.pintaFicha(g, ENC.eleCx, this.mostraEle / this.ele.max);
     this.pintaFicha(g, ENC.vcCx, this.mostraVc / this.vc.max);
 
-    caixa(g, ENC.msg.x, ENC.msg.y, ENC.msg.w, ENC.msg.h, 0xf2f0ff);
+    /* A caixa cresce com o texto: o fim tem três linhas ('ELE DESVIOU O
+       OLHO / E FOI PRO OUTRO VAGÃO. / +8 PONTOS', 14 + 72 = 86) e a caixa
+       tinha 70, então o placar saía por baixo dela. Só cresce no fim, que
+       é quando o menu embaixo já sumiu. */
+    var hMsg = Math.max(ENC.msg.h, Math.round(this.tMsg.height) + 22);
+    caixa(g, ENC.msg.x, ENC.msg.y, ENC.msg.w, hMsg, 0xf2f0ff);
 
     /* No fim da briga o menu some: escolher golpe depois que acabou é
        oferecer uma decisão que não existe mais. */
     var mostraMenu = (this.fase === 'menu');
-    for (i = 0; i < GOLPES.length; i++) {
+    for (i = 0; i < GOLPES_ENCARADA.length; i++) {
       var c = menuCelula(i), mira = (i === this.sel);
       this.tGolpes[i].setVisible(mostraMenu)
-        .setColor(mira ? GOLPES[i].cor : PAL.cinza);
+        .setColor(mira ? GOLPES_ENCARADA[i].cor : PAL.cinza);
       if (!mostraMenu) continue;
       g.fillStyle(mira ? 0x1b2438 : 0x11141d, 1).fillRect(c.x, c.y, c.w, c.h);
-      g.lineStyle(2, mira ? num(GOLPES[i].cor) : 0x2a2a3a, 1)
+      g.lineStyle(2, mira ? num(GOLPES_ENCARADA[i].cor) : 0x2a2a3a, 1)
         .strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
       if (mira) {
-        g.fillStyle(num(GOLPES[i].cor), 1);
+        g.fillStyle(num(GOLPES_ENCARADA[i].cor), 1);
         g.fillTriangle(c.x + 9, c.y + 13, c.x + 9, c.y + 25, c.x + 17, c.y + 19);
       }
     }
     if (!mostraMenu && this.fase === 'fim' && this.t > 1600) {
       // e no lugar dele, como sair
       this.tGolpes[0].setVisible(true).setColor(PAL.cinzaEsc).setText(nomeAgir() + ' PRA SEGUIR');
-      this.tGolpes[0].setPosition(ENC.menu.x + 22, ENC.menu.y + 12);
+      this.tGolpes[0].setPosition(ENC.menu.x + 22, Math.max(ENC.menu.y + 12, ENC.msg.y + hMsg + 12));
     } else if (this.tGolpes[0]) {
-      this.tGolpes[0].setText(GOLPES[0].nome)
+      this.tGolpes[0].setText(GOLPES_ENCARADA[0].nome)
         .setPosition(menuCelula(0).x + 22, menuCelula(0).y + 12);
     }
   },

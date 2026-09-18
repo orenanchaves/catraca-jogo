@@ -2353,6 +2353,37 @@ function desenhaCoracaoQuebrado(scene, x, y) {
 /* Todo lugar que tira um coração passa por aqui: a perda é a coisa
    mais importante que acontece com o jogador e não podia depender de
    cada minigame lembrar de mostrar. */
+/* ---------- devolver as cenas sem devolver o toque ----------
+   Um duelo pausa quem está por baixo e, no fim, devolve. Devolver na
+   hora deixava o MESMO toque que fechou o duelo chegar à cena de baixo:
+   medido no treino, tocar o "PRA SEGUIR" da encarada fechava a encarada
+   e abria a PULAR A CATRACA, que era o item da lista sob o dedo. No
+   vagão, o mesmo toque vira um passo ou um "agir" que ninguém pediu.
+   Então a cena volta a rodar já, mas surda ao toque até o dedo sair da
+   tela, e nunca antes de 120ms. O HUD não entra: ele nunca é pausado. */
+function devolveCenas(cena, lista) {
+  var ms = cena.scene.manager, i, s;
+  for (i = 0; i < lista.length; i++) {
+    ms.resume(lista[i]);
+    s = ms.getScene(lista[i]);
+    if (s && s.input) s.input.enabled = false;
+  }
+  var libera = function () {
+    for (var j = 0; j < lista.length; j++) {
+      var c = ms.getScene(lista[j]);
+      if (c && c.input) c.input.enabled = true;
+    }
+  };
+  var hud = ms.getScene('Hud');
+  if (!hud || !hud.time) { libera(); return; }
+  var espera = function () {
+    var dedo = hud.input.activePointer && hud.input.activePointer.isDown;
+    if (dedo || TOQUE.ativo || TOQUE_DIR.ativo) hud.time.delayedCall(60, espera);
+    else libera();
+  };
+  hud.time.delayedCall(120, espera);
+}
+
 function perdeVida(scene, sp, quanto) {
   var n = GameState.perdeCoracao(quanto);
   if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40, quanto);

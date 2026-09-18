@@ -27,11 +27,36 @@ var BRG = {
    quanto tempo o braço leva pra sair, e `trava` é quanto tempo você fica
    sem poder fazer nada depois — é a trava que faz o soco forte ser uma
    aposta em vez de o botão certo. */
-var GOLPES = {
+var GOLPES_BRIGA = {
   rapido: { nome: 'SOCO\nRÁPIDO', cor: 0xf2c14e, dano: 7, alcance: 46, espera: 90, trava: 210 },
   forte: { nome: 'SOCO\nFORTE', cor: 0xe8362c, dano: 16, alcance: 56, espera: 260, trava: 540 },
   defesa: { nome: 'DEFESA', cor: 0x0b9fdd, dano: 0, alcance: 0, espera: 0, trava: 0 }
 };
+
+/* ---------- o que fazia a briga "não valer" ----------
+   Medido parado, sem tocar em nada: o primeiro soco dele chegava em
+   0,8s, antes de dar tempo de ler a tela, e em 3,4s a vida ia de 0,90
+   a 0,35. E o aviso "ELE ARMOU O BRAÇO" durava os mesmos 260ms do SEU
+   soco forte, que é o tempo de reação de uma pessoa sem contar o dedo
+   chegando no botão: o jogo avisava e não deixava responder.
+
+   BRG_ABRE: 1,4s de encarada antes de ele andar. Você pode bater
+   primeiro, ele não.
+   ESPERA_DELE: o forte DELE demora 380ms pra sair, e não 260. Medido
+   em 30 brigas por valor, com um jogador que segura a DEFESA 330ms
+   depois do aviso (o tempo de ler e o dedo chegar): ganha 30 de 30. E
+   quem só martela o rápido ganha 17 de 30 — com 420 ou 450 ganhava 20
+   a 23, porque braço lento é braço comprometido, e ele apanha sem
+   guarda enquanto arma. O rápido dele fica em 90: é o golpe fraco, e
+   quem responde a ele é a distância, não o reflexo.
+   AFASTA: os dois bonecos eram desenhados a 30px, e o corpo opaco do
+   sprite tem 62 (26 de 32 pixels, escala 2,4): um em cima do outro. Na
+   TELA cada um fica 12px mais pro seu lado; as contas de alcance
+   continuam nas posições de sempre, então o equilíbrio medido antes
+   não muda. */
+var BRG_ABRE = 1400;
+var ESPERA_DELE = { rapido: 90, forte: 380 };
+var AFASTA = 12;
 
 function brigaCelula(i) {
   var b = BRG.bot, larg = Math.floor((GW - 16 - b.vao * 2) / 3);
@@ -77,7 +102,7 @@ var BrigaScene = new Phaser.Class({
     this.acabou = false;
     this.resultado = null;
     this.t = 0;
-    this.msg = 'ELE PARTIU PRA CIMA.';
+    this.msg = 'ELE PARTIU PRA CIMA.\nSE PREPARA.';
     this.tremor = 0;
 
     /* Ele não é burro nem é máquina: pensa de tantos em tantos
@@ -113,7 +138,7 @@ var BrigaScene = new Phaser.Class({
     for (i = 0; i < 3; i++) {
       var c = brigaCelula(i);
       this.tBot.push(txtC(this, c.x + c.w / 2, c.y + c.h - 34,
-        GOLPES[this.ordem[i]].nome, PAL.branco, 8).setMaxWidth(c.w).setAlign('center').setDepth(2005));
+        GOLPES_BRIGA[this.ordem[i]].nome, PAL.branco, 8).setMaxWidth(c.w).setAlign('center').setDepth(2005));
       var z = this.add.zone(c.x, c.y, c.w, c.h).setOrigin(0, 0).setInteractive().setDepth(2006);
       (function (idx) {
         z.on('pointerdown', function () { eu.aperta(idx, true); });
@@ -123,13 +148,39 @@ var BrigaScene = new Phaser.Class({
     }
 
     this.teclas = this.input.keyboard.addKeys('LEFT,RIGHT,A,D,Z,X,C,SPACE', true, true);
+
+    /* ---------- a saída, que a briga não tinha ----------
+       Acabada a briga, o botão do meio vira "CLIQUE PRA SEGUIR" — e
+       clicar nele não fazia nada. O botão continuava sendo zona de soco,
+       o `aperta` voltava cedo porque a briga acabou, e com `topOnly` o
+       clique morria ali: o HUD, que é quem transforma toque em "agir",
+       nunca ficava sabendo. O espaço também falhava: `Ctrl` lê as teclas
+       da cena que ficou pausada por baixo, e `teclas.SPACE.isDown` perde
+       a batida curta que nasce e morre entre dois quadros.
+       Medido no treino: perdida a luta, clique no botão, clique no
+       botão, espaço — a briga parada na tela. Agora são as mesmas três
+       portas da encarada e da disputa: o próprio botão, a tela inteira e
+       tecla por EVENTO. E o mesmo relógio delas: sozinha, fecha. */
+    this.querSair = false;
+    this.tFim = -1;
+    this.input.keyboard.on('keydown', function (ev) {
+      if (!eu.acabou) return;
+      var c = ev.code;
+      if (c === 'Space' || c === 'Enter' || c === 'KeyZ' || c === 'Escape') eu.querSair = true;
+    });
+    this.zonaSair = this.add.zone(0, 0, GW, GH).setOrigin(0, 0).setInteractive().setDepth(1999);
+    this.zonaSair.on('pointerdown', function () { if (eu.acabou) eu.querSair = true; });
+    /* Desligada durante a luta: tela inteira interativa aqui em cima
+       engoliria todo toque, e andar arrastando o dedo é do HUD, lá embaixo. */
+    this.zonaSair.disableInteractive();
     sfx('nao');
   },
 
   /* defesa é botão de SEGURAR, os socos são de apertar: é o que faz
      defender custar o seu tempo em vez de ser grátis */
   aperta: function (i, apertando) {
-    if (this.acabou) return;
+    // acabou: o botão do meio diz PRA SEGUIR, e qualquer um dos três segue
+    if (this.acabou) { if (apertando) this.querSair = true; return; }
     var chave = this.ordem[i];
     if (chave === 'defesa') { this.defendendo = apertando; return; }
     if (apertando) this.soca(chave);
@@ -153,7 +204,7 @@ var BrigaScene = new Phaser.Class({
      'PASSOU LONGE' vira informacao de verdade em vez de sentenca. */
   soca: function (chave) {
     if (this.travaVc > 0 || this.golpeVc || this.defendendo) return;
-    var g = GOLPES[chave];
+    var g = GOLPES_BRIGA[chave];
     var dist = Math.abs(this.xEle - this.xVc);
     if (dist > g.alcance && dist <= g.alcance + 26) {
       this.xVc = Phaser.Math.Clamp(this.xEle - (g.alcance - 4), BRG.x0, this.xEle - 26);
@@ -168,7 +219,7 @@ var BrigaScene = new Phaser.Class({
   resolveGolpe: function (deQuem) {
     var g, alvoLonge, defende;
     if (deQuem === 'vc') {
-      g = GOLPES[this.golpeVc];
+      g = GOLPES_BRIGA[this.golpeVc];
       alvoLonge = Math.abs(this.xEle - this.xVc) > g.alcance;
       /* ---------- a guarda dele e REACAO, nao plano ----------
          Ela morava no `pensaEle`, que roda a cada 560ms. O soco rapido
@@ -200,7 +251,17 @@ var BrigaScene = new Phaser.Class({
       this.travaVc = g.trava * (defende && !alvoLonge ? 1.7 : 1);
       this.golpeVc = null;
     } else {
-      g = GOLPES[this.golpeEle];
+      g = GOLPES_BRIGA[this.golpeEle];
+      /* O soco DELE também leva o corpo, a mesma regra do seu. Com o braço
+         dele mais lento (ESPERA_DELE), cada soco seu o empurrava 10px pra
+         fora do alcance no meio do golpe, e o forte dele morria no ar:
+         medido, só apertar o rápido sem parar passou a ganhar 6 de 8. A
+         regra dos 26px nos dois lados, com o forte em 380, devolve o
+         martelar pra perto da metade (17 de 30). */
+      var dEle = Math.abs(this.xEle - this.xVc);
+      if (dEle > g.alcance && dEle <= g.alcance + 26) {
+        this.xEle = Phaser.Math.Clamp(this.xVc + (g.alcance - 4), this.xVc + 30, BRG.x1);
+      }
       alvoLonge = Math.abs(this.xEle - this.xVc) > g.alcance;
       defende = this.defendendo;
       if (!alvoLonge) {
@@ -245,12 +306,12 @@ var BrigaScene = new Phaser.Class({
        proximo soco entra de graca (o soco anda com voce) e o dele gasta
        um ciclo so voltando. Um lado pagava o deslocamento e o outro nao.
        Agora ele anda E soca no mesmo pensamento, se o passo bastar. */
-    if (dist > GOLPES.rapido.alcance - 6) {
+    if (dist > GOLPES_BRIGA.rapido.alcance - 6) {
       this.xEle = Math.max(this.xVc + 30, this.xEle - 22);
       dist = Math.abs(this.xEle - this.xVc);
     }
     if (this.travaEle > 0 || this.golpeEle) return;
-    if (dist > GOLPES.rapido.alcance) return;
+    if (dist > GOLPES_BRIGA.rapido.alcance) return;
     var podeForte = (this.travaVc > 0) || (this.hpEle > this.hpVc);
     this.golpeEle = (podeForte && Math.random() < 0.4) ? 'forte' : 'rapido';
     this.tGolpeEle = 0;
@@ -269,7 +330,8 @@ var BrigaScene = new Phaser.Class({
     GameState.addCarisma(-7);
     GameState.addDescanso(-12);
     GameState.stats.causos++;
-    this.diz('ACABOU.\nE O VAGÃO INTEIRO VIU.\n+' + pts + ' PONTOS');
+    // no treino o ponto é zero, e "+0 PONTOS" não diz nada
+    this.diz('ACABOU.\nE O VAGÃO INTEIRO VIU.' + (pts ? '\n+' + pts + ' PONTOS' : ''));
     sfx('vitoria');
   },
 
@@ -308,8 +370,7 @@ var BrigaScene = new Phaser.Class({
   },
 
   fecha: function () {
-    var eu = this;
-    this.congeladas.forEach(function (k) { eu.scene.resume(k); });
+    devolveCenas(this, this.congeladas);   // volta sem o toque que fechou isto
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Briga');
     if (cb) cb(r);
@@ -321,7 +382,18 @@ var BrigaScene = new Phaser.Class({
     if (this.tremor > 0) this.tremor -= dt;
 
     if (this.acabou) {
-      if (this.t > 900 && (Ctrl.actJust || this.teclas.Z.isDown || this.teclas.SPACE.isDown)) this.fecha();
+      /* 900ms de leitura antes de aceitar a saída: quem estava batendo no
+         botão quando a luta acabou não pode pular o resultado sem ler.
+         Pedido feito nessa janela é jogado fora, não guardado. 4200 é o
+         teto da encarada: ninguém fica preso numa tela sem menu. */
+      if (this.tFim < 0) { this.tFim = this.t; this.zonaSair.setInteractive(); }
+      var desde = this.t - this.tFim;
+      if (desde <= 900) this.querSair = false;
+      if (desde > 900 && (this.querSair || Ctrl.actJust || this.teclas.Z.isDown || this.teclas.SPACE.isDown)) {
+        this.fecha();
+        return;
+      }
+      if (desde > 4200) { this.fecha(); return; }
       Ctrl.update();
       this.pinta();
       return;
@@ -347,15 +419,15 @@ var BrigaScene = new Phaser.Class({
 
     if (this.golpeVc) {
       this.tGolpeVc += dt;
-      if (this.tGolpeVc >= GOLPES[this.golpeVc].espera) this.resolveGolpe('vc');
+      if (this.tGolpeVc >= GOLPES_BRIGA[this.golpeVc].espera) this.resolveGolpe('vc');
     }
     if (this.golpeEle) {
       this.tGolpeEle += dt;
-      if (this.tGolpeEle >= GOLPES[this.golpeEle].espera) this.resolveGolpe('ele');
+      if (this.tGolpeEle >= ESPERA_DELE[this.golpeEle]) this.resolveGolpe('ele');
     }
 
     this.pensa += dt;
-    if (this.pensa > this.cadencia) { this.pensa = 0; this.pensaEle(); }
+    if (this.t > BRG_ABRE && this.pensa > this.cadencia) { this.pensa = 0; this.pensaEle(); }
 
     if (this.hpEle <= 0) this.ganhou();
     else if (this.hpVc <= 0) this.perdeu();
@@ -400,28 +472,32 @@ var BrigaScene = new Phaser.Class({
     g.lineStyle(2, 0x08080e, 1).strokeRect(v.x + meia + 13, v.y + 1, meia - 2, v.h - 2);
     g.fillStyle(0xf2f0ff, 0.8).fillRect(v.x + meia + 5, v.y + 3, 2, v.h - 6);
 
-    caixa(g, BRG.msg.x, BRG.msg.y, BRG.msg.w, BRG.msg.h, 0xf2f0ff);
+    /* A caixa cresce com o texto. Era fixa em 34, do tamanho de uma
+       linha, e as mensagens de duas ou três ('VOCÊ FOI PRO CHÃO / NO MEIO
+       DO VAGÃO.', o placar do fim) vazavam por baixo dela. */
+    var hMsg = Math.max(BRG.msg.h, Math.round(this.tMsg.height) + 12);
+    caixa(g, BRG.msg.x, BRG.msg.y, BRG.msg.w, hMsg, 0xf2f0ff);
 
     // os dois, e o braço que sai quando o golpe está no ar
-    this.spVc.x = Math.round(this.xVc + tr);
-    this.spEle.x = Math.round(this.xEle - tr);
+    this.spVc.x = Math.round(this.xVc - AFASTA + tr);
+    this.spEle.x = Math.round(this.xEle + AFASTA - tr);
     this.spVc.setAlpha(this.travaVc > 0 ? 0.6 : 1);
 
     if (this.golpeVc) {
-      var gv = GOLPES[this.golpeVc];
+      var gv = GOLPES_BRIGA[this.golpeVc];
       g.fillStyle(gv.cor, 1);
-      g.fillRect(this.xVc + 10, BRG.chao - 62, gv.alcance - 6, 7);
+      g.fillRect(this.xVc - AFASTA + 10, BRG.chao - 62, gv.alcance - 6 + 2 * AFASTA, 7);
     }
     if (this.golpeEle) {
-      var ge = GOLPES[this.golpeEle];
+      var ge = GOLPES_BRIGA[this.golpeEle];
       g.fillStyle(ge.cor, 0.85);
-      g.fillRect(this.xEle - ge.alcance + 6, BRG.chao - 66, ge.alcance - 6, 7);
+      g.fillRect(this.xEle + AFASTA - ge.alcance - 2 * AFASTA + 6, BRG.chao - 66, ge.alcance - 6 + 2 * AFASTA, 7);
     }
     if (this.defendendo) {
-      g.fillStyle(0x0b9fdd, 0.5).fillRect(this.xVc + 14, BRG.chao - 76, 8, 44);
+      g.fillStyle(0x0b9fdd, 0.5).fillRect(this.xVc - AFASTA + 14, BRG.chao - 76, 8, 44);
     }
     if (this.eleDefende) {
-      g.fillStyle(0x0b9fdd, 0.4).fillRect(this.xEle - 22, BRG.chao - 76, 8, 44);
+      g.fillStyle(0x0b9fdd, 0.4).fillRect(this.xEle + AFASTA - 22, BRG.chao - 76, 8, 44);
     }
 
     /* Os botões: contorno aceso e miolo quase transparente. É briga em
@@ -431,14 +507,16 @@ var BrigaScene = new Phaser.Class({
       var c = brigaCelula(i), k = this.ordem[i];
       var ativo = (k === 'defesa') ? this.defendendo : (this.golpeVc === k);
       var travado = (k !== 'defesa') && (this.travaVc > 0);
-      g.fillStyle(GOLPES[k].cor, ativo ? 0.34 : 0.13).fillRect(c.x, c.y, c.w, c.h);
-      g.lineStyle(2, GOLPES[k].cor, travado ? 0.25 : (ativo ? 1 : 0.6));
+      g.fillStyle(GOLPES_BRIGA[k].cor, ativo ? 0.34 : 0.13).fillRect(c.x, c.y, c.w, c.h);
+      g.lineStyle(2, GOLPES_BRIGA[k].cor, travado ? 0.25 : (ativo ? 1 : 0.6));
       g.strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
       this.tBot[i].setAlpha(travado ? 0.35 : 1);
       this.icone(g, k, c);
     }
-    if (this.acabou && this.t > 900) {
-      this.tBot[1].setText(nomeAgir() + '\nPRA SEGUIR');
+    if (this.acabou && this.tFim >= 0 && this.t - this.tFim > 900) {
+      /* 'CLIQUE PRA SEGUIR' quebrava em três linhas num botão de 97px, e a
+         terceira saía por baixo dele. Duas linhas cabem; o verbo é o toque. */
+      this.tBot[1].setText('PRA\nSEGUIR');
     }
   },
 
@@ -446,7 +524,7 @@ var BrigaScene = new Phaser.Class({
      pra defesa. Ícone antes da palavra: em briga não dá tempo de ler. */
   icone: function (g, k, c) {
     var cx = c.x + c.w / 2, cy = c.y + 30;
-    g.fillStyle(GOLPES[k].cor, 1);
+    g.fillStyle(GOLPES_BRIGA[k].cor, 1);
     if (k === 'defesa') {
       g.fillRect(cx - 10, cy - 12, 20, 14);
       g.fillTriangle(cx - 10, cy + 2, cx + 10, cy + 2, cx, cy + 14);
