@@ -57,6 +57,14 @@ var ZapScene = new Phaser.Class({
       self.scene.pause(k);
     });
 
+    /* O aparelho SOBE: ele vem da mão que acabou de tirá-lo do bolso lá
+       no mundo. A cena inteira sai de baixo em 220ms, o véu junto, então
+       por um instante o mundo aparece em cima, que é o que se vê ao
+       levantar o celular. */
+    this.saindo = false;
+    this.cameras.main.setScroll(0, -Math.round(GH * 0.55));
+    this.tweens.add({ targets: this.cameras.main, scrollY: 0, duration: 220, ease: 'Cubic.easeOut' });
+
     this.g = this.add.graphics().setDepth(2400);
     this.tStatus = txt(this, ZAP.tx0 + 6, ZAP.status + 4, '', PAL.cinza, 8).setDepth(2402);
     this.tHora = txt(this, ZAP.tx1 - 34, ZAP.status + 4, '', PAL.branco, 8).setDepth(2402).setOrigin(1, 0);
@@ -524,12 +532,27 @@ var ZapScene = new Phaser.Class({
     }
   },
 
+  /* E desce antes de o mundo voltar: o aparelho some por baixo, o jogo
+     descongela, e só então o boneco guarda o celular no bolso. O X, o
+     botão do aparelho e o toque fora passam todos por aqui. */
   fecha: function () {
+    if (this.saindo) return;
+    this.saindo = true;
     var self = this;
-    this.congeladas.forEach(function (k) { self.scene.resume(k); });
-    this.congeladas = [];
     sfx('porta');
-    this.scene.stop('Zap');
+    this.tweens.add({
+      targets: this.cameras.main, scrollY: -Math.round(GH * 0.55), duration: 180, ease: 'Cubic.easeIn',
+      onComplete: function () {
+        var voltam = self.congeladas.slice(0);
+        voltam.forEach(function (k) { self.scene.resume(k); });
+        self.congeladas = [];
+        voltam.forEach(function (k) {
+          var c = self.scene.get(k);
+          if (c && c._celular && c.pl) celularNoMundo(c, c.pl, false);
+        });
+        self.scene.stop('Zap');
+      }
+    });
   },
 
   update: function () {

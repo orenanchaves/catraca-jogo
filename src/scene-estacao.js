@@ -57,6 +57,9 @@ var ESC_PISTA = [
 /* Desceu de 296 pra 352 depois de medido na tela: a placa dele batia na
    do DOG DO CÃO, que fica na parede de frente na mesma altura. */
 var ACH = { y: 352, h: 62, alcance: 64 };
+/* A altura do eixo do tripé: o meio da barra que atravessava o vão
+   (218..226). Cruzar esta linha andando é passar pela catraca. */
+var CATRACA_Y = 222;
 
 /* a plataforma em coordenadas do mundo: o piso vai da faixa tátil à
    parede da direita */
@@ -849,7 +852,7 @@ var EstacaoScene = new Phaser.Class({
     this.gates = [];
     for (var i = 0; i < TOTAL; i++) {
       var vao = (i === larga) ? VAO_LARGO : VAO;
-      this.gates.push({ x0: x, x1: x + vao, larga: (i === larga), fechada: false });
+      this.gates.push({ x0: x, x1: x + vao, larga: (i === larga), fechada: false, giro: 0, alvo: 0 });
       x += vao + POSTE;
     }
 
@@ -862,11 +865,47 @@ var EstacaoScene = new Phaser.Class({
     this.abertas = abertas;
   },
 
+  /* ---------- catraca de braço, e não muro ----------
+     Era uma barra de metal atravessando o vão INTEIRO, que sumia quando
+     você pagava: de cima, quatro muros que desapareciam. Catraca de metrô
+     é um tripé — três braços num eixo preso no gabinete, um deles sempre
+     atravessado no vão — e ela GIRA quando alguém passa: o braço da frente
+     varre pro lado de dentro e o próximo toma o lugar.
+
+     De cima, cada braço é um risco saindo do eixo, com o y encolhido
+     (0,55) porque o eixo do tripé é inclinado: é o que faz o giro parecer
+     um braço descendo e não um ponteiro de relógio. Braço virado pra
+     dentro do gabinete não é desenhado — com 120° ele passaria 1,5px do
+     gabinete e espetaria o vão do lado. E o gabinete vem por cima de tudo,
+     que é onde o eixo mora. */
   pintaCatracas: function () {
     var g = this.gCatracas; g.clear();
-    for (var i = 0; i < this.gates.length; i++) {
-      var t = this.gates[i];
-      var w = t.x1 - t.x0;
+    var i, t, w, k;
+    for (i = 0; i < this.gates.length; i++) {
+      t = this.gates[i]; w = t.x1 - t.x0;
+      if (t.fechada) continue;
+      if (t.larga) {
+        // faixa azul no chão marcando a porta larga
+        g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
+        g.fillStyle(0x3a7fd0, 0.6).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
+      }
+      if (this.liberado) {
+        // pago: o chão do vão acende de leve; o braço continua lá, pra girar
+        g.fillStyle(0x00e676, 0.12).fillRect(t.x0, 208, w, 32);
+        g.fillStyle(0x00e676, 0.45).fillRect(t.x0, 236, w, 2);
+      }
+      var hx = t.x0 - 2, hy = CATRACA_Y, L = w - 3;
+      for (k = 0; k < 3; k++) {
+        var ang = (t.giro + k * 120) * Math.PI / 180;
+        if (Math.cos(ang) < -0.3) continue;
+        var ex = hx + Math.cos(ang) * L, ey = hy - Math.sin(ang) * L * 0.55;
+        g.lineStyle(4, num(PAL.metalSom), 1).lineBetween(hx, hy + 1, ex, ey + 1);
+        g.lineStyle(2, num(PAL.metal), 1).lineBetween(hx, hy, ex, ey);
+        g.lineStyle(1, num(PAL.metalLuz), 1).lineBetween(hx, hy - 1, ex, ey - 1);
+      }
+    }
+    for (i = 0; i < this.gates.length; i++) {
+      t = this.gates[i]; w = t.x1 - t.x0;
       var passa = this.liberado && !t.fechada;
       var postes = [t.x0 - 14, t.x1];
       for (var p = 0; p < 2; p++) {
@@ -879,7 +918,6 @@ var EstacaoScene = new Phaser.Class({
         g.fillRect(px + 2, 204, 7, 6);
         g.fillStyle(0xffffff, 0.5).fillRect(px + 2, 204, 7, 2);
       }
-
       if (t.fechada) {
         // corrente e placa de fora de serviço
         g.fillStyle(num(PAL.metalSom), 1).fillRect(t.x0, 214, w, 16);
@@ -889,22 +927,38 @@ var EstacaoScene = new Phaser.Class({
         g.fillStyle(0x000000, 0.45).fillRect(t.x0, 230, w, 4);
         continue;
       }
-
-      if (t.larga) {
-        // faixa azul no chão marcando a porta larga
-        g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
-        g.fillStyle(0x3a7fd0, 0.6).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
-      }
-
-      if (!this.liberado) {
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(t.x0, 218, w, 8);
-        g.fillStyle(num(PAL.metal), 1).fillRect(t.x0, 218, w, 5);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(t.x0, 218, w, 2);
-      } else {
-        g.fillStyle(0x00e676, 0.22).fillRect(t.x0, 208, w, 32);
-        g.fillStyle(0x00e676, 0.5).fillRect(t.x0, 236, w, 2);
-      }
+      // o eixo do tripé, na face do gabinete
+      g.fillStyle(num(PAL.metalLuz), 1).fillCircle(t.x0 - 2, CATRACA_Y, 3);
+      g.fillStyle(num(PAL.metalSom), 1).fillCircle(t.x0 - 2, CATRACA_Y, 1.5);
     }
+  },
+
+  /* Gira o tripé da catraca debaixo de x. 120° por passagem, pro lado de
+     dentro quando entra e pro lado de fora quando sai. Duas passagens
+     seguidas somam: a segunda pega o braço no meio do giro, como na
+     catraca de verdade quando a fila anda colada. */
+  giraCatracaEm: function (x, sentido, som) {
+    var t = this.gateSob(x);
+    if (!t || t.fechada) return;
+    t.alvo += 120 * (sentido < 0 ? -1 : 1);
+    if (som) sfx('catraca');
+  },
+
+  /* ~0,3s pra completar o giro, aproximando o alvo a cada quadro. O tripé
+     é simétrico — 120° depois é o mesmo desenho —, então ao chegar os dois
+     voltam pra zero e o ângulo nunca cresce sem fim. Só repinta quando
+     algum braço está mexendo. */
+  animaCatracas: function (dt) {
+    var mexeu = false;
+    for (var i = 0; i < this.gates.length; i++) {
+      var t = this.gates[i];
+      if (t.giro === t.alvo) continue;
+      var dif = t.alvo - t.giro;
+      if (Math.abs(dif) < 0.8) { t.giro = 0; t.alvo = 0; }
+      else t.giro += dif * Math.min(1, dt / 70);
+      mexeu = true;
+    }
+    if (mexeu) this.pintaCatracas();
   },
 
   azulejo: function (g, x, y, w, h) {
@@ -1042,7 +1096,6 @@ var EstacaoScene = new Phaser.Class({
         if (a.indo.fase === 'fila') {
           // passou a catraca: o giro do braço e o caminho pra escada
           a.indo = { x: a.indo.x, y: 150, fase: 'passou' };
-          if (Math.abs(a.sp.x - this.pl.sp.x) < 90) sfx('catraca');
         } else {
           a.sp.destroy();
           this.plateia.splice(i, 1);
@@ -1051,8 +1104,14 @@ var EstacaoScene = new Phaser.Class({
         }
       }
       var v = 46 * dt / 1000;
+      var yA = a.sp.y;
       a.sp.x += (dx / d) * v;
       a.sp.y += (dy / d) * v;
+      /* cruzou a linha: é aqui que a catraca gira e faz barulho, e não
+         quando ele ainda estava parado na frente dela */
+      if (a.indo.fase === 'passou' && yA > CATRACA_Y && a.sp.y <= CATRACA_Y) {
+        this.giraCatracaEm(a.sp.x, 1, Math.abs(a.sp.x - this.pl.sp.x) < 90);
+      }
       a.setDir(dx, dy);
       a.anima(dt, true);
     }
@@ -1979,6 +2038,7 @@ var EstacaoScene = new Phaser.Class({
        fecha o minigame é justamente uma delas, e vigiado depois dele o
        fim nunca seria visto. */
     if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
+    if (this.gates) this.animaCatracas(dt);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.fim) return;
@@ -2026,6 +2086,17 @@ var EstacaoScene = new Phaser.Class({
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
+    /* Passou pela catraca andando, o braço gira pra você: pra dentro na
+       entrada, pra fora na saída. Pulando não — quem pula passa por cima,
+       não pagou, e o braço fica onde estava. */
+    var yAgora = this.pl.sp.y;
+    var yAntes = (this.yCatraca === undefined) ? yAgora : this.yCatraca;
+    if (this.liberado && !this.pulo &&
+      ((yAntes > CATRACA_Y && yAgora <= CATRACA_Y) || (yAntes < CATRACA_Y && yAgora >= CATRACA_Y))) {
+      this.giraCatracaEm(this.pl.sp.x, yAgora < yAntes ? 1 : -1, true);
+    }
+    this.yCatraca = yAgora;
+
     if (this.pl.sp.y <= 204) GameState.dentroDoSistema = true;
 
     this.contexto(vendo);

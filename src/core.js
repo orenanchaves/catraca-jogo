@@ -3660,6 +3660,53 @@ function voltaProTreino(cena) {
   cena.scene.start('Treino', { volta: GameState.treino });
 }
 
+/* ---------- o celular sai do bolso ----------
+   Abrir o ZipZap era um corte seco: você apertava e a tela do aparelho
+   aparecia, sem o boneco ter feito nada. No mundo ninguém tem o celular
+   na cara de repente: a mão vai no bolso, o aparelho sobe, a tela acende.
+   Agora é isso que acontece ANTES de o ZipZap abrir, e o caminho inverso
+   depois que ele fecha: o aparelho desce e volta pro bolso.
+
+   Desenhado e não animado em quadro: a folha de sprites não tem pose de
+   celular, e um retângulo de 5x8 com a tela acendendo, subindo do quadril
+   até o rosto, já diz "pegou o celular" num boneco de 32x48. A luz da
+   tela no rosto, no fim da subida, é o que separa pegar de só segurar.
+
+   380ms pra subir e 300 pra descer: mais que isso e abrir o celular vira
+   espera; menos, e o olho não acompanha o aparelho saindo do bolso. */
+var CELULAR_SOBE = 380, CELULAR_DESCE = 300;
+function celularNoMundo(cena, ator, sobe, aoFim) {
+  if (!cena || !cena.tweens || !ator || !ator.sp || !ator.sp.active) { if (aoFim) aoFim(); return; }
+  var c = cena._celular;
+  if (!c) c = cena._celular = { g: cena.add.graphics(), p: sobe ? 0 : 1, tw: null };
+  if (c.tw) { c.tw.stop(); c.tw = null; }
+  var desenha = function () {
+    var g = c.g, p = c.p;
+    if (!g || !g.scene) return;
+    g.clear();
+    if (!ator.sp || !ator.sp.active) return;
+    g.setDepth(ator.sp.depth + 1);
+    var x = Math.round(ator.sp.x + 7 - 6 * p);      // do bolso, do lado, pro meio do corpo
+    var y = Math.round(ator.sp.y - 16 - 18 * p);    // do quadril pro rosto
+    g.fillStyle(0x16161e, 1).fillRect(x - 2, y - 4, 5, 8);
+    g.fillStyle(0x6fe3ff, 0.25 + 0.75 * p).fillRect(x - 1, y - 3, 3, 5);
+    if (p > 0.85) g.fillStyle(0x6fe3ff, 0.14 * p).fillRect(x - 5, y - 9, 11, 13);
+  };
+  c.tw = cena.tweens.add({
+    targets: c, p: sobe ? 1 : 0,
+    duration: sobe ? CELULAR_SOBE : CELULAR_DESCE,
+    ease: sobe ? 'Cubic.easeOut' : 'Cubic.easeIn',
+    onUpdate: desenha,
+    onComplete: function () {
+      c.tw = null;
+      desenha();
+      if (!sobe) { c.g.destroy(); cena._celular = null; }
+      if (aoFim) aoFim();
+    }
+  });
+  desenha();
+}
+
 function abreBarraca(scene, titulo, cardapio, aoFechar) {
   /* ---------- o preço fantasma ----------
      Apareceu R$ 12,00 do dogão por cima do R$ 3,00 da água, numa barraca
@@ -3839,19 +3886,34 @@ var HudScene = new Phaser.Class({
   /* Abrir o celular é parar de olhar pra frente: o jogo congela e o
      boneco baixa a cabeça pro aparelho. */
   abreZap: function () {
-    if (this.scene.isActive('Zap') || this.scene.isActive('Pausa')) return;
+    if (this.scene.isActive('Zap') || this.scene.isActive('Pausa') || this.pegandoCelular) return;
     if (!GameState.char || !HUD_VISIVEL) return;
     audioOn();
-    var cenas = this.scene.manager.getScenes(true);
+    var cenas = this.scene.manager.getScenes(true), alvo = null;
     for (var i = 0; i < cenas.length; i++) {
       var c = cenas[i];
-      if (c.pl && c.pl.sp && c.pl.sp.active && !c.sentadoEm) {
-        c.pl.dir = 'down';
-        c.pl.anima(0, false);
+      if (c.pl && c.pl.sp && c.pl.sp.active) {
+        alvo = c;
+        if (!c.sentadoEm) { c.pl.dir = 'down'; c.pl.anima(0, false); }
       }
     }
     if (typeof TUTORIAL !== 'undefined') TUTORIAL.viuZap = true;
-    this.scene.launch('Zap');
+    if (!alvo) { this.scene.launch('Zap'); return; }
+    /* Primeiro o aparelho sai do bolso, no mundo; só então a tela abre.
+       Não pega dois celulares ao mesmo tempo. Se a pausa abrir no meio da
+       subida, ela congela a subida junto com o jogo, e ao sair da pausa o
+       aparelho termina de subir e o ZipZap abre — medido assim, e é o que
+       a pessoa tinha pedido. A checagem de Pausa/Zap no fim fica de
+       guarda. E se a cena morrer no meio (embarcou, desceu), o relógio do
+       HUD libera o celular: senão ele ficaria "sendo pego" pra sempre. */
+    var eu = this;
+    this.pegandoCelular = true;
+    this.time.delayedCall(CELULAR_SOBE + 400, function () { eu.pegandoCelular = false; });
+    celularNoMundo(alvo, alvo.pl, true, function () {
+      eu.pegandoCelular = false;
+      if (eu.scene.isActive('Pausa') || eu.scene.isActive('Zap')) celularNoMundo(alvo, alvo.pl, false);
+      else eu.scene.launch('Zap');
+    });
   },
 
   /* ---------- as pálpebras ---------- */
