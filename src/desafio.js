@@ -129,6 +129,22 @@ function dsfCelula(i) {
   return { x: m.x + (i % 2) * (m.w + m.vaoX), y: m.y + Math.floor(i / 2) * (m.h + m.vaoY), w: m.w, h: m.h };
 }
 
+/* ---------- a animação de cada ataque ----------
+   Texto e tremida não bastavam: o ataque tem que SAIR de alguém e
+   CHEGAR no outro. Cada resposta sua tem um desenho (coração da lábia,
+   raio da ironia, a respiração da calma, as notas do fone), e cada golpe
+   deles também. No impacto o alvo pisca branco, é empurrado pra trás e
+   soltam estrelinhas; bloqueado, o golpe para num escudo na sua frente. */
+var FX_GOLPE = {
+  'ÁUDIO DE 5 MINUTOS': 'audio', 'CORNETA': 'audio',
+  'CORRENTE DO BOM DIA': 'balao', 'AMÉM COLETIVO': 'balao',
+  'NOTÍCIA DUVIDOSA': 'papel',
+  'VERSÍCULO NO GRITO': 'grito', 'O FIM ESTÁ PRÓXIMO': 'sombra',
+  'VAI CORINTHIANS!': 'torcida', 'BANDO DE LOUCOS': 'torcida',
+  'AVANTI PALESTRA': 'torcida', 'GRITO DE GOL': 'torcida'
+};
+var FX_CHEGA = 460;      // ms até o ataque chegar no outro
+
 function multiplicador(resp, quem) {
   if (quem.fraco === resp.tipo) return 2;
   if (quem.resiste === resp.tipo) return 0.5;
@@ -169,6 +185,12 @@ var DesafioScene = new Phaser.Class({
     this.tempo = 0;
 
     this.g = this.add.graphics().setDepth(10);
+    // os ataques voam por baixo dos painéis, no meio da tela, onde estão os dois
+    this.gFx = this.add.graphics().setDepth(5);
+    this.fx = [];
+    // onde cada um estava: o recuo do golpe é desfeito na saída, mesmo no meio
+    this.xPl = this.dados.pl ? this.dados.pl.x : 0;
+    this.xEle = this.dados.ele ? this.dados.ele.x : 0;
     this.tEle = txt(this, DSF.ele.x + 10, DSF.ele.y + 4, this.quem.nome, PAL.branco, 8).setDepth(12);
     this.tVc = txt(this, DSF.vc.x + 10, DSF.vc.y + 4, nomeDoChar(GameState.charKey, GameState.genero), PAL.branco, 8).setDepth(12);
     this.tVcNum = txt(this, DSF.vc.x + DSF.vc.w - 10, DSF.vc.y + 32, '', PAL.cinza, 8).setOrigin(1, 0).setDepth(12);
@@ -277,6 +299,7 @@ var DesafioScene = new Phaser.Class({
     var depois = Math.max(0, this.ele.pac - dano);
     var eu = this;
     var msgs = [{ msg: r.fala, fx: function () {
+      eu.ataque(r.tipo, true, false, mult > 1);
       eu.ele.pac = Math.max(0, eu.ele.pac - dano);
       eu.tremeEle = 260;
       sfx(mult > 1 ? 'batida' : 'empurra');
@@ -303,6 +326,7 @@ var DesafioScene = new Phaser.Class({
     var dano = bloq ? 0 : Math.round(g.dano * (0.85 + Math.random() * 0.3) * (this.nervoso ? 1.3 : 1) * (this.bonus || 1));
     var eu = this;
     var msgs = [{ msg: q.nome + ' USOU\n' + g.nome + '!', fx: function () {
+      eu.ataque(FX_GOLPE[g.nome] || 'balao', false, bloq, eu.nervoso);
       if (bloq) { sfx('catraca'); return; }
       eu.vc.pac = Math.max(0, eu.vc.pac - dano);
       eu.tremeVc = 260;
@@ -349,6 +373,10 @@ var DesafioScene = new Phaser.Class({
   fecha: function () {
     if (this.saindo) return;
     this.saindo = true;
+    // a cena morre com piscada e recuo pela metade: devolve os dois como estavam
+    var dp = this.dados.pl, de = this.dados.ele;
+    if (dp && dp.active) { dp.clearTint(); dp.x = this.xPl; }
+    if (de && de.active) { de.clearTint(); de.x = this.xEle; }
     devolveCenas(this, this.congeladas);
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Desafio');
@@ -369,7 +397,168 @@ var DesafioScene = new Phaser.Class({
     this.ele.mostra += Phaser.Math.Clamp(this.ele.pac - this.ele.mostra, -v, v);
     if (this.tremeEle > 0) this.tremeEle -= dt;
     if (this.tremeVc > 0) this.tremeVc -= dt;
+    this.pintaFx(dt);
     this.pinta();
+  },
+
+  /* Onde um sprite do vagão aparece na tela, com o zoom da câmera de lá.
+     O y é o do peito (22 acima do pé), que é de onde se fala. */
+  naTela: function (sp) {
+    var cam = this.dados.cam;
+    if (!sp || !cam) return { x: GW / 2, y: GH / 2 };
+    var m = cam.midPoint, z = cam.zoom;
+    return { x: (sp.x - m.x) * z + GW / 2, y: (sp.y - 22 - m.y) * z + GH / 2 };
+  },
+
+  // um ataque: de quem sai, pra quem vai, e o que acontece quando chega
+  ataque: function (tipo, deVc, bloq, forte) {
+    var A = this.naTela(deVc ? this.dados.pl : this.dados.ele);
+    var B = this.naTela(deVc ? this.dados.ele : this.dados.pl);
+    // bloqueado, o golpe morre num escudo a um quarto do caminho
+    var alvo = bloq ? { x: B.x + (A.x - B.x) * 0.25, y: B.y + (A.y - B.y) * 0.25 } : B;
+    var f = this.fx, i, eu = this;
+    function voa(k, n, passo, extra) {
+      for (var j = 0; j < n; j++) {
+        var p = { k: k, t: -j * passo, dur: FX_CHEGA, ax: A.x, ay: A.y, bx: alvo.x, by: alvo.y,
+          arco: (Math.random() - 0.5) * 50, gira: Math.random() * 6 };
+        if (extra) for (var q in extra) p[q] = extra[q];
+        f.push(p);
+      }
+    }
+    if (tipo === 'LABIA') voa('coracao', 5, 70);
+    else if (tipo === 'IRONIA') { voa('raio', 1, 0, { dur: 300 }); voa('raio', 1, 110, { dur: 260 }); }
+    else if (tipo === 'CALMA') {
+      voa('respira', 2, 160, { dur: 520, bx: A.x, by: A.y });
+      voa('mais', 3, 120, { dur: 600, bx: A.x, by: A.y });
+      voa('anel', 3, 110, { cor: 0x4fb8ff });
+    } else if (tipo === 'FONE') { voa('nota', 4, 80); voa('anel', 2, 140, { cor: 0x00e676 }); }
+    else if (tipo === 'audio') voa('anel', 5, 70, { cor: 0xe8762c });
+    else if (tipo === 'balao') voa('balao', 4, 90);
+    else if (tipo === 'papel') voa('papel', 5, 70);
+    else if (tipo === 'grito') {
+      voa('grito', 2, 150, { dur: 520, bx: A.x, by: A.y });
+      voa('balao', 2, 120);
+    } else if (tipo === 'sombra') {
+      voa('sombra', 1, 0, { dur: 700 });
+      voa('anel', 3, 120, { cor: 0x6a1a1a });
+    } else if (tipo === 'torcida') {
+      var cores = this.dados.tipo === 'palmeirense' ? [0x0a7a42, 0xf2f0ff] : [0xf2f0ff, 0x26262c];
+      voa('grito', 1, 0, { dur: 480, bx: A.x, by: A.y, cor: cores[0] });
+      for (i = 0; i < 16; i++) {
+        f.push({ k: 'confete', t: -120, dur: 900, ax: alvo.x, ay: alvo.y - 30, bx: 0, by: 0,
+          vx: (Math.random() - 0.5) * 0.22, vy: -0.05 - Math.random() * 0.12, cor: cores[i % 2], gira: Math.random() * 6 });
+      }
+    } else voa('balao', 3, 90);
+
+    // a chegada
+    this.time.delayedCall(FX_CHEGA + 40, function () {
+      if (bloq) {
+        f.push({ k: 'escudo', t: 0, dur: 420, ax: alvo.x, ay: alvo.y, bx: A.x, by: A.y });
+        return;
+      }
+      eu.acerta(deVc ? eu.dados.ele : eu.dados.pl, alvo, A, forte);
+    });
+  },
+
+  // o alvo pisca branco duas vezes, recua um pouco e solta estrelinhas
+  acerta: function (sp, pt, de, forte) {
+    var f = this.fx, n = forte ? 10 : 6, eu = this;
+    for (var i = 0; i < n; i++) {
+      var an = Math.random() * Math.PI * 2, v = 0.06 + Math.random() * 0.08;
+      f.push({ k: 'estrela', t: 0, dur: 420, ax: pt.x, ay: pt.y, bx: 0, by: 0,
+        vx: Math.cos(an) * v, vy: Math.sin(an) * v, cor: forte ? 0xf2c14e : 0xf2f0ff });
+    }
+    if (!sp || !sp.active) return;
+    sp.setTintFill(0xffffff);
+    this.time.delayedCall(70, function () { if (sp.active) sp.clearTint(); });
+    this.time.delayedCall(140, function () { if (sp.active) sp.setTintFill(0xffffff); });
+    this.time.delayedCall(210, function () { if (sp.active) sp.clearTint(); });
+    var x0 = sp.x, dx = (pt.x - de.x) > 0 ? 1 : -1;
+    this.tweens.add({ targets: sp, x: x0 + dx * (forte ? 5 : 3), duration: 70, yoyo: true,
+      onComplete: function () { if (sp.active) sp.x = x0; } });
+  },
+
+  pintaFx: function (dt) {
+    var g = this.gFx; g.clear();
+    for (var i = this.fx.length - 1; i >= 0; i--) {
+      var p = this.fx[i];
+      p.t += dt;
+      if (p.t < 0) continue;
+      var u = p.t / p.dur;
+      if (u >= 1) { this.fx.splice(i, 1); continue; }
+      // o caminho: de A pra B, com um arco pro lado que cada um sorteou
+      var x = p.ax + (p.bx - p.ax) * u, y = p.ay + (p.by - p.ay) * u;
+      var nx = -(p.by - p.ay), ny = (p.bx - p.ax), nl = Math.sqrt(nx * nx + ny * ny) || 1;
+      var off = Math.sin(u * Math.PI) * p.arco;
+      x += nx / nl * off; y += ny / nl * off;
+      var al = 1 - u * 0.4;
+      switch (p.k) {
+        case 'coracao':
+          // tudo aqui é desenhado no dobro: os bonecos estão com zoom de 2,2
+          g.fillStyle(0xa47cff, al).fillCircle(x - 5, y, 6).fillCircle(x + 5, y, 6);
+          g.fillTriangle(x - 11, y + 2, x + 11, y + 2, x, y + 14);
+          g.fillStyle(0xffffff, al * 0.6).fillRect(x - 7, y - 3, 3, 3);
+          break;
+        case 'raio':
+          // um zigue-zague novo a cada quadro: é isso que faz ele estalar
+          g.lineStyle(6, 0xf2c14e, 1 - u);
+          g.beginPath(); g.moveTo(p.ax, p.ay);
+          for (var s2 = 1; s2 < 5; s2++) {
+            var k2 = s2 / 5;
+            g.lineTo(p.ax + (p.bx - p.ax) * k2 + (Math.random() - 0.5) * 18, p.ay + (p.by - p.ay) * k2 + (Math.random() - 0.5) * 18);
+          }
+          g.lineTo(p.bx, p.by); g.strokePath();
+          g.lineStyle(2, 0xffffff, 1 - u).lineBetween(p.ax, p.ay, p.bx, p.by);
+          break;
+        case 'anel':
+          g.lineStyle(4, p.cor, 1 - u).strokeCircle(x, y, 8 + u * 26);
+          break;
+        case 'respira':
+          g.lineStyle(2, 0x4fb8ff, 1 - u).strokeCircle(p.ax, p.ay, 10 + u * 34);
+          break;
+        case 'mais':
+          var my = p.ay - u * 36;
+          g.fillStyle(0x00e676, 1 - u).fillRect(p.ax + p.arco * 0.6 - 2, my - 9, 5, 19).fillRect(p.ax + p.arco * 0.6 - 9, my - 2, 19, 5);
+          break;
+        case 'nota':
+          var wy = y + Math.sin(u * 12) * 4;
+          g.fillStyle(0x00e676, al).fillCircle(x, wy, 6).fillRect(x + 4, wy - 20, 3, 20).fillRect(x + 4, wy - 20, 11, 5);
+          break;
+        case 'balao':
+          g.fillStyle(0xf2f0ff, al).fillRoundedRect(x - 18, y - 12, 36, 23, 7);
+          g.fillTriangle(x - 9, y + 9, x - 2, y + 9, x - 13, y + 18);
+          g.fillStyle(0x14141c, al).fillRect(x - 11, y - 2, 4, 4).fillRect(x - 2, y - 2, 4, 4).fillRect(x + 7, y - 2, 4, 4);
+          break;
+        case 'papel':
+          var an = p.gira + u * 9, c = Math.cos(an), sn = Math.sin(an);
+          g.fillStyle(0xe8e8f0, al);
+          g.fillPoints([{ x: x + (-9 * c - -11 * sn), y: y + (-9 * sn + -11 * c) }, { x: x + (9 * c - -11 * sn), y: y + (9 * sn + -11 * c) },
+            { x: x + (9 * c - 11 * sn), y: y + (9 * sn + 11 * c) }, { x: x + (-9 * c - 11 * sn), y: y + (-9 * sn + 11 * c) }], true);
+          g.lineStyle(2, 0x6a6c78, al).lineBetween(x - 6 * c, y - 6 * sn, x + 6 * c, y + 6 * sn);
+          break;
+        case 'grito':
+          g.lineStyle(4, p.cor || 0xe8362c, 1 - u).strokeCircle(p.ax, p.ay, 12 + u * 70);
+          break;
+        case 'sombra':
+          g.fillStyle(0x3a0008, Math.sin(u * Math.PI) * 0.45).fillRect(0, 0, GW, GH);
+          break;
+        case 'confete':
+          var cx2 = p.ax + p.vx * p.t, cy2 = p.ay + p.vy * p.t + 0.00018 * p.t * p.t;
+          g.fillStyle(p.cor, 1 - u).fillRect(cx2, cy2, 7, 5 + Math.abs(Math.sin(p.gira + p.t / 60)) * 6);
+          break;
+        case 'estrela':
+          var ex = p.ax + p.vx * p.t, ey = p.ay + p.vy * p.t;
+          g.fillStyle(p.cor, 1 - u).fillRect(ex - 3, ey - 3, 7, 7);
+          break;
+        case 'escudo':
+          // o escudo verde cresce na frente de quem defendeu, e some
+          var sc = 2 + u * 0.8, ex2 = p.ax, ey2 = p.ay;
+          g.fillStyle(0x00e676, 0.85 * (1 - u)).fillRect(ex2 - 9 * sc, ey2 - 10 * sc, 18 * sc, 12 * sc);
+          g.fillTriangle(ex2 - 9 * sc, ey2 + 2 * sc, ex2 + 9 * sc, ey2 + 2 * sc, ex2, ey2 + 12 * sc);
+          g.lineStyle(2, 0xffffff, 1 - u).strokeCircle(ex2, ey2, 10 + u * 20);
+          break;
+      }
+    }
   },
 
   ficha: function (g, cx, prop, treme, cor) {

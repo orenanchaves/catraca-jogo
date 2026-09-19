@@ -1165,6 +1165,8 @@ var VagaoScene = new Phaser.Class({
         e.fase = 'luta';
         eu.scene.launch('Desafio', {
           tipo: d.desafio.tipo,
+          // quem luta e a câmera com zoom: é por eles que os ataques voam
+          pl: eu.pl.sp, ele: d.sp, cam: cam,
           aoFechar: function (r) { eu.fimDaAbordagem(r); }
         });
       }
