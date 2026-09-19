@@ -522,6 +522,7 @@ var VagaoScene = new Phaser.Class({
 
     var self = this;
     fala(this, GameState.hora() + '. Próxima:\n' + GameState.proximaEstacaoNome(), []);
+    anuncia('Próxima estação: ' + nomeFalado(GameState.proximaEstacaoNome()) + '.');
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
     if (this.treino) this.montaTreino();
   },
@@ -963,9 +964,22 @@ var VagaoScene = new Phaser.Class({
     sfx('apito');
   },
 
+  /* Quem joga olha pra quem está enfrentando, a cada quadro: de costas
+     pra câmera quando ele está em cima, de frente quando está embaixo,
+     como o seu boneco no Pokémon. Uma vez só, no começo, não bastava —
+     medido na luta, o estudante aparecia virado pra baixo, de costas
+     pro tiozão. */
+  encaraDesafiante: function () {
+    var d = this.abordagem && this.abordagem.d;
+    if (!d) return;
+    var dir = (d.sp.y < this.pl.sp.y) ? 'up' : 'down';
+    if (this.pl.dir !== dir || this.pl.andando) { this.pl.dir = dir; this.pl.anima(0, false); }
+  },
+
   atualizaAbordagem: function (dt) {
     var e = this.abordagem, d = e.d, eu = this;
     e.t += dt;
+    this.encaraDesafiante();
     var gb = this.gBalao; gb.clear();
     this.tBalao.setVisible(false);
     if (e.fase === 'susto') {
@@ -1012,6 +1026,7 @@ var VagaoScene = new Phaser.Class({
      some enquanto isso: ela também levaria o zoom e sairia enorme. */
   zoomNaAbordagem: function () {
     var e = this.abordagem, d = e.d, eu = this, cam = this.cameras.main;
+    this.encaraDesafiante();
     cam.stopFollow();
     this.uiEscondida = [];
     var lista = this.children.list;
@@ -3095,7 +3110,11 @@ var VagaoScene = new Phaser.Class({
     sfx('chegando');
     var eu = this;
     this.time.delayedCall(420, function () { sfx('porta'); });
-    this.time.delayedCall(700, function () { if (eu.scene && eu.scene.isActive()) sfx('anuncio'); });
+    this.time.delayedCall(700, function () {
+      if (!eu.scene || !eu.scene.isActive()) return;
+      var aqui = GameState.estacaoAtual();
+      anuncia('Estação ' + nomeFalado(aqui) + '.' + (aqui === 'SÉ' ? ' Transferência para as linhas 1 e 3.' : ''));
+    });
     if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
     /* Um pedido de lugar por estação: pedir sem parar transformaria o
        idoso num botão de sentar. O cochilo NÃO é zerado aqui de
@@ -3222,6 +3241,7 @@ var VagaoScene = new Phaser.Class({
       }
       if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
+        anuncia('Próxima estação: ' + nomeFalado(GameState.proximaEstacaoNome()) + '.');
         this.sorteiaRitmo();
         this.sorteouFalha = false;
         this.pintaPortas(false);

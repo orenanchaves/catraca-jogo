@@ -1942,11 +1942,119 @@ function agendaMusica() {
   if (AC.state !== 'running') return;
   // ficou pra trás (contexto suspenso, aba voltando): retoma do agora, sem rajada
   if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
+  var modo = modoDoSom();
+  // a música volta sempre do começo da frase, não do meio de onde parou
+  if (modo === 'musica' && _musModo !== 'musica') _musPasso = 0;
+  _musModo = modo;
   while (_musProx < AC.currentTime + 0.15) {
-    tocaPassoMusica(_musPasso, _musProx);
+    if (modo === 'musica') tocaPassoMusica(_musPasso, _musProx);
+    else tocaPassoAmbiente(_musPasso, _musProx, modo);
     _musPasso = (_musPasso + 1) % MUS_MELODIA.length;
     _musProx += MUS_COLCHEIA;
   }
+}
+
+/* ---------- música só onde é jogo; no mundo, o mundo ----------
+   "Não sei se faz sentido música o tempo todo, pode ser barulho de
+   pessoas." Faz sentido: no metrô de verdade ninguém ouve trilha, ouve
+   gente, trilho e aviso. Então a música fica nos menus (título, treino,
+   fim) e na luta, que é o momento "de jogo" — e no mundo toca o mundo. */
+var _musModo = null;
+function modoDoSom() {
+  var m = window.jogo && jogo.scene;
+  if (!m) return 'musica';
+  if (m.isActive('Desafio') || m.isActive('Title') || m.isActive('Treino') || m.isActive('Fim')) return 'musica';
+  if (m.isActive('Vagao') || m.isPaused('Vagao')) return 'vagao';
+  return 'estacao';
+}
+
+/* O burburinho: gente falando é ruído com cara de voz — faixa estreita
+   entre 350 e 900Hz, que é onde mora a vogal, com começo e fim macios.
+   Várias dessas se sobrepondo, cada uma de um tom, viram conversa que
+   não se entende. Quanto mais lotado, mais vozes. No vagão andando entra
+   o ronco do trem e o tá-dum dos trilhos, uma vez por compasso. */
+function tocaPassoAmbiente(i, t, modo) {
+  var lot = (typeof GameState !== 'undefined' && GameState.lotacao) ? GameState.lotacao() : 0.5;
+  var atraso = Math.max(0, t - AC.currentTime);
+  var vozes = Math.random() < 0.35 + lot * 0.45 ? (Math.random() < lot ? 2 : 1) : 0;
+  for (var v = 0; v < vozes; v++) {
+    var f0 = 350 + Math.random() * 550;
+    ruido(0.22 + Math.random() * 0.35, (0.0025 + Math.random() * 0.003) * (0.7 + lot),
+      f0, f0 * (0.8 + Math.random() * 0.4), 5, 'bandpass', atraso + Math.random() * 0.1);
+  }
+  // de vez em quando alguém ri ou tosse mais perto
+  if (Math.random() < 0.025) ruido(0.12, 0.006, 1400, 900, 3, 'bandpass', atraso);
+
+  var vg = window.jogo && jogo.scene.getScene('Vagao');
+  if (modo === 'vagao' && vg && vg.estado === 'andando') {
+    if (i % 4 === 0) ruido(1.1, 0.014, 110, 85, 0.7, 'lowpass', atraso);
+    var p = i % 8;
+    if (p === 0 || p === 1) {
+      ruido(0.05, 0.016, 2600, 1700, 2, 'bandpass', atraso);
+      ruido(0.08, 0.02, 160, 70, 1, 'lowpass', atraso);
+    }
+  }
+}
+
+/* ---------- o aviso da estação ----------
+   O "plim" e a voz. As gravações do Metrô são do Metrô: aqui o plim é
+   sintetizado e quem fala é a voz em português que o próprio aparelho
+   já tem (speechSynthesis). Sem voz em português no aparelho, o aviso é
+   só o plim — voz inglesa lendo "Anhangabaú" seria pior que nada. */
+var NOME_FALADO = {
+  'PÇA. ÁRVORE': 'Praça da Árvore', 'JD.SÃO PAULO': 'Jardim São Paulo', 'PD. INGLESA': 'Parada Inglesa',
+  'MAL. DEODORO': 'Marechal Deodoro', 'STA. CECÍLIA': 'Santa Cecília', 'PEDRO II': 'Pedro Segundo',
+  'BARRA FUNDA': 'Palmeiras Barra Funda', 'ITAQUERA': 'Corinthians Itaquera', 'LIBERDADE': 'Japão Liberdade',
+  'PORTUGUESA': 'Portuguesa Tietê'
+};
+function nomeFalado(n) {
+  if (NOME_FALADO[n]) return NOME_FALADO[n];
+  return String(n).toLowerCase().replace(/(^|\s)(\S)/g, function (m, a, b) { return a + b.toUpperCase(); });
+}
+
+function plim() {
+  if (!AC || !SOM_LIGADO) return;
+  var t = AC.currentTime + 0.02, notas = [79, 76, 72];
+  for (var i = 0; i < notas.length; i++) {
+    notaEm(t + i * 0.3, notas[i], 0.7, 'sine', 0.05);
+    notaEm(t + i * 0.3, notas[i] + 12, 0.35, 'triangle', 0.012);
+  }
+}
+
+var _vozPt = null;
+function vozPt() {
+  if (_vozPt || !window.speechSynthesis) return _vozPt;
+  var vs = speechSynthesis.getVoices(), melhor = null;
+  for (var i = 0; i < vs.length; i++) {
+    var l = (vs[i].lang || '').toLowerCase().replace('_', '-');
+    if (l.indexOf('pt') !== 0) continue;
+    if (!melhor || (l === 'pt-br' && (melhor.lang || '').toLowerCase().replace('_', '-') !== 'pt-br')) melhor = vs[i];
+  }
+  _vozPt = melhor;
+  return _vozPt;
+}
+if (window.speechSynthesis && speechSynthesis.addEventListener) {
+  speechSynthesis.addEventListener('voiceschanged', function () { _vozPt = null; vozPt(); });
+}
+
+function anuncia(texto) {
+  if (!SOM_LIGADO || document.hidden) return;
+  if (typeof GameState !== 'undefined' && GameState.treino) return;
+  plim();
+  var voz = vozPt();
+  if (!voz) return;
+  setTimeout(function () {
+    if (!SOM_LIGADO || document.hidden) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(texto);
+      u.voice = voz; u.lang = voz.lang; u.rate = 1.02; u.pitch = 1; u.volume = 0.9;
+      speechSynthesis.speak(u);
+    } catch (e) { }
+  }, 950);
+}
+function calaAnuncio() {
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { }
 }
 
 function ligaMusica(v) {
@@ -1994,6 +2102,7 @@ function suspendeAudio() {
    trem. */
 function fechaAudio() {
   paraMusica();
+  calaAnuncio();
   bufRuido = null;
   if (AC && AC.close) {
     try { AC.close(); } catch (e) { }
@@ -2018,6 +2127,7 @@ function fechaAudio() {
 function calaOSom() {
   paraMusica();
   suspendeAudio();
+  calaAnuncio();
 }
 
 function voltaOSom() {
