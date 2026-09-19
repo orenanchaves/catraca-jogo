@@ -1821,30 +1821,127 @@ function ligaSom(v) {
 }
 
 /* ---------- música ----------
-   Não havia música nenhuma: desligar "música" no menu não desligaria
-   coisa nenhuma, e botão que não faz nada é pior que botão que falta.
-   Então entrou o mínimo honesto — um baixo de metrô, duas notas
-   alternando no compasso do trem, baixo o bastante pra não brigar com
-   os efeitos. É ambiente, não trilha. */
+   Era um baixo de 49Hz alternando duas notas a cada 640ms: "chata e
+   grave", foi o veredito. Agora é trilha de jogo de verdade, no molde
+   das músicas de rota de RPG portátil — alegre, andando pra frente,
+   com a melodia no alto e nada abaixo de 82Hz.
+
+   Quatro vozes, como um chip de console: melodia (quadrada), baixo
+   (triângulo, saltando oitava), arpejo do acorde (quadrada baixinha, em
+   semicolcheias) e bateria (bumbo de seno que despenca, caixa e chimbal
+   de ruído). 128 BPM, dó maior, 16 compassos: A (C Am F G / C Am Dm G)
+   e B (F G Em Am / F G C C), e volta.
+
+   As notas são AGENDADAS no relógio do áudio, 150ms à frente, e não
+   tocadas por setInterval. setInterval atrasa quando o quadro pesa, e
+   música com a batida escorregando soa quebrada; o relógio do áudio não
+   escorrega. O intervalo só acorda o agendador.
+
+   Os volumes são medidos, renderizando a volta inteira offline: na
+   primeira mixagem o pico da música era 0,155 e o do sfx('ok') 0,047 —
+   a trilha tapava o jogo. Agora ela fica por baixo dos efeitos. */
 var MUSICA_LIGADA = true;
 try {
   MUSICA_LIGADA = (localStorage.getItem('metrosp_musica') !== '0');
 } catch (e) { }
 
-var BAIXO_METRO = [49.0, 49.0, 58.3, 49.0, 43.7, 43.7, 51.9, 43.7];
-var _musicaT = null, _musicaI = 0;
+var MUS_BPM = 128;
+var MUS_COLCHEIA = 60 / MUS_BPM / 2;          // o passo da melodia e do baixo
+// melodia em colcheias, 8 por compasso: nota MIDI, 0 pausa, -1 segura a anterior
+var MUS_MELODIA = [
+  76, 0, 79, 0, 84, -1, 79, 0,     81, -1, 79, 76, -1, -1, 74, 0,
+  77, 0, 81, 0, 84, -1, 81, 79,    79, -1, -1, 74, -1, -1, 0, 0,
+  76, 0, 79, 0, 84, -1, 86, 84,    81, -1, 79, 76, -1, 74, 76, -1,
+  77, -1, 76, 74, -1, 72, 74, -1,  71, -1, 74, -1, 79, -1, 0, 0,
+  72, 74, 77, -1, 81, -1, 77, 74,  74, 76, 79, -1, 83, -1, 79, 76,
+  76, -1, 79, -1, 83, -1, 79, 76,  81, -1, -1, -1, 79, 76, 74, 72,
+  77, -1, 81, -1, 84, -1, 81, 77,  79, -1, 83, -1, 86, -1, 83, 79,
+  84, -1, 79, -1, 76, -1, 72, -1,  72, -1, -1, -1, 0, 0, 0, 0
+];
+// um acorde por compasso: a fundamental (pro baixo) e a tríade (pro arpejo)
+var MUS_ACORDES = [
+  [48, [60, 64, 67]], [45, [57, 60, 64]], [41, [57, 60, 65]], [43, [55, 59, 62]],
+  [48, [60, 64, 67]], [45, [57, 60, 64]], [50, [57, 62, 65]], [43, [55, 59, 62]],
+  [41, [57, 60, 65]], [43, [55, 59, 62]], [40, [55, 59, 64]], [45, [57, 60, 64]],
+  [41, [57, 60, 65]], [43, [55, 59, 62]], [48, [60, 64, 67]], [48, [60, 64, 67]]
+];
+// o baixo salta: fundamental, oitava, fundamental, oitava... e a quinta no fim
+var MUS_BAIXO = [0, 12, 0, 12, 0, 12, 7, 12];
 
-function passoDaMusica() {
+var _musicaT = null, _musPasso = 0, _musProx = 0;
+
+function hzDe(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+/* uma nota com hora marcada: ataque curtinho, e cai até o fim */
+function notaEm(t, n, dur, tipo, vol) {
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = tipo; o.frequency.value = hzDe(n);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.008);
+  g.gain.setValueAtTime(vol * 0.8, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+function bumboEm(t) {
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+  g.gain.setValueAtTime(0.035, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + 0.16);
+}
+
+/* Um passo é uma colcheia. Os dois arpejos de cada colcheia (as
+   semicolcheias) saem daqui também, meio passo defasados. */
+function tocaPassoMusica(i, t) {
+  var c = MUS_COLCHEIA;
+  var passoNoCompasso = i % 8, compasso = Math.floor(i / 8) % MUS_ACORDES.length;
+  var acorde = MUS_ACORDES[compasso];
+
+  // melodia: conta quantas colcheias ela segura pra saber a duração
+  var m = MUS_MELODIA[i % MUS_MELODIA.length];
+  if (m > 0) {
+    var seg = 1;
+    while (MUS_MELODIA[(i + seg) % MUS_MELODIA.length] === -1) seg++;
+    notaEm(t, m, c * seg * 0.95, 'square', 0.011);
+  }
+
+  // baixo, em triângulo, uma oitava acima do grave de antes
+  notaEm(t, acorde[0] + MUS_BAIXO[passoNoCompasso], c * 0.8, 'triangle', 0.030);
+
+  // arpejo: duas notas do acorde por colcheia, sobe e desce
+  var tri = acorde[1];
+  var k = (i * 2) % 4;
+  var ordem = [0, 1, 2, 1];
+  notaEm(t, tri[ordem[k]] + 12, c * 0.45, 'square', 0.0035);
+  notaEm(t + c / 2, tri[ordem[k + 1]] + 12, c * 0.45, 'square', 0.0035);
+
+  // bateria: bumbo no 1 e no 3, caixa no 2 e no 4, chimbal no contratempo
+  var atraso = Math.max(0, t - AC.currentTime);
+  if (passoNoCompasso === 0 || passoNoCompasso === 4) bumboEm(t);
+  if (passoNoCompasso === 2 || passoNoCompasso === 6) ruido(0.10, 0.012, 1900, 1400, 0.8, 'bandpass', atraso);
+  if (passoNoCompasso % 2 === 1) ruido(0.035, 0.006, 9000, 9000, 0.7, 'highpass', atraso);
+}
+
+function agendaMusica() {
   if (!MUSICA_LIGADA || !SOM_LIGADO || !AC) return;
   /* Rede de seguranca: se por algum motivo nenhum evento avisou que a
      janela saiu de cena, o proprio relogio da musica percebe e se
      desliga. Um `setInterval` continua rodando em aba de fundo — so
      mais devagar — entao ele e o ultimo lugar em que da pra checar. */
   if (document.hidden) { paraMusica(); suspendeAudio(); return; }
-  var f = BAIXO_METRO[_musicaI % BAIXO_METRO.length];
-  _musicaI++;
-  tom(f, 0.55, 'triangle', 0.028);
-  if (_musicaI % 4 === 2) tom(f * 4, 0.10, 'sine', 0.012);
+  if (AC.state !== 'running') return;
+  // ficou pra trás (contexto suspenso, aba voltando): retoma do agora, sem rajada
+  if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
+  while (_musProx < AC.currentTime + 0.15) {
+    tocaPassoMusica(_musPasso, _musProx);
+    _musPasso = (_musPasso + 1) % MUS_MELODIA.length;
+    _musProx += MUS_COLCHEIA;
+  }
 }
 
 function ligaMusica(v) {
@@ -1857,7 +1954,8 @@ function ligaMusica(v) {
 function comecaMusica() {
   if (_musicaT || !MUSICA_LIGADA || !SOM_LIGADO) return;
   if (typeof document !== 'undefined' && document.hidden) return;
-  _musicaT = setInterval(passoDaMusica, 640);
+  _musProx = 0;
+  _musicaT = setInterval(agendaMusica, 40);
 }
 
 function paraMusica() {
