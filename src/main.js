@@ -65,7 +65,8 @@ var ASSETS = {
        como se aprende a ler treinador no Pokémon. Provisórios até a arte. */
     { key: 'np_tiozao', file: 'assets/npcs/tiozao.png', pal: PELES.tiozao, corpo: 'careca_celular' },
     { key: 'np_pregador', file: 'assets/npcs/pregador.png', pal: PELES.pregador, corpo: 'padrao' },
-    { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'bone' }
+    { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'bone' },
+    { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'bone' }
   ]
 };
 

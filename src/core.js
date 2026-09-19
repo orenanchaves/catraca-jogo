@@ -1578,7 +1578,9 @@ var PELES = {
      camisa verde de time e boné */
   tiozao: pele('#0a0a12', '#e0b088', '#c8c8d8', '#e3d2a0', '#4a5a7a', '#3a2a22', '#f0eeff'),
   pregador: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#f0eeff', '#14141c', '#14141c', '#14141c'),
-  torcedor: pele('#0a0a12', '#c99a70', '#2a2a30', '#0a7a42', '#e8e8f0', '#14141c', '#f0eeff')
+  torcedor: pele('#0a0a12', '#c99a70', '#2a2a30', '#0a7a42', '#e8e8f0', '#14141c', '#f0eeff'),
+  // camisa preta com detalhe branco, bermuda branca: o do Corinthians
+  corintiano: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#26262c', '#e8e8f0', '#14141c', '#f0eeff')
 };
 
 /* desenha um quadro 32x48 a partir da silhueta 16x24, com sombreamento */

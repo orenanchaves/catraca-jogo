@@ -55,19 +55,44 @@ var DESAFIANTES = {
       { nome: 'AMÉM COLETIVO', dano: 10 }
     ]
   },
-  torcedor: {
-    nome: 'TORCEDOR', sprite: 'np_torcedor', pac: 75,
+  /* O torcedor depende de onde o trem está: na Vermelha, da Sé até
+     Itaquera é Corinthians (a Arena fica colada na estação); da Sé até
+     a Barra Funda é Palmeiras (o Allianz fica do lado). Mesmo tipo de
+     briga — ironia derruba, calma nem arranha —, time diferente. */
+  corintiano: {
+    nome: 'CORINTIANO', sprite: 'np_corintiano', pac: 75,
     fraco: 'IRONIA', resiste: 'CALMA',
-    chega: 'E AÍ, TORCE\nPRA QUEM?',
-    sai: 'DOMINGO A GENTE\nCONVERSA.',
+    chega: 'AQUI É CORINTHIANS,\nTÁ LIGADO?',
+    sai: 'DOMINGO TEM JOGO\nNA ARENA, HEIN.',
     golpes: [
-      { nome: 'HINO DO TIME', dano: 12 },
+      { nome: 'VAI CORINTHIANS!', dano: 12 },
+      { nome: 'BANDO DE LOUCOS', dano: 14 },
+      { nome: 'CORNETA', dano: 10 }
+    ]
+  },
+  palmeirense: {
+    nome: 'PALMEIRENSE', sprite: 'np_torcedor', pac: 75,
+    fraco: 'IRONIA', resiste: 'CALMA',
+    chega: 'E AÍ, É PORCO\nOU NÃO É?',
+    sai: 'AVANTI, PALESTRA.',
+    golpes: [
+      { nome: 'AVANTI PALESTRA', dano: 12 },
       { nome: 'GRITO DE GOL', dano: 14 },
       { nome: 'CORNETA', dano: 10 }
     ]
   }
 };
 var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor'];
+
+/* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
+function sorteiaDesafiante() {
+  var t = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
+  if (t !== 'torcedor') return t;
+  var l = GameState.linhaAtual(), se = l.estacoes.indexOf(BALDEACAO);
+  if (l === LINHAS.vermelha && GameState.idx > se) return 'corintiano';
+  if (l === LINHAS.vermelha && GameState.idx < se) return 'palmeirense';
+  return Math.random() < 0.5 ? 'corintiano' : 'palmeirense';
+}
 
 /* A vida inteira de quem joga é 100; entrar cansado corta, mas nunca
    abaixo da metade: luta perdida de antemão não é dificuldade. */

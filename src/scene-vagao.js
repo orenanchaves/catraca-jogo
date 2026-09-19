@@ -945,7 +945,7 @@ var VagaoScene = new Phaser.Class({
      linha de visão: a regra do jogo é justamente você saber pra onde ele
      está olhando e escolher passar ou não. */
   poeDesafiante: function (carro, x, y, olha, tipo) {
-    tipo = tipo || TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
+    tipo = tipo || sorteiaDesafiante();
     var a = new Ator(this, x, y, DESAFIANTES[tipo].sprite);
     afastaDoPoste(a.sp);
     a.dir = olha; a.anima(0, false);
@@ -1285,7 +1285,7 @@ var VagaoScene = new Phaser.Class({
         eu.comecaBatalha();
       } else if (eu.treino === 'desafio') {
         // um desafiante 100px à frente, olhando pra você: vê na hora
-        var tipo = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
+        var tipo = sorteiaDesafiante();
         var dd = eu.poeDesafiante(carroDe(eu.pl.sp.y), eu.pl.sp.x, eu.pl.sp.y - 100, 'down', tipo);
         eu.tDesafio = 99999;
         eu.comecaAbordagem(dd);
