@@ -170,6 +170,27 @@ var Missoes = {
    entram em fila, uma depois da outra. */
 var AVISOS = [], AVISO_ATIVO = false;
 
+/* ---------- a ordem da missão, em letra grande ----------
+   'Depois de responder a mensagem e voltar pro jogo, aparecer um textão
+   na tela: vá até o estágio na estação tal.' Mora no HUD, que nunca é
+   pausado, e some sozinho em 3,4 s. */
+function bannerObjetivo(texto) {
+  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  if (!hud || !hud.sys || !hud.sys.isActive() || !texto) return;
+  var c = hud.add.container(0, 0).setDepth(4800);
+  var g = hud.add.graphics();
+  var t1 = txtC(hud, GW / 2, GH / 2 - 34, 'AGORA', PAL.amarelo, 8).setScale(ESCALA_TEXTO / 2);
+  var t2 = txtC(hud, GW / 2, GH / 2 - 16, texto, PAL.branco, 8).setMaxWidth(GW - 48);
+  var alt = 40 + Math.round(t2.height);
+  g.fillStyle(0x05050a, 0.86).fillRect(0, GH / 2 - 44, GW, alt);
+  g.fillStyle(0xf2c14e, 1).fillRect(0, GH / 2 - 44, GW, 2).fillRect(0, GH / 2 - 44 + alt - 2, GW, 2);
+  c.add([g, t1, t2]);
+  c.setAlpha(0);
+  hud.tweens.add({ targets: c, alpha: 1, duration: 220, hold: 3000, yoyo: true,
+    onComplete: function () { c.destroy(); } });
+  sfx('ok');
+}
+
 function avisaMissao(titulo, texto) {
   AVISOS.push([titulo, texto]);
   if (!AVISO_ATIVO) proximoAviso();

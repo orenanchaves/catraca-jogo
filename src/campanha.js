@@ -26,10 +26,16 @@ var Campanha = {
   CAMPOS: ['charKey', 'genero', 'dia', 'pernaIdx', 'perna', 'origem', 'destino', 'minutos',
     'dinheiro', 'carisma', 'descanso', 'coracoes', 'valeRestante', 'mochila', 'extrato', 'bateria',
     'atrasos', 'ultimoAtraso', 'pernasFeitas', 'estacoes', 'pontosDaCorrida', 'stats', 'lixo',
-    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia'],
+    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso'],
 
+  /* 'Se você morre antes da missão, perde tudo que ganhou': o XP e os
+     pontos do momento do checkpoint entram no save, e voltar pro
+     checkpoint devolve os dois. Sem isso, cair era de graça — bastava
+     morrer depois de ganhar o duelo. */
   captura: function () {
     var d = { versao: this.VERSAO, quando: Date.now() };
+    d.xp = (typeof leXp === 'function' ? (leXp()[GameState.charKey] || 0) : 0);
+    d.pontos = (typeof lePontos === 'function' ? lePontos() : 0);
     for (var i = 0; i < this.CAMPOS.length; i++) {
       var v = GameState[this.CAMPOS[i]];
       d[this.CAMPOS[i]] = (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
@@ -78,6 +84,11 @@ var Campanha = {
 
   // devolve o GameState pro ponto salvo (depois de um init do mesmo personagem)
   aplica: function (d) {
+    // o XP e os pontos voltam pro que eram no checkpoint
+    if (d.xp !== undefined && typeof leXp === 'function') {
+      try { var x = leXp(); x[d.charKey] = d.xp; localStorage.setItem('metrosp_xp', JSON.stringify(x)); } catch (e) { }
+    }
+    if (d.pontos !== undefined && typeof gravaPontos === 'function' && d.pontos < lePontos()) gravaPontos(d.pontos);
     for (var i = 0; i < this.CAMPOS.length; i++) {
       var k = this.CAMPOS[i];
       if (d[k] !== undefined) GameState[k] = (d[k] && typeof d[k] === 'object') ? JSON.parse(JSON.stringify(d[k])) : d[k];
@@ -116,7 +127,7 @@ function voltaAoCheckpoint(scene) {
   GameState.minutos = (GameState.minutos + CUSTO_CHECKPOINT.minutos) % 1440;
   GameState.minutoSaida = GameState.minutos;
   GameState.checkpointAviso = motivo.split('\n')[0] + '\nVocê voltou pra ' + placaDe(d.origem) + '.\n-R$ ' +
-    multa.toFixed(2).replace('.', ',') + ', -' + CUSTO_CHECKPOINT.carisma + ' de carisma, +30 min.';
+    multa.toFixed(2).replace('.', ',') + ', -' + CUSTO_CHECKPOINT.carisma + ' de carisma, +30 min.\nO que ganhou depois do checkpoint, perdeu.';
   // desliga o que estiver no ar e abre a estação do checkpoint
   var m = scene.scene.manager;
   ['Vagao', 'Baldeacao', 'Desafio', 'Briga', 'Encarada', 'Disputa', 'Zap', 'Pausa', 'Fim'].forEach(function (k) {

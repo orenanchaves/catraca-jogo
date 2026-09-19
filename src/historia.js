@@ -413,6 +413,24 @@ var Historia = {
     var st = this.estado();
     if (st.ativas[id] || st.feitas[id]) return;
     st.ativas[id] = { no: noId, estado: 'ativa', dia: GameState.dia || 1, passo: 0 };
+    // e o que fazer aparece em letra grande quando você guarda o celular
+    GameState.avisoObjetivo = this.ordemDe(HISTORIA[id].nos[noId].missao);
+  },
+  /* A missão dita em uma frase, do jeito que se fala: 'VÁ ATÉ O PARAÍSO
+     ANTES DAS 8:00'. É o que aparece na tela ao sair do ZipZap, pra nunca
+     restar dúvida do que fazer agora. */
+  ordemDe: function (m) {
+    if (!m) return '';
+    var p = (m.passos || [m.objetivo])[0], onde = p.estacao ? placaDe(p.estacao) : '';
+    var t = '';
+    if (p.ev === 'chegou') t = 'VÁ ATÉ ' + onde;
+    else if (p.ev === 'desceu') t = 'DESÇA EM ' + onde;
+    else if (p.ev === 'baldeacao') t = 'PASSE PELA BALDEAÇÃO DA SÉ';
+    else t = 'SIGA O QUE PEDIRAM';
+    if (p.item && ITENS[p.item]) t += ' COM ' + ITENS[p.item].nome;
+    if (p.ate !== undefined) t += ' ANTES DAS ' + Math.floor(p.ate / 60) + ':' + ('0' + (p.ate % 60)).slice(-2);
+    if (p.depois !== undefined) t += ' DEPOIS DAS ' + Math.floor(p.depois / 60) + 'H';
+    return t;
   },
   missaoDe: function (id) {
     var a = this.estado().ativas[id];

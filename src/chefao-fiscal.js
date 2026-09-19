@@ -219,6 +219,7 @@ EstacaoScene.prototype.fimDoChefao = function (ganhou) {
   var c = this.chefao, eu = this;
   c.fase = 'fim';
   Historia.fechaChefao('fiscal', ganhou, 'duelo');
+  if (ganhou && typeof ganhaXp === 'function') ganhaXp(100);      // chefão vale um nível inteiro
   if (!ganhou) {
     var multa = Math.min(20, GameState.dinheiro);
     if (multa > 0) GameState.gastar(multa, 'MULTA DO FISCAL');
@@ -238,6 +239,7 @@ EstacaoScene.prototype.escapouDoFiscal = function () {
   this.tFuga.setVisible(false); if (this.gFuga) this.gFuga.clear();
   this.gFiscal.clear();
   Historia.fechaChefao('fiscal', true, 'fuga');
+  if (typeof ganhaXp === 'function') ganhaXp(100);
   if (typeof avisaMissao === 'function') avisaMissao('CHEFÃO VENCIDO', 'Você escapou do FISCAL.');
 };
 

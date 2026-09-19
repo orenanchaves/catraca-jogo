@@ -491,6 +491,8 @@ var VagaoScene = new Phaser.Class({
        lado não é pra você. Semeia o trem inteiro, não o carro em que
        você entrou. */
     this.chao = new Chao(this, 26);
+    // e o que alguém esqueceu: só brilha de perto (src/achados.js)
+    this.escondeAchado();
     var euC = this;
     // 2,2 por carro (era 0,9): catar moeda é o que se faz andando pelo trem
     this.chao.semeia(quantoCaiNoChao(CARROS * 2.2), function () { return euC.pontoDoChao(); });
@@ -1653,6 +1655,8 @@ var VagaoScene = new Phaser.Class({
     };
     this.flash(patente.nome + ' ENTROU\nOLHANDO TODO MUNDO.');
     sfx('apito');
+    // o ambulante pede pra você segurar a caixa dele (src/achados.js)
+    this.talvezIsopor();
   },
 
   atualizaRonda: function (dt) {
@@ -1686,6 +1690,7 @@ var VagaoScene = new Phaser.Class({
   /* ---------- ele para em voce ---------- */
   revista: function (r) {
     var eu = this;
+    this.revistaIsopor();          // com a caixa do ambulante na mão: sentado passa, em pé ele leva
     /* Sentado voce e passageiro. Nao e truque: e a mesma regra pela qual
        o ambulante escapa do fiscal sentando, e vale aqui pelo mesmo
        motivo — o que ele procura e quem esta em pe sem ter passado. */
@@ -1742,6 +1747,7 @@ var VagaoScene = new Phaser.Class({
   terminaRonda: function () {
     var r = this.ronda;
     if (!r) return;
+    this.fimDaRondaIsopor();
     this.ronda = null;
     var k = this.gente.indexOf(r.a);
     if (k >= 0) this.gente.splice(k, 1);
@@ -3594,11 +3600,12 @@ var VagaoScene = new Phaser.Class({
 
     this.atualizaSono();
     this.atualizaCochilo(dt);
-    if (this.sentadoEm) GameState.addDescanso(0.0018 * dt);
+    // sentado descansa bem mais; segurando a barra, um pouquinho só
+    if (this.sentadoEm) GameState.addDescanso(0.0026 * dt);
     // o chão descansa menos que o banco, e o cochilo em pé menos ainda
     else if (this.noChao) GameState.addDescanso(0.0011 * dt);
     else if (this.cochilando()) GameState.addDescanso(0.0008 * dt);
-    else if (this.segurando) GameState.addDescanso(-0.00041 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
+    else if (this.segurando) GameState.addDescanso(0.0004 * dt);
     // o cansaço é o eixo que nunca satura: a lotação bate no teto no
     // quarto dia, mas ficar em pé cansa cada vez mais
     else GameState.addDescanso(-0.00082 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
@@ -3704,6 +3711,10 @@ var VagaoScene = new Phaser.Class({
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+    this.vigiaAchado(dt);
+    this.regeneraSentado(dt);          // descansar sentado devolve coração
+    var euD = this;
+    dicaDeParado(this, dt, this.andandoAgora || !!this.sentadoEm, function (m) { euD.flash(m); });
     mostraLixoNaMao(this, this.pl);
     ondasDoPregao(this, time);
     vigiaDex(this, time);
@@ -3727,6 +3738,7 @@ var VagaoScene = new Phaser.Class({
 
   contexto: function () {
     var dica = '';
+    if (this.contextoAchado()) { this.pintaRota(); return; }
 
     // tremendo e solto em pé: é a única coisa que importa agora
     if (this.tranco && this.tranco.fase === 'aviso' && !this.segurando && !this.sentadoEm && !this.noChao) {

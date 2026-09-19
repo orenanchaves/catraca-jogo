@@ -278,6 +278,7 @@ var TitleScene = new Phaser.Class({
     if (destravado(k)) return false;
     var r = compraPersonagem(k);
     if (r === 'ok') { sfx('vitoria'); this.flashLoja('DESTRAVOU!'); }
+    else if (r === 'trancado') { sfx('nao'); this.flashLoja('VOCÊ AINDA NÃO CONHECE'); }
     else { sfx('nao'); this.flashLoja('AINDA NÃO'); }
     this.ignoraAct = true;
     this.atualiza();
@@ -300,7 +301,10 @@ var TitleScene = new Phaser.Class({
     this.heroi.setTexture(spriteChar(k, gsel), 0);
     if (aberto) this.heroi.clearTint(); else this.heroi.setTint(0x16161f);
     var gc = this.gCadeado; gc.clear();
-    this.tPreco.setText(aberto ? '' : String(precoDe(k)));
+    /* Quem a história ainda não apresentou não tem preço: tem '???'. Só
+       depois de você cruzar com a pessoa (ou fechar o mês de quem a
+       apresenta) ela entra na loja (CAMPANHA.md). */
+    this.tPreco.setText(aberto ? '' : (apresentado(k) ? String(precoDe(k)) : '???'));
     if (!aberto) {
       var lx = GW / 2, ly = TIT.pes - 70;
       gc.lineStyle(4, 0xf2c14e, 1).strokeRoundedRect(lx - 8, ly - 14, 16, 18, 7);

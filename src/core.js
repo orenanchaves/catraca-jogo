@@ -595,6 +595,8 @@ var ITENS = {
   jornal: { nome: 'JORNAL', preco: 4.00, descanso: 4, min: 1, carisma: 5 },
   /* o que a galeria da Itaquera vende: a lista do que existe de verdade
      nas estações (salgado, capinha e fone, perfume, raspadinha) */
+  // achada no chão, fechada: não se compra em lugar nenhum (src/achados.js)
+  marmita: { nome: 'MARMITA', preco: 0, descanso: 30, min: 6, coracao: true },
   coxinha: { nome: 'COXINHA', preco: 7.00, descanso: 18, min: 2 },
   // o power bank da loja de acessórios: +60% de bateria na hora
   powerbank: { nome: 'POWER BANK', preco: 15.00, descanso: 0, min: 1, bateria: 60 },
@@ -639,7 +641,24 @@ function leDestravados() {
   } catch (e) { }
   return l;
 }
-function destravado(k) { return leDestravados().indexOf(k) >= 0; }
+/* 'Os outros personagens ficam bloqueados pra jogar antes de poder
+   apresentar': só o estudante começa aberto. Cada um abre quando a
+   história apresenta ele — hoje, quando você o encontra no mundo (o
+   SENHOR das compras, o AMBULANTE da caixa); quando o mês de cada um
+   existir, abre ao fechar o mês anterior. */
+function leApresentados() {
+  try { return JSON.parse(localStorage.getItem('metrosp_apresentados') || '[]') || []; } catch (e) { return []; }
+}
+function apresenta(k) {
+  var l = leApresentados();
+  if (l.indexOf(k) >= 0) return false;
+  l.push(k);
+  try { localStorage.setItem('metrosp_apresentados', JSON.stringify(l)); } catch (e) { }
+  if (typeof avisaMissao === 'function') avisaMissao('NOVO PERSONAGEM', nomeDoChar(k) + ' entrou na sua história.');
+  return true;
+}
+function apresentado(k) { return k === 'estudante' || leApresentados().indexOf(k) >= 0; }
+function destravado(k) { return apresentado(k) && leDestravados().indexOf(k) >= 0; }
 function destrava(k) {
   if (destravado(k)) return;
   var l = leDestravados();
@@ -651,6 +670,8 @@ function precoDe(k) { return CHARS[k] && CHARS[k].preco ? CHARS[k].preco : 0; }
 /* compra se der: devolve o que aconteceu, pra tela dizer o porquê */
 function compraPersonagem(k) {
   if (destravado(k)) return 'ja';
+  // personagem que a história ainda não apresentou não está à venda
+  if (!apresentado(k)) return 'trancado';
   var p = lePontos(), c = precoDe(k);
   if (p < c) return 'falta';
   gravaPontos(p - c);
@@ -720,7 +741,7 @@ var GameState = {
       cedidos: 0, disfarces: 0, disfarcesOk: 0, recusas: 0,
       catracasPuladas: 0, catracasPagas: 0, causos: 0, baldeacoes: 0,
       minigamesGanhos: 0, minigamesPerdidos: 0,
-      caidos: 0, achados: 0
+      caidos: 0, achados: 0, terciarias: 0
     };
   },
   linhaAtual: function () { return LINHAS[this.linha]; },
@@ -1009,6 +1030,8 @@ var GameState = {
     var it = ITENS[chave];
     if (!it) return null;
     if (this.dinheiro < it.preco) return 'falta';
+    // bolso cheio não recebe mais nada (src/achados.js)
+    if (typeof cabeNaMochila === 'function' && !cabeNaMochila(chave)) return 'cheio';
     this.gastar(it.preco, it.nome);
     if (!this.mochila) this.mochila = {};
     this.mochila[chave] = (this.mochila[chave] || 0) + 1;
@@ -1085,7 +1108,22 @@ var GameState = {
      primeiro dia inteiro. */
   dificuldade: function () { return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1; },
   addCarisma: function (n) { this.carisma = Phaser.Math.Clamp(this.carisma + n, 0, 100); },
-  addDescanso: function (n) { this.descanso = Phaser.Math.Clamp(this.descanso + n, 0, this.char.descansoMax); },
+  /* 'A barra cheia você usa pra melhorar a sua vida, não fica pra nada':
+     o que passaria do teto do descanso vira coração. Quarenta de sobra
+     valem um. */
+  addDescanso: function (n) {
+    var teto = this.char.descansoMax, novo = this.descanso + n;
+    if (novo > teto) {
+      this.sobraDescanso = (this.sobraDescanso || 0) + (novo - teto);
+      while (this.sobraDescanso >= 40 && this.coracoes < CORACOES_POR_PERNA) {
+        this.sobraDescanso -= 40;
+        this.coracoes++;
+        if (typeof avisaMissao === 'function') avisaMissao('+1 CORAÇÃO', 'Descansou de sobra.');
+      }
+      if (this.coracoes >= CORACOES_POR_PERNA) this.sobraDescanso = 0;
+    }
+    this.descanso = Phaser.Math.Clamp(novo, 0, teto);
+  },
   gastar: function (n, desc) {
     this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100);
     if (n > 0) this.gastoNoDia = (this.gastoNoDia || 0) + n;     // a missão do fim do mês
@@ -3549,11 +3587,12 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
 function leXp() {
   try { return JSON.parse(localStorage.getItem('metrosp_xp') || '{}') || {}; } catch (e) { return {}; }
 }
-/* A curva (skill rpg): os primeiros níveis rápidos e os de cima mais
-   lentos. Do nível n pro n+1 pede 30 + 10n de XP: 40, 50, 60... Uma vitória
-   típica rende uns 20 a 40, então o nível 2 sai no primeiro dia e o 10 lá
-   pela metade do mês. */
-function xpPraSubir(n) { return 30 + 10 * n; }
+/* A curva (skill rpg), refeita em 19/09 ('tá muito fácil de subir o
+   nível'): do nível n pro n+1 pede 60 + 30n de XP: 90, 120, 150... Duelo
+   ganho rende de 8 a 20, e missão rende de 15 (secundária) a 60 (a do
+   dia) e 100 (chefão). Ou seja: nível vem de MISSÃO, e duelo é troco.
+   Antes eram 40 e um duelo bastava. */
+function xpPraSubir(n) { return 60 + 30 * n; }
 function nivelDoXp(x) {
   var n = 1, resto = x || 0;
   while (n < 30 && resto >= xpPraSubir(n)) { resto -= xpPraSubir(n); n++; }
@@ -3610,13 +3649,17 @@ var DEX = [
   // o estágio do estudante (Ato 1): dois pacíficos e o primeiro chefão
   { id: 'sueli', nome: 'SUELI', sprite: 'np_sueli', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'Do RH. Foi quem te chamou pro estágio.' },
   { id: 'marcao', nome: 'MARCÃO', sprite: 'np_marcao', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'O gestor. Repara em quem chega atrasado.' },
-  { id: 'fiscal', nome: 'O FISCAL', sprite: 'np_fiscal', desafio: true, chefao: true, tipo: 'CHEFÃO', onde: 'CATRACA', desc: 'Caça bilhete clonado. Chefão do Ato 1.' }
+  { id: 'fiscal', nome: 'O FISCAL', sprite: 'np_fiscal', desafio: true, chefao: true, tipo: 'CHEFÃO', onde: 'CATRACA', desc: 'Caça bilhete clonado. Chefão do Ato 1.' },
+  /* O crossover: os jogáveis aparecem no mês dos outros como gente do
+     mundo, e depois ganham o mês deles (CAMPANHA.md). */
+  { id: 'j_senhor', nome: 'O SENHOR', sprite: 'ch_senhor_m', tipo: 'JOGÁVEL', onde: 'SAGUÃO', desc: 'Aposentado, de sacola na mão. Um dia você joga com ele.' },
+  { id: 'j_ambulante', nome: 'O AMBULANTE', sprite: 'ch_ambulante_m', tipo: 'JOGÁVEL', onde: 'VAGÃO', desc: 'Vende no vagão e foge do fiscal. Um dia você joga com ele.' }
 ];
 // a cor de cada tipo: a da bolinha e a da borda da carta
 var COR_TIPO = {
   CHATO: 0xf2c14e, TORCIDA: 0x00e676, GUARDA: 0x3a7fd0, VENDEDOR: 0xe8a33c,
   RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0, COSPLAY: 0xf08ab8,
-  'ESTÁGIO': 0xd0719f, 'CHEFÃO': 0xec7000
+  'ESTÁGIO': 0xd0719f, 'CHEFÃO': 0xec7000, 'JOGÁVEL': 0x00e676
 };
 /* Onde cada um costuma aparecer ('coloca em qual estação, pra toda a
    METRODEX'): é o que o jogo faz de verdade, e não enfeite. */
@@ -3629,7 +3672,8 @@ var DEX_APARECE = {
   pedinte: 'SAGUÃO DE TODAS', atendente: 'BILHETERIA DE TODAS', gestante: 'BANCO DO VAGÃO', idoso: 'BANCO DO VAGÃO',
   cosLaranja: 'DA ANA ROSA ATÉ TIRADENTES', cosVingador: 'DA ANA ROSA ATÉ TIRADENTES', cosNuvem: 'DA ANA ROSA ATÉ TIRADENTES',
   cosRosa: 'DA ANA ROSA ATÉ TIRADENTES', cosColegial: 'DA ANA ROSA ATÉ TIRADENTES',
-  sueli: 'SAÍDA DO PARAÍSO', marcao: 'SAÍDA DO PARAÍSO', fiscal: 'PARAÍSO, E NA SUA CATRACA'
+  sueli: 'SAÍDA DO PARAÍSO', marcao: 'SAÍDA DO PARAÍSO', fiscal: 'PARAÍSO, E NA SUA CATRACA',
+  j_senhor: 'SAGUÃO DE QUALQUER ESTAÇÃO', j_ambulante: 'VAGÃO, NA RONDA DO GUARDA'
 };
 for (var dxa = 0; dxa < DEX.length; dxa++) DEX[dxa].aparece = DEX_APARECE[DEX[dxa].id] || DEX[dxa].onde;
 var DEX_POR_SPRITE = {};
@@ -4742,6 +4786,17 @@ var CAIDOS = {
     peso: 12, nome: 'BILHETE ÚNICO', raio: 7,
     grana: [0, 0], pontos: 3,
     cor: 0x4d9bf0, corSom: 0x1d4c86, corLuz: 0xbfe2ff
+  },
+  /* 'Achar comida no chão também': é arcade, e no metrô isso existe. Só
+     o que está FECHADO: a marmita de quem esqueceu a janta e o pacote que
+     caiu da sacola. Vai pra mochila, e come quando quiser. */
+  marmita: {
+    peso: 8, nome: 'MARMITA', raio: 7, grana: [0, 0], pontos: 0, item: 'marmita',
+    cor: 0xd8d8e8, corSom: 0x7a7a90, corLuz: 0xffffff
+  },
+  pacote: {
+    peso: 10, nome: 'PACOTE FECHADO', raio: 7, grana: [0, 0], pontos: 0, item: 'pururuca',
+    cor: 0xf2a93b, corSom: 0x9a6a18, corLuz: 0xffe0a0
   }
 };
 
@@ -4779,6 +4834,18 @@ function texturasDoChao(scene) {
           g.fillStyle(c.cor, 1).fillRect(3, 4, 14, 9);
           g.fillStyle(c.corLuz, 1).fillRect(4, 5, 12, 2);
           g.fillStyle(c.corSom, 1).fillRect(8, 7, 4, 4);
+        } else if (chave === 'marmita') {
+          // a marmita de alumínio, com a tampa e o elástico
+          g.fillStyle(c.corSom, 1).fillRect(3, 6, 14, 9);
+          g.fillStyle(c.cor, 1).fillRect(3, 5, 14, 8);
+          g.fillStyle(c.corLuz, 1).fillRect(4, 6, 12, 2);
+          g.fillStyle(0xe8362c, 1).fillRect(9, 5, 2, 8);
+        } else if (chave === 'pacote') {
+          // o pacote fechado, com as orelhas soldadas
+          g.fillStyle(c.corSom, 1).fillRect(4, 6, 12, 9);
+          g.fillStyle(c.cor, 1).fillRect(4, 5, 12, 8);
+          g.fillStyle(c.corLuz, 1).fillRect(5, 6, 10, 2);
+          g.fillStyle(c.corSom, 1).fillRect(2, 7, 2, 4).fillRect(16, 7, 2, 4);
         } else {
           g.fillStyle(c.corSom, 1).fillRect(4, 4, 12, 11);
           g.fillStyle(c.cor, 1).fillRect(4, 3, 12, 11);
@@ -4872,11 +4939,19 @@ Chao.prototype.pega = function (i) {
     : 0;
   if (grana > 0) { GameState.ganhar(grana, 'ACHOU NO CHÃO'); Missoes.conta('moedaDoChao'); }
   if (c.pontos > 0) gravaPontos(lePontos() + c.pontos);
+  /* comida fechada achada no chão: vai pra mochila, se couber; com o
+     compartimento cheio ela fica onde está (src/achados.js) */
+  if (c.item) {
+    if (typeof cabeNaMochila === 'function' && !cabeNaMochila(c.item)) return null;
+    if (!GameState.mochila) GameState.mochila = {};
+    GameState.mochila[c.item] = (GameState.mochila[c.item] || 0) + 1;
+  }
   GameState.stats.caidos = (GameState.stats.caidos || 0) + 1;
 
-  var rotulo = c.pontos > 0
-    ? '+' + c.pontos + ' PONTOS'
-    : '+' + grana.toFixed(2).replace('.', ',');
+  var rotulo = c.item ? ITENS[c.item].nome + ' NA MOCHILA'
+    : (c.pontos > 0
+      ? '+' + c.pontos + ' PONTOS'
+      : '+' + grana.toFixed(2).replace('.', ','));
   var o = txtC(this.scene, it.sp.x, it.base - 44, rotulo,
     c.pontos > 0 ? PAL.verde : PAL.amarelo, 8).setDepth(420);
   o.setScrollFactor(it.sp.scrollFactorX, it.sp.scrollFactorY);
@@ -5275,6 +5350,14 @@ MenuComida.prototype.compra = function () {
   var it = ITENS[this.itens[this.sel]];
   var r = GameState.guarda(this.itens[this.sel]);
   if (r === 'falta') { sfx('nao'); this.redesenha(); return; }
+  if (r === 'cheio') {
+    var scC = this.scene, aoC = this.aoFechar;
+    sfx('nao'); this.fecha();
+    fala(scC, 'A MOCHILA TÁ CHEIA.\nUSE OU LARGUE ALGO ANTES.', []);
+    scC.time.delayedCall(1700, function () { if (scC.dialog) scC.dialog.fecha(); });
+    if (aoC) aoC();
+    return;
+  }
   sfx('moeda');
   if (this.scene._deAmbulante) Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
   var sc = this.scene, ao = this.aoFechar;

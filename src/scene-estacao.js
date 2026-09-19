@@ -133,7 +133,10 @@ function espelhaX(x) { return DUPLA_IMG_X + GW - x; }
    ali, foi pro lado dela no mezanino e subiu um pouco na plataforma. Não
    tem na Sé (central, sem lado de parede) nem no treino (saguão estreito). */
 var ESCADA_FIXA = false;
-var ESCF_X0 = ESC_X1 + 10, ESCF_X1 = ESCF_X0 + 36;     // 218..254
+/* Dupla, como a rolante ('senão fica ruim de andar nela'): duas faixas de
+   32 com o corrimão no meio, 218..282. O elevador do mezanino foi pra
+   290 pra caber. */
+var ESCF_X0 = ESC_X1 + 10, ESCF_X1 = ESCF_X0 + 64;     // 218..282
 function naEscadaFixa(x) {
   if (!ESCADA_FIXA) return false;
   if (x > ESCF_X0 + 4 && x < ESCF_X1 - 4) return true;
@@ -387,7 +390,7 @@ var EstacaoScene = new Phaser.Class({
     var nEst = GameState.linhaAtual().estacoes.length;
     DUPLA = !CENTRAL && !this.itq && !this.treino && GameState.idx > 0 && GameState.idx < nEst - 1;
     // o mezanino cresce pra esquerda, pra caber a segunda escada ('mexer no mezanino pro lado')
-    MEZ.x0 = DUPLA ? -300 : -120;
+    MEZ.x0 = DUPLA ? -344 : -120;
     ESCADA_FIXA = this.mez && !CENTRAL;
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
@@ -528,6 +531,7 @@ var EstacaoScene = new Phaser.Class({
     // a campanha (src/chefao-fiscal.js): o vulto do fiscal nos dias 3 e 4, e o chefão no dia 5
     this.montaVulto();
     this.montaChefao();
+    this.montaSenhorzinho();          // as compras do senhorzinho (src/achados.js)
 
     /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
        baldeação ou desceu na estação errada já está lá em cima. */
@@ -1155,7 +1159,7 @@ var EstacaoScene = new Phaser.Class({
      último degrau. yMundo é onde o y0 cai no mundo, pra os degraus da
      textura e os do mezanino emendarem no mesmo passo. */
   pintaEscadaFixa: function (g, x0, y0, y1, yMundo, topo, pe) {
-    var w = ESCF_X1 - ESCF_X0, fase = ((yMundo - ESC_Y) % 8 + 8) % 8;
+    var w = ESCF_X1 - ESCF_X0, fase = ((yMundo - ESC_Y) % 8 + 8) % 8, meio = x0 + w / 2;
     g.fillStyle(0x22252f, 1).fillRect(x0, y0, w, y1 - y0);
     for (var y = y0 - fase; y < y1; y += 8) {
       var ya = Math.max(y, y0), yb = Math.min(y + 8, y1);
@@ -1166,9 +1170,10 @@ var EstacaoScene = new Phaser.Class({
     }
     if (topo) g.fillStyle(num(PAL.amarelo), 1).fillRect(x0 + 5, y0, w - 10, 3);
     if (pe) g.fillStyle(num(PAL.amarelo), 1).fillRect(x0 + 5, y1 - 3, w - 10, 3);
-    for (var d = 0; d < 2; d++) {
-      var hx = d ? x0 + w - 5 : x0;
-      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 5, y1 - y0);
+    // corrimão dos dois lados e o do meio, que é o que faz serem duas faixas
+    for (var d = 0; d < 3; d++) {
+      var hx = d === 0 ? x0 : (d === 1 ? meio - 2 : x0 + w - 5);
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, d === 1 ? 4 : 5, y1 - y0);
       g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx + 1, y0, 1, y1 - y0);
     }
   },
@@ -2025,6 +2030,14 @@ var EstacaoScene = new Phaser.Class({
      graça. */
   abreAchados: function () {
     var eu = this;
+    /* O guichê também RECEBE: o que você achou no trem e é de alguém
+       (src/achados.js). Entregar é terciária. */
+    var entregas = this.opcoesDeEntrega();
+    if (entregas.length) {
+      entregas.push({ label: 'Deixa pra lá', cb: function () { } });
+      fala(this, '"Perdeu alguma coisa?"\n\nOu achou?', entregas);
+      return;
+    }
     if (lePontos() < ACHADOS_PRECO) {
       sfx('nao');
       fala(this, '"Só com ' + ACHADOS_PRECO + ' pontos, meu querido."\n\nVocê tem ' + lePontos() + '.', []);
@@ -3181,11 +3194,16 @@ var EstacaoScene = new Phaser.Class({
     this.andaSaguao(dt);
     this.andaFila(dt);
     this.andaAmbulante(dt);
+    this.atualizaSenhorzinho(dt);
     this.vigiaDuelos();
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
     // na escada fixa se sobe no próprio passo, e degrau cansa
     if (this.pl.sp.y > ESC_Y && this.pl.sp.y < ESC_BOCA && naEscadaFixa(this.pl.sp.x)) vel *= 0.7;
+    /* de mão cheia ninguém corre. `maosCheias` e não `carregando`: esse
+       nome já é do celular na tomada (estacao-itaquera.js), e o mesmo nome
+       zerava as sacolas a cada passo. */
+    if (this.maosCheias) vel *= 0.62;
     var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
     var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
     var mv = (dx !== 0 || dy !== 0);
@@ -3202,6 +3220,11 @@ var EstacaoScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    var euD = this;
+    dicaDeParado(this, dt, mv, function (m) {
+      euD.alerta.setText(m);
+      euD.time.delayedCall(2600, function () { if (euD.alerta) euD.alerta.setText(''); });
+    });
     this.olhaAFrente(dt);
     this.rodaEscada(dt, mv);
     var eu = this;
@@ -3240,6 +3263,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.contextoLixo()) return;
     if (this.contextoTomada()) return;
     if (this.contextoElevador()) return;
+    if (this.contextoSenhorzinho()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {

@@ -650,7 +650,9 @@ var DesafioScene = new Phaser.Class({
     if (pts) fim.push({ msg: '+' + pts + ' PONTOS', cor: PAL.amarelo });
     // o XP: mais por quem é mais forte, quase nada por quem é bem mais fraco
     if (!GameState.treino) {
-      var xp = Math.max(2, 8 + 3 * this.nvEle + 4 * (this.nvEle - this.nvVc));
+      // o troco do duelo: quem sobe de nível é quem cumpre missão
+      var xp = Math.max(1, 4 + 1.5 * this.nvEle + 2 * (this.nvEle - this.nvVc));
+      xp = Math.round(xp);
       var subiu = ganhaXp(xp);
       fim.push({ msg: '+' + xp + ' XP', cor: PAL.amarelo });
       if (subiu) fim.push({ msg: 'SUBIU PRO NÍVEL ' + subiu + '!', cor: PAL.verde, fx: function () { tocaJingle('vitoria'); } });
@@ -666,7 +668,7 @@ var DesafioScene = new Phaser.Class({
     GameState.stats.causos++;
     sfx('derrota');
     var msgs = [{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: this.dados.ondeViu || 'O VAGÃO INTEIRO VIU.' }];
-    if (!GameState.treino) { ganhaXp(2); msgs.push({ msg: '+2 XP. DA PRÓXIMA VOCÊ SABE.', cor: PAL.cinza }); }
+    if (!GameState.treino) { ganhaXp(1); msgs.push({ msg: '+1 XP. DA PRÓXIMA VOCÊ SABE.', cor: PAL.cinza }); }
     /* perder o desafio custa um coração, como perder qualquer outro
        minigame; no treino não, que treino não vale nada */
     if (!GameState.treino) {

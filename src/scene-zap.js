@@ -389,6 +389,14 @@ var ZapScene = new Phaser.Class({
     });
     this.zonaFicha = this.add.zone(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.status).setOrigin(0, 0);
     this.zonaFicha.on('pointerdown', function () { self.fechaFicha(); });
+    /* os quatro bolsos da mochila: cada parte do desenho é uma zona */
+    this.bolsoSel = 'grande';
+    this.zonasBolso = {};
+    ORDEM_BOLSOS.forEach(function (bb) {
+      var z = self.add.zone(0, 0, 10, 10).setOrigin(0, 0);
+      z.on('pointerdown', function () { if (self.modo === 'app' && self.aba === 4) self.abreBolso(bb); });
+      self.zonasBolso[bb] = z;
+    });
     this.figMochila = []; this.zonasMochila = [];
     for (i = 0; i < 6; i++) {
       this.figMochila.push(this.add.image(ZAP.tx0 + 24, ZAP.topo + i * 56 + 26, '__DEFAULT').setDepth(2403).setVisible(false).setScale(1.2));
@@ -501,6 +509,12 @@ var ZapScene = new Phaser.Class({
         else if (c === 'KeyS' || c === 'ArrowDown') dd = 2;
         if (dd) { self.sel = Phaser.Math.Clamp(self.sel + dd, 0, Math.max(0, self.dexLista().length - 1)); sfx('catraca'); self.pinta(); return; }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') { self.abreFicha(self.sel); return; }
+      }
+      if (self.aba === 4 && (c === 'KeyA' || c === 'ArrowLeft' || c === 'KeyD' || c === 'ArrowRight')) {
+        var dbo = (c === 'KeyA' || c === 'ArrowLeft') ? -1 : 1;
+        var io = ORDEM_BOLSOS.indexOf(self.bolsoSel || 'grande');
+        self.abreBolso(ORDEM_BOLSOS[(io + dbo + ORDEM_BOLSOS.length) % ORDEM_BOLSOS.length]);
+        return;
       }
       if (c === 'KeyA' || c === 'ArrowLeft') { self.trocaAba(-1); return; }
       if (c === 'KeyD' || c === 'ArrowRight') { self.trocaAba(1); return; }
@@ -618,7 +632,7 @@ var ZapScene = new Phaser.Class({
       this.pinta();
       return;
     }
-    var n = this.aba === 4 ? this.itensDaMochila().length : (this.aba === 5 ? DEX.length : this.caixaZap().length);
+    var n = this.aba === 4 ? this.listaDoBolso().length : (this.aba === 5 ? DEX.length : this.caixaZap().length);
     if ((this.aba !== 0 && this.aba !== 4 && this.aba !== 5) || !n) return;
     this.sel = (this.sel + d + n) % n;
     sfx('catraca');
@@ -704,6 +718,7 @@ var ZapScene = new Phaser.Class({
     this.zonaVolta.disableInteractive();
     for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false).setCrop(); }
     this.zonaCat.disableInteractive(); this.zonaAbasCat.disableInteractive();
+    if (this.zonasBolso) for (var zb in this.zonasBolso) this.zonasBolso[zb].disableInteractive();
     for (i = 0; i < this.cartasDex.length; i++) {
       var cc = this.cartasDex[i];
       cc.num.setVisible(false); cc.nome.setVisible(false); cc.r1.setVisible(false); cc.v1.setVisible(false);
@@ -1748,52 +1763,123 @@ var ZapScene = new Phaser.Class({
     return false;
   },
 
-  /* ---------- o app da mochila ----------
-     Uma linha por coisa guardada: a figurinha, o nome com a quantidade e
-     o que ela faz. Tocar usa. */
+  /* ---------- o app da MOCHILA ----------
+     'A mochila em si, você clica em várias partes dela pra abrir. Tipo
+     uma mochila meio 3D, um falso 3D, em 16 bits.' Então ela é desenhada
+     de três quartos: o corpo, a lateral com profundidade, a alça, o
+     bolsinho da frente, o bolso da garrafa e a divisória do notebook.
+     Toca num bolso, ele abre, e embaixo vem o que está dentro dele.
+
+     Cada bolso tem limite (BOLSOS, em src/achados.js), e é isso que faz
+     guardar virar escolha. O que se come fica no compartimento grande (a
+     garrafa, na lateral); o que se acha, no bolsinho da frente. */
   itensDaMochila: function () {
     var m = GameState.mochila || {}, out = [];
     for (var k in m) if (m.hasOwnProperty(k) && m[k] > 0 && ITENS[k]) out.push(k);
     return out;
   },
+  // o que está no bolso aberto, na ordem em que aparece na lista
+  listaDoBolso: function () {
+    return conteudoDoBolso(this.bolsoSel || 'grande');
+  },
   pintaMochila: function (g) {
-    var itens = this.itensDaMochila(), i;
-    if (!itens.length) {
-      this.linha(0, ZAP.topo + 40, '  MOCHILA VAZIA.', PAL.cinzaEsc);
-      this.linha(1, ZAP.topo + 70, '  COMPRE NAS LOJAS', PAL.cinzaEsc);
-      this.tRodape.setText('');
+    var x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0, i;
+    var b = this.bolsoSel || (this.bolsoSel = 'grande');
+    g.fillStyle(0x14141c, 1).fillRect(x0, ZAP.topo - 8, W, ZAP.abas - ZAP.topo + 8);
+    this.desenhaMochila(g, b);
+    // o rótulo do bolso aberto, com o quanto cabe
+    var oc = ocupadoNoBolso(b);
+    // meia escala: 'COMPARTIMENTO GRANDE' em corpo cheio dá 240px e entra no contador
+    this.linhas[0].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 8, 302).setText(BOLSOS[b].nome).setColor(PAL.amarelo);
+    this.linhas[1].setVisible(true).setOrigin(1, 0).setPosition(ZAP.tx1 - 8, 302)
+      .setScale(ESCALA_TEXTO / 2).setText(oc + ' DE ' + BOLSOS[b].cabe).setColor(oc >= BOLSOS[b].cabe ? PAL.vermelho : PAL.cinza);
+    g.fillStyle(0x2a2a3a, 1).fillRect(x0 + 8, 322, W - 16, 1);
+
+    var lista = this.listaDoBolso();
+    if (!lista.length) {
+      this.linhas[2].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 10, 336)
+        .setText(b === 'notebook' ? 'VAZIO. UM DIA ALGUÉM TE PEDE PRA LEVAR UM.' : 'VAZIO.').setColor(PAL.cinzaEsc);
+      this.tRodape.setText('TOQUE NA MOCHILA PRA ABRIR OUTRO BOLSO');
       return;
     }
-    if (this.sel >= itens.length) this.sel = 0;
-    for (i = 0; i < itens.length && i < 6; i++) {
-      var k = itens[i], it = ITENS[k], y = ZAP.topo + i * 56, sel = (i === this.sel);
-      g.fillStyle(sel ? 0x2a2014 : 0x16161f, 1).fillRect(ZAP.tx0, y, ZAP.tx1 - ZAP.tx0, 52);
-      if (sel) g.lineStyle(2, 0xf2c14e, 0.9).strokeRect(ZAP.tx0 + 1, y + 1, ZAP.tx1 - ZAP.tx0 - 2, 50);
-      g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0 + 8, y + 10, 32, 32);
-      this.figMochila[i].setTexture(texturaItem(this, k)).clearTint().setScale(1.2)
-        .setPosition(ZAP.tx0 + 24, y + 26).setVisible(true);
-      this.zonasMochila[i].setInteractive();
-      var ef = [];
-      if (it.descanso) ef.push('+' + it.descanso + ' DESC');
-      if (it.carisma) ef.push('+' + it.carisma + ' CAR');
-      if (it.coracao) ef.push('+1 CORAÇÃO');
-      if (it.bateria) ef.push('+' + it.bateria + '% BATERIA');
-      if (it.sorte) ef.push('RASPE PRA VER');
-      this.linhas[i * 2].setVisible(true).setPosition(ZAP.tx0 + 50, y + 6)
-        .setText(it.nome.length > 13 ? it.nome.slice(0, 12) + '.' : it.nome).setColor(PAL.branco);
-      // a linha de baixo cabe 18 letras (218px a 12 cada): se os efeitos não cabem, vai o primeiro
-      var linhaEf = 'x' + GameState.mochila[k] + '  ' + ef.join(' ');
-      if (linhaEf.length > 18) linhaEf = 'x' + GameState.mochila[k] + '  ' + ef[0];
-      this.linhas[i * 2 + 1].setVisible(true).setPosition(ZAP.tx0 + 50, y + 28)
-        .setText(linhaEf).setColor(PAL.cinza);
+    if (this.sel >= lista.length) this.sel = 0;
+    for (i = 0; i < lista.length && i < 6; i++) {
+      var c = lista[i], sel = (i === this.sel), y = 330 + i * 26;
+      var it = c.guardado ? GUARDADOS[c.chave] : ITENS[c.chave];
+      if (sel) g.fillStyle(0x2a2418, 1).fillRect(x0 + 6, y - 3, W - 12, 24);
+      g.fillStyle(c.guardado ? 0xf2c14e : 0x7fd6a0, 1).fillRect(x0 + 10, y + 4, 6, 6);
+      this.linhas[2 + i * 2].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 24, y)
+        .setText(it.nome + (c.n > 1 ? '  x' + c.n : '')).setColor(sel ? PAL.branco : PAL.cinza);
+      var dir = c.guardado ? 'ACHADO' : efeitoCurto(c.chave);
+      this.linhas[3 + i * 2].setVisible(true).setOrigin(1, 0).setScale(ESCALA_TEXTO / 2)
+        .setPosition(ZAP.tx1 - 10, y).setText(dir).setColor(PAL.cinzaEsc);
+      this.zonasMochila[i].setPosition(x0 + 6, y - 4).setSize(W - 12, 26).setInteractive();
     }
-    this.tRodape.setText(nomeAgir() + ': USAR');
+    var cs = lista[this.sel];
+    if (cs.guardado) this.tRodape.setText(GUARDADOS[cs.chave].dica);
+    else this.tRodape.setText(nomeAgir() + ': USAR');
+  },
+
+  /* O desenho da mochila, de três quartos. Cada parte é uma zona de
+     toque (montaBolsos, no create); a aberta ganha o contorno amarelo. */
+  desenhaMochila: function (g, b) {
+    var cx = GW / 2, topo = 108;
+    var corpo = { x: cx - 62, y: topo + 26, w: 124, h: 132 };
+    var prof = 18;
+    // a divisória do notebook, atrás de tudo, espiando por cima
+    var nb = (b === 'notebook');
+    g.fillStyle(nb ? 0x3a4a5e : 0x2a3240, 1).fillRoundedRect(corpo.x + 10, corpo.y - 16, corpo.w - 4, 30, 5);
+    g.fillStyle(0x1c2430, 1).fillRect(corpo.x + 16, corpo.y - 10, corpo.w - 16, 4);
+    // a alça de cima
+    g.lineStyle(6, 0x1a2a20, 1).strokeCircle(cx, corpo.y - 6, 14);
+    // a lateral (a profundidade do falso 3D)
+    g.fillStyle(0x1a3327, 1).fillPoints([
+      { x: corpo.x + corpo.w, y: corpo.y }, { x: corpo.x + corpo.w + prof, y: corpo.y - prof / 2 },
+      { x: corpo.x + corpo.w + prof, y: corpo.y + corpo.h - prof / 2 }, { x: corpo.x + corpo.w, y: corpo.y + corpo.h }
+    ], true);
+    // o corpo, que é o compartimento grande
+    g.fillStyle(0x2f7d5e, 1).fillRoundedRect(corpo.x, corpo.y, corpo.w, corpo.h, 12);
+    g.fillStyle(0x3fa07d, 1).fillRoundedRect(corpo.x + 4, corpo.y + 4, corpo.w - 8, 22, 8);
+    // o zíper do compartimento grande
+    g.fillStyle(0xc8cad4, 1).fillRect(corpo.x + 8, corpo.y + 30, corpo.w - 16, 3);
+    g.fillStyle(0xf2f0ff, 1).fillRect(corpo.x + corpo.w - 26, corpo.y + 27, 5, 9);
+    // o bolsinho da frente
+    var bf = { x: cx - 44, y: corpo.y + 62, w: 88, h: 50 };
+    g.fillStyle(0x27694f, 1).fillRoundedRect(bf.x, bf.y, bf.w, bf.h, 8);
+    g.fillStyle(0xc8cad4, 1).fillRect(bf.x + 6, bf.y + 10, bf.w - 12, 3);
+    g.fillStyle(0xf2f0ff, 1).fillRect(bf.x + bf.w - 22, bf.y + 7, 5, 9);
+    // o bolso da garrafa, na lateral esquerda
+    var bl = { x: corpo.x - 16, y: corpo.y + 54, w: 22, h: 54 };
+    g.fillStyle(0x24503d, 1).fillRoundedRect(bl.x, bl.y, bl.w, bl.h, 8);
+    for (var m = 0; m < 4; m++) g.fillStyle(0x1a3327, 1).fillRect(bl.x + 2, bl.y + 10 + m * 10, bl.w - 4, 2);
+    if ((GameState.mochila || {}).agua > 0) {
+      g.fillStyle(0x4fb8ff, 0.9).fillRoundedRect(bl.x + 5, bl.y - 12, 12, 30, 4);
+      g.fillStyle(0xd8e8ff, 1).fillRect(bl.x + 8, bl.y - 16, 6, 5);
+    }
+    // as alças de baixo
+    g.fillStyle(0x1a2a20, 1).fillRect(corpo.x + 18, corpo.y + corpo.h - 4, 12, 10)
+      .fillRect(corpo.x + corpo.w - 30, corpo.y + corpo.h - 4, 12, 10);
+    // o que está aberto
+    var quadros = { grande: [corpo.x, corpo.y, corpo.w, 56], frente: [bf.x, bf.y, bf.w, bf.h],
+      lateral: [bl.x, bl.y - 14, bl.w, bl.h + 14], notebook: [corpo.x + 10, corpo.y - 16, corpo.w - 4, 30] };
+    var q = quadros[b];
+    g.lineStyle(2, 0xf2c14e, 1).strokeRoundedRect(q[0] - 2, q[1] - 2, q[2] + 4, q[3] + 4, 8);
+    this.bolsoQuadros = quadros;
+    for (var k in quadros) this.zonasBolso[k].setPosition(quadros[k][0] - 4, quadros[k][1] - 4).setSize(quadros[k][2] + 8, quadros[k][3] + 8).setInteractive();
+  },
+  abreBolso: function (b) {
+    if (this.bolsoSel === b) return;
+    this.bolsoSel = b; this.sel = 0;
+    sfx('catraca');
+    this.pinta();
   },
   usaItem: function (idx) {
-    var itens = this.itensDaMochila();
-    if (idx >= itens.length) return;
-    var k = itens[idx], it = ITENS[k];
+    var lista = this.listaDoBolso();
+    if (idx >= lista.length) return;
+    var c = lista[idx];
     this.sel = idx;
+    if (c.guardado) { sfx('catraca'); this.pinta(); this.tRodape.setText(GUARDADOS[c.chave].dica); return; }
+    var k = c.chave, it = ITENS[k];
     var r = GameState.usaDaMochila(k);
     var msg = 'USOU: ' + it.nome;
     if (r === 'coracao') msg = '+1 CORAÇÃO';
@@ -2102,6 +2188,8 @@ var ZapScene = new Phaser.Class({
           var c = self.scene.get(k);
           if (c && c._celular && c.pl) celularNoMundo(c, c.pl, false);
         });
+        // guardou o celular com missão nova: a ordem aparece em letra grande
+        if (GameState.avisoObjetivo) { bannerObjetivo(GameState.avisoObjetivo); GameState.avisoObjetivo = null; }
         self.scene.stop('Zap');
       }
     });
