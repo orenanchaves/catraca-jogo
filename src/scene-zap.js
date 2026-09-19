@@ -57,6 +57,31 @@ var ZAP_BOTAO = { dx: 8, dy: -92, alt: 30, altNota: 40, passo: 44, texto: 18 };
    aqui porque o recorte do nome de cada carta é feito uma vez só, no create. */
 var DEXC = { W: 128, H: 156, VAO: 8 };
 DEXC.x0 = 0; DEXC.y0 = 0;   // acertados logo abaixo do ZAP
+/* ---------- o mapa do celular, fiel ao do Metrô ----------
+   'Tentar mais fiel a esse mapa, focando na azul e na vermelha.' A Azul
+   em pé, com todas as estações a 14px; a Vermelha sai da Barra Funda na
+   altura da Luz, desce inclinada pela Santa Cecília até a República,
+   cruza a Sé, e depois do Pedro II sobe de novo até o Brás, de onde
+   corre reta até Itaquera, como no mapa da parede do metrô. */
+var MAPA_CEL = { BX: 150, Y0: 144, PASSO: 14 };
+MAPA_CEL.yDe = function (i) { return MAPA_CEL.Y0 + (LINHAS.azul.estacoes.length - 1 - i) * MAPA_CEL.PASSO; };
+(function () {
+  var M = MAPA_CEL, yL = M.yDe(LINHAS.azul.estacoes.indexOf('LUZ')), yS = M.yDe(LINHAS.azul.estacoes.indexOf('SÉ'));
+  M.rota = [[40, yL], [70, yL], [98, yS], [200, yS], [218, yL], [286, yL]];
+  M.verm = {
+    'BARRA FUNDA': [40, yL], 'MAL. DEODORO': [62, yL], 'STA. CECÍLIA': [84, yL + 14],
+    'REPÚBLICA': [106, yS], 'ANHANGABAÚ': [128, yS], 'SÉ': [150, yS], 'PEDRO II': [174, yS]
+  };
+  var leste = LINHAS.vermelha.estacoes.slice(LINHAS.vermelha.estacoes.indexOf('BRÁS'));
+  for (var i = 0; i < leste.length; i++) M.verm[leste[i]] = [Math.round(218 + i * 6.8), yL];
+})();
+MAPA_CEL.pos = function (linha, nome) {
+  if (linha === 'vermelha' && MAPA_CEL.verm[nome]) return { x: MAPA_CEL.verm[nome][0], y: MAPA_CEL.verm[nome][1] };
+  var i = LINHAS.azul.estacoes.indexOf(nome);
+  if (i < 0) return MAPA_CEL.pos('vermelha', nome);
+  return { x: MAPA_CEL.BX, y: MAPA_CEL.yDe(i) };
+};
+
 var ZAP = {
   x0: 16, x1: 304, y0: 36, y1: 552,   // moldura
   tx0: 26, tx1: 294,                  // tela útil
@@ -226,6 +251,10 @@ var ZapScene = new Phaser.Class({
       }); })(cd);
       this.cartasDex.push(ct);
     }
+    this.rotMapa = [];
+    for (var rm = 0; rm < 44; rm++) this.rotMapa.push(txt(this, 0, 0, '', PAL.cinza, 8).setDepth(2403).setVisible(false));
+    this.zonaMapa = this.add.zone(ZAP.tx0, ZAP.topo + 36, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.topo - 60).setOrigin(0, 0);
+    this.zonaMapa.on('pointerdown', function (pt) { self.tocaMapa(pt.x, pt.y + self.cameras.main.scrollY); });
     this.zonaFicha = this.add.zone(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.status).setOrigin(0, 0);
     this.zonaFicha.on('pointerdown', function () { self.fechaFicha(); });
     this.figMochila = []; this.zonasMochila = [];
@@ -509,6 +538,8 @@ var ZapScene = new Phaser.Class({
       cc._rola = null;
     }
     this.zonaFicha.disableInteractive();
+    this.zonaMapa.disableInteractive();
+    for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0);
     if (this.fichaFig) this.fichaFig.setVisible(false);
     var noInicio = (this.modo !== 'app');
     for (i = 0; i < this.zonas.length; i++) {
@@ -670,19 +701,29 @@ var ZapScene = new Phaser.Class({
     // o risco de "home" no pé da tela
     g.fillStyle(0xd8d8e8, 0.85).fillRoundedRect(GW / 2 - 34, sy1 - 9, 68, 4, 2);
 
-    // as mãos: palma embaixo e os dedos abraçando as laterais do aparelho
-    var pele = 0xc98d63, som = 0xa8744e, lado, dd;
-    for (lado = 0; lado < 2; lado++) {
-      var px = lado ? GW - 44 : 0;
-      g.fillStyle(0x2a1e18, 1).fillRect(px, GH - 34, 44, 34);
-      g.fillStyle(pele, 1).fillRect(px + 4, GH - 30, 36, 30);
-      g.fillStyle(som, 1).fillRect(px + 4, GH - 30, 36, 3);
-      for (dd = 0; dd < 3; dd++) {
-        var fy = ZAP.y1 - 150 + dd * 22;
-        var fx = lado ? ZAP.x1 - 6 : ZAP.x0 - 8;
-        g.fillStyle(som, 1).fillRoundedRect(fx, fy, 14, 16, 5);
-        g.fillStyle(pele, 1).fillRoundedRect(fx + 1, fy, 12, 14, 5);
-      }
+    /* A mão, como na foto ('a pessoa segura o celular assim'): uma mão
+       só, a esquerda, e só o que aparece dela. A palma fica atrás do
+       canto de baixo e sai da tela pela esquerda; o polegar, curto, sobe
+       inclinado e deita a ponta na moldura esquerda, na altura do meio;
+       do outro lado aparecem só as pontas dos quatro dedos, que dão a
+       volta por trás. Nada entra na tela. */
+    var pele = 0xc98d63, som = 0xa8744e, unha = 0xe8b894, dd, X = ZAP.x0, Y = ZAP.y1;
+    // a palma, atrás do canto de baixo, e a manga saindo pela esquerda
+    g.fillStyle(0x1c1c26, 1).fillEllipse(-14, GH + 4, 70, 46);
+    g.fillStyle(som, 1).fillEllipse(-2, Y - 40, 40, 150);
+    g.fillStyle(pele, 1).fillEllipse(-4, Y - 40, 36, 146);
+    // o polegar: da palma, inclinado, com a ponta deitada na moldura
+    var ty = Y - 250;
+    g.fillStyle(som, 1).fillPoints([{ x: X - 18, y: ty + 70 }, { x: X - 2, y: ty + 2 }, { x: X + 14, y: ty + 6 }, { x: X, y: ty + 82 }], true);
+    g.fillStyle(pele, 1).fillPoints([{ x: X - 16, y: ty + 70 }, { x: X - 1, y: ty + 4 }, { x: X + 12, y: ty + 8 }, { x: X - 1, y: ty + 80 }], true);
+    g.fillStyle(pele, 1).fillCircle(X + 5, ty + 7, 7);
+    g.fillStyle(unha, 1).fillRoundedRect(X + 1, ty + 2, 8, 9, 3);
+    // as pontas dos quatro dedos, do lado direito, o mindinho menor
+    for (dd = 0; dd < 4; dd++) {
+      var fy = Y - 330 + dd * 26, larg = dd === 3 ? 8 : 11;
+      g.fillStyle(som, 1).fillRoundedRect(ZAP.x1 - 3, fy, larg + 1, 19, 6);
+      g.fillStyle(pele, 1).fillRoundedRect(ZAP.x1 - 3, fy, larg, 17, 6);
+      g.fillStyle(unha, 0.7).fillRoundedRect(ZAP.x1 - 4 + larg - 4, fy + 4, 3, 8, 2);
     }
   },
 
@@ -825,40 +866,107 @@ var ZapScene = new Phaser.Class({
      desenho logo abaixo dele e texto que cabe cortar. */
   pintaMapa: function (g) {
     if (!GameState.char) return;
-    var eu = this, n = 2;
+    var M = MAPA_CEL, eu = GameState.estacaoAtual(), alvo = GameState.alvoAtual(), fim = GameState.destinoFinal();
+    var n = 0, self = this;
+    // um rótulo da reserva: rodado (os da Vermelha, como no mapa oficial) ou reto
+    function rot(t, x, y, cor, ox, oy, ang) {
+      if (n >= self.rotMapa.length) return null;
+      return self.rotMapa[n++].setVisible(true).setOrigin(ox, oy).setAngle(ang || 0)
+        .setPosition(Math.round(x), Math.round(y)).setText(t).setColor(cor);
+    }
+    function corDe(nome, base) {
+      return nome === eu ? PAL.branco : (nome === fim || nome === alvo ? PAL.verde : base);
+    }
+    var az = LINHAS.azul.estacoes, vm = LINHAS.vermelha.estacoes, i, p;
 
-    /* Os rotulos saem de uma reserva de BitmapText. O indice 0 e 1 sao o
-       cabecalho, entao os do mapa comecam no 2 — e a origem e escrita
-       toda vez, porque a mesma reserva serve a aba da grana, que alinha
-       pela direita, e origem herdada de outro quadro desalinha tudo. */
-    desenhaMapaRede(g, 34, 162, 244, 258, {
-      eu: GameState.estacaoAtual(),
-      linhaEu: GameState.linha,
-      alvo: GameState.destinoFinal(),
-      // o limite e a tela util do aparelho, nao a caixa do desenho: os
-      // nomes das pontas podem passar do tronco, mas nunca da moldura
-      lim: [ZAP.tx0, ZAP.tx1],
-      rotula: function (t, x, y, cor) {
-        if (n >= 14) return;
-        eu.linhas[n++].setVisible(true).setOrigin(0, 0)
-          .setPosition(x, y).setText(t).setColor(cor);
-      }
+    // as duas linhas, grossas, com os pontinhos brancos das estações por dentro
+    g.fillStyle(0x0b5fae, 1).fillRect(M.BX - 2, M.yDe(az.length - 1), 5, M.yDe(0) - M.yDe(az.length - 1));
+    g.lineStyle(5, 0xe8362c, 1);
+    g.beginPath(); g.moveTo(M.rota[0][0], M.rota[0][1]);
+    for (i = 1; i < M.rota.length; i++) g.lineTo(M.rota[i][0], M.rota[i][1]);
+    g.strokePath();
+    for (i = 0; i < az.length; i++) { p = M.pos('azul', az[i]); g.fillStyle(0xf2f0ff, 1).fillRect(p.x - 1, p.y - 1, 2, 2); }
+    for (i = 0; i < vm.length; i++) { p = M.pos('vermelha', vm[i]); g.fillStyle(0xf2f0ff, 1).fillRect(p.x - 1, p.y - 1, 2, 2); }
+    // a Sé, baldeação: a cápsula branca das estações de troca
+    p = M.pos('azul', 'SÉ');
+    g.fillStyle(0x0a0a12, 1).fillCircle(p.x, p.y, 6);
+    g.fillStyle(0xf2f0ff, 1).fillCircle(p.x, p.y, 4.5);
+    g.fillStyle(0x0a0a12, 1).fillCircle(p.x, p.y, 2);
+
+    // os números das linhas, nos quadradinhos da cor delas
+    g.fillStyle(0x0b5fae, 1).fillRect(M.BX - 20, M.yDe(az.length - 1) - 6, 12, 12);
+    rot('1', M.BX - 14, M.yDe(az.length - 1) - 3, PAL.branco, 0.5, 0).setScale(ESCALA_TEXTO / 2);
+    var pi = M.pos('vermelha', 'ITAQUERA');
+    g.fillStyle(0xe8362c, 1).fillRect(pi.x - 6, pi.y - 24, 12, 12);
+    rot('3', pi.x, pi.y - 21, PAL.branco, 0.5, 0).setScale(ESCALA_TEXTO / 2);
+
+    /* Os nomes da Azul, todos, na vertical: do Tucuruvi até a Luz do lado
+       direito, como no mapa; da Sé pra baixo do lado esquerdo, porque o
+       lado direito de baixo é dos nomes da Vermelha que descem inclinados. */
+    for (i = 0; i < az.length; i++) {
+      var nm = az[i]; p = M.pos('azul', nm);
+      if (nm === 'SÉ') { rot('SÉ', p.x + 6, p.y + 4, nm === eu ? PAL.branco : PAL.amarelo, 0, 0).setScale(ESCALA_TEXTO / 2); continue; }
+      /* São Bento também à direita (à esquerda ela batia no nome da
+         República), abreviada pra acabar antes da subida da Vermelha */
+      var direita = i >= az.indexOf('SÃO BENTO');
+      var t = rot(nm === 'SÃO BENTO' ? 'S. BENTO' : nm, p.x + (direita ? 7 : -7), p.y, corDe(nm, '#8fb4e0'), direita ? 0 : 1, 0.5);
+      if (t) t.setScale(ESCALA_TEXTO / 2);
+    }
+    /* Os da Vermelha inclinados a 45 graus, como no mapa oficial: os do
+       oeste sobem pra direita saindo da estação; os do leste terminam na
+       estação e descem pra esquerda. No leste as estações ficam a 7px uma
+       da outra: vão só as que todo mundo conhece (a sua e a do destino sempre). */
+    var LESTE_COM_NOME = { 'BRÁS': 1, 'TATUAPÉ': 1, 'PENHA': 1, 'ITAQUERA': 1 };
+    for (i = 0; i < vm.length; i++) {
+      var nv = vm[i], pv = M.pos('vermelha', nv), leste = i > vm.indexOf('SÉ'), oeste = i < vm.indexOf('ANHANGABAÚ');
+      var mostra = oeste || (leste && LESTE_COM_NOME[nv]) || nv === eu || nv === fim || nv === alvo;
+      if (!mostra || nv === 'SÉ' || nv === 'PEDRO II' && nv !== eu && nv !== fim) continue;
+      var tv = leste ? rot(nv, pv.x - 2, pv.y + 5, corDe(nv, '#eca09a'), 1, 0.5, -45)
+                     : rot(nv, pv.x + 2, pv.y - 5, corDe(nv, '#eca09a'), 0, 0.5, -45);
+      if (tv) tv.setScale(ESCALA_TEXTO / 2);
+    }
+
+    // onde você está: o anel branco; pra onde vai: o anel verde
+    var pe = M.pos(GameState.linha, eu);
+    g.lineStyle(2, 0xf2f0ff, 1).strokeCircle(pe.x, pe.y, 6);
+    g.fillStyle(0xf2f0ff, 1).fillCircle(pe.x, pe.y, 2.5);
+    var pa = M.pos(linhaDaEstacao(alvo) === 'azul' || alvo === 'SÉ' ? 'azul' : 'vermelha', alvo);
+    if (pa && alvo !== eu) { g.lineStyle(2, 0x00e676, 1).strokeCircle(pa.x, pa.y, 7); }
+
+    this.linha(0, ZAP.topo, '► ' + GameState.rotuloDaPerna(), PAL.amarelo).setOrigin(0, 0);
+    this.linha(1, ZAP.topo + 18, '  ' + GameState.faltamEstacoes() + ' ATÉ ' + alvo, PAL.cinza).setOrigin(0, 0);
+    // no EXPLORAR o mapa é um teletransporte: tocar numa estação leva até ela
+    if (GameState.explorar) {
+      this.linhas[1].setText('  TOQUE NUMA ESTAÇÃO').setColor(PAL.verde);
+      this.zonaMapa.setInteractive();
+    }
+    this.tRodape.setText('AQUI: ' + eu);
+  },
+
+  /* ---------- ir de estação em estação, no EXPLORAR ----------
+     'No modo explorar, clicou no mapa, você vai pra lá.' A estação mais
+     perto do toque (até 10px) vira o lugar: o que estava rodando por
+     baixo do celular (estação, vagão, luta) é desligado e você aparece
+     na plataforma dela. */
+  tocaMapa: function (px, py) {
+    if (!GameState.explorar || this.modo !== 'app' || this.aba !== 1) return;
+    var M = MAPA_CEL, melhor = null, dm = 10;
+    ['azul', 'vermelha'].forEach(function (l) {
+      LINHAS[l].estacoes.forEach(function (nm) {
+        var p = M.pos(l, nm), d = Math.hypot(p.x - px, p.y - py);
+        if (d < dm) { dm = d; melhor = nm; }
+      });
     });
-
-    this.linha(0, ZAP.topo, '► ' + GameState.rotuloDaPerna(), PAL.amarelo)
-      .setOrigin(0, 0);
-    this.linha(1, ZAP.topo + 18, '  ' + GameState.faltamEstacoes() +
-      ' ATÉ ' + GameState.alvoAtual(), PAL.cinza).setOrigin(0, 0);
-    /* O rodape diz o NOME do onde: a bolinha e o anel branco dizem o
-       ponto, mas so as quatro pontas tem nome escrito no desenho, e no
-       meio da linha o anel sozinho nao responde "que estacao e esta".
-
-       Com o nome pelado ele parecia mais um rotulo do mapa — ficava logo
-       abaixo de JABAQUARA, na mesma coluna, e lia-se como uma estacao a
-       mais pendurada no fim da linha. O 'AQUI:' resolve por ser legenda
-       e nao topônimo. Curto de proposito: 'VOCÊ ESTÁ EM PÇA. ÁRVORE' da
-       24 caracteres, 288px, e a tela util do aparelho tem 268. */
-    this.tRodape.setText('AQUI: ' + GameState.estacaoAtual());
+    if (!melhor) return;
+    if (melhor === GameState.estacaoAtual()) { sfx('nao'); return; }
+    sfx('ok');
+    var self = this;
+    ['Estacao', 'Vagao', 'Baldeacao', 'Desafio', 'Briga', 'Encarada', 'Disputa'].forEach(function (k) {
+      if (self.scene.isActive(k) || self.scene.isPaused(k)) self.scene.stop(k);
+    });
+    this.congeladas = [];
+    GameState.poeNoTrajeto(melhor);
+    this.scene.start('Estacao', { onde: 'plataforma' });
   },
 
   /* ---------- aba 3: a grana ----------

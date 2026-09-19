@@ -2740,6 +2740,30 @@ function gritaAmbulante(modo) {
   }
 }
 
+/* ---------- o som ambiente gravado ----------
+   'Som ambiente de transporte público': dois minutos de metrô de
+   verdade (gente, freio, porta, aviso ao longe), cortados de uma
+   gravação maior e com a emenda fundida em 5 s, pra rodar em laço sem
+   pulo. Toca por baixo de tudo na estação e no vagão (no vagão um pouco
+   mais alto, que é onde o barulho mora) e cala no menu, na luta, na
+   rima, com o som desligado e com a aba escondida. */
+var AUDIO_AMBIENTE = 'assets/audio/ambiente_transporte.mp3';
+var _audAmbiente = null;
+function ambienteGravado() {
+  var modo = modoDoSom(), quer = SOM_LIGADO && !document.hidden && (modo === 'estacao' || modo === 'vagao');
+  if (!quer) { if (_audAmbiente && !_audAmbiente.paused) _audAmbiente.pause(); return; }
+  try {
+    if (!_audAmbiente) { _audAmbiente = new Audio(AUDIO_AMBIENTE); _audAmbiente.loop = true; }
+    _audAmbiente.volume = modo === 'vagao' ? 0.42 : 0.3;
+    if (_audAmbiente.paused) {
+      var pr = _audAmbiente.play();
+      if (pr && pr.catch) pr.catch(function () { });
+    }
+  } catch (e) { }
+}
+// relógio próprio: a música pode estar desligada e o mundo continua fazendo barulho
+setInterval(ambienteGravado, 250);
+
 function anuncia(texto) {
   if (!SOM_LIGADO || document.hidden) return;
   if (typeof GameState !== 'undefined' && GameState.treino) return;
