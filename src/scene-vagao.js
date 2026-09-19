@@ -400,6 +400,8 @@ var VagaoScene = new Phaser.Class({
        congelava o jogo (glTexture nulo) na segunda abordagem. */
     this.gBalao = null; this.tBalao = null; this.uiEscondida = [];
     this.segurando = null;
+    // o primeiro tranco demora: dá tempo de achar a barra
+    this.tranco = { fase: 'off', t: 0, proximo: 9000 + Math.random() * 6000 };
     // o poste em pé fica atrás do boneco (60), a mão na frente dele
     this.gMao = this.add.graphics().setDepth(59);
     this.gMaoFrente = this.add.graphics().setDepth(66);   // a mão, por cima da barra do teto (65)
@@ -1191,6 +1193,75 @@ var VagaoScene = new Phaser.Class({
     sentaAnimado(this.pl);
     sfx('caixa');
     this.flash('SENTOU NO CHÃO.\nNINGUÉM ACHOU BONITO.');
+  },
+
+  /* ---------- o tranco ----------
+     'Se não segurar na barra e o trem tremer, o personagem cai no
+     chão.' Era um minigame (caixa SEGURE!, barra enchendo) e saiu por
+     isso; o que volta é só a física: o trem treme um pouco mais de um
+     segundo, o rodapé avisa, e vem o tranco. Segurando na barra ou
+     sentado, fica firme. Solto em pé, cai sentado no chão e tem que
+     levantar. De 14 a 26 segundos entre um e outro, menos no fim da
+     semana, que é quando o maquinista também já cansou. */
+  atualizaTranco: function (dt) {
+    var tr = this.tranco;
+    if (!tr) return;
+    if (this.falha) { tr.fase = 'off'; return; }
+    tr.t += dt;
+    if (tr.fase === 'off') {
+      if (tr.t < tr.proximo) return;
+      // no meio de uma encarada, fuga ou disfarce o tranco espera a vez
+      if (this.encontro || this.abordagem || this.fuga || this.disfarce) { tr.t = tr.proximo - 1500; return; }
+      tr.fase = 'aviso'; tr.t = 0;
+      tr.dur = Math.max(900, 1500 - GameState.dificuldade() * 80);
+      sfx('empurra');
+      return;
+    }
+    // o trem tremendo: tremor fraco o tempo todo do aviso
+    this.cameras.main.shake(70, 0.0022);
+    this.balanca(tr.t / tr.dur);
+    if (tr.t < tr.dur) return;
+    tr.fase = 'off'; tr.t = 0;
+    this.balanca(-1);
+    tr.proximo = Math.max(9000, 14000 + Math.random() * 12000 - GameState.dificuldade() * 800);
+    this.cameras.main.shake(320, 0.008);
+    if (this.segurando || this.sentadoEm || this.noChao || this.cochilando()) {
+      if (this.segurando) sfx('catraca');
+      return;
+    }
+    this.caiNoChao();
+  },
+
+  /* A tentativa de equilíbrio: o corpo gira pelos pés (a origem do
+     sprite é o pé) de um lado pro outro, cada vez mais, até o tranco.
+     Quem está solto em pé balança muito; segurando, quase nada; as
+     pessoas em pé em volta balançam junto, cada uma no seu tempo.
+     k de 0 a 1 é quanto do aviso já passou; -1 endireita todo mundo. */
+  balanca: function (k) {
+    var i, a, t = this.time.now;
+    var solto = !this.segurando && !this.sentadoEm && !this.noChao;
+    if (k < 0) this.pl.sp.setRotation(0);
+    else if (solto) this.pl.sp.setRotation(Math.sin(t / 75) * (0.06 + 0.2 * k));
+    else if (this.segurando) this.pl.sp.setRotation(Math.sin(t / 110) * 0.03);
+    for (i = 0; i < this.gente.length; i++) {
+      a = this.gente[i];
+      if (!a || !a.sp || !a.sp.active || a.sentado || a.bx !== undefined) continue;
+      a.sp.setRotation(k < 0 ? 0 : Math.sin(t / 90 + i * 1.7) * (0.03 + 0.07 * k));
+    }
+  },
+
+  // o tranco derruba: sentado no chão, e custa um coração (menos no treino)
+  caiNoChao: function () {
+    this.indoPara = null;
+    this.noChao = true;
+    GameState.sentado = true;
+    if (!GameState.treino) perdeVida(this, this.pl.sp, 1);
+    this.pl.dir = this.pl.sp.x < 160 ? 'sentadoR' : 'sentadoL';
+    this.pl.anima(0, false);
+    sentaAnimado(this.pl);
+    sfx('nao');
+    if (Math.random() < 0.5) falaGente(['Eita!', 'Segura aí!', 'Opa, cuidado!'][Math.floor(Math.random() * 3)], 1.2);
+    this.flash('CAIU COM O TRANCO!\nSEGURE NA BARRA.');
   },
 
   levantaDoChao: function () {
@@ -3300,7 +3371,11 @@ var VagaoScene = new Phaser.Class({
     // antes das saídas antecipadas, pelo mesmo motivo da estação
     if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
 
-    if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
+    if (this.dialog && this.dialog.ativo) {
+      // conversa aberta congela o tranco: ninguém fica torto esperando
+      if (this.tranco && this.tranco.fase === 'aviso') { this.tranco.fase = 'off'; this.tranco.t = 0; this.balanca(-1); }
+      this.dialog.update(dt); return;
+    }
     if (this.abordagem) { if (this.abordagem.fase !== 'luta' && this.abordagem.fase !== 'volta') this.atualizaAbordagem(dt); return; }
     this.vigiaDesafiantes(dt);
     // três toques rápidos abrem caminho no braço (ver empurraoNaMarra)
@@ -3328,6 +3403,7 @@ var VagaoScene = new Phaser.Class({
     if (this.lugar) this.atualizaLugar(dt);
 
     if (this.estado === 'andando') {
+      this.atualizaTranco(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }
       if (this.tCarroAtual && this.t > this.tCarroAtual) {
@@ -3431,6 +3507,13 @@ var VagaoScene = new Phaser.Class({
 
   contexto: function () {
     var dica = '';
+
+    // tremendo e solto em pé: é a única coisa que importa agora
+    if (this.tranco && this.tranco.fase === 'aviso' && !this.segurando && !this.sentadoEm && !this.noChao) {
+      this.dica.setText('TREMENDO! SEGURE NA BARRA', PAL.vermelho);
+      this.pintaRota();
+      return;
+    }
 
     /* De olho fechado não se vê nada — nem a placa de rota, nem o aviso
        de que a sua estação é esta. Cochilar devolve descanso de graça, e
