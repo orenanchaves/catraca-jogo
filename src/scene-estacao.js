@@ -279,6 +279,8 @@ var EstacaoScene = new Phaser.Class({
     this.treino = (dados && dados.treino) || null;
     // desceu na Itaquera na volta: o dia só acaba na saída de casa (estacao-itaquera.js)
     this.praCasa = !!(dados && dados.praCasa);
+    // veio pela passagem do outro sentido (src/scene-estacao.js, passagem)
+    this.daPassagem = !!(dados && dados.daPassagem);
   },
 
   create: function () {
@@ -361,7 +363,7 @@ var EstacaoScene = new Phaser.Class({
        Numa central é o trem do SEU sentido que fica parado, e não o da
        esquerda: você desceu dele, e ele é o da via cujo rumo bate com o
        que você vinha seguindo. */
-    if (this.entrada === 'plataforma') {
+    if (this.entrada === 'plataforma' && !this.daPassagem) {
       for (var q = 0; q < this.trens.length; q++) {
         if (this.trens[q].dir !== GameState.dir) continue;
         this.trens[q].estado = 'aberto';
@@ -470,6 +472,7 @@ var EstacaoScene = new Phaser.Class({
       noAlto ? platY(PLAT_ALT - 140) : 500, spriteJogador());
     this.pl.sp.setDepth(60);
     this.pl.dir = noAlto ? 'left' : 'up';
+    if (this.daPassagem) { this.pl.sp.x = PLAT_X1 - 16; this.pl.sp.y = platY(665); this.naPassagem = true; }
 
     /* ---------- a câmera ----------
        A estação tem 1144 pixels de altura e a tela tem 576. Mesma regra
@@ -652,6 +655,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.itq) this.montaItaquera();
     else if (this.mez) this.montaMezanino();
     // o elevador, em toda plataforma lateral (na central não cabe do lado da escada)
+    this.montaPassagem();
     if (!CENTRAL) this.montaElevadores();
     else if (!this.mez) {
       /* as lixeiras das estações de sempre: duas no saguão, rente à parede
@@ -2726,6 +2730,58 @@ var EstacaoScene = new Phaser.Class({
     cam.setFollowOffset(-Math.round(this._olhaX), -Math.round(HUD_H / 2) - Math.round(this._olhaY));
   },
 
+  /* ---------- a passagem pro outro sentido ----------
+     'Não tem dois lados pra ir em algumas.' A plataforma lateral tem uma
+     via só, a do sentido em que você vinha, e quem precisava voltar
+     (desceu errado, trocou de destino, está explorando) ficava preso.
+     Nas estações de verdade o outro sentido é a plataforma do outro lado
+     da via, e se chega nela por uma passagem. Aqui é uma porta na parede
+     da direita, no meio da plataforma, entre o nome da estação (560) e o
+     quadro do mapa (760), com a placa pendurada apontando: SENTIDO e o
+     outro terminal. Entrou na porta, pergunta; confirmou, você aparece na
+     plataforma do outro sentido, na mesma porta. Nas pontas da linha e na
+     Itaquera (terminal) não tem: lá só existe um sentido. A Sé é central,
+     e os dois trens já estão nela. */
+  passagemExiste: function () {
+    if (CENTRAL || this.itq || this.treino) return false;
+    var n = GameState.linhaAtual().estacoes.length;
+    return GameState.idx > 0 && GameState.idx < n - 1;
+  },
+  montaPassagem: function () {
+    this.passagem = null;
+    if (!this.passagemExiste()) return;
+    var y0 = platY(640), y1 = platY(690), x0 = PLAT_X1 + 4, w = 24;
+    this.passagem = { y0: y0, y1: y1 };
+    var g = this.add.graphics().setDepth(2);
+    g.fillStyle(0x39415f, 1).fillRect(x0 - 2, y0 - 4, w + 4, y1 - y0 + 8);
+    g.fillStyle(0x0a0a12, 1).fillRect(x0, y0, w, y1 - y0);
+    // os degraus descendo pro corredor, vistos pela porta
+    for (var d = 0; d < 5; d++) g.fillStyle(0x1c1c26 + d * 0x040404, 1).fillRect(x0 + 2, y0 + 4 + d * 9, w - 4, 5);
+    g.fillStyle(GameState.linhaAtual().num, 1).fillRect(x0 - 2, y0 - 4, w + 4, 3);
+    var outro = placaDe(GameState.terminal(-GameState.dir));
+    placaItq(this, PLAT_X1 - 58, platY(622), 'SENTIDO ' + outro + ' ►', false, false, corDaPlaca());
+  },
+  // chamado no contexto: encostou na porta, pergunta
+  contextoPassagem: function () {
+    var p = this.passagem, sp = this.pl.sp;
+    if (!p) return false;
+    var naPorta = sp.x >= PLAT_X1 - 6 && sp.y > p.y0 && sp.y < p.y1;
+    if (!naPorta) { this.naPassagem = false; return false; }
+    if (this.naPassagem || this.dialog) return true;
+    this.naPassagem = true;
+    var eu = this, outro = placaDe(GameState.terminal(-GameState.dir));
+    fala(this, 'Passagem pro outro lado.\nSentido ' + outro + '.', [
+      { label: 'Ir pro sentido ' + outro, cb: function () {
+        GameState.dir = -GameState.dir;
+        GameState.passaTempo(1);
+        sfx('porta');
+        eu.scene.start('Estacao', { onde: 'plataforma', daPassagem: true });
+      } },
+      { label: 'Ficar deste lado', cb: function () { eu.pl.sp.x = PLAT_X1 - 24; } }
+    ]);
+    return true;
+  },
+
   juntaGente: function () {
     var f = (this.fixos || []).filter(function (a) { return a && a.sp && a.sp.active; });
     return this.plateia.concat(this.esperando, [this.guarda], f);
@@ -2922,6 +2978,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.contextoLixo()) return;
     if (this.contextoTomada()) return;
     if (this.contextoElevador()) return;
+    if (this.contextoPassagem()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {
