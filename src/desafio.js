@@ -119,17 +119,63 @@ var DESAFIANTES = {
       { nome: 'CAI-CAI', dano: 10, bloqueia: 'IRONIA', cai: true }
     ]
   },
-  /* Os cosplayers da Liberdade: a fantasia sorteada é o boneco (sprites),
-     e a lábia (elogiar a fantasia) derruba. */
-  cosplayer: {
-    nome: 'COSPLAYER', sprite: 'np_cos_naruto', sprites: COSPLAYERS, pac: 70, nivel: 5,
-    fraco: 'LABIA', resiste: 'IRONIA',
-    chega: 'SABE DE QUAL\nANIME EU SOU?',
-    sai: 'VOU PRO EVENTO.\nSAYONARA!',
+  /* ---------- os cosplayers ----------
+     'O cosplayer é um tipo, cada cosplay é diferente pra derrotar.' Cinco
+     desafiantes do tipo COSPLAY, cada um com a fraqueza, a resistência e
+     os golpes do personagem que está vestindo. */
+  cosLaranja: {
+    nome: 'COSPLAY LARANJA', sprite: 'np_cos_naruto', pac: 75, nivel: 4,
+    fraco: 'IRONIA', resiste: 'LABIA',
+    chega: 'EU VOU SER O MAIOR\nNINJA DA LIBERDADE!',
+    sai: 'NÃO VOU DESISTIR,\nESSE É O MEU JEITO!',
     golpes: [
-      { nome: 'JUTSU DOS CLONES', dano: 12, bloqueia: 'CALMA' },
-      { nome: 'FALA EM JAPONÊS', dano: 10, bloqueia: 'FONE' },
-      { nome: 'POSE DE ANIME', dano: 14, bloqueia: 'LABIA' }
+      { nome: 'CLONES DAS SOMBRAS', dano: 12, bloqueia: 'CALMA' },
+      { nome: 'NUNCA DESISTO!', dano: 14, bloqueia: 'IRONIA' },
+      { nome: 'CORRIDA NINJA', dano: 10, bloqueia: 'FONE' }
+    ]
+  },
+  cosVingador: {
+    nome: 'COSPLAY VINGADOR', sprite: 'np_cos_sasuke', pac: 70, nivel: 6,
+    fraco: 'LABIA', resiste: 'IRONIA',
+    chega: 'HMPH.\nVOCÊ NÃO É PÁREO.',
+    sai: '...TSC.',
+    golpes: [
+      { nome: 'OLHAR FRIO', dano: 14, bloqueia: 'CALMA' },
+      { nome: 'HMPH.', dano: 10, bloqueia: 'LABIA' },
+      { nome: 'SEDE DE VINGANÇA', dano: 16, bloqueia: 'FONE' }
+    ]
+  },
+  cosNuvem: {
+    nome: 'COSPLAY NUVEM', sprite: 'np_cos_akatsuki', pac: 85, nivel: 8,
+    fraco: 'CALMA', resiste: 'LABIA',
+    chega: 'VOCÊ JÁ ESTÁ\nNA MINHA ILUSÃO.',
+    sai: 'PERDOE-ME.\nFICA PRA PRÓXIMA.',
+    golpes: [
+      { nome: 'ILUSÃO', dano: 16, bloqueia: 'CALMA' },
+      { nome: 'CAPA ESVOAÇANTE', dano: 12, bloqueia: 'IRONIA' },
+      { nome: 'SILÊNCIO SOMBRIO', dano: 12, bloqueia: 'FONE' }
+    ]
+  },
+  cosRosa: {
+    nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', pac: 70, nivel: 5,
+    fraco: 'FONE', resiste: 'CALMA',
+    chega: 'SE FALAR DO MEU\nCABELO, JÁ ERA.',
+    sai: 'TÁ, TÁ. VOU PRO\nEVENTO, ENTÃO.',
+    golpes: [
+      { nome: 'SOCO NO CHÃO', dano: 16, bloqueia: 'LABIA' },
+      { nome: 'GRITO DE GUERRA', dano: 12, bloqueia: 'FONE' },
+      { nome: 'OLHADA DE JULGAMENTO', dano: 10, bloqueia: 'IRONIA' }
+    ]
+  },
+  cosColegial: {
+    nome: 'COLEGIAL', sprite: 'np_cos_marinheira', pac: 60, nivel: 3,
+    fraco: 'CALMA', resiste: 'FONE',
+    chega: 'KYAA! VOCÊ PISOU\nNO MEU PÉ!',
+    sai: 'HMF! BAKA!',
+    golpes: [
+      { nome: 'KAWAII!', dano: 10, bloqueia: 'IRONIA' },
+      { nome: 'BIQUINHO DE BRAVA', dano: 12, bloqueia: 'LABIA' },
+      { nome: 'POSE DE FOTO', dano: 12, bloqueia: 'CALMA' }
     ]
   },
   // o ambulante da plataforma, que insiste ('batalhar com o ambulante')
@@ -197,13 +243,14 @@ function spriteDoDesafiante(tipo) {
    pode fugir': três níveis de diferença, pra qualquer lado. */
 var DSF_FUGA = 3;
 var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor'];
+var TIPOS_COSPLAY = ['cosLaranja', 'cosVingador', 'cosNuvem', 'cosRosa', 'cosColegial'];
 var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
 function sorteiaDesafiante() {
   // perto da Liberdade, quem desafia muitas vezes é cosplayer
   var dl = pertoDaLiberdade();
-  if (dl >= 0 && Math.random() < 0.45 - dl * 0.07) return 'cosplayer';
+  if (dl >= 0 && Math.random() < 0.45 - dl * 0.07) return TIPOS_COSPLAY[Math.floor(Math.random() * TIPOS_COSPLAY.length)];
   var t = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
   if (t !== 'torcedor') return t;
   /* Itaquera é da Fiel: nas quatro últimas da Vermelha (Patriarca até
@@ -273,7 +320,11 @@ var FX_GOLPE = {
   'O REI PELÉ': 'balao', 'SANTOS É PRAIA': 'torcida',
   'COTOVELADA': 'grito', 'BAFO NO CANGOTE': 'audio', 'MÃO POR CIMA DA SUA': 'papel',
   'CAI-CAI': 'caicai',
-  'JUTSU DOS CLONES': 'sombra', 'FALA EM JAPONÊS': 'balao', 'POSE DE ANIME': 'grito',
+  'CLONES DAS SOMBRAS': 'balao', 'NUNCA DESISTO!': 'grito', 'CORRIDA NINJA': 'papel',
+  'OLHAR FRIO': 'sombra', 'HMPH.': 'audio', 'SEDE DE VINGANÇA': 'grito',
+  'ILUSÃO': 'sombra', 'CAPA ESVOAÇANTE': 'papel', 'SILÊNCIO SOMBRIO': 'sombra',
+  'SOCO NO CHÃO': 'grito', 'GRITO DE GUERRA': 'audio', 'OLHADA DE JULGAMENTO': 'sombra',
+  'KAWAII!': 'balao', 'BIQUINHO DE BRAVA': 'balao', 'POSE DE FOTO': 'grito',
   'É DOIS, É CINCO!': 'grito', 'ÁGUA GELADINHA': 'balao', 'ÚLTIMA UNIDADE': 'papel',
   'APITO NO OUVIDO': 'audio', 'CADÊ O BILHETE?': 'papel', 'VOU CHAMAR O CHEFE': 'grito',
   'ANOTA O NOME': 'papel', 'RÁDIO NA CENTRAL': 'audio', 'OLHAR DE CIMA': 'sombra', 'BRAÇO CRUZADO': 'grito'

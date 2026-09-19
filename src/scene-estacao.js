@@ -2679,8 +2679,10 @@ var EstacaoScene = new Phaser.Class({
     this.ambulante = null;
     // de madrugada não tem ninguém vendendo; no movimento, quase sempre
     if (Math.random() > 0.35 + GameState.lotacao() * 0.55) return;
-    var a = new Ator(this, 180, platY(200 + Math.random() * (PLAT_ALT - 340)),
-      ['np_ambulante_a', 'np_ambulante_b', 'np_ambulante_c'][Math.floor(Math.random() * 3)]);
+    /* sempre o do isopor e da mochila: os outros dois bonecos de ambulante
+       são os atendentes das lojas, e de longe liam como passageiro comum
+       ('não é ambulante essa') */
+    var a = new Ator(this, 180, platY(200 + Math.random() * (PLAT_ALT - 340)), 'np_ambulante_a');
     a.sp.setDepth(39);
     a.vy = (Math.random() < 0.5 ? -1 : 1) * 26;
     this.ambulante = a;

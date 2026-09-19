@@ -3523,7 +3523,12 @@ var DEX = [
   { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', tipo: 'METRÔ', onde: 'GUICHÊ', desc: 'Na bilheteria. Vende a passagem.' },
   { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
   { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
-  { id: 'cosplayer', nome: 'COSPLAYER', sprite: 'np_cos_naruto', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Vai pro evento de anime. Marinheira, Akatsuki, Naruto, Sasuke, Sakura.' }
+  // os cinco cosplayers, cada um com o seu jeito de ser derrotado
+  { id: 'cosLaranja', nome: 'COSPLAY LARANJA', sprite: 'np_cos_naruto', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Macacão laranja e bandana. Não desiste nunca.' },
+  { id: 'cosVingador', nome: 'COSPLAY VINGADOR', sprite: 'np_cos_sasuke', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Quimono branco, cara fechada. Só responde hmph.' },
+  { id: 'cosNuvem', nome: 'COSPLAY NUVEM', sprite: 'np_cos_akatsuki', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Capa preta de nuvens vermelhas. O mais forte do evento.' },
+  { id: 'cosRosa', nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Cabelo rosa e soco que racha o chão.' },
+  { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' }
 ];
 // a cor de cada tipo: a da bolinha e a da borda da carta
 var COR_TIPO = {
@@ -3534,7 +3539,6 @@ var DEX_POR_SPRITE = {};
 for (var dxi = 0; dxi < DEX.length; dxi++) DEX_POR_SPRITE[DEX[dxi].sprite] = DEX[dxi].id;
 DEX_POR_SPRITE.np_pedinte_b = 'pedinte';
 DEX_POR_SPRITE.np_atendenteF = 'atendente';
-COSPLAYERS.forEach(function (k) { DEX_POR_SPRITE[k] = 'cosplayer'; });
 function leDex() {
   try { return JSON.parse(localStorage.getItem('metrosp_dex') || '{}') || {}; } catch (e) { return {}; }
 }
