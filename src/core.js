@@ -1470,17 +1470,17 @@ function afina(alvo) {
    de lado olha pra direita), e é por ali que o mullet sai. */
 var CABELO_MOICANO = {
   down: {
-    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...okaaaaaako...', 3: '...okkaaaakko...',
-    4: '...okkkaakkko...', 5: '...okkkkkkkko...'
+    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...oyaaaaaayo...', 3: '...oyyaaaayyo...',
+    4: '...oyyyaayyyo...', 5: '...okkkkkkkko...'
   },
   up: {
-    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...okaaaaaako...', 3: '...okkaaaakko...',
-    4: '...okkaaaakko...', 5: '...okkaaaakko...', 6: '...okkaaaakko...', 7: '...okaaaaaako...',
+    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...oyaaaaaayo...', 3: '...oyyaaaayyo...',
+    4: '...oyyaaaayyo...', 5: '...oyyaaaayyo...', 6: '...oyyaaaayyo...', 7: '...oyaaaaaayo...',
     8: '...oaaaaaaaao...', 9: '....oaaaaaao....', 10: '.....oaaaao.....'
   },
   side: {
-    0: '.....oeoeoeo....', 1: '....oaeeeeeao...', 2: '....oaakkkkko...', 3: '....oakkkkkko...',
-    4: '....oakkkkkko...', 5: '....oakkkkkko...', 7: '...oaakkkkkko...', 8: '....oaokkkko....'
+    0: '.....oeoeoeo....', 1: '....oaeeeeeao...', 2: '....oaayyyyyo...', 3: '....oayyyyyyo...',
+    4: '....oayyykkko...', 5: '....oayykkkko...', 7: '...oaakkkkkko...', 8: '....oaokkkko....'
   }
 };
 
@@ -1800,6 +1800,7 @@ PELES.saopaulino = pele('#0a0a12', '#f0c8a0', '#3a2a22', '#f0eeff', '#1c1c22', '
 PELES.saopaulino.e = '#d8302a'; PELES.saopaulino.z = '#1c1c22';
 PELES.santista = pele('#0a0a12', '#8a5a3c', '#4a2c18', '#f0eeff', '#f0eeff', '#14141c', '#f0eeff');
 PELES.santista.z = '#1c1c22'; PELES.santista.e = '#e8b83c';   // a base escura e a ponta dourada da crista
+PELES.santista.y = '#5a3a24';                                 // o cabelo curtinho das laterais raspadas
 // o torcedor jogável: pele, cabelo e jeans; a camisa vem do time escolhido
 PELES.torcedorJog = pele('#0a0a12', '#6b4228', '#1a1a22', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
 PELES.torcedoraJog = pele('#0a0a12', '#c99a70', '#3a2418', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
@@ -1813,7 +1814,7 @@ var TIMES = {
   corinthians: { nome: 'TIMÃO', desafiante: 'corintiano', j: '#1c1c22', e: '#d8302a', cor: 0x1c1c22, cor2: 0xf0eeff },
   palmeiras: { nome: 'VERDÃO', desafiante: 'palmeirense', j: '#12783c', k: '#f0c8a0', cor: 0x12783c, cor2: 0xf0eeff },
   saopaulo: { nome: 'TRICOLOR', desafiante: 'saopaulino', j: '#f0eeff', e: '#d8302a', z: '#1c1c22', k: '#f0c8a0', cor: 0xf0eeff, cor2: 0xd8302a },
-  santos: { nome: 'PEIXE', desafiante: 'santista', j: '#f0eeff', z: '#1c1c22', a: '#4a2c18', e: '#e8b83c', k: '#b07d52', cor: 0xf0eeff, cor2: 0x1c1c22 }
+  santos: { nome: 'PEIXE', desafiante: 'santista', j: '#f0eeff', z: '#1c1c22', a: '#4a2c18', e: '#e8b83c', y: '#5a3a24', k: '#b07d52', cor: 0xf0eeff, cor2: 0x1c1c22 }
 };
 var ORDEM_TIMES = ['corinthians', 'palmeiras', 'saopaulo', 'santos'];
 function paletaDoTime(base, t, g) {
@@ -1822,6 +1823,7 @@ function paletaDoTime(base, t, g) {
   p.j = T.j; if (T.e) p.e = T.e; if (T.z) p.z = T.z;
   if (T.a && g !== 'f') p.a = T.a;   // a crista do santista; a santista, cabelo escuro como a Marta
   if (T.k && g !== 'f') p.k = T.k;   // a pele do torcedor de cada time
+  if (T.y) p.y = T.y;
   return p;
 }
 function corpoDoTorcedor(g, t) {
@@ -3008,6 +3010,20 @@ function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 /* o verbo que só este personagem tem */
 function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
 
+/* ---------- o lixo na mão ----------
+   Quem comeu fica com o papel na mão (GameState.lixo) até achar uma
+   lixeira: um papelzinho amassado do lado do boneco, e o rodapé lembra
+   quando não tem nada mais importante pra dizer. */
+function mostraLixoNaMao(cena, pl) {
+  if (!cena._gLixoMao) cena._gLixoMao = cena.add.graphics().setDepth(70);
+  var g = cena._gLixoMao; g.clear();
+  if (!GameState.lixo || !pl || !pl.sp || !pl.sp.visible) return;
+  var x = Math.round(pl.sp.x + (pl.sp.flipX ? -10 : 10)), y = Math.round(pl.sp.y - 18);
+  g.fillStyle(0x0a0a12, 1).fillRect(x - 3, y - 3, 7, 6);
+  g.fillStyle(0xe8e4d8, 1).fillRect(x - 2, y - 2, 5, 4);
+  g.fillStyle(0xe8362c, 1).fillRect(x - 1, y - 1, 2, 1);
+}
+
 /* ---------- o coração quebrado ----------
    Perder uma vida acontecia só no alto do HUD: o quinto ícone apagava,
    a nove pixels de altura, longe de onde a pessoa está olhando — que é
@@ -3145,6 +3161,10 @@ var ESTILO_LOJA = {
   recarga: { nome: 'RECARGA BU', cor: 0x1c6fd0, fundo: 0x16223a, parede: 'cartoes', balcao: 0x1c4a8a, produto: 'cartao', letra: '#f2f0ff', ven: 'np_pax1' },
   boticario: { nome: 'O BOTICÁRIO', cor: 0x2f7d5e, fundo: 0x14281e, parede: 'frascos', balcao: 0x1f5a40, produto: 'frasco', letra: '#f2f0ff', ven: 'np_pax10' },
   loterica: { nome: 'LOTÉRICA', cor: 0xf2c14e, fundo: 0x14284a, parede: 'bilhetes', balcao: 0x1c4a8a, produto: 'bilhete', letra: '#f2c14e', ven: 'np_pax9' },
+  /* as cabines do mezanino: a bilheteria (duas, cada uma com o seu
+     atendente) e o achados e perdidos, no mesmo molde das lojas */
+  bilheteria: { nome: 'BILHETERIA', cor: 0x1c5ab4, fundo: 0x2a3550, parede: 'guiche', balcao: 0x6a7080, produto: 'bilhete', letra: '#f2f0ff', ven: 'np_pax5' },
+  achados: { nome: 'ACHADOS', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'achados', balcao: 0x6b4226, produto: 'caixa', letra: '#f2c14e', ven: 'np_pax4' },
   // o caixa eletrônico: máquina, sem balcão e sem ninguém atrás
   atm: { nome: 'CAIXA 24H', letreiro: '24H', cor: 0xe8362c, fundo: 0x3a3a44, parede: 'atm', maquina: true, letra: '#f2f0ff' }
 };
@@ -3167,7 +3187,23 @@ function pintaFundoDaLoja(g, b) {
     g.fillStyle(0xf2c14e, 0.1).fillRect(x - 2, y + h, w + 4, 14);
     return;
   }
-  if (e.parede === 'estufa') {
+  if (e.parede === 'guiche') {
+    // o vidro do guichê, o painel da tarifa e a maquininha do cartão
+    g.fillStyle(0x9ec4dc, 0.35).fillRect(x + 5, py, w - 10, ph);
+    g.fillStyle(0xffffff, 0.3).fillRect(x + 7, py + 2, 2, ph - 4);
+    g.fillStyle(0x0a0a10, 1).fillRect(x + w - 22, py + 2, 16, 9);
+    g.fillStyle(0xf2c14e, 1).fillRect(x + w - 20, py + 4, 12, 2).fillRect(x + w - 20, py + 7, 8, 2);
+    g.fillStyle(0x1c5ab4, 1).fillRect(x + 8, py + 2, 12, 5);
+  } else if (e.parede === 'achados') {
+    // prateleiras com o que ninguém veio buscar: guarda-chuva, bolsa, caixa, mochila, boné
+    g.fillStyle(0x5a3f22, 1).fillRect(x + 4, py + 8, w - 8, 2).fillRect(x + 4, py + 18, w - 8, 2);
+    var coisas = [[0xe8362c, 8, 5], [0x3a7fd0, 9, 6], [0xf2c14e, 7, 5], [0x7fd6a0, 10, 6], [0xd05a8a, 8, 5], [0xf2f0ff, 9, 5]];
+    for (k = 0; k < coisas.length; k++) {
+      var cx0 = x + 6 + (k % 3) * Math.floor((w - 12) / 3), cy0 = py + (k < 3 ? 2 : 12);
+      g.fillStyle(coisas[k][0], 1).fillRect(cx0, cy0 + 6 - coisas[k][2], coisas[k][1], coisas[k][2]);
+    }
+    g.lineStyle(1, 0x14141a, 1).lineBetween(x + w - 10, py + 2, x + w - 14, py + 18);   // o guarda-chuva encostado
+  } else if (e.parede === 'estufa') {
     // a estufa de vidro com as coxinhas e os pães de queijo
     g.fillStyle(0x9ec4dc, 0.6).fillRect(x + 6, py, w - 12, ph);
     for (r = 0; r < 2; r++) for (k = 0; k < Math.floor((w - 18) / 10); k++) {
@@ -3258,7 +3294,7 @@ function montaFrenteDaLoja(cena, b) {
     return;
   }
   // o atendente, de frente, com as pernas atrás do balcão
-  var ven = new Ator(cena, x + w / 2, y + h - 4, e.ven);
+  var ven = new Ator(cena, x + w / 2, y + h - 4, b.ven || e.ven);
   ven.dir = 'down'; ven.anima(0, false); ven.sp.setDepth(39);
   // o balcão
   var gb = cena.add.graphics().setDepth(40), by = y + h - 20;
@@ -3292,6 +3328,10 @@ function montaFrenteDaLoja(cena, b) {
       gb.fillStyle(0x9ec4dc, 1).fillRect(hx + 4, hy - 4, 6, 8);
       gb.fillStyle(0x2f7d5e, 1).fillRect(hx + 5, hy - 6, 4, 2);
       gb.fillStyle(0xe8c96a, 1).fillRect(hx + 12, hy - 2, 4, 6);
+    } else if (e.produto === 'caixa') {
+      gb.fillStyle(0xb07a3a, 1).fillRect(hx + 3, hy - 4, 11, 8);
+      gb.fillStyle(0x6b4226, 1).fillRect(hx + 3, hy - 4, 11, 2);
+      gb.fillStyle(0xf2c14e, 1).fillRect(hx + 7, hy - 1, 3, 3);
     } else if (e.produto === 'bilhete') {
       gb.fillStyle(0xf2c14e, 1).fillRect(hx + 2, hy - 3, 12, 7);
       gb.fillStyle(0xe8362c, 1).fillRect(hx + 9, hy - 1, 4, 3);

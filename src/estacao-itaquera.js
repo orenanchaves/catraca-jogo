@@ -168,6 +168,20 @@ EstacaoScene.prototype.bateNaLixeira = function (x, y) {
   }
   return false;
 };
+// perto de uma lixeira com o papel na mão: jogar é a única coisa a dizer
+EstacaoScene.prototype.contextoLixo = function () {
+  if (!GameState.lixo || !this.lixeiraPerto()) return false;
+  this.dica.setText(nomeAgir() + ': JOGAR NO LIXO', PAL.verde);
+  if (Ctrl.actJust) {
+    GameState.lixo = false;
+    GameState.addCarisma(1);
+    sfx('ok');
+    this.alerta.setText('+1 CARISMA. LIXO NO LIXO');
+    var al = this.alerta, eu = this;
+    this.time.delayedCall(1600, function () { if (eu.alerta === al) al.setText(''); });
+  }
+  return true;
+};
 EstacaoScene.prototype.lixeiraPerto = function () {
   if (!this.lixeiras) return null;
   for (var i = 0; i < this.lixeiras.length; i++) {
@@ -175,6 +189,75 @@ EstacaoScene.prototype.lixeiraPerto = function () {
     if (Math.hypot(this.pl.sp.x - l.x, this.pl.sp.y - l.y) < 24) return l;
   }
   return null;
+};
+
+/* ---------- as cabines do mezanino ----------
+   Duas bilheterias lado a lado, cada uma com o seu atendente, na
+   esquerda do lado de fora das catracas, e o achados e perdidos na
+   direita. Mesmo molde das lojas: letreiro, parede de dentro,
+   atendente e balcão, e quem compra chega por baixo. */
+function cabinesDoMezanino() {
+  var y = 300, h = 58;
+  return [
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 34, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_pax5' },
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 100, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_pax1' },
+    { chave: 'achados', nome: 'ACHADOS', x: MEZ.x1 - 110, y: y, w: 76, h: h, lado: 0, acao: 'achados' }
+  ];
+}
+
+/* ---------- quem compra passagem ----------
+   Uma ou duas pessoas na frente de cada guichê, olhando pro atendente.
+   A da frente compra (uns quatro segundos), vira passageiro comum e vai
+   pra catraca; outra chega de baixo e entra na fila. */
+EstacaoScene.prototype.montaCompradores = function () {
+  this.compradores = [];
+  this.tComprador = 3000;
+  for (var i = 0; i < this.barracas.length; i++) {
+    var b = this.barracas[i];
+    if (b.acao !== 'bilheteria') continue;
+    var n = Math.random() < 0.5 + 0.4 * GameState.lotacao() ? 2 : 1;
+    for (var k = 0; k < n; k++) this.novoComprador(b, k, true);
+  }
+};
+EstacaoScene.prototype.novoComprador = function (b, k, jaNaFila) {
+  var alvo = { x: b.x + b.w / 2, y: b.y + b.h + 14 + k * 22 };
+  var a = new Ator(this, jaNaFila ? alvo.x : alvo.x + (Math.random() - 0.5) * 40, jaNaFila ? alvo.y : 500, sorteiaPax());
+  a.sp.setDepth(40);
+  a.dir = 'up'; a.anima(0, false);
+  this.compradores.push({ a: a, cab: b, t: -Math.random() * 1500 });
+};
+EstacaoScene.prototype.andaCompradores = function (dt) {
+  if (!this.compradores) return;
+  var porCab = {}, i;
+  for (i = 0; i < this.compradores.length; i++) {
+    var c = this.compradores[i], chave = c.cab.x;
+    var k = porCab[chave] || 0; porCab[chave] = k + 1;
+    var ax = c.cab.x + c.cab.w / 2, ay = c.cab.y + c.cab.h + 14 + k * 22;
+    var dx = ax - c.a.sp.x, dy = ay - c.a.sp.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > 2) {
+      var v = 42 * dt / 1000;
+      c.a.sp.x += dx / d * Math.min(v, d); c.a.sp.y += dy / d * Math.min(v, d);
+      c.a.setDir(dx, dy); c.a.anima(dt, true);
+      continue;
+    }
+    c.a.dir = 'up'; c.a.anima(0, false);
+    if (k !== 0) continue;
+    c.t += dt;
+    if (c.t < 4000) continue;
+    // comprou: vira passageiro, e o saguão manda ele pra catraca
+    this.compradores.splice(i, 1); i--;
+    c.a.indo = null;
+    this.plateia.push(c.a);
+    this.gente.push(c.a);
+  }
+  // alguém novo chega, se tiver guichê com fila curta
+  this.tComprador -= dt;
+  if (this.tComprador > 0) return;
+  this.tComprador = 4000 + Math.random() * 3000;
+  for (i = 0; i < this.barracas.length; i++) {
+    var b = this.barracas[i];
+    if (b.acao === 'bilheteria' && (porCab[b.x] || 0) < 2) { this.novoComprador(b, porCab[b.x] || 0, false); return; }
+  }
 };
 
 /* ---------- o que é chão ---------- */
@@ -241,24 +324,9 @@ EstacaoScene.prototype.pintaMezanino = function (g, l) {
     g.fillStyle(num(PAL.parede), 1).fillRect(px + (px === x0 ? 0 : 4), 116, 22, 404);
     g.fillStyle(num(PAL.paredeLuz), 1).fillRect(px + (px === x0 ? 0 : 4), 116, 3, 404);
   });
-  // o guichê de achados e perdidos, na parede da esquerda
-  g.fillStyle(0x0a0a12, 1).fillRect(x0, ACH.y, 30, ACH.h);
-  g.fillStyle(0x1c2436, 1).fillRect(x0 + 2, ACH.y + 4, 26, ACH.h - 12);
-  var coisas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0x7fd6a0];
-  for (var ci = 0; ci < coisas.length; ci++) {
-    g.fillStyle(coisas[ci], 0.85).fillRect(x0 + 5 + (ci % 2) * 12, ACH.y + 12 + Math.floor(ci / 2) * 16, 9, 11);
-  }
-  g.fillStyle(num(PAL.metalSom), 1).fillRect(x0, ACH.y + ACH.h - 10, 34, 10);
-  g.fillStyle(num(PAL.metal), 1).fillRect(x0, ACH.y + ACH.h - 10, 34, 7);
-  g.fillStyle(num(PAL.amarelo), 0.5).fillRect(x0, ACH.y + ACH.h, 40, 3);
-  // a bilheteria, encostada na parede da esquerda, na linha das catracas
-  var bx = x0 + 8, bw = 50;
-  g.fillStyle(num(PAL.paredeSom), 1).fillRect(bx, 176, bw, 64);
-  g.fillStyle(num(PAL.parede), 1).fillRect(bx, 176, bw, 48);
-  g.fillStyle(num(PAL.paredeLuz), 1).fillRect(bx, 176, bw, 4);
-  g.fillStyle(0x0a0a12, 1).fillRect(bx + 6, 196, bw - 12, 26);
-  g.fillStyle(0x1c2436, 1).fillRect(bx + 8, 198, bw - 16, 22);
-  g.fillStyle(num(PAL.amarelo), 1).fillRect(bx + 6, 226, bw - 12, 5);
+  /* A bilheteria e o achados e perdidos saíram da parede: eram um vão
+     de 50px e um de 30, e não pareciam nada ('pequeno', 'estranho').
+     Viraram cabines de frente, no molde das lojas (cabinesDoMezanino). */
   g.translateCanvas(x0, 0);
 };
 
@@ -539,6 +607,7 @@ EstacaoScene.prototype.montaItaquera = function () {
 
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
+  this.montaCompradores();
   this.lixeiras = lixeirasItq();
   var gLixo = this.add.graphics().setDepth(2.5);
   for (var li = 0; li < this.lixeiras.length; li++) pintaLixeira(gLixo, this.lixeiras[li].x, this.lixeiras[li].y);
@@ -670,6 +739,7 @@ EstacaoScene.prototype.atualizaItaquera = function (dt) {
   }
   this.pintaPSD();
   this.andaPassantes(dt);
+  this.andaCompradores(dt);
 
   // as portas pra rua
   var s = this.saidaSob(this.pl.sp.x, this.pl.sp.y);
@@ -826,18 +896,7 @@ EstacaoScene.prototype.andaPassantes = function (dt) {
 /* ---------- o rodapé, fora do mezanino ---------- */
 EstacaoScene.prototype.contextoItq = function () {
   var x = this.pl.sp.x, y = this.pl.sp.y;
-  if (GameState.lixo && this.lixeiraPerto()) {
-    this.dica.setText(nomeAgir() + ': JOGAR NO LIXO', PAL.verde);
-    if (Ctrl.actJust) {
-      GameState.lixo = false;
-      GameState.addCarisma(1);
-      sfx('ok');
-      this.alerta.setText('+1 CARISMA. LIXO NO LIXO');
-      var al = this.alerta, eu = this;
-      this.time.delayedCall(1600, function () { if (eu.alerta === al) al.setText(''); });
-    }
-    return true;
-  }
+  if (this.contextoLixo()) return true;
   if (y < ESC_Y) {
     if (this.sentadoPlat) { this.dica.setText('SENTADO. ' + nomeAgir() + ': LEVANTAR', PAL.cinza); return true; }
     // a porta aberta e o ambulante mandam mais que o banco

@@ -293,7 +293,18 @@ var CONTATOS = {
   ]
 };
 
-function contatosDe(k) { return CONTATOS[k] || CONTATOS.clt; }
+/* o grupo do torcedor é a organizada do time dele */
+var ORGANIZADA = { corinthians: 'GAVIÕES', palmeiras: 'MANCHA', saopaulo: 'INDEPENDENTE', santos: 'CAMISA 12' };
+function contatosDe(k) {
+  var l = CONTATOS[k] || CONTATOS.clt;
+  if (k !== 'torcedor') return l;
+  return l.map(function (c) {
+    if (c.nome !== 'A TORCIDA') return c;
+    var copia = {}; for (var q in c) copia[q] = c[q];
+    copia.nome = ORGANIZADA[leTime()] || c.nome;
+    return copia;
+  });
+}
 
 /* ---------- a caixa de entrada de uma perna ----------
    Uma perna começa com um punhado de conversas. No máximo uma delas

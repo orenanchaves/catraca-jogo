@@ -426,7 +426,9 @@ var EstacaoScene = new Phaser.Class({
     var chance = 0.75 - 0.45 * GameState.lotacao();
     for (var q = 0; q < 2; q++) {
       if (Math.random() > chance) continue;
-      var pd = new Ator(this, q ? (this.itq ? MEZ.x1 - 34 : 286) : (this.itq ? MEZ.x0 + 34 : 34), 300 + Math.random() * 130,
+      // na Itaquera as cabines ocupam a altura de 300 a 390: o pedinte senta mais embaixo
+      var pd = new Ator(this, q ? (this.itq ? MEZ.x1 - 34 : 286) : (this.itq ? MEZ.x0 + 34 : 34),
+        this.itq ? 430 + Math.random() * 50 : 300 + Math.random() * 130,
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(38); pd.anima(0, false);
       pd.fixo = true;                 // quem está agachado não se mexe
@@ -526,7 +528,7 @@ var EstacaoScene = new Phaser.Class({
      passagem de quem vai comprar passagem. */
   montaBarracas: function () {
     // na Itaquera as lojas moram na galeria, lado a lado (estacao-itaquera.js)
-    if (this.itq) { this.barracas = lojasDaGaleria(); return; }
+    if (this.itq) { this.barracas = lojasDaGaleria().concat(cabinesDoMezanino()); return; }
     this.barracas = [
       {
         chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
@@ -605,6 +607,14 @@ var EstacaoScene = new Phaser.Class({
     this.add.image(this.itq ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
     if (this.itq) this.montaItaquera();
+    else {
+      /* as lixeiras das estações de sempre: duas no saguão, rente à parede
+         de baixo, e duas na plataforma, encostadas na parede */
+      this.lixeiras = [{ x: 44, y: 506 }, { x: 278, y: 506 },
+        { x: PLAT_X1 - 8, y: platY(320) }, { x: PLAT_X1 - 8, y: platY(700) }];
+      var gLx = this.add.graphics().setDepth(2.5);
+      for (var lx = 0; lx < this.lixeiras.length; lx++) pintaLixeira(gLx, this.lixeiras[lx].x, this.lixeiras[lx].y);
+    }
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
     this.montaDegraus();
 
@@ -1664,6 +1674,7 @@ var EstacaoScene = new Phaser.Class({
     if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80);
     // ---- escada rolante: a única passagem entre os dois andares ----
     if (y < 116) return x > ESC_X0 && x < ESC_X1;
+    if (this.bateNaLixeira(x, y)) return false;
     // ---- saguão ----
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
        saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
@@ -2549,8 +2560,9 @@ var EstacaoScene = new Phaser.Class({
        gente se desviando em fila é o que a rota já faz. */
     if (this.passantes) {
       var meuPeso = pesoDaMultidao();
-      for (var k = 0; k < this.passantes.length; k++) {
-        var ps = this.passantes[k];
+      var quem = this.passantes.concat((this.compradores || []).map(function (c) { return c.a; }));
+      for (var k = 0; k < quem.length; k++) {
+        var ps = quem[k];
         if (!ps || !ps.sp || !ps.sp.active) continue;
         if (Math.abs(ps.sp.y - this.pl.sp.y) > PERTO_Y) continue;
         var ax = this.pl.sp.x, ay = this.pl.sp.y;
@@ -2635,6 +2647,7 @@ var EstacaoScene = new Phaser.Class({
     empurraoNaMarra(this, this.gente, function (sp) { return eu.podeIr(sp.x, sp.y); });
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+    mostraLixoNaMao(this, this.pl);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
@@ -2659,6 +2672,7 @@ var EstacaoScene = new Phaser.Class({
      ambulante, embaixo é bilheteria, barraca e catraca. */
   contexto: function (vendo) {
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
+    if (this.contextoLixo()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {
@@ -2693,8 +2707,9 @@ var EstacaoScene = new Phaser.Class({
 
     if (y < 116) { this.dica.setText('▲ PLATAFORMA', PAL.cinza); return; }
 
-    var noGuiche = (x < (this.itq ? MEZ.x0 : 0) + ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
-    var naBilheteria = (x < (this.itq ? MEZ.x0 + 60 : 96) && y > 244 && y < 288 && !this.liberado);
+    // na Itaquera os dois são cabines (barracas com acao), e não vãos na parede
+    var noGuiche = !this.itq && (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
+    var naBilheteria = !this.itq && (x < 96 && y > 244 && y < 288 && !this.liberado);
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
     var naCatraca = (perto && !this.liberado && !gate.fechada && gate.sentido !== 'sai');
@@ -2722,10 +2737,13 @@ var EstacaoScene = new Phaser.Class({
     } else if (vendo) dica = 'sai da frente dele';
     else if (this.praCasa) dica = 'CASA: ' + SAIDAS_ITQ[saidaDeCasa()].rotulo + ' ▼';
     else if (this.liberado || this.pulou) dica = 'suba pela escada ▲';
+    if (!dica && GameState.lixo) dica = 'JOGUE O LIXO NA LIXEIRA';
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 
     if (Ctrl.actJust) {
-      if (barraca && barraca.acao === 'recarga') this.recargaBU();
+      if (barraca && barraca.acao === 'bilheteria') this.recargaBU();
+      else if (barraca && barraca.acao === 'achados') this.abreAchados();
+      else if (barraca && barraca.acao === 'recarga') this.recargaBU();
       else if (barraca && barraca.acao === 'saque') this.saca24h();
       else if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
       else if (noMapa) abreMapaParede(this);

@@ -3581,6 +3581,7 @@ var VagaoScene = new Phaser.Class({
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+    mostraLixoNaMao(this, this.pl);
 
     if (this.fuga) this.atualizaFuga(dt);
 
