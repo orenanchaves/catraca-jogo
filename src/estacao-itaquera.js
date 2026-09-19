@@ -74,7 +74,7 @@ var MEZ = { x0: -120, x1: 440 };
    outro, com as lojas lado a lado na parede de cima (a parede do fim do
    saguão vira a fachada delas), viradas pra galeria. A passarela desce
    do meio dela. Três lojas de cada lado da boca da passarela. */
-var GAL = { x0: -252, x1: 592, lojaY: 520, lojaH: 58, piso0: 578, piso1: 668 };
+var GAL = { x0: -300, x1: 592, lojaY: 520, lojaH: 58, piso0: 578, piso1: 668 };
 var ITQ_MEIO_X = (ITQ.passX0 + ITQ.passX1) / 2;
 var ITQ_MEIO_Y = (ITQ.cruzY0 + ITQ.cruzY1) / 2;
 
@@ -118,9 +118,9 @@ function lojasDaGaleria() {
      do Bilhete Único, a perfumaria e a lotérica (na transição pro
      shopping, mas todo mundo conta como "dentro").
      Lado a lado, com 20px de vão entre uma e outra ('redistribui o
-     espaçamento'): a galeria cresceu pros dois lados (de -252 a 592)
-     pra caber, com 48px de piso depois da lotérica, pra ela não ficar
-     espremida no fim. A esquerda termina em 70: dali até 188 é a boca da
+     espaçamento'): a galeria cresceu pros dois lados (de -300 a 592)
+     pra caber, com 48px de piso antes do dog e depois da lotérica, pra
+     nenhuma das duas ficar espremida na ponta. A esquerda termina em 70: dali até 188 é a boca da
      passarela. */
   var L = [
     ['dog', -244, 68, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
@@ -148,7 +148,7 @@ function lojasDaGaleria() {
 function lixeirasItq() {
   return [
     { x: MEZ.x0 + 36, y: 476 }, { x: MEZ.x1 - 36, y: 476 }, { x: 214, y: 506 },
-    { x: -150, y: GAL.piso1 - 10 }, { x: 250, y: GAL.piso1 - 10 }, { x: 566, y: GAL.piso1 - 10 },
+    { x: -278, y: GAL.piso1 - 10 }, { x: 250, y: GAL.piso1 - 10 }, { x: 566, y: GAL.piso1 - 10 },
     { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[0] + 4 },
     { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[2] + 4 }
   ];
