@@ -1633,7 +1633,8 @@ var ZapScene = new Phaser.Class({
     this.linha(2, y + 134, nivel ? e.nome : '???', nivel ? PAL.branco : PAL.cinzaEsc);
     this.linhas[2].setOrigin(0.5, 0).setPosition(cx, y + 134);
     var estado = nivel === 2 ? 'VENCIDO' : (nivel ? 'VISTO' : 'NUNCA VISTO');
-    this.linha(3, y + 156, estado + (nivel ? '  -  ' + e.onde : ''), nivel === 2 ? PAL.verde : PAL.cinza);
+    // embaixo do nome: se já viu, e onde costuma aparecer (isso a METRODEX conta sempre)
+    this.linha(3, y + 156, estado + '  -  ' + e.aparece, nivel === 2 ? PAL.verde : PAL.cinza);
     this.linhas[3].setScale(ESCALA_TEXTO / 2).setOrigin(0.5, 0).setPosition(cx, y + 156);
     // o que ele faz
     g.fillStyle(0x121218, 1).fillRoundedRect(x + 10, y + 172, W - 20, 36, 6);

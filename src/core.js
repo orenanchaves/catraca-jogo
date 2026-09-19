@@ -3541,6 +3541,19 @@ var COR_TIPO = {
   CHATO: 0xf2c14e, TORCIDA: 0x00e676, GUARDA: 0x3a7fd0, VENDEDOR: 0xe8a33c,
   RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0, COSPLAY: 0xf08ab8
 };
+/* Onde cada um costuma aparecer ('coloca em qual estação, pra toda a
+   METRODEX'): é o que o jogo faz de verdade, e não enfeite. */
+var DEX_APARECE = {
+  tiozao: 'QUALQUER VAGÃO', pregador: 'QUALQUER VAGÃO',
+  corintiano: 'DA SÉ ATÉ ITAQUERA', palmeirense: 'DA SÉ ATÉ BARRA FUNDA',
+  saopaulino: 'TODA A REDE, MENOS ITAQUERA', santista: 'TODA A REDE, MENOS ITAQUERA',
+  barra: 'VAGÃO CHEIO, SEGURANDO', guardinha: 'CATRACA DE TODAS', guardaMedio: 'CATRACA DE TODAS',
+  guardaForte: 'CATRACA DE TODAS', ambulante: 'PLATAFORMA E VAGÃO', rimador: 'VAGÃO',
+  pedinte: 'SAGUÃO DE TODAS', atendente: 'BILHETERIA DE TODAS', gestante: 'BANCO DO VAGÃO', idoso: 'BANCO DO VAGÃO',
+  cosLaranja: 'DA ANA ROSA ATÉ TIRADENTES', cosVingador: 'DA ANA ROSA ATÉ TIRADENTES', cosNuvem: 'DA ANA ROSA ATÉ TIRADENTES',
+  cosRosa: 'DA ANA ROSA ATÉ TIRADENTES', cosColegial: 'DA ANA ROSA ATÉ TIRADENTES'
+};
+for (var dxa = 0; dxa < DEX.length; dxa++) DEX[dxa].aparece = DEX_APARECE[DEX[dxa].id] || DEX[dxa].onde;
 var DEX_POR_SPRITE = {};
 for (var dxi = 0; dxi < DEX.length; dxi++) DEX_POR_SPRITE[DEX[dxi].sprite] = DEX[dxi].id;
 DEX_POR_SPRITE.np_pedinte_b = 'pedinte';
