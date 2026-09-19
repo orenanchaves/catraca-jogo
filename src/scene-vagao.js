@@ -2451,7 +2451,16 @@ var VagaoScene = new Phaser.Class({
       // encostou: a oferta abre; ficou longe demais por muito tempo: desiste
       if (d < 26) {
         v.fase = 'vende'; a.dir = dy < 0 ? 'up' : 'down'; a.anima(0, false);
-        fala(this, '"Olha o chocolate, dois real,\ndois real o chocolate."', [
+        fala(this, '"Olha o Ralls, olha o chocolate,\né dois real!"', [
+          { label: 'Comprar um Ralls (R$ 2,00)', cb: function () {
+            if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); }
+            else {
+              GameState.gastar(2); GameState.addCarisma(2); GameState.addDescanso(1);
+              GameState.stats.causos++; sfx('moeda'); self.flash('Hálito de menta.');
+              Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
+            }
+            self.ambulanteVai();
+          } },
           { label: 'Comprar (R$ 2,00)', cb: function () {
             if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); }
             else {

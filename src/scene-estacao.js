@@ -558,7 +558,7 @@ var EstacaoScene = new Phaser.Class({
         { chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c, x: 236, y: 420, w: 68, h: 58, lado: 0,
           titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."', cardapio: ['dogao', 'agua', 'chocolate'] },
         { chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0, x: 318, y: 424, w: 68, h: 54, lado: 0,
-          titulo: '"Jornal, bala, pururuca."', cardapio: ['pururuca', 'doce', 'jornal', 'agua'] }
+          titulo: '"Jornal, Ralls, pururuca."', cardapio: ['pururuca', 'ralls', 'jornal', 'agua'] }
       ]);
       return;
     }
@@ -2909,8 +2909,8 @@ var EstacaoScene = new Phaser.Class({
         // mais do que a faixa aguenta, e o fim sai pela borda
         this.dica.setText(nomeAgir() + ': COMPRAR', PAL.amarelo);
         if (Ctrl.actJust) {
-          abreBarraca(this, '"Olha o chocolate, a água\ngeladinha, a pururuca!"',
-            estaCalor() ? ['agua', 'pururuca', 'chocolate', 'doce'] : ['chocolate', 'pururuca', 'doce', 'agua'],
+          abreBarraca(this, '"Olha o Ralls, o chocolate,\na água geladinha!"',
+            estaCalor() ? ['agua', 'ralls', 'pururuca', 'chocolate'] : ['ralls', 'chocolate', 'pururuca', 'agua'],
             null, true);
         }
       } else if (this.mapaPerto(x, y)) {

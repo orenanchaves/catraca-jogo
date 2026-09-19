@@ -586,6 +586,8 @@ function nomeDoPasso(v) {
 var ITENS = {
   chocolate: { nome: 'CHOCOLATE', preco: 2.00, descanso: 8, min: 1 },
   doce: { nome: 'DOCE', preco: 1.00, descanso: 5, min: 1 },
+  // a bala de todo ambulante de metrô: refresca o hálito, e isso é carisma
+  ralls: { nome: 'RALLS', preco: 2.00, descanso: 4, min: 1, carisma: 2 },
   pururuca: { nome: 'PURURUCA', preco: 3.00, descanso: 10, min: 1, carisma: 1 },
   agua: { nome: 'ÁGUA', preco: 3.00, descanso: 12, min: 1, noCalor: 1.6 },
   cafe: { nome: 'CAFÉ', preco: 4.00, descanso: 16, min: 2 },
