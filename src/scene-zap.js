@@ -55,7 +55,8 @@ var ZAP_BOTAO = { dx: 8, dy: -92, alt: 30, altNota: 40, passo: 44, texto: 18 };
 
 /* As cartas da METRODEX: duas por fileira, duas fileiras. A medida mora
    aqui porque o recorte do nome de cada carta é feito uma vez só, no create. */
-var DEXC = { W: 128, H: 156, VAO: 8 };
+var DEXC = { W: 128, H: 148, VAO: 8 };
+function semAcentoDex(t) { return String(t).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 DEXC.x0 = 0; DEXC.y0 = 0;   // acertados logo abaixo do ZAP
 /* ---------- o mapa do celular, fiel ao do Metrô ----------
    'Tentar mais fiel a esse mapa, focando na azul e na vermelha.' A Azul
@@ -238,7 +239,8 @@ var ZapScene = new Phaser.Class({
     /* as cartas da METRODEX: quatro na tela, cada uma com seis textos e
        uma zona de toque (o boneco vem da reserva de figurinhas da mochila) */
     this.cartasDex = [];
-    DEXC.x0 = ZAP.tx0 + (ZAP.tx1 - ZAP.tx0 - (DEXC.W * 2 + DEXC.VAO)) / 2; DEXC.y0 = ZAP.topo + 4;
+    DEXC.x0 = ZAP.tx0 + (ZAP.tx1 - ZAP.tx0 - (DEXC.W * 2 + DEXC.VAO)) / 2; DEXC.y0 = ZAP.topo + 44;
+    this.montaBuscaDex();
     this.dexAberta = -1;
     for (var cd = 0; cd < 4; cd++) {
       var meia = function (s) { return s.setScale(ESCALA_TEXTO / 2).setDepth(2404).setVisible(false); };
@@ -254,7 +256,7 @@ var ZapScene = new Phaser.Class({
          largura de dentro dela. */
       var mx = DEXC.x0 + (cd % 2) * (DEXC.W + DEXC.VAO), my = DEXC.y0 + Math.floor(cd / 2) * (DEXC.H + DEXC.VAO);
       var mn = this.make.graphics({ add: false });
-      mn.fillStyle(0xffffff, 1).fillRect(mx + 6, my + 88, DEXC.W - 12, 22);
+      mn.fillStyle(0xffffff, 1).fillRect(mx + 6, my + 84, DEXC.W - 12, 22);
       ct.nome.setMask(mn.createGeometryMask());
       ct.zona = this.add.zone(0, 0, 10, 10).setOrigin(0, 0);
       // tocar na carta abre a ficha dela, com tudo o que se sabe da pessoa
@@ -384,7 +386,11 @@ var ZapScene = new Phaser.Class({
       if (self.modo === 'app' && self.dexAberta >= 0) {
         // na ficha: as setas passam pra pessoa do lado; o resto volta pras cartas
         var df = (c === 'KeyA' || c === 'ArrowLeft') ? -1 : ((c === 'KeyD' || c === 'ArrowRight') ? 1 : 0);
-        if (df) { self.dexAberta = self.sel = (self.dexAberta + df + DEX.length) % DEX.length; sfx('catraca'); self.pinta(); }
+        if (df) {
+          var ld = self.dexLista();
+          self.sel = (self.sel + df + ld.length) % ld.length; self.dexAberta = ld[self.sel];
+          sfx('catraca'); self.pinta();
+        }
         else self.fechaFicha();
         return;
       }
@@ -409,7 +415,7 @@ var ZapScene = new Phaser.Class({
         else if (c === 'KeyD' || c === 'ArrowRight') dd = 1;
         else if (c === 'KeyW' || c === 'ArrowUp') dd = -2;
         else if (c === 'KeyS' || c === 'ArrowDown') dd = 2;
-        if (dd) { self.sel = Phaser.Math.Clamp(self.sel + dd, 0, DEX.length - 1); sfx('catraca'); self.pinta(); return; }
+        if (dd) { self.sel = Phaser.Math.Clamp(self.sel + dd, 0, Math.max(0, self.dexLista().length - 1)); sfx('catraca'); self.pinta(); return; }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') { self.abreFicha(self.sel); return; }
       }
       if (c === 'KeyA' || c === 'ArrowLeft') { self.trocaAba(-1); return; }
@@ -487,8 +493,10 @@ var ZapScene = new Phaser.Class({
     this.pinta();
   },
 
-  abreFicha: function (k) {
-    this.sel = this.dexAberta = k;
+  abreFicha: function (pos) {
+    var l = this.dexLista();
+    if (!l.length || pos >= l.length) return;
+    this.sel = pos; this.dexAberta = l[pos];
     sfx('ok');
     this.pinta();
   },
@@ -501,6 +509,7 @@ var ZapScene = new Phaser.Class({
 
   vaiInicio: function () {
     if (this.modo !== 'app') return;
+    if (this.inpDex) this.inpDex.blur();
     this.fio = null; this.dexAberta = -1;
     this.modo = 'inicio';
     sfx('catraca');
@@ -610,6 +619,11 @@ var ZapScene = new Phaser.Class({
       cc._rola = null;
     }
     this.zonaFicha.disableInteractive();
+    if (this.tChipsDex) {
+      this.tChipsDex.forEach(function (t) { t.setVisible(false); });
+      this.tBuscaDex.setVisible(false); this.gChipsDex.clear();
+      this.zBuscaDex.disableInteractive(); this.zChipsDex.disableInteractive();
+    }
     this.zonaMapa.disableInteractive();
     this.zonaAbasMapa.disableInteractive();
     for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0).clearMask();
@@ -1418,16 +1432,22 @@ var ZapScene = new Phaser.Class({
      fraqueza (que só aparece depois de vencer); dos outros: onde aparece e
      se já foi visto. Quem nunca passou perto é silhueta com ???. */
   pintaDex: function (g) {
-    var dex = leDex(), n = DEX.length, vistos = 0, i;
-    for (i = 0; i < n; i++) if (dex[DEX[i].id]) vistos++;
+    var dex = leDex(), lista = this.dexLista(), n = lista.length, vistos = 0, i;
+    for (i = 0; i < DEX.length; i++) if (dex[DEX[i].id]) vistos++;
+    this.pintaBuscaDex(g);
     if (this.sel >= n) this.sel = 0;
+    if (!n) {
+      this.linha(0, DEXC.y0 + 60, 'NADA ENCONTRADO', PAL.cinzaEsc).setOrigin(0.5, 0).setPosition(GW / 2, DEXC.y0 + 60);
+      this.tRodape.setText('VISTOS ' + vistos + ' DE ' + DEX.length);
+      return;
+    }
     var fileiras = Math.ceil(n / 2);
-    this.topoDex = Math.min(Math.floor(this.sel / 2), fileiras - 2) * 2;
+    this.topoDex = Math.max(0, Math.min(Math.floor(this.sel / 2), fileiras - 2) * 2);
     var W = DEXC.W, H = DEXC.H, VAO = DEXC.VAO, x0 = DEXC.x0, y0 = DEXC.y0;
     for (i = 0; i < 4; i++) {
       var k = this.topoDex + i, ct = this.cartasDex[i], fig = this.figMochila[i];
       if (k >= n) continue;
-      var e = DEX[k], nivel = dex[e.id] || 0, sel = (k === this.sel);
+      var kd = lista[k], e = DEX[kd], nivel = dex[e.id] || 0, sel = (k === this.sel);
       var x = x0 + (i % 2) * (W + VAO), y = y0 + Math.floor(i / 2) * (H + VAO), cx = x + W / 2;
       var cor = nivel ? (COR_TIPO[e.tipo] || 0xb8bccc) : 0x3a3a4a;
       // a carta: fundo, borda do tipo (mais grossa na escolhida)
@@ -1437,14 +1457,14 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0x0a0a10, 0.9).fillRoundedRect(x + 5, y + 5, 30, 12, 6);
       g.fillStyle(cor, 1).fillCircle(x + W - 12, y + 11, 5);
       // o círculo escuro com o boneco
-      g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 52, 36);
-      g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 46, 28);
-      fig.setTexture(e.sprite, 0).setScale(1.4).setPosition(cx, y + 54).setVisible(true);
+      g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 50, 34);
+      g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 44, 26);
+      fig.setTexture(e.sprite, 0).setScale(1.4).setPosition(cx, y + 52).setVisible(true);
       if (nivel) fig.clearTint(); else fig.setTintFill(0x14141c);
-      ct.num.setVisible(true).setPosition(x + 10, y + 7).setText('#' + (k + 1 < 10 ? '00' : '0') + (k + 1));
+      ct.num.setVisible(true).setPosition(x + 10, y + 7).setText('#' + (kd + 1 < 10 ? '00' : '0') + (kd + 1));
       // o nome, sempre no tamanho cheio; o que passa da carta vira letreiro (ver update)
       var nome = nivel ? e.nome : '???';
-      ct.nome.setVisible(true).setOrigin(0.5, 0).setPosition(cx, y + 91).setText(nome)
+      ct.nome.setVisible(true).setOrigin(0.5, 0).setPosition(cx, y + 87).setText(nome)
         .setScale(ESCALA_TEXTO).setColor(nivel ? PAL.branco : PAL.cinzaEsc);
       if (ct.nome.width > W - 14) {
         // três vezes com vão de três espaços: a volta não pula e a faixa nunca fica vazia
@@ -1460,16 +1480,122 @@ var ZapScene = new Phaser.Class({
         r1 = 'ONDE'; v1 = nivel ? e.onde : '???';
         r2 = e.pega ? 'PEGA' : 'VISTO'; v2 = nivel ? (e.pega || 'SIM') : 'NÃO';
       }
-      ct.r1.setVisible(true).setPosition(x + W * 0.28, y + 112).setText(r1);
-      ct.v1.setVisible(true).setPosition(x + W * 0.28, y + 122).setText(v1);
-      ct.r2.setVisible(true).setPosition(x + W * 0.72, y + 112).setText(r2);
-      ct.v2.setVisible(true).setPosition(x + W * 0.72, y + 122).setText(v2).setColor(nivel === 2 ? PAL.verde : PAL.branco);
-      ct.tipo.setVisible(true).setPosition(cx, y + 138).setText('TIPO: ' + (nivel ? e.tipo : '???'));
+      ct.r1.setVisible(true).setPosition(x + W * 0.28, y + 106).setText(r1);
+      ct.v1.setVisible(true).setPosition(x + W * 0.28, y + 116).setText(v1);
+      ct.r2.setVisible(true).setPosition(x + W * 0.72, y + 106).setText(r2);
+      ct.v2.setVisible(true).setPosition(x + W * 0.72, y + 116).setText(v2).setColor(nivel === 2 ? PAL.verde : PAL.branco);
+      ct.tipo.setVisible(true).setPosition(cx, y + 131).setText('TIPO: ' + (nivel ? e.tipo : '???'));
       ct.zona.setPosition(x, y).setSize(W, H).setInteractive();
     }
-    // a carta escolhida conta o que ela faz no rodapé
-    var es = DEX[this.sel], ns = dex[es.id] || 0;
-    this.tRodape.setText('VISTOS ' + vistos + ' DE ' + n);
+    this.tRodape.setText('VISTOS ' + vistos + ' DE ' + DEX.length);
+  },
+
+  /* ---------- a pesquisa e as tags da METRODEX ----------
+     'Tem que ter tags e barra de pesquisa no METRODEX também.' Em cima
+     das cartas, a pesquisa (um campo de texto de verdade, invisível, pra
+     o teclado do celular abrir) e a fileira de tags por tipo, que se
+     arrasta pro lado como os filtros do zap. A pesquisa procura no tipo,
+     no lugar e, de quem você já viu, no nome: quem é ??? continua ???. */
+  montaBuscaDex: function () {
+    var self = this, W = ZAP.tx1 - ZAP.tx0;
+    this.dexTag = 'TODOS'; this.dexBusca = ''; this.dexChipX = 0;
+    var tipos = ['TODOS'];
+    DEX.forEach(function (e) { if (tipos.indexOf(e.tipo) < 0) tipos.push(e.tipo); });
+    this.tagsDex = tipos;
+    this.gChipsDex = this.add.graphics().setDepth(2401);
+    var mk = this.make.graphics({ add: false });
+    mk.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, ZAP.topo + 18, W, 20);
+    this.mascChips = mk.createGeometryMask();
+    this.gChipsDex.setMask(this.mascChips);
+    this.tChipsDex = tipos.map(function () {
+      return txtC(self, 0, 0, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2403).setVisible(false).setMask(self.mascChips);
+    });
+    this.tBuscaDex = txt(this, ZAP.tx0 + 30, ZAP.topo - 1, '', PAL.cinza, 8).setScale(ESCALA_TEXTO / 2).setDepth(2403).setVisible(false);
+    // o campo de texto de verdade, fora da vista
+    var inp = document.getElementById('buscaDex');
+    if (!inp) {
+      inp = document.createElement('input');
+      inp.id = 'buscaDex'; inp.type = 'text'; inp.autocomplete = 'off'; inp.setAttribute('autocapitalize', 'characters');
+      inp.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;';
+      document.body.appendChild(inp);
+    }
+    inp.value = '';
+    this.inpDex = inp;
+    var teclado = function (liga) {
+      self.scene.manager.getScenes(true).forEach(function (sc) {
+        if (sc.input && sc.input.keyboard) { sc.input.keyboard.enabled = liga; if (liga) sc.input.keyboard.enableGlobalCapture(); else sc.input.keyboard.disableGlobalCapture(); }
+      });
+    };
+    inp.oninput = function () {
+      if (!self.sys.isActive()) return;
+      self.dexBusca = inp.value.toUpperCase(); self.sel = 0; self.pinta();
+    };
+    inp.onfocus = function () { teclado(false); self.buscaAtiva = true; if (self.sys.isActive()) self.pinta(); };
+    inp.onblur = function () { teclado(true); self.buscaAtiva = false; if (self.sys.isActive()) self.pinta(); };
+    inp.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === 'Escape') inp.blur(); };
+    this.events.once('shutdown', function () { try { inp.blur(); } catch (e) { } });
+    // tocar na pesquisa abre o teclado
+    this.zBuscaDex = this.add.zone(ZAP.tx0 + 6, ZAP.topo - 6, W - 12, 22).setOrigin(0, 0);
+    this.zBuscaDex.on('pointerdown', function () { if (self.modo === 'app' && self.aba === 5 && self.dexAberta < 0) inp.focus(); });
+    // as tags: arrastar rola, tocar escolhe
+    this.zChipsDex = this.add.zone(ZAP.tx0, ZAP.topo + 18, W, 20).setOrigin(0, 0);
+    this.zChipsDex.on('pointerdown', function (pt) { self._arrChip = { x: pt.x, x0: self.dexChipX, andou: false }; });
+    this.input.on('pointermove', function (pt) {
+      var a = self._arrChip;
+      if (!a || !pt.isDown || self.aba !== 5) return;
+      if (Math.abs(pt.x - a.x) > 5) a.andou = true;
+      if (a.andou) { self.dexChipX = Phaser.Math.Clamp(a.x0 - (pt.x - a.x), 0, Math.max(0, self._larguraChips - W + 16)); self.pinta(); }
+    });
+    this.input.on('pointerup', function (pt) {
+      var a = self._arrChip; self._arrChip = null;
+      if (!a || a.andou || self.aba !== 5) return;
+      var pos = self._posChips || [];
+      for (var i = 0; i < pos.length; i++) {
+        if (pt.x >= pos[i].x && pt.x <= pos[i].x + pos[i].w) {
+          self.dexTag = self.tagsDex[i]; self.sel = 0; sfx('catraca'); self.pinta(); return;
+        }
+      }
+    });
+  },
+  // os índices de DEX que passam pela tag e pela pesquisa
+  dexLista: function () {
+    var tag = this.dexTag || 'TODOS', b = semAcentoDex((this.dexBusca || '').trim()), dex = leDex(), out = [];
+    for (var i = 0; i < DEX.length; i++) {
+      var e = DEX[i];
+      if (tag !== 'TODOS' && e.tipo !== tag) continue;
+      if (b) {
+        var onde = semAcentoDex((dex[e.id] ? e.nome + ' ' : '') + e.tipo + ' ' + e.onde);
+        if (onde.indexOf(b) < 0) continue;
+      }
+      out.push(i);
+    }
+    return out;
+  },
+  pintaBuscaDex: function (g) {
+    var x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0, gc = this.gChipsDex, T = ZAP.topo, i;
+    // a pesquisa
+    g.fillStyle(this.buscaAtiva ? 0x2a3440 : 0x1c1c24, 1).fillRoundedRect(x0 + 6, T - 6, W - 12, 20, 10);
+    if (this.buscaAtiva) g.lineStyle(1, 0x00e676, 1).strokeRoundedRect(x0 + 6.5, T - 5.5, W - 13, 19, 10);
+    g.lineStyle(2, 0x8b90a6, 1).strokeCircle(x0 + 19, T + 3, 4);
+    g.lineBetween(x0 + 22, T + 6, x0 + 26, T + 10);
+    var cursor = this.buscaAtiva && Math.floor(Date.now() / 500) % 2 ? '_' : '';
+    this.tBuscaDex.setVisible(true).setText(this.dexBusca ? this.dexBusca + cursor : (this.buscaAtiva ? cursor : 'PESQUISAR NA METRODEX'))
+      .setColor(this.dexBusca ? PAL.branco : PAL.cinzaEsc);
+    // as tags
+    gc.clear();
+    var x = x0 + 8 - this.dexChipX, pos = [];
+    for (i = 0; i < this.tagsDex.length; i++) {
+      var tg = this.tagsDex[i], on = tg === this.dexTag, w = tg.length * 6 + 16;
+      var cor = tg === 'TODOS' ? 0x00e676 : (COR_TIPO[tg] || 0xb8bccc);
+      gc.fillStyle(on ? cor : 0x1c1c24, 1).fillRoundedRect(x, T + 19, w, 17, 8);
+      if (!on) gc.lineStyle(1, cor, 0.8).strokeRoundedRect(x + 0.5, T + 19.5, w - 1, 16, 8);
+      this.tChipsDex[i].setVisible(true).setPosition(x + w / 2, T + 24).setText(tg).setColor(on ? '#0a0a12' : PAL.branco);
+      pos.push({ x: x, w: w });
+      x += w + 5;
+    }
+    this._posChips = pos;
+    this._larguraChips = x + this.dexChipX - x0;
+    this.zBuscaDex.setInteractive(); this.zChipsDex.setInteractive();
   },
 
   /* ---------- a ficha ----------
@@ -1578,6 +1704,7 @@ var ZapScene = new Phaser.Class({
       GameState.bateria = Math.max(0, GameState.bateria - dt / 3000);
       if (GameState.bateria <= 0) { sfx('nao'); this.fecha(); return; }
     }
+    if (this.buscaAtiva && this.aba === 5 && time - (this._tCursor || 0) > 500) { this._tCursor = time; this.pinta(); }
     // o nome comprido das cartas da METRODEX roda da direita pra esquerda
     if (this.modo === 'app' && this.aba === 5 && this.cartasDex) {
       for (var ci = 0; ci < this.cartasDex.length; ci++) {
