@@ -769,45 +769,66 @@ var ZapScene = new Phaser.Class({
     var i;
 
     if (this.fio) {
-      // conversa aberta: o nome no topo e os balões embaixo
-      g.fillStyle(0x14231c, 1).fillRect(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, 26);
-      /* A seta de voltar mora no nome, como em qualquer aplicativo de
-         mensagem. Sem ela, a conversa com compromisso não tinha saída
-         que não fosse responder: as duas opções eram sim e não, e
-         nenhuma delas era "depois eu vejo". */
-      this.linha(0, ZAP.topo - 4, '◄ ' + (this.fio.grupo ? '# ' : '') + this.fio.nome, PAL.verde);
-
-      /* Os balões: o que chegou fica à esquerda, cinza; o que VOCÊ
-         mandou fica à direita, verde. É a única coisa que faz uma tela
-         de mensagens parecer uma conversa em vez de um mural. */
-      var y = ZAP.topo + 32, n = 0;
-      for (i = 0; i < this.fio.msgs.length && n < 9; i++, n++) {
-        this.balao(g, n + 1, y, this.fio.msgs[i], false);
-        y += 30;
+      /* ---------- a conversa, com cara de zap ----------
+         'Melhora os diálogos do celular no ZipZap.' Era uma linha de
+         texto grande por balão, que passava da borda da tela, e o
+         destino da resposta encavalava no botão. Agora é o que todo
+         mundo reconhece: o cabeçalho com a foto, o nome e o 'online'; o
+         fundo escuro de conversa; UMA mensagem por balão, quebrando a
+         linha dentro dele, com o biquinho e a hora no canto; a sua
+         resposta à direita em verde, com o ✓✓; e as respostas possíveis
+         como botões, com o destino numa linha menor embaixo. */
+      var f0 = this.fio, x0 = ZAP.tx0, x1 = ZAP.tx1, W = x1 - x0;
+      // o fundo da conversa, com os pontinhos do papel de parede
+      g.fillStyle(0x0b141a, 1).fillRect(x0, ZAP.topo - 8, W, ZAP.abas - ZAP.topo + 8);
+      g.fillStyle(0x16222a, 1);
+      for (var py = ZAP.topo + 30; py < ZAP.abas - 100; py += 18) {
+        for (var px = x0 + 10 + ((py / 18) % 2) * 9; px < x1 - 6; px += 18) g.fillRect(px, py, 2, 2);
       }
-      for (i = 0; i < this.fio.enviadas.length && n < 9; i++, n++) {
-        this.balao(g, n + 1, y, this.fio.enviadas[i], true);
-        y += 30;
-      }
+      // o cabeçalho: voltar, a foto, o nome e o online
+      g.fillStyle(0x1f2c34, 1).fillRect(x0, ZAP.topo - 8, W, 34);
+      g.fillStyle(f0.grupo ? 0x3a5a8a : 0x4a4a5e, 1).fillCircle(x0 + 30, ZAP.topo + 9, 11);
+      g.fillStyle(0x7a7a90, 1).fillCircle(x0 + 30, ZAP.topo + 5, 4).fillRect(x0 + 24, ZAP.topo + 11, 12, 6);
+      this.linha(0, ZAP.topo - 6, '◄', PAL.verde).setPosition(x0 + 4, ZAP.topo + 1);
+      this.linha(1, ZAP.topo - 6, (f0.grupo ? '# ' : '') + f0.nome, PAL.branco).setPosition(x0 + 48, ZAP.topo - 5);
+      this.linha(2, ZAP.topo, f0.grupo ? 'GRUPO' : 'ONLINE', PAL.verde).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 48, ZAP.topo + 13);
 
-      // e as respostas possíveis, uma por linha, com a mira na escolhida
+      var hora = GameState.hora ? GameState.hora() : '';
+      var y = ZAP.topo + 38, eu = this;
+      // um balão: o texto quebra dentro dele; a hora (e o ✓✓ no seu) no canto de baixo
+      var bal = function (iTxt, iHora, texto, meu) {
+        var t = eu.linhas[iTxt], th = eu.linhas[iHora], esc = ESCALA_TEXTO / 2, maxW = W - 64;
+        t.setVisible(true).setOrigin(0, 0).setScale(esc).setMaxWidth(maxW / esc).setText(texto).setColor(PAL.branco);
+        var tw = Math.min(maxW, Math.ceil(t.width)), tHt = Math.ceil(t.height);
+        th.setVisible(true).setOrigin(1, 0).setScale(esc).setText(hora + (meu ? ' ✓✓' : '')).setColor(meu ? '#7fd8ff' : PAL.cinza);
+        var bw = Math.max(tw, Math.ceil(th.width) + 4) + 16, bh = tHt + 22;
+        var bx = meu ? x1 - 10 - bw : x0 + 10;
+        g.fillStyle(meu ? 0x005c4b : 0x1f2c34, 1).fillRoundedRect(bx, y, bw, bh, 6);
+        // o biquinho, no canto de cima do lado de quem fala
+        if (meu) g.fillTriangle(bx + bw - 6, y, bx + bw + 6, y, bx + bw - 6, y + 10);
+        else g.fillTriangle(bx + 6, y, bx - 6, y, bx + 6, y + 10);
+        t.setPosition(bx + 8, y + 6);
+        th.setPosition(bx + bw - 6, y + bh - 12);
+        y += bh + 8;
+      };
+      bal(3, 4, f0.msgs.join(' '), false);
+      for (i = 0; i < f0.enviadas.length && i < 2; i++) bal(5 + i * 2, 6 + i * 2, f0.enviadas[i], true);
+
+      // as respostas possíveis: botões arredondados, o destino numa linha menor embaixo
       var ops = this.respostasDoFio();
       for (i = 0; i < ops.length; i++) {
         var by = ZAP.abas + ZAP_BOTAO.dy + i * ZAP_BOTAO.passo;
         var mira = (i === Math.min(this.opBotao, ops.length - 1));
         var cor = num(ops[i].cor);
-        var bx = ZAP.tx0 + ZAP_BOTAO.dx, bw = (ZAP.tx1 - ZAP.tx0) - ZAP_BOTAO.dx * 2;
+        var bx = x0 + ZAP_BOTAO.dx, bw = W - ZAP_BOTAO.dx * 2;
         var bh = ops[i].nota ? ZAP_BOTAO.altNota : ZAP_BOTAO.alt;
-        g.fillStyle(mira ? 0x1b2a22 : 0x11161d, 1).fillRect(bx, by, bw, bh);
-        g.lineStyle(2, mira ? cor : 0x2a2a3a, 1).strokeRect(bx, by, bw, bh);
-        /* o texto começa dentro da caixa do botão, não na margem da
-           tela: com o recuo em espaços a resposta longa encostava na
-           borda direita da moldura */
-        this.linha(10 + i * 2, by + 5, ops[i].rotulo, mira ? ops[i].cor : PAL.cinzaEsc)
+        g.fillStyle(mira ? 0x10332a : 0x1f2c34, 1).fillRoundedRect(bx, by, bw, bh, 8);
+        g.lineStyle(2, mira ? cor : 0x2f3f48, 1).strokeRoundedRect(bx + 1, by + 1, bw - 2, bh - 2, 8);
+        this.linha(10 + i * 2, by + 5, ops[i].rotulo, mira ? ops[i].cor : PAL.branco)
           .setPosition(bx + 10, by + 5);
         if (ops[i].nota) {
-          this.linha(11 + i * 2, by + 24, '► ' + ops[i].nota, PAL.cinza)
-            .setPosition(bx + 24, by + 24);
+          this.linha(11 + i * 2, by + 25, 'VAI PRA: ' + ops[i].nota, PAL.amarelo)
+            .setScale(ESCALA_TEXTO / 2).setPosition(bx + 12, by + 25);
         }
       }
       /* Zona de toque só onde há coisa desenhada. Dentro da conversa a
