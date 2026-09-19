@@ -713,20 +713,29 @@ var ZapScene = new Phaser.Class({
        toco. Fica o que se vê de quem segura: o polegar entrando pela
        borda, inclinado, com a ponta e a unha deitadas na moldura. A mão
        está fora da tela, como na foto. */
-    var ty = Y - 250, ang = -0.5, cs = Math.cos(ang), sn = Math.sin(ang);
-    var gira = function (px, py) { return { x: X + 6 + px * cs - py * sn, y: ty + 8 + px * sn + py * cs }; };
-    var dedo = function (comp, larg, d) {
+    /* Dedão é dedão ('não tá com cara de dedão'): grosso (18px, o dobro
+       das pontas do outro lado), comprido, quase em pé como quem segura,
+       a ponta redonda e a unha oval grande e clara, com a dobra da junta. */
+    var ty = Y - 236, ang = -1.1, cs = Math.cos(ang), sn = Math.sin(ang);
+    var gira = function (px, py) { return { x: X + 8 + px * cs - py * sn, y: ty + px * sn + py * cs }; };
+    var forma = function (d) {
       var pts = [], k;
-      for (k = 0; k <= 8; k++) { var a = -Math.PI / 2 + k * Math.PI / 8; pts.push(gira(Math.cos(a) * larg + d, Math.sin(a) * larg + d)); }
-      pts.push(gira(-comp + d, larg + d)); pts.push(gira(-comp + d, -larg + d));
+      for (k = 0; k <= 10; k++) { var a = -Math.PI / 2 + k * Math.PI / 10; pts.push(gira(-10 + Math.cos(a) * (10 + d), Math.sin(a) * (9 + d))); }
+      pts.push(gira(-80, 11 + d)); pts.push(gira(-80, -11 - d));
       return pts;
     };
-    g.fillStyle(som, 1).fillPoints(dedo(46, 8, 1), true);
-    g.fillStyle(pele, 1).fillPoints(dedo(46, 7, 0), true);
-    var un = gira(1, 0);
-    g.fillStyle(unha, 1).fillCircle(un.x, un.y, 4);
-    var dob = [gira(-18, -6), gira(-18, 5)];
-    g.lineStyle(1, som, 1).lineBetween(dob[0].x, dob[0].y, dob[1].x, dob[1].y);   // a dobra do polegar
+    var oval = function (cx, cy, rx, ry) {
+      var pts = [];
+      for (var k = 0; k < 12; k++) { var a = k * Math.PI / 6; pts.push(gira(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry)); }
+      return pts;
+    };
+    g.fillStyle(som, 1).fillPoints(forma(1), true);
+    g.fillStyle(pele, 1).fillPoints(forma(0), true);
+    g.fillStyle(0xb67c55, 1).fillPoints(oval(-9, 1, 8, 7), true);        // a borda da unha
+    g.fillStyle(unha, 1).fillPoints(oval(-8, 1, 6.5, 5.5), true);        // a unha
+    g.fillStyle(0xf6dcc4, 1).fillPoints(oval(-6, -1, 2.5, 2), true);     // o brilho
+    var j0 = gira(-30, -8), j1 = gira(-30, 8), j2 = gira(-34, -6), j3 = gira(-34, 6);
+    g.lineStyle(1, som, 1).lineBetween(j0.x, j0.y, j1.x, j1.y).lineBetween(j2.x, j2.y, j3.x, j3.y);   // a dobra da junta
     // as pontas dos quatro dedos, do lado direito, o mindinho menor
     for (dd = 0; dd < 4; dd++) {
       var fy = Y - 330 + dd * 26, larg = dd === 3 ? 8 : 11;
