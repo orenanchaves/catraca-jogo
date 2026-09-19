@@ -1122,6 +1122,9 @@ var CORPO_BASE = {
     '....pppppppp....', '................', '................', '................']
 };
 
+// a pose de segurar parte do de frente; o braço sobe depois das camadas (bracoPraCima)
+CORPO_BASE.segurando = CORPO_BASE.down;
+
 /* pernas: os quadros de caminhada trocam as últimas linhas do corpo */
 var PERNAS_PADRAO = {
   inicio: 20,
@@ -1479,14 +1482,35 @@ var CORPOS = {
   pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE }
 };
 
-var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas'];
+var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas', 'segurando'];
+
+/* ---------- segurando a barra do teto ----------
+   A pose nasce do boneco de frente DEPOIS de todas as camadas (cabelo,
+   saia, mochila, bengala): o braço da direita sobe pelo lado da cabeça
+   até a linha 0, com a mão fechada no alto, e a mão que estava do lado
+   do corpo some. Feito por cima e não como camada porque o braço tem
+   que passar na frente de qualquer cabelo. No quadro de 32x48 a mão
+   fica 12px à direita do meio: é essa a distância pra barra. */
+var MAO_DA_BARRA = 12;
+function bracoPraCima(art) {
+  var a = art.slice(0), y;
+  function poe(yy, x, ch) { a[yy] = a[yy].substr(0, x) + ch + a[yy].substr(x + 1); }
+  poe(0, 12, 'o'); poe(0, 13, 'k'); poe(0, 14, 'k'); poe(0, 15, 'o');
+  for (y = 1; y <= 10; y++) {
+    if (a[y][12] === '.') poe(y, 12, 'o');
+    poe(y, 13, y < 2 ? 'k' : 'j'); poe(y, 14, y < 2 ? 'k' : 'j'); poe(y, 15, 'o');
+  }
+  poe(11, 13, 'j'); poe(11, 14, 'j'); poe(11, 15, 'o');
+  for (y = 13; y <= 17; y++) if (a[y][13] === 'k') poe(y, 13, 'j');
+  return a;
+}
 /* A diagonal parte do que a camada faz de frente (ou de costas) e leva
    por cima só o que é diferente nela. Sem isso, toda camada teria que
    redesenhar as linhas inteiras pra existir na diagonal, e um cabelo
    comprido que só precisa mexer no olho perderia o resto. */
 var DIR_HERDA = {
   diagDown: 'down', diagUp: 'up', sentado: 'side',
-  sentadoFrente: 'down', sentadoCostas: 'up'
+  sentadoFrente: 'down', sentadoCostas: 'up', segurando: 'down'
 };
 
 function aplicaDir(alvo, nome, linhas) {
@@ -1528,6 +1552,12 @@ function quadrosDoCorpo(key) {
   var out = {};
   for (var d = 0; d < DIRS.length; d++) {
     var nome = DIRS[d], parado = r[nome];
+    if (nome === 'segurando') {
+      // parado, os três quadros iguais: quem segura não anda
+      var seg = r.poseUnica ? r.down : bracoPraCima(r.down);
+      out[nome] = [seg, seg, seg];
+      continue;
+    }
     var passos = (nome === 'side') ? r.pernas.lado : r.pernas.frente;
     out[nome] = [parado, null, null];
     for (var q = 0; q < 2; q++) {
@@ -1814,9 +1844,11 @@ var FILEIRA_DIR = {
   sentadoR: 15, sentadoL: 15,
   // quem senta no banco virado pro outro banco: olhando pro fundo do
   // vagão, ou olhando pra quem está do outro lado do joelho
-  sentadoFrente: 18, sentadoCostas: 21
+  sentadoFrente: 18, sentadoCostas: 21,
+  // de frente, com a mão na barra: à direita dele, ou à esquerda (espelhado)
+  segurandoR: 24, segurandoL: 24
 };
-var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1 };
+var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1, segurandoL: 1 };
 var DIAGONAL_MIN = 0.42;   // o eixo fraco precisa disso do forte pra virar diagonal
 
 Ator.prototype.setDir = function (dx, dy) {

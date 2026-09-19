@@ -402,7 +402,7 @@ var VagaoScene = new Phaser.Class({
     this.segurando = null;
     // o poste em pé fica atrás do boneco (60), a mão na frente dele
     this.gMao = this.add.graphics().setDepth(59);
-    this.gMaoFrente = this.add.graphics().setDepth(61);
+    this.gMaoFrente = this.add.graphics().setDepth(66);   // a mão, por cima da barra do teto (65)
     this.tPasso = 0;
     this.sentadoEm = null;
     this.indoPara = null;      // o lugar que você tocou, e pra onde está indo
@@ -596,6 +596,7 @@ var VagaoScene = new Phaser.Class({
     var eu = this;
     this.textura('vg_carro', GH, function (g) { eu.desenhaCarro(g, l); });
     this.textura('vg_barras', GH, function (g) { eu.desenhaBarrasDoCarro(g); });
+    this.textura('vg_teto', GH, function (g) { eu.desenhaBarraDoTeto(g); });
     this.textura('vg_sanfona', SANFONA_ALT + 8, function (g) { eu.desenhaSanfona(g, 4); });
 
     for (var carro = 0; carro < CARROS; carro++) {
@@ -608,6 +609,7 @@ var VagaoScene = new Phaser.Class({
          Na 70, por cima de todo mundo, ela cortava o corpo de quem parava
          embaixo dela: de cima, lia como um poste atravessando a pessoa. */
       this.add.image(0, topo, 'vg_barras').setOrigin(0, 0).setDepth(20);
+      this.add.image(0, topo, 'vg_teto').setOrigin(0, 0).setDepth(65);
       if (carro < CARROS - 1) {
         this.add.image(0, topoDoCarro(carro) + CARRO_ALT - 4, 'vg_sanfona')
           .setOrigin(0, 0).setDepth(0);
@@ -785,23 +787,33 @@ var VagaoScene = new Phaser.Class({
      A da direita é cortada na altura de cada porta: barra atravessando
      a saída é o que mais fazia o vagão parecer trancado, e no vagão de
      verdade ela também não passa ali. */
+  /* A barra do teto mora em duas camadas. A barra corrida no meio do
+     corredor, desenhada por TRÁS das pessoas, fazia o boneco andar em
+     cima dela ('tá passando por cima da barra'); levada pra beirada dos
+     bancos, ninguém mais a via ('sumiu'). Agora ela volta pro corredor,
+     em cima dos postes, e vai POR CIMA das pessoas (vg_teto, camada 65),
+     que é onde uma barra de teto está: quem anda passa por baixo. A
+     sombra dela fica no chão (aqui, camada 20), 6px deslocada, e é a
+     distância entre as duas que diz que ela está no alto. Na coluna da
+     direita ela some na frente das portas, como no trem de verdade. */
+  desenhaBarraDoTeto: function (g) {
+    for (var i = 0; i < 2; i++) {
+      var cx = BARRAS_X[i] + 4;
+      for (var by = HUD_H; by < GH; by += 2) {
+        if (i && naPorta(by, 8)) continue;
+        g.fillStyle(num(PAL.metalSom), 0.95).fillRect(cx - 2, by, 4, 2);
+        g.fillStyle(num(PAL.metalLuz), 0.95).fillRect(cx - 1, by, 1, 2);
+      }
+    }
+  },
+
   desenhaBarrasDoCarro: function (g) {
     for (var i = 0; i < 2; i++) {
       var cx = BARRAS_X[i] + 4;
-      /* A barra corrida do teto: no meio do corredor, qualquer camada
-         errava ('tá passando por cima da barra'). Por trás das pessoas,
-         o boneco andava em cima dela; por cima, ela cortava o corpo.
-         Agora ela corre onde ninguém pisa: na beirada dos bancos, 6px
-         pra fora do corredor (esquerda 64, direita 256), como a barra
-         do teto do trem de verdade, que fica em cima de quem está
-         sentado. Na direita ela some na frente das portas, onde o
-         vestíbulo abre até a parede. */
-      var bx = i ? CORREDOR_DIR + 6 : CORREDOR_ESQ - 6;
+      // a sombra da barra do teto no chão, longe dela: é o que diz que ela está no alto
       for (var by = HUD_H; by < GH; by += 2) {
-        if (i && naPorta(by, RAMPA_VESTIBULO + 4)) continue;
-        g.fillStyle(0x000000, 0.18).fillRect(bx + 3, by, 2, 2);            // a sombra no chão
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(bx - 2, by, 4, 2);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(bx - 1, by, 1, 2);
+        if (i && naPorta(by, 8)) continue;
+        g.fillStyle(0x000000, 0.2).fillRect(cx + 5, by, 3, 2);
       }
       for (var ay = POSTE_Y0; ay < GH - 40; ay += POSTE_PASSO) {
         if (!temPoste(i, ay)) continue;
@@ -814,27 +826,30 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
-  /* ---------- segurar a barra saiu do jogo ----------
-     Era um minigame de tranco: vinha o SEGURE!, você apertava perto de
-     uma barra, e o boneco ganhava um braço desenhado por cima. Em
-     pixel art, braço de linha em cima de sprite nunca combinou — primeiro
-     um gancho saindo da cintura, depois um braço vetorial em cima do
-     boneco. E o verbo em si era o menos interessante do vagão: esperar
-     o aviso e segurar um botão. Saiu inteiro em 18/09. A barra continua
-     no cenário, e continua valendo pro CLT, que cochila parado perto
-     dela. */
-
-  /* ---------- segurar, de novo, sem minigame ----------
-     'Não consegue segurar': o gesto fazia falta, o jogo em volta dele é
-     que não. Perto de um poste, agir segura: o boneco encosta nele, o
-     poste aparece em pé (de cima ele é só uma bolinha, e bolinha não
-     se segura) e a mão fecha no tubo. Segurando, ninguém te empurra do
-     lugar e ficar em pé cansa pela metade. Andar ou agir de novo solta. */
+  /* ---------- segurar, com o personagem ----------
+     'Segurar com o personagem': o boneco levanta o braço e fecha a mão
+     na barra do teto, a que corre em cima do corredor. Ele encosta
+     embaixo dela, do lado em que estava, e a mão aparece por cima da
+     barra. Segurando, ninguém te empurra do lugar e ficar em pé cansa
+     pela metade. Andar ou agir de novo solta. */
+  barraDoTetoPerto: function () {
+    var x = this.pl.sp.x, y = this.pl.sp.y, melhor = null;
+    for (var i = 0; i < BARRAS_X.length; i++) {
+      if (i && naPorta(y, 8)) continue;            // na frente da porta não tem barra
+      var cx = BARRAS_X[i] + 4, d = Math.abs(x - cx);
+      if (!melhor || d < melhor.d) melhor = { x: cx, d: d };
+    }
+    return melhor || { x: null, d: 1e9 };
+  },
   seguraBarra: function () {
-    var p = postePerto(this.pl.sp.x, this.pl.sp.y);
-    if (!p) return;
-    var lado = this.pl.sp.x < p.x ? -1 : 1;
-    this.segurando = { x: p.x, y: p.y, lado: lado };
+    var b = this.barraDoTetoPerto();
+    if (b.x === null) return;
+    var lado = this.pl.sp.x < b.x ? -1 : 1;
+    var y = this.pl.sp.y;
+    // em cima de um poste não dá pra ficar: escorrega pra fora dele
+    var p = postePerto(b.x, y);
+    if (p && Math.abs(p.y - y) < 14) y = p.y + (y >= p.y ? 14 : -14);
+    this.segurando = { x: b.x, y: y, lado: lado };
     this.indoPara = null;
     sfx('ok');
   },
@@ -842,26 +857,23 @@ var VagaoScene = new Phaser.Class({
     this.segurando = null;
     this.gMao.clear(); this.gMaoFrente.clear();
   },
-  // encosta no poste e desenha o poste em pé com a mão nele
+  /* Embaixo da barra, de frente, braço pra cima. A barra (camada 65)
+     passa por cima do boneco; a mão é redesenhada por cima dela (66),
+     que é o que faz ela parecer fechada NA barra e não atrás dela. */
   atualizaSegura: function () {
-    var s = this.segurando, g = this.gMao;
+    var s = this.segurando;
     if (!s) return;
-    this.pl.sp.x = s.x + s.lado * 11;
-    this.pl.sp.y = s.y + 2;
-    this.pl.dir = s.lado < 0 ? 'right' : 'left';
-    g.clear();
-    // o tubo, do chão até acima da cabeça: 4px de inox com o brilho
-    var ty = s.y - 58;
-    g.fillStyle(num(PAL.metalSom), 1).fillRect(s.x - 2, ty, 4, 58);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(s.x - 1, ty, 1, 58);
-    // a mão: 4x4 da cor da pele, contorno escuro, na altura do ombro
+    this.pl.sp.x = s.x + s.lado * MAO_DA_BARRA;
+    this.pl.sp.y = s.y;
+    this.pl.dir = s.lado < 0 ? 'segurandoR' : 'segurandoL';
+    this.pl.anima(0, false);
     var pl = PELES[GameState.charKey + (GameState.genero === 'f' ? 'F' : '')] || PELES[GameState.charKey];
     var cor = pl ? num(pl.k) : 0xe0b088;
-    var hx = s.x - 3, hy = s.y - 34;
-    this.gMaoFrente.clear();
-    this.gMaoFrente.fillStyle(0x0a0a12, 1).fillRect(hx - 1, hy - 1, 7, 6);
-    this.gMaoFrente.fillStyle(cor, 1).fillRect(hx, hy, 5, 4);
-    this.gMaoFrente.fillStyle(0xffffff, 0.25).fillRect(hx, hy, 5, 1);
+    var g = this.gMaoFrente; g.clear();
+    var hx = s.x - 2, hy = s.y - 48;
+    g.fillStyle(0x0a0a12, 1).fillRect(hx - 1, hy - 1, 6, 6);
+    g.fillStyle(cor, 1).fillRect(hx, hy, 4, 4);
+    g.fillStyle(0xffffff, 0.25).fillRect(hx, hy, 4, 1);
   },
 
   /* Quem é a barra mais perto, e a que distância. É o que decide se dá
@@ -3513,7 +3525,7 @@ var VagaoScene = new Phaser.Class({
         } else if (this.segurando) {
           dica = 'SEGURANDO. ' + nomeAgir() + ': SOLTAR';
           if (Ctrl.actJust) this.soltaBarra();
-        } else if (this.barraPerto().d <= ALCANCE_BARRA && !this.comSono()) {
+        } else if (this.barraDoTetoPerto().d <= 30 && !this.comSono()) {
           dica = nomeAgir() + ': SEGURAR NA BARRA';
           if (Ctrl.actJust) this.seguraBarra();
         } else if (this.comSono() && this.temLugarVago()) {
