@@ -60,7 +60,7 @@ var DESAFIANTES = {
      a Barra Funda é Palmeiras (o Allianz fica do lado). Mesmo tipo de
      briga — ironia derruba, calma nem arranha —, time diferente. */
   corintiano: {
-    nome: 'CORINTIANO', sprite: 'np_corintiano', pac: 75,
+    nome: 'CORINTHIANO', sprite: 'np_corintiano', pac: 75,
     fraco: 'IRONIA', resiste: 'CALMA',
     chega: 'AQUI É CORINTHIANS,\nTÁ LIGADO?',
     sai: 'DOMINGO TEM JOGO\nNA ARENA, HEIN.',
@@ -318,14 +318,20 @@ function contaDuelo(tipo) {
   var d = duelosDoDia();
   d[tipo] = (d[tipo] || 0) + 1;
 }
-/* o tema de cada família, tocado quando a conversa começa */
+/* ---------- a música de cada rival ----------
+   'A música de cada luta muda de acordo com o rival.' A família dá o
+   jeito da melodia (o chato é arrastado, a torcida é marcha, o guarda é
+   grave, o cosplay é agudo, o chefão é pesado) e a TRANSPOSIÇÃO dá a
+   pessoa: o mesmo tema, em outro tom, soa outro. Assim cada um dos
+   dezoito tem a sua, sem dezoito melodias escritas à mão. */
 var TEMA_DSF = {
-  tiozao: 'temaChato', pregador: 'temaChato', barra: 'temaChato', ambulante: 'temaChato',
-  tiktoker: 'temaCosplay', vendedorCurso: 'temaChato', mochilao: 'temaGuarda',
-  corintiano: 'temaTorcida', palmeirense: 'temaTorcida', saopaulino: 'temaTorcida', santista: 'temaTorcida',
-  guardinha: 'temaGuarda', guardaMedio: 'temaGuarda', guardaForte: 'temaGuarda',
-  cosLaranja: 'temaCosplay', cosVingador: 'temaCosplay', cosNuvem: 'temaCosplay', cosRosa: 'temaCosplay', cosColegial: 'temaCosplay',
-  fiscal: 'temaChefao', fiscalDuro: 'temaChefao'
+  tiozao: ['temaChato', 0], pregador: ['temaChato', 5], barra: ['temaChato', -3], ambulante: ['temaChato', 3],
+  tiktoker: ['temaCosplay', -5], vendedorCurso: ['temaChato', 7], mochilao: ['temaGuarda', 5],
+  corintiano: ['temaTorcida', 0], palmeirense: ['temaTorcida', 4], saopaulino: ['temaTorcida', -2], santista: ['temaTorcida', 7],
+  guardinha: ['temaGuarda', 0], guardaMedio: ['temaGuarda', -2], guardaForte: ['temaGuarda', -5],
+  cosLaranja: ['temaCosplay', 0], cosVingador: ['temaCosplay', -3], cosNuvem: ['temaCosplay', -7],
+  cosRosa: ['temaCosplay', 2], cosColegial: ['temaCosplay', 5],
+  fiscal: ['temaChefao', 0], fiscalDuro: ['temaChefao', -3]
 };
 
 /* o nível de cada um (sem `nivel` na ficha, é 2) e os que sobem com os
@@ -485,7 +491,8 @@ var DesafioScene = new Phaser.Class({
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
     // o teto do dia e o tema da família dele (o chefão tem o próprio)
     contaDuelo(this.dados.tipo);
-    tocaJingle(TEMA_DSF[this.dados.tipo] || 'temaChato');
+    var tm = TEMA_DSF[this.dados.tipo] || ['temaChato', 0];
+    tocaJingle(tm[0], tm[1]);
     // as quatro respostas: as de sempre, ou as que a cena mandou (o EXTRATO do honesto contra o fiscal)
     this.resps = this.dados.respostas || RESPOSTAS;
     marcaDex(this.dados.dexId || this.dados.tipo, 1);

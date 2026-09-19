@@ -135,13 +135,15 @@ function CartaoAchado(cena, chave, titulo, recomenda) {
   var t2 = txtC(cena, GW / 2, cy + 50, nomeDaCoisa(chave), PAL.branco, 16).setScrollFactor(0).setDepth(3003);
   var t3 = txtC(cena, GW / 2, cy + 96, recomenda || '', PAL.verde, 8).setScrollFactor(0).setDepth(3003)
     .setScale(ESCALA_TEXTO / 2).setMaxWidth((GW - 40) / (ESCALA_TEXTO / 2));
-  var t4 = txtC(cena, GW / 2, GH - 96, nomeAgir() + ' PRA SEGUIR', PAL.cinza, 8).setScrollFactor(0).setDepth(3003)
+  var t4 = txtC(cena, GW / 2, GH - 96, '', PAL.cinza, 8).setScrollFactor(0).setDepth(3003)
     .setScale(ESCALA_TEXTO / 2);
+  // o convite pra seguir só aparece quando o toque já vale
+  cena.time.delayedCall(1800, function () { if (t4 && t4.scene) t4.setText(nomeAgir() + ' PRA SEGUIR'); });
   this.coisas = [g, gr, img, t1, t2, t3, t4];
   this.img = img;
   // entra crescendo e já girando
   cena.tweens.add({ targets: img, scale: 5, duration: 260, ease: 'Back.easeOut' });
-  cena.tweens.add({ targets: img, scaleX: { from: 5, to: -5 }, duration: 520, yoyo: true, repeat: 2, delay: 260, ease: 'Sine.easeInOut' });
+  cena.tweens.add({ targets: img, scaleX: { from: 5, to: -5 }, duration: 520, yoyo: true, repeat: 3, delay: 260, ease: 'Sine.easeInOut' });
   tocaJingle('achou');
   sfx('moeda');
 }
@@ -158,7 +160,10 @@ CartaoAchado.prototype.update = function (dt) {
       GW / 2 + Math.cos(ang) * d1, this.cy + Math.sin(ang) * d1,
       GW / 2 + Math.cos(ang) * d2, this.cy + Math.sin(ang) * d2);
   }
-  if (this.t > 2600 || (this.t > 500 && Ctrl.actJust)) this.fecha();
+  /* 'Tem que durar mais quando roda e aparece um objeto novo, e poder
+     clicar depois': o giro inteiro leva 1,8 s, e só depois disso o toque
+     fecha. Sozinho, o cartão fica 5,2 s. */
+  if (this.t > 5200 || (this.t > 1800 && Ctrl.actJust)) this.fecha();
 };
 CartaoAchado.prototype.fecha = function () {
   if (!this.ativo) return;

@@ -293,7 +293,7 @@ var Catragram = {
    faixa com a MEDALHA desenhada, o nome da conquista, o XP, e o convite
    pra abrir o Catragram (que já fica com a bolinha vermelha). */
 function avisaConquista(c, xp, ganhou) {
-  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  var hud = typeof cenaDoAviso === 'function' ? cenaDoAviso() : null;
   if (!hud || !hud.sys || !hud.sys.isActive()) { avisaMissao('CATRAGRAM', c.legenda); return; }
   var cx = hud.add.container(0, -110).setDepth(5200);
   var g = hud.add.graphics();

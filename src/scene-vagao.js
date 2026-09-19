@@ -1078,6 +1078,9 @@ var VagaoScene = new Phaser.Class({
         this.gente.push(p);
       }
     }
+    // ninguém nasce em cima de ninguém: separa antes do primeiro quadro
+    for (var sep = 0; sep < 10; sep++) resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao, true);
+
     /* Um desafiante por carro. No treino não: lá quem arma o desafio é o
        montaTreino, na frente de quem joga. */
     this.desafiantes = [];
@@ -3843,6 +3846,9 @@ var VagaoScene = new Phaser.Class({
       this.passos(dt, this.andandoAgora);
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
       this.atualizaSegura(dt);          // segurando, o empurrão não te tira da barra
+    } else {
+      // parado ou sentado: a multidão continua se desencostando sozinha
+      resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao, true);
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);

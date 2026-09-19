@@ -237,6 +237,10 @@ var BALDEACAO = 'SÉ';
    GameState.init decide (casaDe). */
 var CASA = 'ITAQUERA';
 var CASA_DO_TIME = { corinthians: 'ITAQUERA', palmeiras: 'BARRA FUNDA', saopaulo: 'SÉ', santos: 'SÉ' };
+// de que linha é a estação (a placa do título sai na cor dela)
+function linhaDaEstacao(nome) {
+  return LINHAS.vermelha.estacoes.indexOf(nome) >= 0 ? LINHAS.vermelha : LINHAS.azul;
+}
 function casaDe(charKey) {
   if (CHARS[charKey] && CHARS[charKey].times) return CASA_DO_TIME[leTime()] || 'ITAQUERA';
   return 'ITAQUERA';
@@ -2259,7 +2263,11 @@ function geraSheet(scene, key, pal, corpo) {
    pesa, mas sempre cede se você insistir. É como se anda em vagão
    cheio de verdade.
    ========================================================= */
-var CORPO_RX = 9, CORPO_RY = 6;      // meios-eixos do corpo, em pixels
+/* 11 e 7, e não 9 e 6: o boneco tem 32px de largura e o corpo de
+   colisão tinha 18 de diâmetro — em estação cheia as pessoas ficavam
+   literalmente uma por cima da outra ('as pessoas ficam uma em cima da
+   outra'). 22 é o ombro a ombro de metrô: encosta, mas não atravessa. */
+var CORPO_RX = 11, CORPO_RY = 7;     // meios-eixos do corpo, em pixels
 var ACHATA = CORPO_RX / CORPO_RY;    // leva a elipse pra um círculo e volta
 
 /* separa dois corpos sobrepostos. peso 1 = anda tudo, 0 = fica no lugar */
@@ -2321,19 +2329,25 @@ function pesoDaMultidao() {
    o custo — o trem de oito carros tem mais de 200 pessoas, e o segundo
    laço aqui é de todos contra todos. Sem esse corte eram 13 mil pares
    de elipse por quadro pra resolver, na prática, nenhum. */
-var PERTO_Y = 16;
+var PERTO_Y = 20;      // acompanha o corpo maior
 
-function resolveCorpos(pl, gente, limitaPl, limitaNpc) {
+/* `soNpcs`: separa a multidão sem mexer em você. É o que roda quando
+   você está sentado ou parado — antes a separação só acontecia dentro do
+   bloco de ANDAR, e quem ficava parado via as pessoas uma por cima da
+   outra ('as pessoas ficam uma em cima da outra'). */
+function resolveCorpos(pl, gente, limitaPl, limitaNpc, soNpcs) {
   var i, j, o, py = pl.sp.y;
   var meuPeso = pesoDaMultidao();
-  for (i = 0; i < gente.length; i++) {
-    o = gente[i];
-    if (!o || !o.sp || !o.sp.active) continue;
-    if (Math.abs(o.sp.y - py) > PERTO_Y) continue;
-    var peso = o.fixo ? 0 : meuPeso;
-    if (separaCorpos(pl.sp, o.sp, 1 - peso, peso)) {
-      if (limitaPl) limitaPl(pl.sp);
-      if (!o.fixo && limitaNpc) limitaNpc(o.sp);
+  if (!soNpcs) {
+    for (i = 0; i < gente.length; i++) {
+      o = gente[i];
+      if (!o || !o.sp || !o.sp.active) continue;
+      if (Math.abs(o.sp.y - py) > PERTO_Y) continue;
+      var peso = o.fixo ? 0 : meuPeso;
+      if (separaCorpos(pl.sp, o.sp, 1 - peso, peso)) {
+        if (limitaPl) limitaPl(pl.sp);
+        if (!o.fixo && limitaNpc) limitaNpc(o.sp);
+      }
     }
   }
   // a multidão também não se atravessa, mas com muito menos empenho
@@ -2681,12 +2695,16 @@ var JINGLES = {
     acorde: [], bumbo: [1.35], caixa: [], dur: 2.2, treme: true
   }
 };
-function tocaJingle(nome) {
+/* `semi` transpõe o tema inteiro: é assim que cada RIVAL tem a própria
+   música sem precisar de uma melodia nova pra cada um. A família dá o
+   jeito (marcha, arrastado, grave, agudo) e a transposição dá a pessoa. */
+function tocaJingle(nome, semi) {
   var j = JINGLES[nome];
   if (!j || !SOM_LIGADO || !AC || AC.state !== 'running') return false;
+  semi = semi || 0;
   var t0 = AC.currentTime + 0.04, i, n;
   for (i = 0; i < j.mel.length; i++) {
-    n = j.mel[i];
+    n = [j.mel[i][0] + semi, j.mel[i][1], j.mel[i][2]];
     var ultima = j.treme && i === j.mel.length - 1;
     if (!ultima) { notaEm(t0 + n[1], n[0], n[2], 'square', 0.014); continue; }
     // o último "uéén" treme: a nota com vibrato largo, caindo no fim
@@ -2705,8 +2723,8 @@ function tocaJingle(nome) {
     o.connect(g); g.connect(AC.destination);
     o.start(ts); lfo.start(ts); o.stop(ts + n[2] + 0.02); lfo.stop(ts + n[2] + 0.02);
   }
-  for (i = 0; i < j.baixo.length; i++) { n = j.baixo[i]; notaEm(t0 + n[1], n[0], n[2], 'triangle', 0.034); }
-  for (i = 0; i < j.acorde.length; i++) { n = j.acorde[i]; notaEm(t0 + n[1], n[0], n[2], 'square', 0.005); }
+  for (i = 0; i < j.baixo.length; i++) { n = j.baixo[i]; notaEm(t0 + n[1], n[0] + semi, n[2], 'triangle', 0.034); }
+  for (i = 0; i < j.acorde.length; i++) { n = j.acorde[i]; notaEm(t0 + n[1], n[0] + semi, n[2], 'square', 0.005); }
   for (i = 0; i < j.bumbo.length; i++) bumboEm(t0 + j.bumbo[i]);
   for (i = 0; i < j.caixa.length; i++) ruido(0.10, 0.012, 1900, 1400, 0.8, 'bandpass', t0 + j.caixa[i] - AC.currentTime);
   _jingleAte = t0 + j.dur;
@@ -3666,7 +3684,7 @@ var COSPLAYERS = ['np_cos_marinheira', 'np_cos_akatsuki', 'np_cos_naruto', 'np_c
 var DEX = [
   { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Manda áudio de 5 minutos. Quer conversar.' },
   { id: 'pregador', nome: 'PREGADOR', sprite: 'np_pregador', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Tem um minutinho? Nunca é um minutinho.' },
-  { id: 'corintiano', nome: 'CORINTIANO', sprite: 'np_corintiano', desafio: true, tipo: 'TORCIDA', onde: 'LESTE', desc: 'Da Sé pra Itaquera. Aqui é Corinthians.' },
+  { id: 'corintiano', nome: 'CORINTHIANO', sprite: 'np_corintiano', desafio: true, tipo: 'TORCIDA', onde: 'LESTE', desc: 'Da Sé pra Itaquera. Aqui é Corinthians.' },
   { id: 'palmeirense', nome: 'PALMEIRENSE', sprite: 'np_torcedor', desafio: true, tipo: 'TORCIDA', onde: 'OESTE', desc: 'Da Sé pra Barra Funda. Fala meio italiano.' },
   { id: 'saopaulino', nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Soberano. Lembra três mundiais sem ninguém pedir.' },
   { id: 'santista', nome: 'SANTISTA', sprite: 'np_santista', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Moicano de 2010. O Peixe vai voltar.' },

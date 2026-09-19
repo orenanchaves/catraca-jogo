@@ -93,6 +93,8 @@ var HISTORIA = {
      carregar o celular, hein'). */
   est_d1_bateria: {
     tipo: 'secundaria', contato: 'BIA ❤',
+    // ela só cobra quando o celular está pela metade: cobrar com ele cheio não faz sentido
+    se: { bateria: ['<=', 50] },
     inicio: 'oi',
     nos: {
       oi: {
@@ -360,7 +362,8 @@ var Historia = {
   // o que as condições podem olhar
   vars: function () {
     return { fama: GameState.fama || 0, dinheiro: GameState.dinheiro, carisma: GameState.carisma,
-      nivel: typeof meuNivel === 'function' ? meuNivel() : 1, dia: GameState.dia || 1, minutos: GameState.minutos };
+      nivel: typeof meuNivel === 'function' ? meuNivel() : 1, dia: GameState.dia || 1, minutos: GameState.minutos,
+      bateria: GameState.bateria === undefined ? 100 : GameState.bateria, descanso: GameState.descanso };
   },
   /* As chaves especiais não comparam número: `tem` pergunta pela mochila
      ('ralls'), `falhou` por uma missão que fechou como não deu, `venceu`
@@ -594,6 +597,9 @@ var Historia = {
     var novos = [];
     for (i = 0; i < hoje.length; i++) {
       if (st.criadas[hoje[i]] || !HISTORIA[hoje[i]]) continue;
+      /* a conversa pode ter hora certa: a Bia só cobra o carregador com o
+         celular pela metade. Sem a condição, ela espera a próxima perna. */
+      if (HISTORIA[hoje[i]].se && !this.cond(HISTORIA[hoje[i]].se)) continue;
       st.criadas[hoje[i]] = dia;
       var p = this.novoFio(hoje[i]);
       p.chegou = false;

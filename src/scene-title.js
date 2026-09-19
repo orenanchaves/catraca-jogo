@@ -109,6 +109,13 @@ var TitleScene = new Phaser.Class({
     this.add.zone(GW - 90, TIT.setaY - 50, 90, 150).setOrigin(0, 0).setInteractive()
       .on('pointerdown', function () { eu.passa(1); eu.ignoraAct = true; });
 
+    /* ---------- onde ele mora ----------
+       'Importante mostrar em que estação começa o jogo do personagem.'
+       Uma placa de metrô em cima do boneco, na cor da linha da casa
+       dele: é a primeira coisa que se lê antes de escolher. */
+    this.gCasa = this.add.graphics().setDepth(1);
+    this.tCasaRot = txtC(this, GW / 2, 78, 'COMEÇA EM', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
+    this.tCasa = txtC(this, GW / 2, 92, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
     this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.amarelo, 16);
 
     /* ---------- o gênero ----------
@@ -374,6 +381,17 @@ var TitleScene = new Phaser.Class({
     var bw = GW / 2 - 52;
     barra(gf, 40, TIT.fichaY + 50, bw, 10, c.carisma / 100, 0xe8a33c);
     barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, 0x00e676);
+
+    // a placa da estação de casa, na cor da linha dela
+    var casaK = casaDe(k), lk = linhaDaEstacao(casaK), nomeCasa = placaDe(casaK);
+    this.tCasa.setText(nomeCasa).setColor(aberto ? PAL.branco : PAL.cinzaEsc);
+    this.tCasaRot.setColor(aberto ? PAL.cinzaEsc : '#33333f');
+    var lw = nomeCasa.length * 6 + 22, lx = GW / 2 - lw / 2;
+    var gc = this.gCasa; gc.clear();
+    gc.fillStyle(0x000000, 0.5).fillRect(lx + 2, 90, lw, 18);
+    gc.fillStyle(aberto ? 0x14141c : 0x101018, 1).fillRect(lx, 88, lw, 18);
+    gc.fillStyle(aberto ? lk.num : 0x2a2a3a, 1).fillRect(lx, 104, lw, 3);
+    gc.lineStyle(1, aberto ? 0x3a3a4a : 0x24242e, 1).strokeRect(lx + 0.5, 88.5, lw - 1, 17);
 
     this.tTopo.setText('RECORDE ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));

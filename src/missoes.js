@@ -170,12 +170,27 @@ var Missoes = {
    entram em fila, uma depois da outra. */
 var AVISOS = [], AVISO_ATIVO = false;
 
+/* ---------- em que cena o aviso aparece ----------
+   O HUD é a cena de cima na maioria das telas, mas não em todas: o
+   DESAFIO (e as outras lutas) desenham DEPOIS dele, porque pintam o
+   painel por cima do mundo com zoom. Aviso no HUD durante o duelo ficava
+   ATRÁS da ficha ('isso tem que sobrepor'). Então o aviso procura a cena
+   mais de cima que está no ar. */
+function cenaDoAviso() {
+  var ordem = ['Desafio', 'Briga', 'Disputa', 'Encarada', 'Hud'];
+  for (var i = 0; i < ordem.length; i++) {
+    var c = (window.jogo && jogo.scene) ? jogo.scene.getScene(ordem[i]) : null;
+    if (c && c.sys && c.sys.isActive()) return c;
+  }
+  return null;
+}
+
 /* ---------- a ordem da missão, em letra grande ----------
    'Depois de responder a mensagem e voltar pro jogo, aparecer um textão
    na tela: vá até o estágio na estação tal.' Mora no HUD, que nunca é
    pausado, e some sozinho em 3,4 s. */
 function bannerObjetivo(texto) {
-  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  var hud = cenaDoAviso();
   if (!hud || !hud.sys || !hud.sys.isActive() || !texto) return;
   var c = hud.add.container(0, 0).setDepth(4800);
   var g = hud.add.graphics();
@@ -195,7 +210,7 @@ function bannerObjetivo(texto) {
 /* A faixa de chegada: grande, no meio, verde quando deu tempo e vermelha
    quando não deu. É o aviso de que a perna acabou. */
 function bannerChegada(titulo, sub, ruim) {
-  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  var hud = cenaDoAviso();
   if (!hud || !hud.sys || !hud.sys.isActive()) return;
   var c = hud.add.container(0, 0).setDepth(4900), g = hud.add.graphics();
   var cor = ruim ? 0xe8362c : 0x00e676, y0 = GH / 2 - 56;
@@ -228,7 +243,7 @@ function avisaMissao(titulo, texto) {
 }
 
 function proximoAviso() {
-  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  var hud = cenaDoAviso();
   var a = AVISOS.shift();
   if (!a || !hud || !hud.sys || !hud.sys.isActive()) { AVISO_ATIVO = false; AVISOS.length = 0; return; }
   AVISO_ATIVO = true;

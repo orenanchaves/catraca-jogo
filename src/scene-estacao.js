@@ -1601,6 +1601,10 @@ var EstacaoScene = new Phaser.Class({
              pela esquerda */
           // na dupla, metade vai pra escada da plataforma do outro sentido
           var eS = (DUPLA && Math.random() < 0.5) ? 1 : 0;
+          // a grade do bolo comporta 15 por faixa; cheia, a pessoa passeia
+          if (this.filaEsc[2 * eS].length >= 15 && this.filaEsc[1 + 2 * eS].length >= 15) {
+            a.indo = ind = { fase: 'passeia', e: eS, t: 0 };
+          }
           /* um em seis vai pela escada fixa, e quatro em dez quando a fila
              da rolante passa de oito: escada de pedra não tem vez */
           var filaR = this.filaEsc[2 * eS].length + this.filaEsc[1 + 2 * eS].length;
@@ -1621,17 +1625,42 @@ var EstacaoScene = new Phaser.Class({
           a.sp.naEscada = true;
         }
       }
+      /* Rodando pelo mezanino enquanto a fila não abre: anda até um ponto
+         qualquer do piso de dentro, espera, e reavalia. É o que gente faz
+         em estação cheia — ninguém fica parado em cima do outro. */
+      if (ind.fase === 'passeia') {
+        if (!ind.alvo || Math.hypot(ind.alvo.x - a.sp.x, ind.alvo.y - a.sp.y) < 8) {
+          ind.t = (ind.t || 0) + 1;
+          var fx0 = this.mez ? MEZ.x0 + 40 : 40, fx1 = this.mez ? MEZ.x1 - 40 : 280;
+          ind.alvo = { x: fx0 + Math.random() * (fx1 - fx0), y: ESC_BOCA + 30 + Math.random() * (CATRACA_Y - ESC_BOCA - 60) };
+          // abriu espaço na fila: volta pra ela
+          var eP = ind.e || 0;
+          if (this.filaEsc[2 * eP].length < 12 || this.filaEsc[1 + 2 * eP].length < 12) {
+            var fp = this.filaEsc[2 * eP].length <= this.filaEsc[1 + 2 * eP].length ? 0 : 1;
+            this.filaEsc[fp + 2 * eP].push(a);
+            a.indo = ind = { fase: 'escada', faixa: fp, e: eP };
+          }
+        }
+        if (ind.fase === 'passeia') { alvoX = ind.alvo.x; alvoY = ind.alvo.y; vel = 34; }
+      }
       if (ind.fase === 'escada') {
         var qS = ind.faixa + 2 * (ind.e || 0), sobeE = pistaEsc(0, ind.e);
         var kk = this.filaEsc[qS].indexOf(a);
         alvoX = faixaDaEscada(sobeE, ind.faixa === 0);
         alvoY = ESC_BOCA + 12 + kk * 22;
-        /* Do quarto em diante a fila vira bolo, três de largura, em vez de
-           uma linha reta que descia até em cima das catracas; e nunca passa
-           da linha delas. */
+        /* ---------- o bolo, de verdade ----------
+           'Fica amontoado quando tem muita gente.' Era isso: do quarto em
+           diante o alvo virava três de largura mas o y batia no teto
+           (CATRACA_Y - 26) já na PRIMEIRA fileira, e do décimo em diante
+           todo mundo mirava o mesmo ponto — um monte de gente empilhada.
+           Agora o bolo é uma grade de verdade: três de largura por quatro
+           de fundo, do pé da escada até a linha das catracas. Quem não
+           cabe nela não entra na fila: fica rodando pelo mezanino
+           (fase 'passeia', abaixo) e volta quando abrir espaço. */
         if (kk >= 3) {
-          alvoX += ((kk - 3) % 3 - 1) * 20 + (ind.faixa === 0 ? -6 : 6);
-          alvoY = Math.min(CATRACA_Y - 26, ESC_BOCA + 12 + (3 + Math.floor((kk - 3) / 3)) * 20);
+          var i2 = kk - 3, col = i2 % 3, fila = Math.floor(i2 / 3);
+          alvoX += (col - 1) * 24 + (ind.faixa === 0 ? -8 : 8);
+          alvoY = ESC_BOCA + 34 + Math.min(fila, 3) * 22;
         }
         var livre = this.ultimoNaEscada[qS];
         var folga = !livre || !livre.sp || !livre.sp.active || livre.sp.y < ESC_BOCA - 12;
