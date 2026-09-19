@@ -32,10 +32,9 @@ function espacosItaquera() {
     { id: 'ITQ-MEZ-1', x: MEZ.x0 + 60, y: 78, tipo: 'estatico', anuncios: ['ceda'] },
     { id: 'ITQ-MEZ-2', x: 54, y: 78, tipo: 'digital', anuncios: ['ond', 'loto', 'ingles'] },
     { id: 'ITQ-MEZ-3', x: 266, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond'] },
-    { id: 'ITQ-MEZ-4', x: 360, y: 78, tipo: 'estatico', anuncios: ['anuncie'] },
-    // na parede da plataforma, em pé, nos vãos entre as placas e os mapas
-    { id: 'ITQ-PLAT-1', x: ITQ.paredeX + 14, y: PLAT_Y + 440, tipo: 'digital', vertical: true, anuncios: ['ond', 'pastel', 'esquerda'] },
-    { id: 'ITQ-PLAT-2', x: ITQ.paredeX + 14, y: PLAT_Y + 670, tipo: 'estatico', vertical: true, anuncios: ['anuncie'] }
+    { id: 'ITQ-MEZ-4', x: 360, y: 78, tipo: 'estatico', anuncios: ['anuncie'] }
+    /* Na parede da plataforma não: em pé, girado, o cartaz brigava com a
+       faixa do nome e o mapa, e ficava feio ('não rola tanto'). */
   ];
 }
 

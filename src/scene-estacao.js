@@ -615,7 +615,7 @@ var EstacaoScene = new Phaser.Class({
       var gLx = this.add.graphics().setDepth(2.5);
       for (var lx = 0; lx < this.lixeiras.length; lx++) pintaLixeira(gLx, this.lixeiras[lx].x, this.lixeiras[lx].y);
       // e as tomadas: parede da esquerda do saguão e parede da plataforma
-      this.montaTomadas([{ x: 24, y: 330 }, { x: PLAT_X1 + 10, y: platY(500) }]);
+      this.montaTomadas([{ x: 26, y: 330, lado: 1 }, { x: PLAT_X1 + 12, y: platY(500), lado: -1 }]);
     }
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
     this.montaDegraus();

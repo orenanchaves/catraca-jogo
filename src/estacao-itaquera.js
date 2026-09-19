@@ -173,16 +173,23 @@ EstacaoScene.prototype.bateNaLixeira = function (x, y) {
    'Tem que ter tomada pra carregar o celular.' Na parede, na altura do
    chão de quem passa: encosta, toca, e o boneco fica ali carregando, com
    o fio ligado na tomada, 4% por segundo. Andar desliga. */
-function pintaTomada(g, x, y) {
-  g.fillStyle(0x000000, 0.3).fillRect(x - 4, y - 5, 10, 12);
-  g.fillStyle(0xe8e8f0, 1).fillRect(x - 5, y - 6, 10, 12);
-  g.fillStyle(0xb8bac4, 1).fillRect(x - 5, y + 4, 10, 2);
-  g.fillStyle(0x2a2a32, 1).fillRect(x - 3, y - 2, 2, 3).fillRect(x + 1, y - 2, 2, 3).fillRect(x - 1, y + 2, 2, 1);
+/* De lado, acompanhando a parede ('tem que ficar meio de lado'): toda
+   tomada mora numa parede lateral, e vista de cima ela é uma plaquinha
+   estreita em perspectiva, com a boca virada pro corredor. lado 1 é a
+   parede da esquerda (a tomada olha pra direita); -1, a da direita. */
+function pintaTomada(g, x, y, lado) {
+  var d = lado || 1;
+  g.fillStyle(0x000000, 0.25).fillRect(x + (d > 0 ? 0 : -3), y - 5, 3, 12);
+  g.fillStyle(0xe8e8f0, 1).fillPoints([
+    { x: x, y: y - 7 }, { x: x + 4 * d, y: y - 5 }, { x: x + 4 * d, y: y + 5 }, { x: x, y: y + 7 }
+  ], true);
+  g.fillStyle(0xb8bac4, 1).fillRect(x + (d > 0 ? 3 : -4), y - 5, 1, 10);   // a quina que pega sombra
+  g.fillStyle(0x2a2a32, 1).fillRect(x + (d > 0 ? 1 : -3), y - 3, 2, 2).fillRect(x + (d > 0 ? 1 : -3), y + 1, 2, 2);
 }
 EstacaoScene.prototype.montaTomadas = function (lista) {
   this.tomadas = lista;
   var g = this.add.graphics().setDepth(2.6);
-  for (var i = 0; i < lista.length; i++) pintaTomada(g, lista[i].x, lista[i].y);
+  for (var i = 0; i < lista.length; i++) pintaTomada(g, lista[i].x, lista[i].y, lista[i].lado);
   this.gCabo = this.add.graphics().setDepth(39);
   this.carregando = null;
 };
@@ -668,8 +675,8 @@ EstacaoScene.prototype.montaItaquera = function () {
      bancos, e longe das lixeiras ('perde o sentido' carregar o celular
      do lado do lixo) */
   this.montaTomadas([
-    { x: MEZ.x0 + 22, y: 396 }, { x: MEZ.x1 - 22, y: 282 },
-    { x: ITQ.paredeX - 4, y: PLAT_Y + 300 }, { x: ITQ.paredeX - 4, y: PLAT_Y + 700 }
+    { x: MEZ.x0 + 26, y: 396, lado: 1 }, { x: MEZ.x1 - 26, y: 282, lado: -1 },
+    { x: ITQ.paredeX, y: PLAT_Y + 300, lado: -1 }, { x: ITQ.paredeX, y: PLAT_Y + 700, lado: -1 }
   ]);
   this.lixeiras = lixeirasItq();
   var gLixo = this.add.graphics().setDepth(2.5);

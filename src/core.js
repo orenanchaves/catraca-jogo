@@ -664,6 +664,7 @@ var GameState = {
     this.dia = 1;
     this.lixo = false; this.sacouNoDia = 0;      // o papel do lanche e o saque do 24 horas
     this.bateria = 100;                           // o celular sai de casa carregado
+    this.mochila = {};                            // o que você comprou e ainda não usou
     this.pernasFeitas = 0;
     this.atrasos = 0;
     this.ultimoAtraso = 0;
@@ -934,22 +935,49 @@ var GameState = {
 
   /* Comer devolve fôlego e custa minutos. O dogão é o único que devolve
      coração — é comida de verdade, e é caro justamente por isso. */
+  /* ---------- a mochila ----------
+     'Preciso ver meu inventário.' Comprar e usar eram a mesma coisa: o
+     dogão era comido no balcão. Agora comprar GUARDA, e o que está
+     guardado aparece no app MOCHILA do celular, com a quantidade, pra
+     usar quando quiser (e o papel do lanche só vai pra mão quando come). */
+  guarda: function (chave) {
+    var it = ITENS[chave];
+    if (!it) return null;
+    if (this.dinheiro < it.preco) return 'falta';
+    this.gastar(it.preco);
+    if (!this.mochila) this.mochila = {};
+    this.mochila[chave] = (this.mochila[chave] || 0) + 1;
+    this.stats.comprou = (this.stats.comprou || 0) + 1;
+    return 'ok';
+  },
+  usaDaMochila: function (chave) {
+    if (!this.mochila || !this.mochila[chave]) return null;
+    this.mochila[chave]--;
+    if (!this.mochila[chave]) delete this.mochila[chave];
+    var it = ITENS[chave];
+    if (it.descanso && !it.carisma && !it.sorte && !it.bateria) this.lixo = true;
+    return this.aplicaItem(chave);
+  },
   consome: function (chave) {
     var it = ITENS[chave];
     if (!it) return null;
     if (this.dinheiro < it.preco) return 'falta';
     this.gastar(it.preco);
+    this.stats.comprou = (this.stats.comprou || 0) + 1;
+    return this.aplicaItem(chave);
+  },
+  // o efeito de um item, pago ou tirado da mochila
+  aplicaItem: function (chave) {
+    var it = ITENS[chave];
     this.passaTempo(it.min || 1);
     var ganho = it.descanso * ((it.noCalor && estaCalor()) ? it.noCalor : 1);
     this.addDescanso(ganho);
     if (it.carisma) this.addCarisma(it.carisma);
     if (it.bateria) {
       this.bateria = Math.min(100, (this.bateria || 0) + it.bateria);
-      this.stats.comprou = (this.stats.comprou || 0) + 1;
       return 'bateria';
     }
     if (it.sorte) {
-      this.stats.comprou = (this.stats.comprou || 0) + 1;
       if (Math.random() < it.sorte) { this.dinheiro += it.premio; return 'premio'; }
       return 'nada';
     }
@@ -960,7 +988,6 @@ var GameState = {
       this.coracoes++;
       deuCoracao = true;
     }
-    this.stats.comprou = (this.stats.comprou || 0) + 1;
     return deuCoracao ? 'coracao' : 'ok';
   },
 
@@ -4609,20 +4636,13 @@ MenuComida.prototype.update = function () {
 };
 MenuComida.prototype.compra = function () {
   var it = ITENS[this.itens[this.sel]];
-  var r = GameState.consome(this.itens[this.sel]);
+  var r = GameState.guarda(this.itens[this.sel]);
   if (r === 'falta') { sfx('nao'); this.redesenha(); return; }
   sfx('moeda');
   if (this.scene._deAmbulante) Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
   var sc = this.scene, ao = this.aoFechar;
   this.fecha();
-  var msg = it.nome + '. Deu uma segurada.';
-  if (r === 'coracao') msg = it.nome + ' na veia.\nVocê recuperou um coração.';
-  else if (r === 'premio') msg = 'RASPOU E GANHOU!\n+R$ ' + it.premio + ',00';
-  else if (r === 'nada') msg = 'Raspou... e nada.\nFica pra próxima.';
-  else if (r === 'bateria') msg = 'Ligou no power bank.\nCelular em ' + Math.round(GameState.bateria) + '%.';
-  else if (!it.descanso && it.carisma) msg = it.nome + '.\nTá se sentindo outra pessoa.';
-  // quem comeu fica com o papel na mão: é o que a lixeira da Itaquera recebe
-  if (it.descanso && !it.carisma && !it.sorte) GameState.lixo = true;
+  var msg = it.nome + ' NA MOCHILA.\nUSE PELO CELULAR.';
   fala(sc, msg, []);
   sc.time.delayedCall(1300, function () { if (sc.dialog) sc.dialog.fecha(); });
   if (ao) ao();

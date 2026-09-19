@@ -14,7 +14,7 @@
    Como a cena de jogo fica pausada por baixo, aqui o teclado é ouvido
    direto por evento — cena pausada não atualiza tecla nenhuma. */
 
-var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES'];
+var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA'];
 
 /* ---------- a tela inicial ----------
    As abas embaixo viraram aplicativos: o celular abre bloqueado, o
@@ -25,11 +25,15 @@ var APPS_ZAP = [
   { nome: 'ZIPZAP', cor: 0x1faa59, cab: 0x0f3a2c },
   { nome: 'MAPA', cor: 0xf2f0ff, cab: 0x1c2a4a },
   { nome: 'BANCO', cor: 0x14284a, cab: 0x14284a },
-  { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 }
+  { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 },
+  { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 }
 ];
-var ICONE_APP = 72;
+/* Com a MOCHILA são cinco: três por fileira, ícones de 60 (os de 72 em
+   2x2 não cabiam mais). 'MISSÕES' e 'MOCHILA' têm 84px de nome, e as
+   colunas ficam a 89 uma da outra. */
+var ICONE_APP = 60;
 function lugarDoApp(i) {
-  return { x: (i % 2 ? 229 : 91) - ICONE_APP / 2, y: 206 + Math.floor(i / 2) * 110 };
+  return { x: [71, 160, 249][i % 3] - ICONE_APP / 2, y: 206 + Math.floor(i / 3) * 112 };
 }
 var DIAS_SEMANA = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO'];
 
@@ -187,6 +191,15 @@ var ZapScene = new Phaser.Class({
       self.fio = null; self.opBotao = 0; sfx('catraca'); self.pinta();
     });
 
+    /* a mochila: uma linha por item, com a figurinha dele e o toque que usa */
+    this.figMochila = []; this.zonasMochila = [];
+    for (i = 0; i < 6; i++) {
+      this.figMochila.push(this.add.image(ZAP.tx0 + 24, ZAP.topo + i * 56 + 26, '__DEFAULT').setDepth(2403).setVisible(false).setScale(1.2));
+      var zm = this.add.zone(ZAP.tx0, ZAP.topo + i * 56, ZAP.tx1 - ZAP.tx0, 52).setOrigin(0, 0);
+      (function (idx) { zm.on('pointerdown', function () { if (self.aba === 4 && self.modo === 'app') self.usaItem(idx); }); })(i);
+      this.zonasMochila.push(zm);
+    }
+
     // uma zona por linha da lista, pra abrir conversa no toque
     this.zonasLinha = [];
     for (i = 0; i < 6; i++) {
@@ -249,9 +262,10 @@ var ZapScene = new Phaser.Class({
         var d = 0;
         if (c === 'KeyA' || c === 'ArrowLeft') d = -1;
         else if (c === 'KeyD' || c === 'ArrowRight') d = 1;
-        else if (c === 'KeyW' || c === 'ArrowUp') d = -2;
-        else if (c === 'KeyS' || c === 'ArrowDown') d = 2;
-        if (d) { self.selApp = (self.selApp + d + 4) % 4; sfx('catraca'); self.pinta(); return; }
+        else if (c === 'KeyW' || c === 'ArrowUp') d = -3;
+        else if (c === 'KeyS' || c === 'ArrowDown') d = 3;
+        var nA = APPS_ZAP.length;
+        if (d) { self.selApp = (self.selApp + d + nA * 2) % nA; sfx('catraca'); self.pinta(); return; }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') self.abreApp(self.selApp);
         return;
       }
@@ -260,7 +274,7 @@ var ZapScene = new Phaser.Class({
       if (c === 'KeyW' || c === 'ArrowUp') { self.move(-1); return; }
       if (c === 'KeyS' || c === 'ArrowDown') { self.move(1); return; }
       if (c === 'Space' || c === 'Enter' || c === 'KeyZ') {
-        if (self.fio) self.confirma(); else if (self.aba === 0) self.abre();
+        if (self.fio) self.confirma(); else if (self.aba === 0) self.abre(); else if (self.aba === 4) self.usaItem(self.sel);
       }
     });
 
@@ -381,8 +395,8 @@ var ZapScene = new Phaser.Class({
       this.pinta();
       return;
     }
-    var n = (GameState.zap || []).length;
-    if (this.aba !== 0 || !n) return;
+    var n = this.aba === 4 ? this.itensDaMochila().length : (GameState.zap || []).length;
+    if ((this.aba !== 0 && this.aba !== 4) || !n) return;
     this.sel = (this.sel + d + n) % n;
     sfx('catraca');
     this.pinta();
@@ -451,6 +465,7 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].disableInteractive();
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
     this.zonaVolta.disableInteractive();
+    for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false); }
     var noInicio = (this.modo !== 'app');
     for (i = 0; i < this.zonas.length; i++) {
       if (this.modo === 'inicio') this.zonas[i].setInteractive(); else this.zonas[i].disableInteractive();
@@ -488,7 +503,8 @@ var ZapScene = new Phaser.Class({
       if (this.aba === 0) this.pintaZap(g);
       else if (this.aba === 1) this.pintaMapa(g);
       else if (this.aba === 2) this.pintaGrana(g);
-      else this.pintaMissoes(g);
+      else if (this.aba === 3) this.pintaMissoes(g);
+      else this.pintaMochila(g);
       this.pintaAbas(g);
     }
     this.pintaTopo(gt, sy0, sy1);
@@ -548,6 +564,13 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xb8862a, 1).fillCircle(cx + 14, cy + 12, 11);
       g.fillStyle(0xf2c14e, 1).fillCircle(cx + 14, cy + 12, 9);
       g.fillStyle(0xb8862a, 1).fillRect(cx + 13, cy + 6, 2, 12);
+    } else if (i === 4) {
+      // Mochila: o corpo marrom, o bolso da frente e as alças
+      g.fillStyle(0x6b4226, 1).fillRoundedRect(cx - 16, cy - 18, 32, 38, 8);
+      g.fillStyle(0x8a5a34, 1).fillRoundedRect(cx - 14, cy - 16, 28, 16, 6);
+      g.fillStyle(0x5a3a1e, 1).fillRoundedRect(cx - 10, cy + 2, 20, 14, 4);
+      g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy + 6, 4, 3);
+      g.fillStyle(0x3a2814, 1).fillRect(cx - 8, cy - 24, 16, 5);
     } else {
       // Missões: a prancheta com três itens e os tiques verdes
       g.fillStyle(0x6b4226, 1).fillRoundedRect(cx - 18, cy - 24, 36, 48, 4);
@@ -849,6 +872,62 @@ var ZapScene = new Phaser.Class({
     }
     var quem = PREMIO_NIVEL[e.nivel + 2];
     this.tRodape.setText('SUBINDO: +' + (10 * (e.nivel + 2)) + (quem ? ' E ' + nomeDoChar(quem) : ' PONTOS'));
+  },
+
+  /* ---------- o app da mochila ----------
+     Uma linha por coisa guardada: a figurinha, o nome com a quantidade e
+     o que ela faz. Tocar usa. */
+  itensDaMochila: function () {
+    var m = GameState.mochila || {}, out = [];
+    for (var k in m) if (m.hasOwnProperty(k) && m[k] > 0 && ITENS[k]) out.push(k);
+    return out;
+  },
+  pintaMochila: function (g) {
+    var itens = this.itensDaMochila(), i;
+    if (!itens.length) {
+      this.linha(0, ZAP.topo + 40, '  MOCHILA VAZIA.', PAL.cinzaEsc);
+      this.linha(1, ZAP.topo + 70, '  COMPRE NAS LOJAS', PAL.cinzaEsc);
+      this.tRodape.setText('');
+      return;
+    }
+    if (this.sel >= itens.length) this.sel = 0;
+    for (i = 0; i < itens.length && i < 6; i++) {
+      var k = itens[i], it = ITENS[k], y = ZAP.topo + i * 56, sel = (i === this.sel);
+      g.fillStyle(sel ? 0x2a2014 : 0x16161f, 1).fillRect(ZAP.tx0, y, ZAP.tx1 - ZAP.tx0, 52);
+      if (sel) g.lineStyle(2, 0xf2c14e, 0.9).strokeRect(ZAP.tx0 + 1, y + 1, ZAP.tx1 - ZAP.tx0 - 2, 50);
+      g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0 + 8, y + 10, 32, 32);
+      this.figMochila[i].setTexture(texturaItem(this, k)).setVisible(true);
+      this.zonasMochila[i].setInteractive();
+      var ef = [];
+      if (it.descanso) ef.push('+' + it.descanso + ' DESC');
+      if (it.carisma) ef.push('+' + it.carisma + ' CAR');
+      if (it.coracao) ef.push('+1 CORAÇÃO');
+      if (it.bateria) ef.push('+' + it.bateria + '% BATERIA');
+      if (it.sorte) ef.push('RASPE PRA VER');
+      this.linhas[i * 2].setVisible(true).setPosition(ZAP.tx0 + 50, y + 6)
+        .setText(it.nome.length > 13 ? it.nome.slice(0, 12) + '.' : it.nome).setColor(PAL.branco);
+      // a linha de baixo cabe 18 letras (218px a 12 cada): se os efeitos não cabem, vai o primeiro
+      var linhaEf = 'x' + GameState.mochila[k] + '  ' + ef.join(' ');
+      if (linhaEf.length > 18) linhaEf = 'x' + GameState.mochila[k] + '  ' + ef[0];
+      this.linhas[i * 2 + 1].setVisible(true).setPosition(ZAP.tx0 + 50, y + 28)
+        .setText(linhaEf).setColor(PAL.cinza);
+    }
+    this.tRodape.setText(nomeAgir() + ': USAR');
+  },
+  usaItem: function (idx) {
+    var itens = this.itensDaMochila();
+    if (idx >= itens.length) return;
+    var k = itens[idx], it = ITENS[k];
+    this.sel = idx;
+    var r = GameState.usaDaMochila(k);
+    var msg = 'USOU: ' + it.nome;
+    if (r === 'coracao') msg = '+1 CORAÇÃO';
+    else if (r === 'premio') msg = 'RASPOU: +R$ ' + it.premio;
+    else if (r === 'nada') msg = 'RASPOU... E NADA';
+    else if (r === 'bateria') msg = 'BATERIA: ' + Math.round(GameState.bateria) + '%';
+    sfx(r === 'nada' ? 'nao' : 'moeda');
+    this.pinta();
+    this.tRodape.setText(msg);
   },
 
   // a faixa de baixo de cada app: o botão de voltar pra tela inicial
