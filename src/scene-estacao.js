@@ -289,6 +289,14 @@ var EstacaoScene = new Phaser.Class({
        treino usa a estação de sempre, porque os minigames medem o saguão
        antigo. Decidido antes de tudo: até as catracas dependem disso. */
     this.itq = ehItaquera() && !this.treino;
+    /* ---------- o mezanino largo, em toda estação ----------
+       'Deixa mais largas as estações, como fiz em Itaquera, por padrão.'
+       O saguão de 320px virou o mezanino da Itaquera em todas: 560px,
+       doze catracas com mão e contramão, as duas bilheterias em cabine
+       com fila, os achados em cabine, o gradil até a parede e as placas
+       finas (na cor da linha). O treino fica no saguão antigo, porque os
+       minigames medem ele. A plataforma de cada estação é a de sempre. */
+    this.mez = !this.treino;
     /* a cena é reaproveitada de estação em estação: os bancos e o
        sentado da Itaquera sobravam na seguinte, e sentar ali prendia o
        boneco, porque só a Itaquera sabe levantar dele */
@@ -428,8 +436,8 @@ var EstacaoScene = new Phaser.Class({
     for (var q = 0; q < 2; q++) {
       if (Math.random() > chance) continue;
       // na Itaquera as cabines ocupam a altura de 300 a 390: o pedinte senta mais embaixo
-      var pd = new Ator(this, q ? (this.itq ? MEZ.x1 - 34 : 286) : (this.itq ? MEZ.x0 + 34 : 34),
-        this.itq ? 430 + Math.random() * 50 : 300 + Math.random() * 130,
+      var pd = new Ator(this, q ? (this.mez ? MEZ.x1 - 34 : 286) : (this.mez ? MEZ.x0 + 34 : 34),
+        this.mez ? 430 + Math.random() * 50 : 300 + Math.random() * 130,
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(38); pd.anima(0, false);
       pd.fixo = true;                 // quem está agachado não se mexe
@@ -459,6 +467,7 @@ var EstacaoScene = new Phaser.Class({
        embrulha o estômago. */
     var cam = this.cameras.main;
     cam.setBounds(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 8);
+    this._camX0 = 0; this._camW = GW;
     /* Presa no personagem, sem zona morta e sem atraso: "a câmera tem
        que acompanhar o personagem, não importa onde ele anda". A zona
        morta de 200px deixava você andar meia tela sem a câmera mexer. */
@@ -531,6 +540,18 @@ var EstacaoScene = new Phaser.Class({
   montaBarracas: function () {
     // na Itaquera as lojas moram na galeria, lado a lado (estacao-itaquera.js)
     if (this.itq) { this.barracas = lojasDaGaleria().concat(cabinesDoMezanino()); return; }
+    /* No mezanino largo das outras: as cabines da Itaquera (duas
+       bilheterias e os achados) e o DOG DO CÃO e a banca lado a lado,
+       de frente, embaixo à direita, longe da porta da rua (x 160). */
+    if (this.mez) {
+      this.barracas = cabinesDoMezanino().concat([
+        { chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c, x: 236, y: 420, w: 68, h: 58, lado: 0,
+          titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."', cardapio: ['dogao', 'agua', 'chocolate'] },
+        { chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0, x: 318, y: 424, w: 68, h: 54, lado: 0,
+          titulo: '"Jornal, bala, pururuca."', cardapio: ['pururuca', 'doce', 'jornal', 'agua'] }
+      ]);
+      return;
+    }
     this.barracas = [
       {
         chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
@@ -597,7 +618,11 @@ var EstacaoScene = new Phaser.Class({
     var fundo = this.add.graphics().setDepth(-1);
     fundo.fillStyle(num(PAL.bg), 1).fillRect(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 16);
 
-    if (this.itq) texturaDeCena(this, 'est_saguao', MEZ.x1 - MEZ.x0, GH, function (g) { eu.pintaMezanino(g, l); });
+    if (this.mez) {
+      // fora dos 320px da plataforma, o fundo escuro (a câmera abre pro mezanino)
+      fundo.fillRect(MEZ.x0, PLAT_Y - 8, MEZ.x1 - MEZ.x0, (GH - PLAT_Y) + 16);
+      texturaDeCena(this, 'est_saguao', MEZ.x1 - MEZ.x0, GH, function (g) { eu.pintaMezanino(g, l); });
+    }
     else texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
     if (this.itq) {
       texturaDeCena(this, 'est_plataforma', ITQ.platX2 - ITQ.outraX0, PLAT_ALT, function (g) { eu.pintaPlataformaItq(g, l); });
@@ -606,12 +631,13 @@ var EstacaoScene = new Phaser.Class({
     }
     texturaDeCena(this, 'est_escada', GW, ESCADA_ALT, function (g) { eu.pintaEscada(g); });
 
-    this.add.image(this.itq ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
+    this.add.image(this.mez ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
     if (this.itq) this.montaItaquera();
+    else if (this.mez) this.montaMezanino();
     // o elevador, em toda plataforma lateral (na central não cabe do lado da escada)
     if (!CENTRAL) this.montaElevadores();
-    else {
+    else if (!this.mez) {
       /* as lixeiras das estações de sempre: duas no saguão, rente à parede
          de baixo, e duas na plataforma, encostadas na parede */
       this.lixeiras = [{ x: 44, y: 506 }, { x: 278, y: 506 },
@@ -645,9 +671,10 @@ var EstacaoScene = new Phaser.Class({
     /* Na Itaquera as placas do mezanino são as mesmas finas e vermelhas
        da passarela e da plataforma ('deixa as placas bem semelhantes'):
        uma família só. O nome vai na parede da direita, que é a vazia. */
-    if (this.itq) {
-      placaItq(this, MEZ.x1 - 13, 380, placaDe(GameState.estacaoAtual()), true, true);
-      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, true);
+    if (this.mez) {
+      var cp = this.itq ? null : corDaPlaca();
+      placaItq(this, MEZ.x1 - 13, 380, placaDe(GameState.estacaoAtual()), true, true, cp);
+      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, true, cp);
     } else {
       var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
       tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
@@ -662,9 +689,11 @@ var EstacaoScene = new Phaser.Class({
        escrito no ar ele ficaria sobre o trilho. Lá ele vira placa
        pendurada no meio do piso, que é onde ela fica na Sé de verdade. */
     if (CENTRAL) {
+      /* 'Placas horríveis, se inspira mais em Itaquera': na central o nome
+         e o sentido também são a placa fina, pendurada no meio do piso,
+         na cor da linha. Os ganchos e a sombra dizem que ela está no alto. */
       for (var nc = 220; nc < PLAT_ALT - 120; nc += 300) {
-        // 45 pelo mesmo motivo das placas de sentido: é peça pendurada
-        placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 45);
+        placaItq(this, GW / 2, platY(nc), placaDe(GameState.estacaoAtual()), false, false, corDaPlaca());
       }
     } else {
       /* Duas vezes, em 150 e 560, e não três a cada 260: com o nome
@@ -712,18 +741,15 @@ var EstacaoScene = new Phaser.Class({
          outra ponta, e os dois fogem das chapas do nome da estação, que
          moram no 220 e no 520. */
       for (var pc = 0; pc < DIR_PLACAS.length; pc++) {
-        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc]),
-          '◄ ' + GameState.terminal(-1), 45, GameState.linhaAtual().nome);
+        placaItq(this, GW / 2, platY(DIR_PLACAS[pc]), '◄ ' + GameState.terminal(-1), false, false, corDaPlaca());
         /* 72 é a altura da peça inteira medida no navegador — chapa 44,
            tarja da linha 22, e 6 de respiro entre uma e outra. Empilhado
            e não lado a lado porque a chapa tem ~150px e o piso da
            central tem 112 de largura: as duas não cabem na mesma linha. */
-        placaSaida(this, GW / 2, platY(DIR_PLACAS[pc] + 72),
-          GameState.terminal(1) + ' ►', 45, GameState.linhaAtual().nome);
+        placaItq(this, GW / 2, platY(DIR_PLACAS[pc] + 26), GameState.terminal(1) + ' ►', false, false, corDaPlaca());
       }
     } else {
-      placaSaida(this, GW / 2, platY(26),
-        '► ' + placaDe(GameState.sentidoAtual()), 3, GameState.linhaAtual().nome);
+      placaItq(this, GW / 2, platY(30), '► ' + placaDe(GameState.sentidoAtual()), false, true, corDaPlaca());
     }
 
     this.gCatracas = this.add.graphics().setDepth(2);
@@ -1020,7 +1046,7 @@ var EstacaoScene = new Phaser.Class({
     /* Na Itaquera é uma fileira comprida, como na estação de verdade:
        doze catracas de 22 (a larga, 30) no mezanino largo, de x -56 a
        432. 12 + 11x34 + 42 = 428px, centrados: vão de -14 a 390. */
-    if (this.itq) { X0 = MEZ.x0 + 64; X1 = MEZ.x1 - 8; TOTAL = 12; VAO = 22; VAO_LARGO = 30; }
+    if (this.mez) { X0 = MEZ.x0 + 64; X1 = MEZ.x1 - 8; TOTAL = 12; VAO = 22; VAO_LARGO = 30; }
     var larga = Math.floor(Math.random() * TOTAL);
 
     var largura = POSTE;
@@ -1048,7 +1074,7 @@ var EstacaoScene = new Phaser.Class({
        SAÍDA e as seis do meio só de ENTRADA, como o fluxo da estação,
        que entra reto da passarela pra escada e sai pelos lados. A seta
        verde e o X vermelho no chão dizem qual é qual. */
-    if (this.itq) {
+    if (this.mez) {
       for (var m = 0; m < TOTAL; m++) this.gates[m].sentido = (m < 3 || m >= TOTAL - 3) ? 'sai' : 'entra';
     }
     /* A larga é a catraca PCD: nunca fecha e passa nos dois sentidos, que
@@ -1076,8 +1102,8 @@ var EstacaoScene = new Phaser.Class({
     // o gradil fecha só as pontas: da bilheteria (x 96) ao primeiro gabinete, e do último à parede
     if (this.gates.length) {
       // na Itaquera o gradil vai da parede (a bilheteria saiu dela e virou cabine)
-      this.gradil(g, this.itq ? MEZ.x0 + 26 : 96, this.gates[0].x0 - 14);
-      this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, this.itq ? MEZ.x1 : GW);
+      this.gradil(g, this.mez ? MEZ.x0 + 26 : 96, this.gates[0].x0 - 14);
+      this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, this.mez ? MEZ.x1 - 26 : GW);
     }
     for (i = 0; i < this.gates.length; i++) {
       t = this.gates[i]; w = t.x1 - t.x0;
@@ -1478,6 +1504,7 @@ var EstacaoScene = new Phaser.Class({
       }
       if (ind.fase === 'rua') {
         alvoX = ind.x; alvoY = 560;
+        if (this.mez && !this.itq) alvoX = 120 + (ind.x - 40) / 240 * 80;   // a porta da rua é no meio
         if (this.itq) alvoX = ITQ_MEIO_X + (Math.random() - 0.5) * 30;
         if (this.itq && a.sp.y > ITQ.passY0 + 4) {
           this.plateia.splice(i, 1);
@@ -1696,7 +1723,7 @@ var EstacaoScene = new Phaser.Class({
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
        saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
        são o único jeito de contornar — cada pixel de beirada é caminho. */
-    if (this.itq ? (x < MEZ.x0 + 22 || x > MEZ.x1 - 22) : (x < 22 || x > 298)) return false;
+    if (this.mez ? (x < MEZ.x0 + 22 || x > MEZ.x1 - 22) : (x < 22 || x > 298)) return false;
     // o corpo da barraca é parede; o balcão é onde se atende
     for (var b = 0; b < this.barracas.length; b++) {
       var q = this.barracas[b];
@@ -1902,7 +1929,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.gEstado === 'anda') {
       var v = (52 + dif * 16) * this.patente.vel * this.gVx * (dt / 1000);
       var nx = g.sp.x + v;
-      var gx0 = this.itq ? MEZ.x0 + 60 : 60, gx1 = this.itq ? MEZ.x1 - 34 : 286;
+      var gx0 = this.mez ? MEZ.x0 + 60 : 60, gx1 = this.mez ? MEZ.x1 - 34 : 286;
       if (nx < gx0) { nx = gx0; this.gVx = 1; }
       if (nx > gx1) { nx = gx1; this.gVx = -1; }
       g.sp.x = nx;
@@ -2431,8 +2458,12 @@ var EstacaoScene = new Phaser.Class({
         }
         break;
       case 'chegando':
-        t.y = PLAT_Y - t.alt + (t.t / 1400) * t.alt;
-        if (t.y >= PLAT_Y) {
+        /* 'O trem tem que chegar mais lento': 3,4 s em vez de 1,4, e
+           freando (a curva desacelera até parar), como trem de verdade
+           entrando na plataforma, e não um bloco que desliza e trava. */
+        var pc = Math.min(1, t.t / 3400);
+        t.y = PLAT_Y - t.alt + (1 - Math.pow(1 - pc, 3)) * t.alt;
+        if (pc >= 1) {
           t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta');
           calaTremChegando(t.aud); t.aud = null;
           this.desembarca(t);
@@ -2774,6 +2805,7 @@ var EstacaoScene = new Phaser.Class({
     vigiaDex(this, time);
     this.atualizaCarga(dt, mv);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
+    else if (this.mez) this.atualizaMezanino(dt);
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
     /* Passou pela catraca andando, o braço gira pra você: pra dentro na
@@ -2835,8 +2867,8 @@ var EstacaoScene = new Phaser.Class({
     if (y < 116) { this.dica.setText('▲ PLATAFORMA', PAL.cinza); return; }
 
     // na Itaquera os dois são cabines (barracas com acao), e não vãos na parede
-    var noGuiche = !this.itq && (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
-    var naBilheteria = !this.itq && (x < 96 && y > 244 && y < 288 && !this.liberado);
+    var noGuiche = !this.mez && (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
+    var naBilheteria = !this.mez && (x < 96 && y > 244 && y < 288 && !this.liberado);
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
     // na cadeira de rodas não se pula catraca

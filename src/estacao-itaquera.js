@@ -718,6 +718,36 @@ EstacaoScene.prototype.montaItaquera = function () {
   this.tPassante = 0;
 };
 
+/* ---------- o mezanino largo nas outras estações ----------
+   As peças do mezanino da Itaquera que não dependem da planta dela: as
+   cabines com fila, os quiosques, os cartazes, as tomadas e lixeiras
+   nas paredes das pontas. Sem passarela, galeria nem rua: quem chega
+   vem pela porta de baixo, no meio, como sempre. */
+EstacaoScene.prototype.montaMezanino = function () {
+  var gLojas = this.add.graphics().setDepth(0.6);
+  this.pintaBarracas(gLojas);
+  this.montaCompradores();
+  montaAnuncios(this, espacosItaquera(), 3);
+  this.montaTomadas([{ x: MEZ.x0 + 26, y: 396, lado: 1 }, { x: MEZ.x1 - 26, y: 282, lado: -1 }]);
+  var lx = [{ x: MEZ.x0 + 44, y: 506 }, { x: 214, y: 506 }];
+  if (CENTRAL) lx.push({ x: PLAT_X1 - 8, y: platY(320) }, { x: PLAT_X1 - 8, y: platY(700) });
+  this.lixeiras = (this.lixeiras || []).concat(lx);
+  var gLx = this.add.graphics().setDepth(2.5);
+  for (var i = 0; i < lx.length; i++) pintaLixeira(gLx, lx[i].x, lx[i].y);
+};
+/* A câmera abre pro mezanino quando você está no saguão e fecha nos
+   320px da plataforma quando sobe: desliza, pra não pular. */
+EstacaoScene.prototype.atualizaMezanino = function (dt) {
+  atualizaAnuncios(this, dt);
+  this.tiraDasCabines();
+  this.andaCompradores(dt);
+  var noSaguao = this.pl.sp.y > ESC_Y + ESCADA_ALT * 0.6;
+  var x0 = noSaguao ? MEZ.x0 : 0, w = noSaguao ? MEZ.x1 - MEZ.x0 : GW, k = Math.min(1, dt / 220);
+  this._camX0 += (x0 - this._camX0) * k; this._camW += (w - this._camW) * k;
+  if (Math.abs(this._camX0 - x0) < 0.5) { this._camX0 = x0; this._camW = w; }
+  this.cameras.main.setBounds(Math.round(this._camX0), PLAT_Y - 8, Math.round(this._camW), (GH - PLAT_Y) + 8);
+};
+
 /* ---------- a placa do metrô, fina ----------
    A placaSaida do resto do jogo é chapa grossa, de letra de 12px: na
    passarela de 88px ela tampava o corredor inteiro ('muito grosseiras',
@@ -727,9 +757,18 @@ EstacaoScene.prototype.montaItaquera = function () {
    fotos); deitada, ela atravessa o caminho (a de SAÍDA). Pendurada, ela
    mostra os dois ganchos e a sombra cai deslocada no chão: solta no meio
    do piso, sem nada, lia como jogada ali. */
-function placaItq(cena, x, y, texto, emPe, fundo) {
-  // `fundo`: presa na parede do fim do corredor, desenhada por baixo de quem passa
-  var prof = fundo ? 3 : 45;
+/* `cor`: [escura, clara]. Sem ela é a vermelha da Itaquera; nas outras
+   estações a placa vem na cor da linha (corDaPlaca). */
+function corDaPlaca(linha) {
+  return (linha || GameState.linha) === 'azul' ? [0x073c70, 0x0b5fae] : [0x8e1c16, 0xd9332a];
+}
+function placaItq(cena, x, y, texto, emPe, fundo, cor) {
+  cor = cor || [0x8e1c16, 0xd9332a];
+  /* `fundo`: presa na parede do fim do corredor, desenhada por baixo de
+     quem passa. Pendurada, ela fica por cima de TODO mundo, você
+     inclusive (62, acima do boneco em 60 e abaixo do véu da hora em 65):
+     a 45 o seu boneco passava por cima dela ('tenho que passar por baixo'). */
+  var prof = fundo ? 3 : 62;
   var t = txtC(cena, x, y, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(prof + 1);
   var comp = Math.round(t.width) + 12, esp = 13;
   var w = emPe ? esp : comp, h = emPe ? comp : esp;
@@ -742,8 +781,8 @@ function placaItq(cena, x, y, texto, emPe, fundo) {
   g.fillStyle(0x2a2a32, 1);
   if (emPe) { g.fillRect(x - 1, y0 + 3, 2, 3).fillRect(x - 1, y0 + h - 6, 2, 3); }
   else { g.fillRect(x0 + 4, y0 - 6, 2, 6).fillRect(x0 + w - 6, y0 - 6, 2, 6); }
-  g.fillStyle(0x8e1c16, 1).fillRect(x0, y0, w, h);
-  g.fillStyle(0xd9332a, 1).fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  g.fillStyle(cor[0], 1).fillRect(x0, y0, w, h);
+  g.fillStyle(cor[1], 1).fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
   g.fillStyle(0xffffff, 0.85);                                                // o friso
   if (emPe) g.fillRect(x0 + 1, y0 + 3, 1, h - 6); else g.fillRect(x0 + 3, y0 + 1, w - 6, 1);
   return t;

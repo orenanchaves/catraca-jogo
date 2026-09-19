@@ -2652,7 +2652,7 @@ function vozesPt() {
 }
 function vozPt() { var v = vozesPt(); return v ? v.aviso : null; }
 if (window.speechSynthesis && speechSynthesis.addEventListener) {
-  speechSynthesis.addEventListener('voiceschanged', function () { _vozes = null; vozesPt(); });
+  speechSynthesis.addEventListener('voiceschanged', function () { _vozes = null; _vozEn = undefined; vozesPt(); });
 }
 
 /* Fala de gente (o ambulante, quem reclama): não passa por cima do
@@ -2713,11 +2713,15 @@ function gritaAmbulante(modo) {
   var agora = Date.now();
   var sc = window.jogo && jogo.scene.getScene(modo === 'vagao' ? 'Vagao' : 'Estacao');
   if (!sc || !sc.pl || !sc.pl.sp || !SOM_LIGADO || document.hidden) { paraPregao(); return; }
-  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), dist = 1e9, fonte = null;
+  /* Só quem é ambulante de verdade grita: o da plataforma (sc.ambulante)
+     ou quem estiver marcado como tal. Pelo desenho não dá: o atendente
+     do DOG DO CÃO e o da banca usam os mesmos bonecos de ambulante, e as
+     ondas saíam deles ('às vezes não é o ambulante falando'). */
+  var lista = [].concat(sc.ambulante ? [sc.ambulante] : [], (sc.gente || []).filter(function (g) { return g && g.ehAmbulante; }));
+  var dist = 1e9, fonte = null;
   for (var i = 0; i < lista.length; i++) {
     var a = lista[i];
-    if (!a || !a.sp || !a.sp.active || !a.sp.texture) continue;
-    if (a.sp.texture.key.indexOf('np_ambulante') !== 0) continue;
+    if (!a || !a.sp || !a.sp.active) continue;
     var d = Math.hypot(a.sp.x - sc.pl.sp.x, a.sp.y - sc.pl.sp.y);
     if (d < dist) { dist = d; fonte = a.sp; }
   }
@@ -2798,7 +2802,25 @@ function calaTremChegando(a) {
   }, 40);
 }
 
-function anuncia(texto) {
+/* 'Nas estações falam as duas, primeiro português e depois inglês.' O
+   aviso vem em pt-BR e, logo depois, a mesma coisa em inglês, na voz
+   inglesa que o aparelho tiver (sem voz inglesa, só o português). */
+var _vozEn;
+function vozEn() {
+  if (_vozEn !== undefined || !window.speechSynthesis) return _vozEn || null;
+  var vs = speechSynthesis.getVoices();
+  if (!vs.length) return null;
+  var en = vs.filter(function (v) { return /^en/i.test(v.lang || ''); });
+  // voz de mulher quando dá pra saber pelo nome, que é a do aviso do metrô
+  en.sort(function (a, b) {
+    var fa = /female|zira|samantha|susan|hazel|google us/i.test(a.name) ? 0 : 1;
+    var fb = /female|zira|samantha|susan|hazel|google us/i.test(b.name) ? 0 : 1;
+    return fa - fb;
+  });
+  _vozEn = en[0] || null;
+  return _vozEn;
+}
+function anuncia(texto, ingles) {
   if (!SOM_LIGADO || document.hidden) return;
   if (typeof GameState !== 'undefined' && GameState.treino) return;
   plim();
@@ -2811,6 +2833,13 @@ function anuncia(texto) {
       var u = new SpeechSynthesisUtterance(texto);
       u.voice = voz; u.lang = voz.lang; u.rate = 0.94; u.pitch = vozesPt().avisoTom; u.volume = 0.9;
       speechSynthesis.speak(u);
+      var ve = ingles && vozEn();
+      if (ve) {
+        // a fila da fala toca uma depois da outra: o inglês entra quando o português acaba
+        var ue = new SpeechSynthesisUtterance(ingles);
+        ue.voice = ve; ue.lang = ve.lang; ue.rate = 0.94; ue.pitch = vozesPt().avisoTom; ue.volume = 0.9;
+        speechSynthesis.speak(ue);
+      }
     } catch (e) { }
   }, 800);
 }
@@ -2821,6 +2850,10 @@ function avisoDaProxima() {
   var prox = GameState.proximaEstacaoNome();
   var lado = (prox === BALDEACAO) ? 'esquerdo' : 'direito';
   return 'Próxima estação: ' + nomeFalado(prox) + '. Desembarque pelo lado ' + lado + ' do trem.';
+}
+function avisoDaProximaEn() {
+  var prox = GameState.proximaEstacaoNome();
+  return 'Next station: ' + nomeFalado(prox) + '. Exit on the ' + (prox === BALDEACAO ? 'left' : 'right') + ' side of the train.';
 }
 function calaAnuncio() {
   try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { }

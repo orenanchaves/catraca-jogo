@@ -568,7 +568,7 @@ var VagaoScene = new Phaser.Class({
 
     var self = this;
     fala(this, GameState.hora() + '. Próxima:\n' + placaDe(GameState.proximaEstacaoNome()), []);
-    anuncia(avisoDaProxima());
+    anuncia(avisoDaProxima(), avisoDaProximaEn());
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
     if (this.treino) this.montaTreino();
   },
@@ -3400,7 +3400,8 @@ var VagaoScene = new Phaser.Class({
     this.time.delayedCall(700, function () {
       if (!eu.scene || !eu.scene.isActive()) return;
       var aqui = GameState.estacaoAtual();
-      anuncia('Estação ' + nomeFalado(aqui) + '.' + (aqui === 'SÉ' ? ' Transferência para as linhas 1 e 3.' : ''));
+      anuncia('Estação ' + nomeFalado(aqui) + '.' + (aqui === 'SÉ' ? ' Transferência para as linhas 1 e 3.' : ''),
+        nomeFalado(aqui) + ' station.' + (aqui === 'SÉ' ? ' Transfer to lines 1 and 3.' : ''));
     });
     if (this.idoso) { this.idoso.destroy(); this.idoso = null; }
     /* Um pedido de lugar por estação: pedir sem parar transformaria o
@@ -3546,7 +3547,7 @@ var VagaoScene = new Phaser.Class({
       }
       if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
-        anuncia(avisoDaProxima());
+        anuncia(avisoDaProxima(), avisoDaProximaEn());
         this.sorteiaRitmo();
         this.sorteouFalha = false;
         this.pintaPortas(false);
