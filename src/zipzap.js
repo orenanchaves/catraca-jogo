@@ -365,6 +365,15 @@ function montaZap(charKey) {
     caixa[i].atraso = i === 0 ? 0 : (soma += 12 + Math.floor(Math.random() * 19));
     caixa[i].chegou = false;
   }
+  /* a história (src/historia.js) entra na caixa: a principal do dia chega
+     primeiro, e as conversas da história que seguem vivas ficam. Com a
+     principal, as conversas soltas atrasam 10 minutos, pra ela ser a
+     primeira a tocar. */
+  if (typeof Historia !== 'undefined' && typeof GameState !== 'undefined') {
+    var antes = caixa.length;
+    caixa = Historia.juntaNaCaixa(caixa, charKey, GameState.zap);
+    if (caixa.length > antes && caixa[0].principal) for (i = 1; i < caixa.length; i++) if (!caixa[i].hist) caixa[i].atraso += 10;
+  }
   return caixa;
 }
 /* as que já chegaram (as antigas, sem hora marcada, contam como chegadas) */

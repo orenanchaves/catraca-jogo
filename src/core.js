@@ -687,6 +687,10 @@ var GameState = {
     this.compromisso = null;
     this.destino = this.destinoDaRotina();
     this.perna = this.ultimaPerna() ? 'volta' : 'ida';
+    /* a história (src/historia.js) começa limpa, e o dia 1 já tem que
+       valer quando a caixa do ZipZap é montada: é ela que traz a missão
+       principal do dia */
+    this.dia = 1; this.fama = 0; this.historia = { ativas: {}, feitas: {}, criadas: {} }; this.zap = [];
     this.zap = montaZap(charKey);
     this.poeNoTrajeto(CASA);
     this.estacoes = 0;
@@ -919,6 +923,8 @@ var GameState = {
   },
 
   chegouNoDestino: function () {
+    // a história ouve a chegada (a missão 'chegar no Paraíso'), antes de a caixa do ZipZap ser refeita
+    if (typeof Historia !== 'undefined') Historia.evento('chegou', { estacao: this.destino });
     // guardado antes de o fôlego novo zerar a conta: é a missão dos 5 corações
     var coracoesAoChegar = this.coracoes;
     this.pernasFeitas++;

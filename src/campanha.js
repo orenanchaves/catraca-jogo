@@ -26,7 +26,7 @@ var Campanha = {
   CAMPOS: ['charKey', 'genero', 'dia', 'pernaIdx', 'perna', 'origem', 'destino', 'minutos',
     'dinheiro', 'carisma', 'descanso', 'coracoes', 'valeRestante', 'mochila', 'extrato', 'bateria',
     'atrasos', 'ultimoAtraso', 'pernasFeitas', 'estacoes', 'pontosDaCorrida', 'stats', 'lixo',
-    'sacouNoDia', 'gastoNoDia', 'multasNoDia'],
+    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia'],
 
   captura: function () {
     var d = { versao: this.VERSAO, quando: Date.now() };
@@ -88,6 +88,7 @@ var Campanha = {
     GameState.compromisso = null;
     GameState.dentroDoSistema = false; GameState.pulouCatraca = false; GameState.sentado = false;
     GameState.folgaPerna = 0; GameState.motivoFim = '';
+    GameState.zap = [];                          // a caixa do init não vale: a história refaz a dela
     GameState.zap = montaZap(d.charKey);
     GameState.poeNoTrajeto(d.origem);
     GameState.minutoSaida = GameState.minutos;

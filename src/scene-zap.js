@@ -576,6 +576,11 @@ var ZapScene = new Phaser.Class({
   respostasDoFio: function () {
     var f = this.fio;
     if (!f) return [];
+    if (f.hist) {
+      var es = f.respondido ? [] : Historia.escolhas(f);
+      if (!es.length) return [{ rotulo: nomeAgir() + ': VOLTAR', cor: PAL.cinzaEsc, acao: 'volta' }];
+      return es.map(function (e) { return { rotulo: e.texto, cor: PAL.verde, acao: 'hist', e: e }; });
+    }
     if (f.respondido) return [{ rotulo: nomeAgir() + ': VOLTAR', cor: PAL.cinzaEsc, acao: 'volta' }];
     if (f.vai) {
       return [
@@ -593,6 +598,7 @@ var ZapScene = new Phaser.Class({
     var op = ops[Math.min(this.opBotao, ops.length - 1)];
 
     if (op.acao === 'volta') { this.fio = null; sfx('catraca'); this.pinta(); return; }
+    if (op.acao === 'hist') { Historia.escolhe(f, op.e); this.opBotao = 0; sfx('ok'); this.pinta(); return; }
 
     f.enviadas.push(op.acao === 'sim' ? f.resSim : (op.acao === 'nao' ? f.resNao : f.resOk));
     f.respondido = true;
@@ -895,8 +901,10 @@ var ZapScene = new Phaser.Class({
       var hora = GameState.hora ? GameState.hora() : '';
       var y = ZAP.topo + 56, eu = this;
       // um balão: o texto quebra dentro dele; a hora (e o ✓✓ no seu) no canto de baixo
-      var bal = function (iTxt, iHora, texto, meu) {
-        var t = eu.linhas[iTxt], th = eu.linhas[iHora], esc = ESCALA_TEXTO / 2, maxW = W - 64;
+      var bal = function (iTxt, iHora, texto, meu) { balLivre(eu.linhas[iTxt], eu.linhas[iHora], texto, meu); };
+      var balLivre = function (t, th, texto, meu) {
+        var esc = ESCALA_TEXTO / 2, maxW = W - 64;
+        t.clearMask && t.clearMask(); th.clearMask && th.clearMask(); t.setAngle(0); th.setAngle(0);
         t.setVisible(true).setOrigin(0, 0).setScale(esc).setMaxWidth(maxW / esc).setText(texto).setColor('#111b21');
         var tw = Math.min(maxW, Math.ceil(t.width)), tHt = Math.ceil(t.height);
         th.setVisible(true).setOrigin(1, 0).setScale(esc).setText(hora + (meu ? ' ✓✓' : '')).setColor(meu ? '#2f8fd0' : '#667781');
@@ -911,8 +919,17 @@ var ZapScene = new Phaser.Class({
         th.setPosition(bx + bw - 6, y + bh - 12);
         y += bh + 8;
       };
-      bal(3, 4, f0.msgs.join(' '), false);
-      for (i = 0; i < f0.enviadas.length && i < 2; i++) bal(5 + i * 2, 6 + i * 2, f0.enviadas[i], true);
+      if (f0.log) {
+        // conversa da história: os últimos balões, em ordem, cada um com a sua vez
+        var ult = f0.log.slice(-4), iTx = 0;
+        for (i = 0; i < ult.length; i++) {
+          var par = [this.rotMapa[iTx], this.rotMapa[iTx + 1]]; iTx += 2;
+          balLivre(par[0], par[1], ult[i].t, ult[i].de === 'eu');
+        }
+      } else {
+        bal(3, 4, f0.msgs.join(' '), false);
+        for (i = 0; i < f0.enviadas.length && i < 2; i++) bal(5 + i * 2, 6 + i * 2, f0.enviadas[i], true);
+      }
 
       // as respostas possíveis: botões arredondados, o destino numa linha menor embaixo
       var ops = this.respostasDoFio();
@@ -992,6 +1009,13 @@ var ZapScene = new Phaser.Class({
       if (f.grupo) {
         g.fillStyle(0xffffff, 1).fillCircle(fx - 5, fy - 4, 4).fillCircle(fx + 6, fy - 3, 3.5)
           .fillRoundedRect(fx - 12, fy + 2, 14, 8, 3).fillRoundedRect(fx + 1, fy + 3, 11, 7, 3);
+      }
+      // a missão principal do dia leva a estrela amarela no canto da foto (src/historia.js)
+      if (f.principal) {
+        var sx0 = fx + 13, sy0 = fy - 12, pts = [];
+        for (var sk = 0; sk < 10; sk++) { var ang = -Math.PI / 2 + sk * Math.PI / 5, rr = sk % 2 ? 3 : 7; pts.push({ x: sx0 + Math.cos(ang) * rr, y: sy0 + Math.sin(ang) * rr }); }
+        g.fillStyle(0xffffff, 1).fillCircle(sx0, sy0, 8);
+        g.fillStyle(0xf2c14e, 1).fillPoints(pts, true);
       }
       var ini = this.linhas[12 + (i % 4)];
       if (!f.grupo && i < 4) ini.setVisible(true).setScale(ESCALA_TEXTO).setOrigin(0.5, 0.5).setPosition(fx, fy + 1)
