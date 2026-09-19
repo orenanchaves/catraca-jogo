@@ -74,7 +74,7 @@ var MEZ = { x0: -120, x1: 440 };
    outro, com as lojas lado a lado na parede de cima (a parede do fim do
    saguão vira a fachada delas), viradas pra galeria. A passarela desce
    do meio dela. Três lojas de cada lado da boca da passarela. */
-var GAL = { x0: -196, x1: 516, lojaY: 520, lojaH: 58, piso0: 578, piso1: 668 };
+var GAL = { x0: -252, x1: 544, lojaY: 520, lojaH: 58, piso0: 578, piso1: 668 };
 var ITQ_MEIO_X = (ITQ.passX0 + ITQ.passX1) / 2;
 var ITQ_MEIO_Y = (ITQ.cruzY0 + ITQ.cruzY1) / 2;
 
@@ -115,21 +115,21 @@ function assentosItq() {
 function lojasDaGaleria() {
   /* O que existe de verdade nas estações grandes: lanche rápido pra quem
      tá com pressa, acessório de celular, banca, caixa 24 horas, recarga
-     do Bilhete Único, O Boticário e a lotérica (na transição pro
+     do Bilhete Único, a perfumaria e a lotérica (na transição pro
      shopping, mas todo mundo conta como "dentro").
-     Lado a lado, mas não colados ('tá muito junto'): 68 de largura e 14
-     de vão, e o letreiro (3px pra cada lado) ainda deixa 8 de parede
-     entre um e outro (o dog, com os emblemas pra fora, ganha 16). A
-     esquerda termina em 98: dali até 188 é a boca da passarela. */
+     Lado a lado, com 20px de vão entre uma e outra ('redistribui o
+     espaçamento'): a galeria cresceu pros dois lados (de -252 a 544)
+     pra caber. A esquerda termina em 70: dali até 188 é a boca da
+     passarela. */
   var L = [
-    ['dog', -188, 68, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
-    ['salgados', -104, 68, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
-    ['celular', -22, 68, '"Capinha, película, fone.\nPower bank tem também."', ['powerbank', 'capinha', 'fone']],
-    ['atm', 60, 38, null, null, 'saque'],
-    ['banca', 200, 68, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
-    ['recarga', 282, 68, null, null, 'recarga'],
-    ['boticario', 364, 68, '"Um perfume pro dia render?"', ['perfume', 'desodorante']],
-    ['loterica', 446, 68, '"Raspadinha, patrão?\nHoje é seu dia."', ['raspadinha']]
+    ['dog', -244, 68, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
+    ['salgados', -156, 68, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
+    ['celular', -68, 68, '"Capinha, película, fone.\nPower bank tem também."', ['powerbank', 'capinha', 'fone']],
+    ['atm', 20, 38, null, null, 'saque'],
+    ['banca', 204, 68, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
+    ['recarga', 292, 68, null, null, 'recarga'],
+    ['boticario', 380, 68, '"Um perfume pro dia render?"', ['perfume', 'desodorante']],
+    ['loterica', 468, 68, '"Raspadinha, patrão?\nHoje é seu dia."', ['raspadinha']]
   ];
   var out = [];
   for (var i = 0; i < L.length; i++) {
@@ -147,7 +147,7 @@ function lojasDaGaleria() {
 function lixeirasItq() {
   return [
     { x: MEZ.x0 + 36, y: 476 }, { x: MEZ.x1 - 36, y: 476 }, { x: 214, y: 506 },
-    { x: -150, y: GAL.piso1 - 10 }, { x: 250, y: GAL.piso1 - 10 }, { x: 470, y: GAL.piso1 - 10 },
+    { x: -150, y: GAL.piso1 - 10 }, { x: 250, y: GAL.piso1 - 10 }, { x: 500, y: GAL.piso1 - 10 },
     { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[0] + 4 },
     { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[2] + 4 }
   ];
@@ -661,9 +661,11 @@ EstacaoScene.prototype.montaItaquera = function () {
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
   this.montaCompradores();
-  // tomadas: nas paredes do mezanino, e na parede da plataforma, perto dos bancos
+  /* tomadas: nas paredes do mezanino e na da plataforma, perto dos
+     bancos, e longe das lixeiras ('perde o sentido' carregar o celular
+     do lado do lixo) */
   this.montaTomadas([
-    { x: MEZ.x0 + 22, y: 450 }, { x: MEZ.x1 - 22, y: 470 },
+    { x: MEZ.x0 + 22, y: 396 }, { x: MEZ.x1 - 22, y: 282 },
     { x: ITQ.paredeX - 4, y: PLAT_Y + 300 }, { x: ITQ.paredeX - 4, y: PLAT_Y + 700 }
   ]);
   this.lixeiras = lixeirasItq();

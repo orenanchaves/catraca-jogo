@@ -3184,8 +3184,9 @@ var ESTILO_LOJA = {
   salgados: { nome: 'SALGADOS', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'estufa', balcao: 0xc0392b, produto: 'coxinha', letra: '#f2c14e', ven: 'np_pax2' },
   celular: { nome: 'ACESSÓRIOS', cor: 0x7c3fff, fundo: 0x1a1a2a, parede: 'capinhas', balcao: 0x2a2a3a, produto: 'fone', letra: '#f2f0ff', ven: 'np_pax11' },
   recarga: { nome: 'RECARGA BU', cor: 0x1c6fd0, fundo: 0x16223a, parede: 'cartoes', balcao: 0x1c4a8a, produto: 'cartao', letra: '#f2f0ff', ven: 'np_pax1' },
-  boticario: { nome: 'O BOTICÁRIO', cor: 0x2f7d5e, fundo: 0x14281e, parede: 'frascos', balcao: 0x1f5a40, produto: 'frasco', letra: '#f2f0ff', ven: 'np_pax10' },
-  loterica: { nome: 'LOTÉRICA', cor: 0xf2c14e, fundo: 0x14284a, parede: 'bilhetes', balcao: 0x1c4a8a, produto: 'bilhete', letra: '#f2c14e', ven: 'np_pax9' },
+  // nomes de paródia, que é o que o jogo faz com marca: O BOTICARO (de caro) e LOTODIFÍCIL
+  boticario: { nome: 'O BOTICARO', cor: 0x2f7d5e, fundo: 0x14281e, parede: 'frascos', balcao: 0x1f5a40, produto: 'frasco', letra: '#f2f0ff', ven: 'np_pax10' },
+  loterica: { nome: 'LOTODIFÍCIL', cor: 0xf2c14e, fundo: 0x14284a, parede: 'bilhetes', balcao: 0x1c4a8a, produto: 'bilhete', letra: '#f2c14e', ven: 'np_pax9' },
   /* as cabines do mezanino: a bilheteria (duas, cada uma com o seu
      atendente) e o achados e perdidos, no mesmo molde das lojas */
   bilheteria: { nome: 'BILHETERIA', cor: 0x1c5ab4, fundo: 0x2a3550, parede: 'guiche', balcao: 0x6a7080, produto: 'bilhete', letra: '#f2f0ff', ven: 'np_atendente' },
@@ -4874,11 +4875,14 @@ function fala(scene, texto, opcoes, cfg) {
 /* Tudo em cima, os quatro blocos numa fileira só: a pausa e o celular
    chegaram a descer pro canto de baixo, e ficou melhor aqui, perto do
    resto ('o HUD localizado em cima, tudo, ficava melhor'). */
+/* Redistribuído com a bateria: o bloco de você cresceu 18px pra pilha e
+   a porcentagem respirarem depois dos corações; a hora ('06:45', 60px)
+   cabe folgada em 86, e os dois botões encolheram 4 cada. */
 var HUDB = {
-  voce: { x: 4, y: 3, w: 132, h: 43 },
-  hora: { x: 140, y: 3, w: 98, h: 43 },
-  pausa: { x: 242, y: 3, w: 34, h: 43 },
-  zap: { x: 280, y: 3, w: 36, h: 43 }
+  voce: { x: 4, y: 3, w: 150, h: 43 },
+  hora: { x: 158, y: 3, w: 86, h: 43 },
+  pausa: { x: 248, y: 3, w: 30, h: 43 },
+  zap: { x: 282, y: 3, w: 34, h: 43 }
 };
 function blocoHud(g, b, aceso) {
   g.fillStyle(0x151522, 1).fillRoundedRect(b.x, b.y, b.w, b.h, 5);
@@ -4949,7 +4953,7 @@ var HudScene = new Phaser.Class({
        primeira linha ficou com uma coisa só — a hora — e o topo parou de
        ser uma fileira de informação disputando espaço. */
     this.tHora = txtC(this, HUDB.hora.x + HUDB.hora.w / 2, HUDB.hora.y + 1, '', PAL.amarelo, 8).setDepth(1001);
-    this.tBatHud = txt(this, HUDB.voce.x + 105, HUDB.voce.y + 3, '', PAL.branco, 8)
+    this.tBatHud = txt(this, HUDB.voce.x + 114, HUDB.voce.y + 3, '', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(1001);
     this.tSemBat = txtC(this, HUDB.zap.x - 7, HUDB.zap.y + HUDB.zap.h + 7, 'SEM BATERIA', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(1001).setVisible(false);
@@ -5183,7 +5187,7 @@ var HudScene = new Phaser.Class({
     /* O celular: um retângulo com tela, e a bolinha vermelha de não
        lidas por cima. É a linguagem de qualquer aparelho — quem vê
        bolinha vermelha sabe que tem recado esperando. */
-    var zx = HUDB.zap.x + 10, zy = HUDB.zap.y + 10;
+    var zx = HUDB.zap.x + 9, zy = HUDB.zap.y + 10;
     g.fillStyle(0x2c2c3a, 1).fillRect(zx, zy, 16, 22);
     g.fillStyle(0x0d1a14, 1).fillRect(zx + 2, zy + 3, 12, 15);
     g.fillStyle(0x00e676, 0.75).fillRect(zx + 3, zy + 5, 10, 2);
@@ -5202,7 +5206,7 @@ var HudScene = new Phaser.Class({
     var bt = Math.max(0, Math.min(1, (GameState.bateria === undefined ? 100 : GameState.bateria) / 100));
     var corB = bt > 0.5 ? 0x00e676 : (bt > 0.15 ? 0xf2c14e : 0xe8362c);
     var pisca = bt <= 0.15 && Math.floor(time / 300) % 2;
-    var bx = HUDB.voce.x + 80, by = HUDB.voce.y + 5;      // logo depois do quinto coração
+    var bx = HUDB.voce.x + 86, by = HUDB.voce.y + 5;      // depois do quinto coração, com vão
     g.fillStyle(0xb8bccc, 1).fillRect(bx, by, 20, 10).fillRect(bx + 20, by + 3, 2, 4);
     g.fillStyle(0x0a0a12, 1).fillRect(bx + 1, by + 1, 18, 8);
     if (!pisca) g.fillStyle(corB, 1).fillRect(bx + 2, by + 2, Math.max(1, Math.round(16 * bt)), 6);
