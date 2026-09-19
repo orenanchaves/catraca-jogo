@@ -40,7 +40,7 @@ var TEMPO_PARADO = 12000;
    pra dentro do carro: elas recuaram pro corredor, que é onde a mão
    alcança em pé. */
 var BARRAS_X = [104, 212];  // as duas barras de apoio do corredor
-var ALCANCE_BARRA = 34;     // até onde o braço chega
+var ALCANCE_BARRA = 34;     // perto o bastante da barra pro CLT cochilar nela
 
 var PORTA_ALT = 60;
 /* Baia, porta, baia, porta, baia. Eram três portas e três baias de 58,
@@ -391,7 +391,6 @@ var VagaoScene = new Phaser.Class({
     this.encarando = false;   // encarada por turnos rolando por cima desta cena
     this.sabeARota = false;   // turista: pagou alguém pra se situar
     this.disfarce = null;
-    this.solavanco = { fase: 'off', t: 0, proximo: 2600 };
     this.gente = [];
     /* Todas as portas do trem, não as de um carro só: são elas que a
        cena abre na estação, e você desce pela que estiver mais perto. */
@@ -557,7 +556,10 @@ var VagaoScene = new Phaser.Class({
       /* A barra vai do chão ao teto: vista de cima ela passa ACIMA das
          cabeças, e desenhada no fundo dava a impressão de que a pessoa
          andava por cima dela. */
-      this.add.image(0, topo, 'vg_barras').setOrigin(0, 0).setDepth(70);
+      /* A barra do teto vai ATRÁS das pessoas (20; elas vivem de 30 a 60).
+         Na 70, por cima de todo mundo, ela cortava o corpo de quem parava
+         embaixo dela: de cima, lia como um poste atravessando a pessoa. */
+      this.add.image(0, topo, 'vg_barras').setOrigin(0, 0).setDepth(20);
       if (carro < CARROS - 1) {
         this.add.image(0, topoDoCarro(carro) + CARRO_ALT - 4, 'vg_sanfona')
           .setOrigin(0, 0).setDepth(0);
@@ -566,8 +568,6 @@ var VagaoScene = new Phaser.Class({
 
     this.gPortas = this.add.graphics().setDepth(2);
     this.pintaPortas(false);
-    // o que muda de quadro pra quadro é só a mão agarrada na barra
-    this.gMao = this.add.graphics().setDepth(71);
   },
 
   /* Um módulo: banco de cima com o encosto em cima, banco de baixo com
@@ -757,60 +757,15 @@ var VagaoScene = new Phaser.Class({
     }
   },
 
-  /* A mão de quem está segurando. Sem isto, "segurar" era só o texto
-     na barra de baixo mudando de cor — não havia nada na tela que
-     dissesse que aquele boneco está agarrado em alguma coisa. Ela é a
-     única parte da barra que muda de quadro pra quadro, e por isso tem
-     gráfico só dela. */
-  /* ---------- o braço na barra ----------
-     Era UMA LINHA RETA do ombro até a barra, e linha reta de ponta a
-     ponta não lê como braço: lê como corda esticada. O que faz um braço
-     parecer braço, mesmo com quatro pixels de largura, é ter COTOVELO —
-     dois segmentos com um ângulo entre eles — e ter uma ponta diferente
-     da outra: ombro grosso, punho fechado.
-
-     O cotovelo cai: braço levantado dobra pra baixo, e é o peso que
-     torna a pose crível. */
-  pintaMao: function () {
-    var g = this.gMao; g.clear();
-    if (!this.segurando) return;
-    var m = this.segurando;
-    var lado = (m.bx > m.px) ? 1 : -1;
-
-    var ox = m.px + lado * 6, oy = m.y + 6;      // ombro
-    var hx = m.bx + (lado > 0 ? 3 : 7), hy = m.y; // punho, na barra
-    var ex = (ox + hx) / 2 + lado * 3;            // cotovelo, no meio
-    var ey = Math.max(oy, hy) + 8;                // e caído
-
-    // o braço de cima é manga, o de baixo é pele: a troca de cor no
-    // cotovelo é o que separa os dois segmentos sem precisar de contorno
-    g.lineStyle(5, 0x2a2a3a, 1);
-    g.beginPath(); g.moveTo(ox, oy); g.lineTo(ex, ey); g.strokePath();
-    g.lineStyle(4, 0xc99a70, 1);
-    g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.strokePath();
-    g.fillStyle(0x2a2a3a, 1).fillCircle(ex, ey, 3);   // o cotovelo
-
-    // o punho fechado em volta da barra, e o brilho do metal por dentro
-    g.fillStyle(0xa8794f, 1).fillRect(hx - 4, hy - 5, 9, 10);
-    g.fillStyle(0xc99a70, 1).fillRect(hx - 4, hy - 5, 9, 6);
-    g.fillStyle(0x8a5a3c, 1).fillRect(hx - 4, hy - 1, 9, 1);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y - 9, 2, 5);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(m.bx + 1, m.y + 5, 2, 5);
-
-    // o ombro, mais grosso que o resto: é o que dá direção ao braço
-    g.fillStyle(0x2a2a3a, 1).fillCircle(ox, oy, 4);
-  },
-
-  /* A mão só aparece quando há mão: apertando, com barra ao alcance, e
-     de pé. Guardo o ponto do ombro e o ponto da barra pra desenhar o
-     braço entre os dois. */
-  atualizaMao: function () {
-    this.segurando = null;
-    if (this.sentadoEm || !Ctrl.act) return;
-    var b = this.barraPerto();
-    if (b.d > ALCANCE_BARRA) return;
-    this.segurando = { px: this.pl.sp.x, bx: b.x - 4, y: this.pl.sp.y - 26 };
-  },
+  /* ---------- segurar a barra saiu do jogo ----------
+     Era um minigame de tranco: vinha o SEGURE!, você apertava perto de
+     uma barra, e o boneco ganhava um braço desenhado por cima. Em
+     pixel art, braço de linha em cima de sprite nunca combinou — primeiro
+     um gancho saindo da cintura, depois um braço vetorial em cima do
+     boneco. E o verbo em si era o menos interessante do vagão: esperar
+     o aviso e segurar um botão. Saiu inteiro em 18/09. A barra continua
+     no cenário, e continua valendo pro CLT, que cochila parado perto
+     dela. */
 
   /* Quem é a barra mais perto, e a que distância. É o que decide se dá
      pra segurar e onde a mão vai parar. */
@@ -972,13 +927,16 @@ var VagaoScene = new Phaser.Class({
     this.pl.dir = 'down';
   },
 
-  /* CLT — cochila em pé, segurando a barra. Descansa de graça, e o
-     preço é a rota: de olho fechado você não vê a estação passar. */
+  /* CLT — cochila em pé, parado perto de uma barra. Descansa de graça,
+     e o preço é a rota: de olho fechado você não vê a estação passar.
+     Era "segurando a barra", apertando; o segurar saiu do jogo, e parar
+     do lado dela é o que sobrou do gesto. */
   atualizaCochilo: function (dt) {
     if (!temPoder('cochilo') || this.sentadoEm) { this.cochilo = 0; return; }
     // com teto: sem ele o contador cresce a viagem inteira e soltar a
     // barra levaria segundos pra acordar
-    if (this.segurando && !this.andandoAgora) this.cochilo = Math.min(1900, this.cochilo + dt);
+    var naBarra = this.barraPerto().d <= ALCANCE_BARRA;
+    if (naBarra && !this.andandoAgora) this.cochilo = Math.min(1900, this.cochilo + dt);
     else this.cochilo = Math.max(0, this.cochilo - dt * 3);
   },
 
@@ -1625,39 +1583,6 @@ var VagaoScene = new Phaser.Class({
     this.pl.pos(this.sentadoEm.x < 160 ? bordaEsqVagao(yL) + 8 : bordaVagao(yL) - 8, yL);
     this.sentadoEm = null;
     GameState.sentado = false;
-  },
-
-  /* ---------- solavanco / segurar na barra ---------- */
-  atualizaSolavanco: function (dt) {
-    if (this.sentadoEm || this.estado !== 'andando') { this.solavanco.fase = 'off'; return; }
-    var s = this.solavanco, dif = GameState.dificuldade();
-    s.t += dt;
-    if (s.fase === 'off') {
-      if (s.t > s.proximo) {
-        s.fase = 'aviso'; s.t = 0;
-        s.dur = Math.max(500, 1100 - dif * 70);
-        sfx('empurra');
-      }
-    } else if (s.fase === 'aviso') {
-      this.cameras.main.shake(60, 0.0015);
-      if (s.t > s.dur) {
-        s.fase = 'off'; s.t = 0;
-        s.proximo = 2200 + Math.random() * 2600 - dif * 200;
-        /* Segurar deixou de ser só apertar: tem que ter barra ao
-           alcance do braço. Antes dava pra "segurar" no meio do
-           corredor, agarrado no ar. */
-        if (Ctrl.act && this.barraPerto().d <= ALCANCE_BARRA) {
-          sfx('catraca');
-          Missoes.conta('segurouSolavanco');
-        } else {
-          GameState.addCarisma(-3);
-          GameState.addDescanso(-3);
-          this.cameras.main.shake(320, 0.008);
-          sfx('nao');
-          this.flash('VOCÊ TROMBOU EM ALGUÉM');
-        }
-      }
-    }
   },
 
   /* Vagão andando não tem ninguém parado de verdade: quem está sentado
@@ -3108,7 +3033,6 @@ var VagaoScene = new Phaser.Class({
     if (this.lugar) this.atualizaLugar(dt);
 
     if (this.estado === 'andando') {
-      this.atualizaSolavanco(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }
       if (this.tCarroAtual && this.t > this.tCarroAtual) {
@@ -3199,8 +3123,6 @@ var VagaoScene = new Phaser.Class({
       this.entraNoCarro(carroAgora);
     }
 
-    this.atualizaMao();
-    this.pintaMao();
     this.atualizaEncontro(dt);
     this.animaGente(dt);
     this.animaRimador(dt);
@@ -3217,7 +3139,7 @@ var VagaoScene = new Phaser.Class({
        o preço é esse: quem dorme em pé passa da estação. Soltar a barra
        acorda na hora. */
     if (this.cochilando()) {
-      this.dica.setText('COCHILANDO ▲   SOLTE PRA ACORDAR', PAL.cinza);
+      this.dica.setText('COCHILANDO ▲   ANDE PRA ACORDAR', PAL.cinza);
       this.pintaRota();
       return;
     }
@@ -3315,10 +3237,11 @@ var VagaoScene = new Phaser.Class({
           var quantos = Math.abs(comC - meuC);
           dica = 'SONO! LUGAR ' + (comC < meuC ? '▲' : '▼') + ' ' + quantos +
             (quantos === 1 ? ' VAGÃO' : ' VAGÕES');
-        } else if (this.barraPerto().d <= ALCANCE_BARRA) {
-          dica = this.segurando ? 'SEGURANDO' : 'SEGURE PRA NÃO CAIR';
+        } else if (temPoder('cochilo')) {
+          // o único motivo que sobrou pra ir até a barra é o do CLT
+          dica = this.barraPerto().d <= ALCANCE_BARRA ? 'PARADO AQUI, VOCÊ COCHILA' : 'NA BARRA, VOCÊ COCHILA';
         } else {
-          dica = 'VÁ ATÉ UMA BARRA';
+          dica = '';
         }
       }
     }
@@ -3456,17 +3379,6 @@ var VagaoScene = new Phaser.Class({
        tem a tela inteira pra si e não briga com nada. */
     if (this.estado === 'andando') {
       barra(g, 8, GH - 41, GW - 16, 6, this.t / this.duracao, GameState.linhaAtual().num, 0x15151f);
-    }
-
-    if (this.solavanco.fase === 'aviso') {
-      var p = 1 - (this.solavanco.t / this.solavanco.dur);
-      caixa(g, 68, 192, 184, 60, 0xe8362c);
-      barra(g, 80, 232, 160, 10, p, 0xe8362c, 0x1e1e2a);
-      this.centro.setY(200).setCor(Ctrl.act ? PAL.verde : PAL.vermelho);
-      this.centro.setText(Ctrl.act ? 'SEGURANDO' : 'SEGURE!');
-    } else if (this.centro.texto() === 'SEGURE!' || this.centro.texto() === 'SEGURANDO') {
-      this.centro.setText('');
-      this.centro.setCor(PAL.branco).setY(232);
     }
 
     if (this.disfarce) {

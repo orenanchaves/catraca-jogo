@@ -6,7 +6,7 @@
    novas. O loop continua sendo o jogo; as missões são o motivo de voltar
    pra ele, e são também o tutorial que não parece tutorial — cada uma
    empurra o jogador pra uma coisa que ele talvez nunca descobrisse
-   sozinho (o mapa da parede, segurar a barra, a correnteza da Sé).
+   sozinho (o mapa da parede, o ambulante, a correnteza da Sé).
 
    Toda missão ACUMULA entre partidas, menos as marcadas `corrida`, que
    têm que sair numa partida só e zeram quando uma nova começa. Treino não
@@ -28,7 +28,8 @@ var NIVEIS = [
     { txt: 'Sente num banco do vagão', ev: 'sentou', meta: 1 }
   ] },
   { nome: 'O CAMINHO', missoes: [
-    { txt: 'Segure a barra num solavanco', ev: 'segurouSolavanco', meta: 1 },
+    // era segurar a barra no solavanco, que saiu do jogo em 18/09
+    { txt: 'Sente 3 vezes no vagão', ev: 'sentou', meta: 3 },
     { txt: 'Olhe o mapa na parede', ev: 'mapaParede', meta: 1 },
     { txt: 'Faça a baldeação na Sé', ev: 'baldeacao', meta: 1 }
   ] },
