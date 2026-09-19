@@ -2066,10 +2066,16 @@ function vozesPt() {
     var ab = /br/i.test(a.lang) ? 0 : 1, bb = /br/i.test(b.lang) ? 0 : 1;
     return ab - bb;
   });
+  /* As vozes NEURAIS vêm primeiro: no Edge, 'Francisca Online (Natural)'
+     é quase gente; a 'Maria' do Windows é a robótica de sempre. No Chrome
+     a do Google é a melhor que tem. Natural > Google > o resto. */
+  var nota = function (v) {
+    return (/natural|neural|online/i.test(v.name) ? 0 : (/google/i.test(v.name) ? 1 : 2));
+  };
   var fem = null, mas = null;
   for (i = 0; i < pt.length; i++) {
-    if (!fem && VOZ_FEMININA.test(pt[i].name)) fem = pt[i];
-    if (!mas && VOZ_MASCULINA.test(pt[i].name)) mas = pt[i];
+    if (VOZ_FEMININA.test(pt[i].name) && (!fem || nota(pt[i]) < nota(fem))) fem = pt[i];
+    if (VOZ_MASCULINA.test(pt[i].name) && (!mas || nota(pt[i]) < nota(mas))) mas = pt[i];
   }
   _vozes = { aviso: fem || pt[0], avisoTom: fem ? 1 : 1.35, gente: mas || pt[0], genteTom: mas ? 1 : 0.75 };
   return _vozes;
@@ -2125,7 +2131,7 @@ function anuncia(texto) {
     try {
       speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(texto);
-      u.voice = voz; u.lang = voz.lang; u.rate = 1.02; u.pitch = vozesPt().avisoTom; u.volume = 0.9;
+      u.voice = voz; u.lang = voz.lang; u.rate = 0.94; u.pitch = vozesPt().avisoTom; u.volume = 0.9;
       speechSynthesis.speak(u);
     } catch (e) { }
   }, 800);
@@ -2353,17 +2359,34 @@ function sfx(n) {
        reconhecer metrô antes de olhar pra tela — e o chiado do ar no fim.
        O guincho entra depois do rolamento, como na plataforma de verdade.
        Oscilador sozinho não faz nada disso: freio é ruído filtrado. */
+    /* Com o burburinho e o trilho tocando o tempo todo, a chegada e a
+       saída ficaram baixas demais pra marcar a troca de estação: subiram
+       uns 60%, e a chegada ficou mais longa, que é a freada de verdade. */
     case 'chegando':
-      glissando(128, 46, 1.9, 'sawtooth', 0.055);           // o rolamento
-      ruido(1.9, 0.05, 260, 70, 1.1);                       // rodas no trilho
-      ruido(1.15, 0.035, 2900, 1250, 14, 'bandpass', 0.55); // o guincho do freio
-      ruido(0.55, 0.03, 5200, 3400, 0.8, 'highpass', 1.7);  // o ar escapando
+      glissando(140, 46, 2.4, 'sawtooth', 0.085);           // o rolamento
+      ruido(2.4, 0.08, 280, 70, 1.1);                       // rodas no trilho
+      ruido(1.3, 0.055, 2900, 1250, 14, 'bandpass', 0.8);   // o guincho do freio
+      ruido(0.6, 0.045, 5200, 3400, 0.8, 'highpass', 2.1);  // o ar escapando
       break;
     /* e o trem saindo: o contrário, subindo de tom e sumindo no túnel */
     case 'partindo':
-      ruido(0.4, 0.03, 4600, 3000, 0.8, 'highpass', 0);
-      glissando(52, 150, 1.7, 'sawtooth', 0.05, 0.25);
-      ruido(1.7, 0.045, 80, 300, 1.1, 'bandpass', 0.25);
+      ruido(0.4, 0.045, 4600, 3000, 0.8, 'highpass', 0);
+      glissando(52, 170, 2.2, 'sawtooth', 0.08, 0.25);       // o motor subindo de tom
+      glissando(260, 780, 2.2, 'square', 0.012, 0.25);       // o chiado do inversor, agudo
+      ruido(2.2, 0.07, 80, 320, 1.1, 'bandpass', 0.25);
+      break;
+    /* O aviso de porta do metrô de SP: bipe curto e agudo, repetido,
+       uns três segundos antes de fechar. E o fechar: o ar da porta
+       (chiado que desce) e o baque das duas folhas se encontrando. */
+    case 'bipePorta':
+      for (var bp = 0; bp < 8; bp++) {
+        (function (k) { setTimeout(function () { tom(1180, 0.09, 'square', 0.035); }, k * 190); })(bp);
+      }
+      break;
+    case 'portaFecha':
+      ruido(0.45, 0.05, 6000, 2200, 0.9, 'highpass', 0);
+      tom(90, 0.14, 'sine', 0.12);
+      setTimeout(function () { tom(70, 0.1, 'triangle', 0.08); }, 60);
       break;
     case 'batida': tom(70, .09, 'sine', .09); setTimeout(function () { tom(1300, .03, 'square', .028); }, 95); break;
     case 'erro': tom(200, .1, 'square', .06); setTimeout(function () { tom(120, .22, 'square', .06); }, 100); break;

@@ -3236,7 +3236,7 @@ var VagaoScene = new Phaser.Class({
          parte da parada que precisa de pressa. */
       if (!this.avisouPorta && this.t > TEMPO_PARADO - 4000) {
         this.avisouPorta = true;
-        sfx('apito');
+        sfx('bipePorta');
         this.flash('PORTAS FECHANDO');
       }
       if (this.t > TEMPO_PARADO) {
@@ -3245,7 +3245,7 @@ var VagaoScene = new Phaser.Class({
         this.sorteiaRitmo();
         this.sorteouFalha = false;
         this.pintaPortas(false);
-        sfx('porta');
+        sfx('portaFecha');
         /* a porta fecha e o trem sai: o som de partir e o de chegar ao
            contrario, e e ele que diz 'acabou o tempo de descer' pra quem
            nao estava olhando pro letreiro */

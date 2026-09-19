@@ -1168,8 +1168,20 @@ var EstacaoScene = new Phaser.Class({
          Só vale pra quem SAI: quem chega nasce nessa mesma faixa e
          sobe, e morreria no berço com a regra pelo y sozinha. */
       if (a.indo.sai && a.sp.y >= ESC_Y - 26) {
-        a.sp.destroy();
+        // um por vez: o da frente tem que ter descido um degrau e meio
+        var ult = this.ultimoDescendo;
+        if (ult && ult.sp && ult.sp.active && ult.indo && ult.indo.fase === 'desce' && ult.sp.y < ESC_Y + 16) {
+          a.anima(dt, false);
+          continue;
+        }
+        this.ultimoDescendo = a;
+        // não some: pega a escada que desce, e o saguão cuida dele dali
         this.esperando.splice(i, 1);
+        a.sp.naEscada = true;
+        a.sp.setDepth(40);
+        a.sp.x = faixaDaEscada(ESC_PISTA[1], false);
+        a.indo = { fase: 'desce' };
+        this.plateia.push(a);
         this.gente = this.plateia.concat(this.esperando, [this.guarda]);
         continue;
       }
@@ -1286,12 +1298,53 @@ var EstacaoScene = new Phaser.Class({
         a.sp.x = faixaDaEscada(sobe, anda);      // o empurra-empurra não tira ninguém da faixa
         a.dir = 'up';
         a.anima(dt, anda);
+        /* No topo ele não some: sai do degrau e vira passageiro da
+           plataforma, andando até um lugar perto de uma porta. O saguão
+           ganha outro pela rua, e a conta de gente fecha. */
         if (a.sp.y < ESC_Y + 6) {
-          a.sp.destroy();
           this.plateia.splice(i, 1);
+          a.sp.naEscada = false; a.sp.dentro = false;
+          a.sp.setDepth(30);
+          a.indo = {
+            x: Phaser.Math.Clamp(PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16), PLAT_X0 + 12, PLAT_X1 - 12),
+            y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
+          };
+          this.esperando.push(a);
           this.chegaNoSaguao(1);
         }
         continue;
+      }
+      /* Quem desceu do trem: desce parado na direita da escada da
+         direita, sai pela catraca (o braço gira pra fora) e vai embora
+         pela rua. Some só lá embaixo, na entrada. */
+      if (ind.fase === 'desce') {
+        var desce = ESC_PISTA[1];
+        a.sp.y += ESC_VEL * dt / 1000;
+        a.sp.x = faixaDaEscada(desce, false);
+        a.dir = 'down';
+        a.anima(dt, false);
+        if (a.sp.y > ESC_BOCA + 6) {
+          a.sp.naEscada = false; a.sp.dentro = true;
+          var abertas = this.gates.filter(function (q) { return !q.fechada; });
+          var porta = abertas[Math.floor(Math.random() * abertas.length)] || this.gates[0];
+          a.indo = ind = { fase: 'saindo', x: (porta.x0 + porta.x1) / 2 };
+        }
+        continue;
+      }
+      if (ind.fase === 'saindo') {
+        alvoX = ind.x; alvoY = CATRACA_Y + 44;
+        if (a.sp.y >= CATRACA_Y + 20) {
+          a.sp.dentro = false;
+          a.indo = ind = { fase: 'rua', x: 40 + Math.random() * 240 };
+        }
+      }
+      if (ind.fase === 'rua') {
+        alvoX = ind.x; alvoY = 560;
+        if (a.sp.y > 540) {
+          a.sp.destroy();
+          this.plateia.splice(i, 1);
+          continue;
+        }
       }
 
       var dx = alvoX - a.sp.x, dy = alvoY - a.sp.y;
@@ -1305,6 +1358,9 @@ var EstacaoScene = new Phaser.Class({
          quando ele ainda estava parado na frente dela */
       if (ind.fase === 'passou' && yA > CATRACA_Y && a.sp.y <= CATRACA_Y) {
         this.giraCatracaEm(a.sp.x, 1, Math.abs(a.sp.x - this.pl.sp.x) < 90);
+      }
+      if (ind.fase === 'saindo' && yA < CATRACA_Y && a.sp.y >= CATRACA_Y) {
+        this.giraCatracaEm(a.sp.x, -1, Math.abs(a.sp.x - this.pl.sp.x) < 90);
       }
       a.setDir(dx, dy);
       a.anima(dt, true);
@@ -1449,7 +1505,7 @@ var EstacaoScene = new Phaser.Class({
          intervalo entre trens no pico — a plataforma acumulava três
          levas ao mesmo tempo e o rio virava represa. A 74 são 12s, que
          cabe dentro de um ciclo. */
-      a.indo = { x: ESC_MEIO + (Math.random() - 0.5) * 70, y: ESC_Y - 8, v: 74, sai: true };
+      a.indo = { x: faixaDaEscada(ESC_PISTA[1], false), y: ESC_Y - 8, v: 74, sai: true };
       this.esperando.push(a);
     }
     this.gente = this.plateia.concat(this.esperando, [this.guarda]);
@@ -1861,15 +1917,70 @@ var EstacaoScene = new Phaser.Class({
     var somA = (lado < 0) ? 16 : 88, somB = (lado < 0) ? 0 : 72;
     var briA = (lado < 0) ? 66 : 34, briB = (lado < 0) ? 44 : 12;
 
-    // corpo com volume
-    g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 88, 0, topo, ac);
-    g.fillStyle(num(PAL.metal), 1); retTrem(g, b, lado, 84, 6, topo, ac);
-    g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, luzA, luzB, topo, ac);
-    g.fillStyle(0x000000, 0.28); retTrem(g, b, lado, somA, somB, topo, ac);
-    // faixa da linha, só se a testeira do trem estiver na plataforma
-    if (y0 >= PLAT_Y && y0 + 12 <= ESC_Y) {
-      g.fillStyle(num(escurecer(l.cor, 0.35)), 1); retTrem(g, b, lado, 84, 6, y0, 12);
-      g.fillStyle(l.num, 1); retTrem(g, b, lado, 84, 6, y0 + 2, 8);
+    /* ---------- o trem do metrô de SP ----------
+       Era um bloco cinza. O trem de verdade é inox, prateado e frisado,
+       com uma faixa AZUL correndo o comprimento inteiro, a frente preta
+       com o letreiro de LED âmbar e dois faróis, e lanterna vermelha
+       atrás. Visto de cima: o teto frisado (as linhas paralelas ao
+       trilho), o ar-condicionado de cada carro, a faixa azul na lateral
+       que dá pra plataforma, e as divisas entre os carros a cada 150px
+       (seis carros em 900). */
+    g.fillStyle(0x6d7384, 1); retTrem(g, b, lado, 88, 0, topo, ac);            // contorno
+    g.fillStyle(0xb9bfcb, 1); retTrem(g, b, lado, 86, 2, topo, ac);            // inox
+    g.fillStyle(0xd9dde6, 1); retTrem(g, b, lado, luzA, luzB, topo, ac);       // o lado da luz
+    g.fillStyle(0x000000, 0.16); retTrem(g, b, lado, somA, somB, topo, ac);    // o da sombra
+    // os frisos do teto
+    g.fillStyle(0x8e95a5, 0.55);
+    for (var fr = 44; fr <= 80; fr += 6) retTrem(g, b, lado, fr + 1, fr, topo, ac);
+    // a faixa azul, dupla, na lateral da plataforma
+    g.fillStyle(0x1f4fb0, 1); retTrem(g, b, lado, 9, 5, topo, ac);
+    g.fillStyle(0x4f8fe0, 1); retTrem(g, b, lado, 11, 9, topo, ac);
+    /* ---------- divisas e ar-condicionado ----------
+       A divisa era a cada 150px e caía em cima de janela: a janela ficava
+       metade num carro e metade no outro. Agora a divisa mora num VÃO
+       entre duas portas (um a cada três), e aquele vão não tem janela —
+       é a ponta do carro. O ar-condicionado vai no meio de cada carro. */
+    var vaos = [], ini = 12, k;
+    for (k = 0; k < t.portas.length; k++) { vaos.push([ini, t.portas[k]]); ini = t.portas[k] + 52; }
+    vaos.push([ini, alt - 22]);
+    var divisas = [0];
+    for (k = 1; k < vaos.length - 1; k++) {
+      if (k % 3 !== 2) continue;
+      var dvy = y0 + Math.round((vaos[k][0] + vaos[k][1]) / 2);
+      divisas.push(dvy - y0);
+      if (dvy - 4 >= topo && dvy + 4 <= base) {
+        g.fillStyle(0x2a2d36, 1); retTrem(g, b, lado, 88, 0, dvy - 4, 8);
+        g.fillStyle(0x4a4f5c, 1); retTrem(g, b, lado, 86, 2, dvy - 1, 2);
+      }
+    }
+    divisas.push(alt);
+    for (k = 0; k < divisas.length - 1; k++) {
+      var ay = y0 + Math.round((divisas[k] + divisas[k + 1]) / 2) - 20;
+      if (ay >= topo && ay + 40 <= base) {
+        g.fillStyle(0x7a8192, 1); retTrem(g, b, lado, 78, 50, ay, 40);
+        g.fillStyle(0x9aa1b1, 1); retTrem(g, b, lado, 76, 52, ay + 2, 36);
+        g.fillStyle(0x5e6474, 1);
+        for (var gr = ay + 6; gr < ay + 36; gr += 5) retTrem(g, b, lado, 74, 54, gr, 1);
+      }
+    }
+    /* A traseira (em cima: o trem chega andando pra baixo) com a
+       lanterna vermelha, e a frente (embaixo) preta, com o letreiro âmbar
+       e os faróis — é a frente que aparece primeiro quando ele chega. */
+    if (y0 >= PLAT_Y && y0 + 10 <= ESC_Y) {
+      g.fillStyle(0x16181f, 1); retTrem(g, b, lado, 86, 2, y0, 10);
+      g.fillStyle(0xe8362c, 1); retTrem(g, b, lado, 16, 8, y0 + 2, 4);
+      g.fillStyle(0xe8362c, 1); retTrem(g, b, lado, 80, 72, y0 + 2, 4);
+    }
+    var fy0 = y0 + alt - 22;
+    if (fy0 >= topo && fy0 + 22 <= base) {
+      g.fillStyle(0x16181f, 1); retTrem(g, b, lado, 88, 0, fy0, 22);
+      g.fillStyle(0x2a2e3a, 1); retTrem(g, b, lado, 84, 4, fy0 + 2, 10);    // o para-brisa
+      g.fillStyle(0xf2a33c, 1);                                              // o letreiro de LED
+      for (var lx = 22; lx < 66; lx += 3) retTrem(g, b, lado, lx + 2, lx, fy0 + 4, 3);
+      g.fillStyle(0xfff4c2, 1); retTrem(g, b, lado, 18, 10, fy0 + 15, 4);   // faróis
+      g.fillStyle(0xfff4c2, 1); retTrem(g, b, lado, 78, 70, fy0 + 15, 4);
+      g.fillStyle(0x1f4fb0, 1); retTrem(g, b, lado, 88, 82, fy0, 22);       // a curva azul da frente
+      g.fillStyle(0x1f4fb0, 1); retTrem(g, b, lado, 6, 0, fy0, 22);
     }
 
     /* ---------- janelas: no vão ENTRE as portas ----------
@@ -1878,17 +1989,15 @@ var EstacaoScene = new Phaser.Class({
        entre duas portas (66px) ganha uma janela de 44 centrada nele, e
        as das pontas ficam entre a testeira e a primeira porta. As que
        caem fora do recorte não existem. */
-    var vaos = [], ini = 12, k;
-    for (k = 0; k < t.portas.length; k++) { vaos.push([ini, t.portas[k]]); ini = t.portas[k] + 52; }
-    vaos.push([ini, alt - 12]);
     for (k = 0; k < vaos.length; k++) {
       if (vaos[k][1] - vaos[k][0] < 56) continue;
+      if (k > 0 && k < vaos.length - 1 && k % 3 === 2) continue;   // ali é a divisa
       var y = y0 + Math.round((vaos[k][0] + vaos[k][1]) / 2) - 22;
       if (y < topo || y + 44 > base) continue;
-      g.fillStyle(0x11161f, 1); retTrem(g, b, lado, 70, 12, y, 44);
-      g.fillStyle(0x1f2a3d, 1); retTrem(g, b, lado, 68, 14, y + 2, 40);
-      g.fillStyle(0x3a4a6a, 0.7); retTrem(g, b, lado, 66, 16, y + 4, 10);
-      g.fillStyle(0xffffff, 0.09); retTrem(g, b, lado, briA, briB, y + 4, 36);
+      // janela da lateral, com a borracha preta e o reflexo em cima
+      g.fillStyle(0x16181f, 1); retTrem(g, b, lado, 38, 12, y, 44);
+      g.fillStyle(0x24324a, 1); retTrem(g, b, lado, 36, 14, y + 2, 40);
+      g.fillStyle(0x4a5f86, 0.8); retTrem(g, b, lado, 34, 16, y + 4, 9);
     }
 
     /* ---------- portas que deslizam ----------
@@ -1914,15 +2023,23 @@ var EstacaoScene = new Phaser.Class({
         var fol = [[py, folha], [py + 52 - folha, folha]];
         for (var f = 0; f < 2; f++) {
           var fy = fol[f][0], fh = fol[f][1];
-          g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 36, 0, fy, fh);
-          g.fillStyle(0x767c92, 1); retTrem(g, b, lado, 34, 2, fy, fh);
-          g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 20, 17, fy, fh);
+          g.fillStyle(0x6d7384, 1); retTrem(g, b, lado, 40, 0, fy, fh);
+          g.fillStyle(0xc4cad5, 1); retTrem(g, b, lado, 38, 2, fy, fh);
+          // o vidro da folha, que anda junto com ela
+          if (fh > 10) {
+            g.fillStyle(0x24324a, 1); retTrem(g, b, lado, 30, 12, fy + 4, fh - 8);
+            g.fillStyle(0x4a5f86, 0.8); retTrem(g, b, lado, 28, 14, fy + 5, 3);
+          }
         }
-        // a faixa amarela mora na borda de cada folha, e se junta no meio quando fecha
-        g.fillStyle(num(PAL.amarelo), 1);
-        retTrem(g, b, lado, 36, 0, py + folha - 2, 2);
-        retTrem(g, b, lado, 36, 0, py + 52 - folha, 2);
-        g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, 34, 2, py, 2);
+        // a borracha preta onde as folhas se encontram
+        g.fillStyle(0x16181f, 1);
+        retTrem(g, b, lado, 40, 0, py + folha - 1, 1);
+        retTrem(g, b, lado, 40, 0, py + 52 - folha, 1);
+        // o losango do metrô, azul, na folha de cima, quando ela está inteira
+        if (folha > 20) {
+          g.fillStyle(0x1f4fb0, 1); retTrem(g, b, lado, 30, 22, py + 8, 8);
+          g.fillStyle(0xffffff, 1); retTrem(g, b, lado, 27, 25, py + 10, 4);
+        }
       }
     }
   },
@@ -2044,14 +2161,14 @@ var EstacaoScene = new Phaser.Class({
              folhas voltando, e só então o trem anda. Partir com a porta
              escancarada e ela sumir no quadro seguinte era o "fica
              estranho" da chegada e da saída. */
-          t.estado = 'fechando'; t.t = 0; sfx('apito');
+          t.estado = 'fechando'; t.t = 0; sfx('bipePorta');
           // só falha o empurrão de quem estava empurrando ESTE trem
           if (this.empurrando && this.tremEmpurrado === t) this.falhouEmbarque();
         }
         break;
       case 'fechando':
         t.aviso = 'PORTAS FECHANDO';
-        if (t.t > 900) { t.estado = 'partindo'; t.t = 0; sfx('porta'); }
+        if (t.t > 1500) { t.estado = 'partindo'; t.t = 0; sfx('portaFecha'); }
         break;
       case 'partindo':
         /* Chega gente nova pela escada quando o trem parte, que é por
@@ -2060,7 +2177,12 @@ var EstacaoScene = new Phaser.Class({
            que tem 112px de largura — mesma razão do relógio. */
         if (!t.repos && t.lado < 0) {
           t.repos = true;
-          this.chegaNaPlataforma(Math.round(2 + 8 * GameState.lotacao()));
+          /* Agora também chega gente de verdade, subindo a escada: a
+             reposição só completa até a lotação do horário (a mesma conta
+             de quando a plataforma nasce), senão ela só enchia. */
+          var teto = Math.round(2 + 34 * GameState.lotacao());
+          var falta = teto - this.esperando.length;
+          if (falta > 0) this.chegaNaPlataforma(Math.min(falta, Math.round(1 + 4 * GameState.lotacao())));
         }
         t.y = PLAT_Y + (t.t / 1400) * t.alt;
         if (t.y >= PLAT_Y + t.alt) { t.y = PLAT_Y - t.alt; t.estado = 'espera'; t.t = 0; }
