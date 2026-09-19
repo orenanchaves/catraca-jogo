@@ -230,7 +230,11 @@ function retTrem(g, b, lado, longe, perto, y, alt) {
    verdade, e faz sentido de jogo: e a parede que voce encara chegando da
    rua, antes da catraca, que e exatamente quando ainda da pra mudar de
    ideia sobre o caminho. */
-var MAPAS_PLAT = [240, 660];
+/* 252 e 790, e não 240 e 660: o nome da estação corre a mesma faixa,
+   centrado em 150, 410 e 670, e um nome de doze letras ocupa 144px em
+   pé. O quadro de 660 caía em cima do terceiro nome (604..736) e cortava
+   as letras. Agora cada quadro mora num vão entre dois nomes. */
+var MAPAS_PLAT = [252, 790];
 var MAPA_PLAT = { x: 298, w: 20, h: 56 };
 var MAPA_SAG = { x: 196, y: 546, w: 84, h: 28 };
 
@@ -1868,33 +1872,57 @@ var EstacaoScene = new Phaser.Class({
       g.fillStyle(l.num, 1); retTrem(g, b, lado, 84, 6, y0 + 2, 8);
     }
 
-    // janelas: as que caem fora do recorte simplesmente não existem
-    for (var y = y0 + 30; y < y0 + alt - 40; y += 80) {
-      if (y < topo || y + 48 > base) continue;
-      g.fillStyle(0x11161f, 1); retTrem(g, b, lado, 70, 12, y, 48);
-      g.fillStyle(0x1f2a3d, 1); retTrem(g, b, lado, 68, 14, y + 2, 44);
+    /* ---------- janelas: no vão ENTRE as portas ----------
+       Eram a cada 80px, e as portas a cada 118: uma não sabia da outra,
+       e janela e porta se amontoavam na lateral do carro. Agora cada vão
+       entre duas portas (66px) ganha uma janela de 44 centrada nele, e
+       as das pontas ficam entre a testeira e a primeira porta. As que
+       caem fora do recorte não existem. */
+    var vaos = [], ini = 12, k;
+    for (k = 0; k < t.portas.length; k++) { vaos.push([ini, t.portas[k]]); ini = t.portas[k] + 52; }
+    vaos.push([ini, alt - 12]);
+    for (k = 0; k < vaos.length; k++) {
+      if (vaos[k][1] - vaos[k][0] < 56) continue;
+      var y = y0 + Math.round((vaos[k][0] + vaos[k][1]) / 2) - 22;
+      if (y < topo || y + 44 > base) continue;
+      g.fillStyle(0x11161f, 1); retTrem(g, b, lado, 70, 12, y, 44);
+      g.fillStyle(0x1f2a3d, 1); retTrem(g, b, lado, 68, 14, y + 2, 40);
       g.fillStyle(0x3a4a6a, 0.7); retTrem(g, b, lado, 66, 16, y + 4, 10);
-      g.fillStyle(0xffffff, 0.09); retTrem(g, b, lado, briA, briB, y + 4, 40);
+      g.fillStyle(0xffffff, 0.09); retTrem(g, b, lado, briA, briB, y + 4, 36);
     }
 
-    // portas
-    var ab = (t.estado === 'aberto');
+    /* ---------- portas que deslizam ----------
+       A porta trocava de desenho de uma vez: fechada, e no quadro
+       seguinte um buraco verde. Agora são duas folhas que se afastam do
+       meio (t.abertura, de 0 a 1, em 380ms) e voltam a se encontrar; o
+       verde só acende quando a porta já está quase toda aberta. */
+    var a = t.abertura || 0, folha = Math.round(26 * (1 - a));
     for (var i = 0; i < t.portas.length; i++) {
       var py = t.portas[i] + y0;
       // porta pela metade não é porta: ou cabe inteira, ou não aparece
       if (py < topo || py + 52 > base) continue;
-      if (ab) {
+      if (a > 0) {
         g.fillStyle(0x07070c, 1); retTrem(g, b, lado, 32, 0, py, 52);
         g.fillStyle(0x232d42, 1); retTrem(g, b, lado, 28, 4, py + 4, 44);
+      }
+      if (a > 0.6) {
         g.fillStyle(0x00e676, 1); retTrem(g, b, lado, 36, 32, py, 52);
         // a luz da porta cai NO PISO: distância negativa é o que avança
-        g.fillStyle(0x00e676, 0.3); retTrem(g, b, lado, 0, -12, py, 52);
-      } else {
-        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 36, 0, py, 52);
-        g.fillStyle(0x767c92, 1); retTrem(g, b, lado, 34, 2, py, 52);
+        g.fillStyle(0x00e676, 0.3 * a); retTrem(g, b, lado, 0, -12, py, 52);
+      }
+      if (folha > 0) {
+        var fol = [[py, folha], [py + 52 - folha, folha]];
+        for (var f = 0; f < 2; f++) {
+          var fy = fol[f][0], fh = fol[f][1];
+          g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 36, 0, fy, fh);
+          g.fillStyle(0x767c92, 1); retTrem(g, b, lado, 34, 2, fy, fh);
+          g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 20, 17, fy, fh);
+        }
+        // a faixa amarela mora na borda de cada folha, e se junta no meio quando fecha
+        g.fillStyle(num(PAL.amarelo), 1);
+        retTrem(g, b, lado, 36, 0, py + folha - 2, 2);
+        retTrem(g, b, lado, 36, 0, py + 52 - folha, 2);
         g.fillStyle(num(PAL.metalLuz), 1); retTrem(g, b, lado, 34, 2, py, 2);
-        g.fillStyle(num(PAL.metalSom), 1); retTrem(g, b, lado, 20, 17, py, 52);
-        g.fillStyle(num(PAL.amarelo), 1); retTrem(g, b, lado, 36, 0, py + 24, 4);
       }
     }
   },
@@ -1958,7 +1986,7 @@ var EstacaoScene = new Phaser.Class({
        frente o trem em que você estava de fato tentando entrar.
        Na lateral nada disso muda, porque lá o único trem que existe é
        sempre o escolhido. */
-    var ordem = { aberto: 0, chegando: 1, espera: 2, partindo: 3 };
+    var ordem = { aberto: 0, fechando: 0, chegando: 1, espera: 2, partindo: 3 };
     var m = null, rm = 9;
     for (var i = 0; i < this.trens.length; i++) {
       var t = this.trens[i];
@@ -2012,10 +2040,18 @@ var EstacaoScene = new Phaser.Class({
         t.falta = Math.max(0, Math.ceil((janela - t.t) / 1000));
         t.aviso = 'EMBARQUE ' + t.falta + 'S';
         if (t.t > janela) {
-          t.estado = 'partindo'; t.t = 0; sfx('porta');
+          /* Antes de partir, as portas fecham: 900ms com o bipe e as
+             folhas voltando, e só então o trem anda. Partir com a porta
+             escancarada e ela sumir no quadro seguinte era o "fica
+             estranho" da chegada e da saída. */
+          t.estado = 'fechando'; t.t = 0; sfx('apito');
           // só falha o empurrão de quem estava empurrando ESTE trem
           if (this.empurrando && this.tremEmpurrado === t) this.falhouEmbarque();
         }
+        break;
+      case 'fechando':
+        t.aviso = 'PORTAS FECHANDO';
+        if (t.t > 900) { t.estado = 'partindo'; t.t = 0; sfx('porta'); }
         break;
       case 'partindo':
         /* Chega gente nova pela escada quando o trem parte, que é por
@@ -2031,6 +2067,10 @@ var EstacaoScene = new Phaser.Class({
         t.aviso = 'PERDEU ESSE';
         break;
     }
+    // as folhas correm pro alvo: abertas só com o trem parado e liberado
+    var alvo = (t.estado === 'aberto') ? 1 : 0;
+    var va = dt / 380;
+    t.abertura = Math.max(0, Math.min(1, (t.abertura || 0) + (alvo > (t.abertura || 0) ? va : -va)));
     this.pintaTrem(t);
   },
 
