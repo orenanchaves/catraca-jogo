@@ -186,7 +186,7 @@ var config = {
      desenhada: o treino fica logo depois do título, senão a lista dele
      aparece por cima da briga que ela mesma abriu. */
   scene: [BootScene, TitleScene, TreinoScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
-    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene, BrigaScene,
+    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, BrigaScene,
     // o desafio desenha só o painel, por cima do vagão com zoom: tem que vir por último
     DesafioScene]
 };

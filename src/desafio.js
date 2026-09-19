@@ -355,13 +355,18 @@ var TIPOS_COSPLAY = ['cosLaranja', 'cosVingador', 'cosNuvem', 'cosRosa', 'cosCol
 var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
+/* O teto do dia: quem já apareceu demais hoje sai do sorteio. Se TODO
+   MUNDO bateu o teto, devolve null — e quem chamou não põe desafiante
+   nenhum. Antes o null virava tiozão lá no duelo (o `|| DESAFIANTES.tiozao`),
+   e por isso o mesmo sujeito aparecia três vezes no mesmo dia. */
 function sorteiaDesafiante() {
-  // o teto do dia: quem já apareceu demais hoje sai do sorteio
-  for (var tent = 0; tent < 8; tent++) {
+  for (var tent = 0; tent < 12; tent++) {
     var t = sorteiaDesafianteBruto();
-    if (podeDesafiar(t)) return t;
+    if (t && podeDesafiar(t)) return t;
   }
-  return null;
+  // a última tentativa: qualquer um da lista que ainda caiba hoje
+  var livres = TIPOS_DESAFIO.filter(function (x) { return x !== 'torcedor' && podeDesafiar(x); });
+  return livres.length ? livres[Math.floor(Math.random() * livres.length)] : null;
 }
 function sorteiaDesafianteBruto() {
   // perto da Liberdade, quem desafia muitas vezes é cosplayer
@@ -488,7 +493,9 @@ var DesafioScene = new Phaser.Class({
       eu.scene.pause(k);
     });
 
+    // tipo que não existe é erro de quem chamou, e o duelo não inventa outro
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
+    if (!DESAFIANTES[this.dados.tipo]) console.warn('DUELO sem tipo:', this.dados.tipo);
     // o teto do dia e o tema da família dele (o chefão tem o próprio)
     contaDuelo(this.dados.tipo);
     var tm = TEMA_DSF[this.dados.tipo] || ['temaChato', 0];

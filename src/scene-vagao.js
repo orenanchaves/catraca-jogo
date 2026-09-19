@@ -1104,6 +1104,7 @@ var VagaoScene = new Phaser.Class({
      está olhando e escolher passar ou não. */
   poeDesafiante: function (carro, x, y, olha, tipo) {
     tipo = tipo || sorteiaDesafiante();
+    if (!tipo) return null;          // todo mundo já apareceu demais hoje
     var a = new Ator(this, x, y, spriteDoDesafiante(tipo));
     afastaDoPoste(a.sp);
     a.dir = olha; a.anima(0, false);
@@ -2472,6 +2473,30 @@ var VagaoScene = new Phaser.Class({
     });
   },
 
+  /* O botão de levantar: só existe sentado, e é a única coisa na tela
+     que faz uma coisa só. Fica no pé, longe do menu de resposta. */
+  botaoLevantar: function () {
+    if (!this.gLevanta) {
+      var eu = this;
+      this.gLevanta = this.add.graphics().setScrollFactor(0).setDepth(520);
+      this.tLevanta = txtC(this, GW / 2, GH - 92, '▲ LEVANTAR', PAL.branco, 8)
+        .setScrollFactor(0).setDepth(521).setScale(ESCALA_TEXTO / 2);
+      this.zLevanta = this.add.zone(GW / 2 - 60, GH - 100, 120, 28).setOrigin(0, 0).setScrollFactor(0);
+      this.zLevanta.on('pointerdown', function () {
+        if (!eu.sentadoEm || eu.dialog) return;
+        Ctrl.bloqueiaAcao(300);          // esse dedo é do botão, não do mundo
+        eu.levanta();
+      });
+    }
+    var mostra = !!this.sentadoEm && !this.dialog;
+    this.gLevanta.setVisible(mostra).clear();
+    this.tLevanta.setVisible(mostra);
+    if (mostra) this.zLevanta.setInteractive(); else this.zLevanta.disableInteractive();
+    if (!mostra) return;
+    this.gLevanta.fillStyle(0x0a0a12, 0.9).fillRoundedRect(GW / 2 - 60, GH - 100, 120, 28, 8);
+    this.gLevanta.lineStyle(2, 0x00e676, 0.9).strokeRoundedRect(GW / 2 - 59, GH - 99, 118, 26, 8);
+  },
+
   flash: function (msg, dur) {
     // cena parada no meio de um aviso: o objeto ainda existe, mas o
     // texto dele já foi destruído junto com a cena
@@ -3122,7 +3147,15 @@ var VagaoScene = new Phaser.Class({
       this.encontro = null;
       this.tagEncontro.setVisible(false);
       if (tipo === 'rima') { this.montaRimadorDoDesafio(quem); this.comecaBatalha(); }
-      else this.comecaDisputa(quem);
+      else {
+        /* 'Esse jogo é muito ruim, remove, prefiro que seja uma batalha
+           mesmo.' A disputa da barra (três botões, FIRMAR/PUXAR/COTOVELO)
+           saiu: quem quer a sua barra agora é desafiante como qualquer
+           outro, e resolve na conversa por turnos. */
+        quem.fixo = false;
+        quem.desafio = { tipo: 'barra', olha: quem.sp.y < this.pl.sp.y ? 'down' : 'up', feito: false, pelaBarra: true };
+        this.comecaAbordagem(quem);
+      }
     }
   },
 
@@ -3852,6 +3885,7 @@ var VagaoScene = new Phaser.Class({
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+    this.botaoLevantar();
     this.vigiaAchado(dt);
     this.atualizaSaindo(dt);           // quem está indo embora anda até o fole
     this.vigiaOfertaDeLugar(dt);       // bem quisto e acabado: alguém te chama pra sentar
@@ -3882,6 +3916,13 @@ var VagaoScene = new Phaser.Class({
 
   contexto: function () {
     var dica = '';
+    /* ---------- levantar nunca trava ----------
+       'Às vezes trava e não dá pra sair da cadeira nem clicando.' O
+       levantar morava no fim de uma fila de contextos: bastava qualquer
+       outro (alguém te abordando, o trem parando) falar primeiro pra o
+       toque não chegar nele. Agora, sentado, existe um botão SÓ pra
+       isso, na tela, e o X do teclado também levanta na hora. */
+    if (this.sentadoEm && Ctrl.backJust) { this.levanta(); this.pintaRota(); return; }
     if (this.contextoAchado()) { this.pintaRota(); return; }
 
     // tremendo e solto em pé: é a única coisa que importa agora

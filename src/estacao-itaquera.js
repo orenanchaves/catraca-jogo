@@ -771,7 +771,7 @@ EstacaoScene.prototype.montaDesafianteDaEstacao = function () {
   this.dsfEst = [];
   if (this.treino || !this.mez || Math.random() > 0.5) return;
   var tipo = sorteiaDesafiante();
-  if (tipo === 'barra') return;
+  if (!tipo || tipo === 'barra') return;
   var a = new Ator(this, PLAT_X0 + 12 + Math.random() * (PLAT_X1 - PLAT_X0 - 24),
     platY(220 + Math.random() * (PLAT_ALT - 420)), spriteDoDesafiante(tipo));
   a.sp.setDepth(30); a.fixo = true; a.dir = 'left'; a.anima(0, false);

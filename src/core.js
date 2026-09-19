@@ -2336,9 +2336,11 @@ var PERTO_Y = 20;      // acompanha o corpo maior
    bloco de ANDAR, e quem ficava parado via as pessoas uma por cima da
    outra ('as pessoas ficam uma em cima da outra'). */
 function resolveCorpos(pl, gente, limitaPl, limitaNpc, soNpcs) {
-  var i, j, o, py = pl.sp.y;
+  var i, j, o, py = (pl && pl.sp) ? pl.sp.y : 0;
   var meuPeso = pesoDaMultidao();
-  if (!soNpcs) {
+  // a separação da multidão também roda antes de o boneco existir (o trem
+  // nasce com a gente já separada), e aí não há com quem te comparar
+  if (!soNpcs && pl && pl.sp) {
     for (i = 0; i < gente.length; i++) {
       o = gente[i];
       if (!o || !o.sp || !o.sp.active) continue;

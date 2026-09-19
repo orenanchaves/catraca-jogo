@@ -340,6 +340,11 @@ var EstacaoScene = new Phaser.Class({
     this.praCasa = !!(dados && dados.praCasa);
     // desceu no destino: agora é atravessar a estação e sair pela rua
     this.chegando = !!(dados && dados.chegando);
+    /* 'Às vezes a estação, quando sai, sem querer faz entrar de novo.'
+       Quem acabou de descer está parado na frente da porta, e o toque
+       seguinte embarcava de volta. A porta só volta a aceitar depois de
+       dois segundos — e o rodapé avisa que você está saindo. */
+    this.travaEmbarque = (dados && dados.onde === 'plataforma') ? 2000 : 0;
   },
 
   create: function () {
@@ -3192,6 +3197,7 @@ var EstacaoScene = new Phaser.Class({
   update: function (time, delta) {
     Ctrl.update();
     var dt = Math.min(delta, 50);
+    if (this.travaEmbarque > 0) this.travaEmbarque -= dt;
     /* A vigia do treino roda ANTES das saídas antecipadas: o diálogo que
        fecha o minigame é justamente uma delas, e vigiado depois dele o
        fim nunca seria visto. */
@@ -3311,7 +3317,9 @@ var EstacaoScene = new Phaser.Class({
       var vendedor = this.ambulantePerto();
       /* A porta manda: quem está com o trem aberto na frente não vai
          parar pra comprar bala. O ambulante é pra quem está esperando. */
-      if (trem) {
+      if (trem && this.travaEmbarque > 0) {
+        this.dica.setText('VOCÊ ACABOU DE DESCER', PAL.cinza);
+      } else if (trem) {
         this.dica.setText(nomeAgir() + ': entrar no vagão', PAL.verde);
         if (Ctrl.actJust) this.comecaEmpurrao(trem);
       } else if (vendedor) {
