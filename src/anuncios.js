@@ -32,10 +32,10 @@ function espacosItaquera() {
   return [
     /* Na parede de cima do mezanino, um painel de cada lado da escada, no
        meio do espaço que sobra ('melhora o espaçamento'): à esquerda, da
-       parede (-94) à boca da escada (102); à direita, do elevador (276) à
+       parede (-94) à boca da escada (102); à direita, do elevador (288) à
        parede (414). Dois de cada lado ficavam encostados. */
     { id: 'ITQ-MEZ-1', x: 4, y: 78, tipo: 'digital', anuncios: ['ond', 'ceda', 'loto', 'ingles'] },
-    { id: 'ITQ-MEZ-2', x: 345, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
+    { id: 'ITQ-MEZ-2', x: 353, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
     /* Na parede da plataforma não: em pé, girado, o cartaz brigava com a
        faixa do nome e o mapa, e ficava feio ('não rola tanto'). */
   ];
