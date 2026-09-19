@@ -214,6 +214,43 @@ var DESAFIANTES = {
       { nome: 'RÁDIO NA CENTRAL', dano: 16, bloqueia: 'FONE' }
     ]
   },
+  /* Os três que entraram em 19/09 ('tem que ter mais pessoas pra
+     enfrentar'): a dancinha, o vendedor de curso e o mochilão. Cada um com
+     a fraqueza que a cena pede: a dancinha não aguenta ironia, o vendedor
+     não aguenta fone, e o mochilão só entende conversa calma. */
+  tiktoker: {
+    nome: 'DANCINHA', sprite: 'np_tiktoker', pac: 70, nivel: 3,
+    fraco: 'IRONIA', resiste: 'LABIA',
+    chega: 'AMIGO, VOCÊ TÁ\nNO MEU QUADRO.',
+    sai: 'DEIXA, EU GRAVO\nDE NOVO.',
+    golpes: [
+      { nome: 'LUZ NA SUA CARA', dano: 12, bloqueia: 'IRONIA' },
+      { nome: 'MÚSICA NO TALO', dano: 14, bloqueia: 'FONE' },
+      { nome: 'GRAVA VOCÊ SEM PEDIR', dano: 16, bloqueia: 'CALMA' }
+    ]
+  },
+  vendedorCurso: {
+    nome: 'VENDE CURSO', sprite: 'np_curso', pac: 80, nivel: 4,
+    fraco: 'FONE', resiste: 'CALMA',
+    chega: 'INGLÊS EM TRÊS MESES.\nPOSSO FALAR UM MINUTO?',
+    sai: 'GUARDA MEU CONTATO,\nVAI QUE MUDA DE IDEIA.',
+    golpes: [
+      { nome: 'QR CODE NA SUA CARA', dano: 14, bloqueia: 'LABIA' },
+      { nome: 'SÓ HOJE, 90% OFF', dano: 16, bloqueia: 'IRONIA' },
+      { nome: 'E SE FOSSE SEU FILHO?', dano: 18, bloqueia: 'CALMA' }
+    ]
+  },
+  mochilao: {
+    nome: 'MOCHILÃO', sprite: 'np_mochilao', pac: 75, nivel: 3,
+    fraco: 'CALMA', resiste: 'IRONIA',
+    chega: 'QUE FOI? NÃO ENCOSTEI\nEM NINGUÉM.',
+    sai: 'TÁ BOM, EU TIRO\nA MOCHILA. PRONTO.',
+    golpes: [
+      { nome: 'GIRA COM A MOCHILA', dano: 16, bloqueia: 'CALMA' },
+      { nome: 'OCUPA DOIS LUGARES', dano: 12, bloqueia: 'LABIA' },
+      { nome: 'FINGE QUE NÃO VIU', dano: 14, bloqueia: 'FONE' }
+    ]
+  },
   /* O FISCAL, chefão do Ato 1 do estudante (CAMPANHA.md): o bilhete deu
      BLOQUEADO e ele acha que é clonado. Só chega no duelo quem ele alcança
      na fuga (src/chefao-fiscal.js). Lábia não cola nele; a fraqueza é a
@@ -261,6 +298,7 @@ var DESAFIANTES = {
    aparece, porque é você que o procura pulando catraca. */
 var LIMITE_DIA = {
   tiozao: 2, pregador: 2, barra: 2, ambulante: 2,
+  tiktoker: 2, vendedorCurso: 1, mochilao: 2,
   corintiano: 2, palmeirense: 2, saopaulino: 2, santista: 2,
   cosLaranja: 1, cosVingador: 1, cosNuvem: 1, cosRosa: 1, cosColegial: 1,
   guardinha: 3, guardaMedio: 2, guardaForte: 2,
@@ -283,6 +321,7 @@ function contaDuelo(tipo) {
 /* o tema de cada família, tocado quando a conversa começa */
 var TEMA_DSF = {
   tiozao: 'temaChato', pregador: 'temaChato', barra: 'temaChato', ambulante: 'temaChato',
+  tiktoker: 'temaCosplay', vendedorCurso: 'temaChato', mochilao: 'temaGuarda',
   corintiano: 'temaTorcida', palmeirense: 'temaTorcida', saopaulino: 'temaTorcida', santista: 'temaTorcida',
   guardinha: 'temaGuarda', guardaMedio: 'temaGuarda', guardaForte: 'temaGuarda',
   cosLaranja: 'temaCosplay', cosVingador: 'temaCosplay', cosNuvem: 'temaCosplay', cosRosa: 'temaCosplay', cosColegial: 'temaCosplay',
@@ -305,7 +344,7 @@ function spriteDoDesafiante(tipo) {
 /* 'Se for muito mais alto você pode fugir, se for muito mais baixo você
    pode fugir': três níveis de diferença, pra qualquer lado. */
 var DSF_FUGA = 3;
-var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor'];
+var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor', 'tiktoker', 'vendedorCurso', 'mochilao'];
 var TIPOS_COSPLAY = ['cosLaranja', 'cosVingador', 'cosNuvem', 'cosRosa', 'cosColegial'];
 var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 

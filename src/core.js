@@ -2078,6 +2078,12 @@ var PELES = {
      crachá. O FISCAL: boné azul-marinho e colete laranja, que não se
      confunde com nenhum dos três uniformes de guarda (azul, azul com bege,
      preto): de longe já se sabe que ele não é da segurança. */
+  /* Mais gente pra enfrentar ('não pode se repetir com tanta
+     frequência'): quem grava dancinha no vagão, quem vende curso em pé
+     na sua frente, e quem entra com a mochila do tamanho dele. */
+  tiktoker: pele('#0a0a12', '#e0b088', '#1a1a24', '#00c2b8', '#2a2a38', '#14141c', '#f2f0ff'),
+  vendedorCurso: pele('#0a0a12', '#c99a70', '#2a2a30', '#f0eeff', '#22283a', '#14141c', '#3a6fb0'),
+  mochilao: pele('#0a0a12', '#8a5a3c', '#3a2a22', '#8a6a3a', '#2e2e40', '#14141c', '#c8552a'),
   sueli: pele('#0a0a12', '#e0b088', '#6b4228', '#d0719f', '#2a2a38', '#14141c', '#f0eeff'),
   marcao: pele('#0a0a12', '#b07d52', '#1a1a24', '#a9c6e8', '#2a2f40', '#14141c', '#f0eeff'),
   fiscal: pele('#0a0a12', '#c99a70', '#1c2436', '#ec7000', '#2a2a38', '#14141c', '#f2f0ff'),
@@ -3681,6 +3687,9 @@ var DEX = [
   { id: 'cosRosa', nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Cabelo rosa e soco que racha o chão.' },
   { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' },
   // o estágio do estudante (Ato 1): dois pacíficos e o primeiro chefão
+  { id: 'tiktoker', nome: 'DANCINHA', sprite: 'np_tiktoker', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Grava dancinha no corredor. Você entrou no quadro.' },
+  { id: 'vendedorCurso', nome: 'VENDE CURSO', sprite: 'np_curso', desafio: true, tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Curso de inglês em três meses. Só hoje, diz ele.' },
+  { id: 'mochilao', nome: 'MOCHILÃO', sprite: 'np_mochilao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Entrou de mochila nas costas e não tirou. Você levou.' },
   { id: 'sueli', nome: 'SUELI', sprite: 'np_sueli', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'Do RH. Foi quem te chamou pro estágio.' },
   { id: 'marcao', nome: 'MARCÃO', sprite: 'np_marcao', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'O gestor. Repara em quem chega atrasado.' },
   { id: 'fiscal', nome: 'O FISCAL', sprite: 'np_fiscal', desafio: true, chefao: true, tipo: 'CHEFÃO', onde: 'CATRACA', desc: 'Caça bilhete clonado. Chefão do Ato 1.' },
@@ -3706,6 +3715,7 @@ var DEX_APARECE = {
   pedinte: 'SAGUÃO DE TODAS', atendente: 'BILHETERIA DE TODAS', gestante: 'BANCO DO VAGÃO', idoso: 'BANCO DO VAGÃO',
   cosLaranja: 'DA ANA ROSA ATÉ TIRADENTES', cosVingador: 'DA ANA ROSA ATÉ TIRADENTES', cosNuvem: 'DA ANA ROSA ATÉ TIRADENTES',
   cosRosa: 'DA ANA ROSA ATÉ TIRADENTES', cosColegial: 'DA ANA ROSA ATÉ TIRADENTES',
+  tiktoker: 'QUALQUER VAGÃO', vendedorCurso: 'QUALQUER VAGÃO', mochilao: 'VAGÃO CHEIO',
   sueli: 'SAÍDA DO PARAÍSO', marcao: 'SAÍDA DO PARAÍSO', fiscal: 'PARAÍSO, E NA SUA CATRACA',
   j_senhor: 'SAGUÃO DE QUALQUER ESTAÇÃO', j_ambulante: 'VAGÃO, NA RONDA DO GUARDA'
 };

@@ -305,16 +305,54 @@ VagaoScene.prototype.talvezIsopor = function () {
     { label: 'Seguro, vai!', cb: function () {
       eu.isopor.fase = 'segura';
       eu.flash('SENTE ANTES DO GUARDA\nCHEGAR EM VOCÊ.');
-      eu.ambulanteSome(a);
+      eu.ambulanteSome(a, true);          // some rápido: a ronda tá entrando
     } },
     { label: 'Não me mete nisso', cb: function () { eu.isopor = null; eu.ambulanteSome(a); } }
   ]);
 };
-VagaoScene.prototype.ambulanteSome = function (a) {
-  var eu = this;
-  this.tweens.add({ targets: a.sp, y: a.sp.y + 140, alpha: 0, duration: 1200,
-    onUpdate: function () { a.dir = 'down'; a.anima(16, true); },
-    onComplete: function () { var k = eu.gente.indexOf(a); if (k >= 0) eu.gente.splice(k, 1); a.sp.destroy(); } });
+/* ---------- ele SAI ANDANDO ----------
+   'O ambulante desaparece quando vai me pedir ajuda; ele tem que sair do
+   trem.' Sumir apagando é o que denuncia cenário. Agora ele anda até o
+   fole mais longe do guarda, passa pro outro carro e só então some — que
+   é o que um ambulante faz quando a ronda entra. E, quando a ronda
+   acaba, ele VOLTA andando pelo mesmo fole pra buscar a caixa. */
+VagaoScene.prototype.ambulanteSome = function (a, rapido) {
+  var c = carroDe(a.sp.y), topo = yDoCarro(c, HUD_H);
+  var cima = topo - SANFONA_ALT / 2, baixo = topo + CARRO_ALT + SANFONA_ALT / 2;
+  // foge pro lado mais longe de você (e do guarda, que entra pela porta mais longe)
+  var alvo = Math.abs(cima - this.pl.sp.y) > Math.abs(baixo - this.pl.sp.y) ? cima : baixo;
+  if (!this.saindoGente) this.saindoGente = [];
+  this.saindoGente.push({ a: a, y: alvo, vel: rapido ? 130 : 96, volta: false });
+};
+VagaoScene.prototype.voltaAmbulante = function (aoChegar) {
+  var c = carroDe(this.pl.sp.y), topo = yDoCarro(c, HUD_H);
+  var deCima = Math.random() < 0.5;
+  var y0 = deCima ? topo - 10 : topo + CARRO_ALT + 10;
+  var a = new Ator(this, 160, y0, spriteChar('ambulante', 'm'));
+  a.sp.setDepth(56); a.fixo = true;
+  this.gente.push(a);
+  if (!this.saindoGente) this.saindoGente = [];
+  this.saindoGente.push({ a: a, y: this.pl.sp.y + (deCima ? -26 : 26), vel: 92, volta: true, aoChegar: aoChegar });
+};
+// quem está indo embora (ou voltando) anda pelo corredor, quadro a quadro
+VagaoScene.prototype.atualizaSaindo = function (dt) {
+  var l = this.saindoGente;
+  if (!l || !l.length) return;
+  for (var i = l.length - 1; i >= 0; i--) {
+    var q = l[i], a = q.a;
+    if (!a || !a.sp || !a.sp.active) { l.splice(i, 1); continue; }
+    var dy = q.y - a.sp.y, dx = 160 - a.sp.x, passo = q.vel * dt / 1000;
+    a.sp.x += Math.max(-passo, Math.min(passo, dx));
+    a.sp.y += Math.max(-passo, Math.min(passo, dy));
+    a.dir = dy < 0 ? 'up' : 'down';
+    a.anima(dt, true);
+    if (Math.abs(dy) > 6) continue;
+    l.splice(i, 1);
+    if (q.volta) { if (q.aoChegar) q.aoChegar(a); continue; }
+    var k = this.gente.indexOf(a);
+    if (k >= 0) this.gente.splice(k, 1);
+    a.sp.destroy();
+  }
 };
 // o guarda chegou em você: sentado com a caixa passa; em pé, ele leva a caixa
 VagaoScene.prototype.revistaIsopor = function () {
@@ -336,9 +374,14 @@ VagaoScene.prototype.fimDaRondaIsopor = function () {
   apresenta('ambulante');          // conheceu: ele entra na roda de personagens
   if (cabeNaMochila('ralls')) { if (!GameState.mochila) GameState.mochila = {}; GameState.mochila.ralls = (GameState.mochila.ralls || 0) + 1; }
   var eu = this;
-  this.time.delayedCall(600, function () {
+  // ele volta andando pelo fole pra buscar a caixa
+  this.voltaAmbulante(function (a) {
+    a.dir = a.sp.y < eu.pl.sp.y ? 'down' : 'up'; a.anima(0, false);
     fala(eu, 'AMBULANTE: Valeu, parceiro! Toma um RALLS. E pra você agora é desconto.', []);
-    eu.time.delayedCall(2600, function () { if (eu.dialog) eu.dialog.fecha(); });
+    eu.time.delayedCall(2600, function () {
+      if (eu.dialog) eu.dialog.fecha();
+      eu.ambulanteSome(a);          // e segue vendendo no próximo carro
+    });
   });
   fechaTerciaria('A MERCADORIA', { carisma: 6, xp: 20 });
 };

@@ -2591,25 +2591,26 @@ var VagaoScene = new Phaser.Class({
       // encostou: a oferta abre; ficou longe demais por muito tempo: desiste
       if (d < 26) {
         v.fase = 'vende'; a.dir = dy < 0 ? 'up' : 'down'; a.anima(0, false);
-        fala(this, '"Olha o Ralls, olha o chocolate,\né dois real!"', [
-          { label: 'Comprar um Ralls (R$ 2,00)', cb: function () {
-            if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); }
-            else {
-              GameState.gastar(2); GameState.addCarisma(2); GameState.addDescanso(1);
-              GameState.stats.causos++; sfx('moeda'); self.flash('Hálito de menta.');
-              Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
-            }
-            self.ambulanteVai();
-          } },
-          { label: 'Comprar (R$ 2,00)', cb: function () {
-            if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); }
-            else {
-              GameState.gastar(2); GameState.addCarisma(4); GameState.addDescanso(2);
-              GameState.stats.causos++; sfx('moeda'); self.flash('O chocolate salva.');
-              Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
-            }
-            self.ambulanteVai();
-          } },
+        /* quem segurou a caixa dele na ronda (src/achados.js) paga R$ 1;
+           e quem tá sem grana pode FIAR, que é o carisma virando crédito
+           (src/carisma.js) */
+        var pr = GameState.amigoDoAmbulante ? 1 : 2;
+        var etiq = 'R$ ' + pr + ',00' + (pr < 2 ? ' (AMIGO)' : '');
+        var compra = function (carisma, desc, msg) {
+          if (GameState.dinheiro >= pr) {
+            GameState.gastar(pr); GameState.addCarisma(carisma); GameState.addDescanso(desc);
+            GameState.stats.causos++; sfx('moeda'); self.flash(msg);
+            Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
+          } else if (pedeFavor('fiado')) {
+            GameState.addCarisma(carisma); GameState.addDescanso(desc);
+            GameState.stats.causos++; self.flash('FIADO. "SEMANA QUE VEM VOCÊ ME PAGA."');
+            Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
+          } else { sfx('nao'); self.flash('Sem troco, e sem crédito.'); }
+          self.ambulanteVai();
+        };
+        fala(this, '"Olha o Ralls, olha o chocolate,\né ' + (pr < 2 ? 'um real pra você' : 'dois real') + '!"', [
+          { label: 'Ralls (' + etiq + ')', cb: function () { compra(2, 1, 'Hálito de menta.'); } },
+          { label: 'Chocolate (' + etiq + ')', cb: function () { compra(4, 2, 'O chocolate salva.'); } },
           { label: 'Fazer que não ouviu', cb: function () { GameState.addCarisma(-2); GameState.stats.causos++; self.ambulanteVai(); } }
         ]);
         return;
@@ -3846,6 +3847,7 @@ var VagaoScene = new Phaser.Class({
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     this.vigiaAchado(dt);
+    this.atualizaSaindo(dt);           // quem está indo embora anda até o fole
     this.vigiaOfertaDeLugar(dt);       // bem quisto e acabado: alguém te chama pra sentar
     this.regeneraSentado(dt);          // descansar sentado devolve coração
     var euD = this;

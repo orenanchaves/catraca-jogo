@@ -78,6 +78,10 @@ var ASSETS = {
     { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'palmeiras' },
     { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'touca_corinthians' },
     { key: 'np_atendente', file: 'assets/npcs/atendente.png', pal: PELES.atendente, corpo: 'atendente' },
+    // os desafiantes novos do vagão
+    { key: 'np_tiktoker', file: 'assets/npcs/tiktoker.png', pal: PELES.tiktoker, corpo: 'celular_longo' },
+    { key: 'np_curso', file: 'assets/npcs/vendedor_curso.png', pal: PELES.vendedorCurso, corpo: 'atendente' },
+    { key: 'np_mochilao', file: 'assets/npcs/mochilao.png', pal: PELES.mochilao, corpo: 'volumoso_bolsa' },
     // o estágio do estudante (Ato 1): a Sueli do RH, o Marcão e o Fiscal
     { key: 'np_sueli', file: 'assets/npcs/sueli.png', pal: PELES.sueli, corpo: 'rh_coque' },
     { key: 'np_marcao', file: 'assets/npcs/marcao.png', pal: PELES.marcao, corpo: 'gestor' },
