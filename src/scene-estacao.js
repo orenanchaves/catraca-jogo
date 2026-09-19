@@ -549,53 +549,66 @@ var EstacaoScene = new Phaser.Class({
   },
 
   /* ---------- barraca que parece barraca ----------
-     Era um retângulo escuro com uma tirinha listrada na borda: de cima,
-     lia como caixa de força. Vista de cima, uma barraca é o TOLDO — ele
-     cobre tudo, listrado da cor dela — e, na frente, o balcão com a
-     mercadoria à mostra, que é o que chama quem passa. O vendedor fica
-     atrás do balcão e a plaquinha com o nome vem por cima (montaVendedores). */
+     Primeiro era um retângulo escuro com uma tirinha listrada; depois um
+     toldo listrado cobrindo tudo com o vendedor por cima dele, que lia
+     como alguém deitado num lençol. Barraca de estação vista de cima é
+     um QUIOSQUE ABERTO: a prateleira no fundo cheia de mercadoria
+     colorida, o chão de dentro onde o vendedor fica em pé, e o balcão de
+     vidro na frente, virado pro corredor. O toldo listrado é só a franja
+     de cima, com o babado. `lado` -1: o balcão fica à esquerda. */
   pintaBarracas: function (g) {
     for (var i = 0; i < this.barracas.length; i++) {
       var b = this.barracas[i];
-      var frente = b.lado > 0 ? b.x + b.w : b.x;           // o lado do balcão
+      // x medido a partir do balcão: d=0 é a frente, d=b.w é o fundo
+      var X = function (d, w) { return b.lado < 0 ? b.x + d : b.x + b.w - d - w; };
       g.fillStyle(0x000000, 0.35).fillRect(b.x + 4, b.y + 4, b.w, b.h);
-      // o toldo: listras na direção do corredor, com a borda de babado
-      for (var f = 0; f < b.w; f += 8) {
-        g.fillStyle(((f / 8) % 2) ? b.cor : 0xf2f0ff, 1).fillRect(b.x + f, b.y, Math.min(8, b.w - f), b.h);
+      // a caixa: laterais na cor da barraca
+      g.fillStyle(0x2a2430, 1).fillRect(b.x, b.y, b.w, b.h);
+      g.fillStyle(b.cor, 1).fillRect(b.x, b.y, b.w, 3).fillRect(b.x, b.y + b.h - 3, b.w, 3);
+      // o chão de dentro
+      g.fillStyle(0x4a3a2c, 1).fillRect(X(11, b.w - 24), b.y + 3, b.w - 24, b.h - 6);
+      g.fillStyle(0x5a4834, 1);
+      for (var fy = b.y + 6; fy < b.y + b.h - 4; fy += 8) g.fillRect(X(11, b.w - 24), fy, b.w - 24, 1);
+      // a prateleira do fundo, com a mercadoria em fileira
+      g.fillStyle(0x3a2a1c, 1).fillRect(X(b.w - 13, 13), b.y + 3, 13, b.h - 6);
+      var cores = b.chave === 'dog' ? [0xf2c14e, 0xe8362c, 0x7fd6a0, 0xc8752a, 0xf2f0ff] : [0xe8a33c, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
+      for (var m = 0; m < 6; m++) {
+        g.fillStyle(cores[m % cores.length], 1).fillRect(X(b.w - 11, 9), b.y + 6 + m * 8, 9, 6);
+        g.fillStyle(0x000000, 0.25).fillRect(X(b.w - 11, 9), b.y + 11 + m * 8, 9, 1);
       }
-      g.fillStyle(0x000000, 0.18).fillRect(b.x, b.y + b.h - 4, b.w, 4);
-      for (var bb = 0; bb < b.h; bb += 6) {
-        g.fillStyle(((bb / 6) % 2) ? b.cor : 0xf2f0ff, 1).fillCircle(frente + (b.lado > 0 ? 2 : -2), b.y + bb + 3, 3);
+      // o balcão da frente: madeira embaixo, vidro em cima, mercadoria à mostra
+      g.fillStyle(0x5a3f22, 1).fillRect(X(0, 11), b.y + 3, 11, b.h - 6);
+      g.fillStyle(0x9ec4dc, 0.55).fillRect(X(1, 9), b.y + 5, 9, b.h - 10);
+      var vitrine = b.chave === 'dog' ? [0xc8752a, 0xc8752a, 0xf2c14e] : [0xf2f0ff, 0xe8a33c, 0xd05a8a];
+      for (var v = 0; v < 5; v++) {
+        g.fillStyle(vitrine[v % vitrine.length], 1).fillRect(X(3, 5), b.y + 8 + v * 9, 5, 4);
       }
-      // o balcão de madeira, pra fora do toldo, com a mercadoria em cima
-      var bx = b.lado > 0 ? frente + 4 : frente - 14;
-      g.fillStyle(0x5a3f22, 1).fillRect(bx, b.y + 4, 10, b.h - 8);
-      g.fillStyle(0x8a6b3a, 1).fillRect(bx + 1, b.y + 4, 8, b.h - 10);
-      var cores = b.chave === 'dog' ? [0xc8752a, 0xf2c14e, 0xe8362c, 0x7fd6a0] : [0xf2f0ff, 0xe8a33c, 0x6ac06a, 0xd05a8a];
-      for (var m = 0; m < 5; m++) {
-        g.fillStyle(cores[m % cores.length], 1).fillRect(bx + 2, b.y + 8 + m * 9, 6, 6);
-        g.fillStyle(0xffffff, 0.35).fillRect(bx + 2, b.y + 8 + m * 9, 6, 1);
+      // o toldo: só a franja de cima, listrada, com o babado caindo
+      for (var f = 0; f < b.w; f += 6) {
+        var c = ((f / 6) % 2) ? b.cor : 0xf2f0ff;
+        g.fillStyle(c, 1).fillRect(b.x + f, b.y - 8, Math.min(6, b.w - f), 8);
+        g.fillCircle(b.x + f + 3, b.y, 3);
       }
       // a luz amarela que a barraca joga no chão da frente
-      g.fillStyle(0xf2c14e, 0.12).fillRect(b.lado > 0 ? bx + 10 : bx - 24, b.y + 2, 24, b.h - 4);
+      g.fillStyle(0xf2c14e, 0.12).fillRect(b.lado < 0 ? b.x - 24 : b.x + b.w, b.y + 2, 24, b.h - 4);
     }
   },
 
-  /* O vendedor atrás do balcão, e a plaquinha com o nome da barraca,
-     pendurada no toldo: é o que faz a barraca ler como barraca de longe. */
+  /* O vendedor em pé no chão de dentro, virado pro balcão, e a
+     plaquinha com o nome em cima do toldo. */
   montaVendedores: function () {
     for (var i = 0; i < this.barracas.length; i++) {
       var b = this.barracas[i];
-      var vx = b.lado > 0 ? b.x + b.w - 8 : b.x + 10;
-      var v = new Ator(this, vx, b.y + b.h / 2 + 16,
+      var vx = b.lado < 0 ? b.x + 24 : b.x + b.w - 24;
+      var ven = new Ator(this, vx, b.y + b.h - 8,
         b.chave === 'dog' ? 'np_ambulante_c' : 'np_ambulante_b');
-      v.dir = b.lado > 0 ? 'right' : 'left'; v.anima(0, false);
-      v.sp.setDepth(39);
-      var t = txtC(this, b.x + b.w / 2, b.y - 12, b.nome, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(41);
+      ven.dir = b.lado < 0 ? 'left' : 'right'; ven.anima(0, false);
+      ven.sp.setDepth(39);
+      var t = txtC(this, b.x + b.w / 2, b.y - 21, b.nome, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(41);
       var w = Math.round(t.width) + 10;
       var gp = this.add.graphics().setDepth(40);
-      gp.fillStyle(0x14141c, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 15, w, 12);
-      gp.fillStyle(b.cor, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 5, w, 2);
+      gp.fillStyle(0x14141c, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 24, w, 12);
+      gp.fillStyle(b.cor, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 14, w, 2);
     }
   },
 

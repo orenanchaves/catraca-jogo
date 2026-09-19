@@ -57,9 +57,23 @@ var CASA_SAIDA = { estudante: 'B', clt: 'C', senhor: 'A', ambulante: 'C', gestan
 function saidaDeCasa() { return CASA_SAIDA[GameState.charKey] || 'B'; }
 function ehItaquera() { return GameState.estacaoAtual() === 'ITAQUERA'; }
 
-/* Os pilares e os bancos da plataforma: coisa em que se esbarra. */
-var ITQ_PILARES = [180, 410, 640];              // y de tela da plataforma
-var ITQ_PILAR_X = 330, ITQ_PILAR_R = 11;
+/* Os pilares e os bancos da plataforma: coisa em que se esbarra, e onde
+   se senta. O banco era uma tirinha de 13px, pequeno demais pra alguém
+   caber ('não tá pra sentar'). Agora são quatro assentos de 18px, da
+   largura de um boneco, com encosto, colados à direita de cada pilar. */
+var ITQ_PILARES = [180, 410, 640];              // y da textura da plataforma
+var ITQ_PILAR_X = 318, ITQ_PILAR_R = 11;
+var ITQ_BANCO = { x0: ITQ_PILAR_X + 16, assento: 20, n: 4, prof: 16 };
+// o centro de cada assento, em coordenadas do mundo
+function assentosItq() {
+  var out = [];
+  for (var i = 0; i < ITQ_PILARES.length; i++) {
+    for (var k = 0; k < ITQ_BANCO.n; k++) {
+      out.push({ x: ITQ_BANCO.x0 + k * ITQ_BANCO.assento + ITQ_BANCO.assento / 2, y: PLAT_Y + ITQ_PILARES[i], npc: null });
+    }
+  }
+  return out;
+}
 
 /* ---------- o que é chão ---------- */
 EstacaoScene.prototype.naPassarela = function (x, y) {
@@ -82,9 +96,10 @@ EstacaoScene.prototype.podeIrItq = function (x, y) {
 EstacaoScene.prototype.bateNaPlataforma = function (x, y) {
   for (var i = 0; i < ITQ_PILARES.length; i++) {
     var py = PLAT_Y + ITQ_PILARES[i];      // y da textura da plataforma → mundo
-    // o pilar, e o banco colado nele (à direita)
+    // o pilar, e o banco colado nele (à direita): de pé, contorna-se
     if (Math.hypot(x - ITQ_PILAR_X, y - py) < ITQ_PILAR_R + 7) return true;
-    if (x > ITQ_PILAR_X + 14 && x < ITQ_PILAR_X + 78 && y > py - 14 && y < py + 20) return true;
+    if (x > ITQ_BANCO.x0 - 4 && x < ITQ_BANCO.x0 + ITQ_BANCO.n * ITQ_BANCO.assento + 4 &&
+        y > py - 12 && y < py + ITQ_BANCO.prof + 4) return true;
   }
   return false;
 };
@@ -121,12 +136,17 @@ EstacaoScene.prototype.pintaPlataformaItq = function (g, l) {
     g.fillStyle(0x000000, 0.3).fillCircle(ITQ_PILAR_X + 3, py + 4, ITQ_PILAR_R + 2);
     g.fillStyle(0x9d9a92, 1).fillCircle(ITQ_PILAR_X, py, ITQ_PILAR_R);
     g.fillStyle(0xc9c6bd, 1).fillCircle(ITQ_PILAR_X - 3, py - 3, ITQ_PILAR_R - 5);
-    g.fillStyle(0x2a2a32, 1).fillRect(ITQ_PILAR_X + 16, py - 2, 60, 6);          // a travessa do banco
-    for (var s = 0; s < 4; s++) {
-      var sx = ITQ_PILAR_X + 16 + s * 15;
-      g.fillStyle(0xb04a14, 1).fillRect(sx, py - 10, 13, 12);                       // o assento laranja
-      g.fillStyle(0xf07a2a, 1).fillRect(sx + 1, py - 10, 11, 8);
-      g.fillStyle(0xffb070, 0.7).fillRect(sx + 2, py - 9, 9, 2);
+    // o banco: a base de metal e quatro assentos laranja com encosto (o encosto em cima)
+    var bw = ITQ_BANCO.n * ITQ_BANCO.assento;
+    g.fillStyle(0x000000, 0.3).fillRect(ITQ_BANCO.x0 + 3, py - 6, bw, ITQ_BANCO.prof + 6);
+    g.fillStyle(0x3a3a44, 1).fillRect(ITQ_BANCO.x0, py - 8, bw, ITQ_BANCO.prof + 4);
+    for (var s = 0; s < ITQ_BANCO.n; s++) {
+      var sx = ITQ_BANCO.x0 + s * ITQ_BANCO.assento + 1;
+      g.fillStyle(0xa8410f, 1).fillRect(sx, py - 10, ITQ_BANCO.assento - 2, 6);                  // o encosto
+      g.fillStyle(0xd9601c, 1).fillRect(sx + 1, py - 9, ITQ_BANCO.assento - 4, 3);
+      g.fillStyle(0xb04a14, 1).fillRect(sx, py - 3, ITQ_BANCO.assento - 2, ITQ_BANCO.prof - 2);  // o assento
+      g.fillStyle(0xf07a2a, 1).fillRect(sx + 1, py - 3, ITQ_BANCO.assento - 4, ITQ_BANCO.prof - 5);
+      g.fillStyle(0xffb070, 0.7).fillRect(sx + 2, py - 2, ITQ_BANCO.assento - 6, 2);
     }
   }
 
@@ -229,13 +249,26 @@ EstacaoScene.prototype.montaItaquera = function () {
   }
 
   // as placas: finas, vermelhas, penduradas, como nas fotos
-  placaItq(this, 280, platY(300), placaDe('ITAQUERA'));
-  placaItq(this, 280, platY(700), 'SAÍDA ▼');
+  // o nome corre ao longo da plataforma, pendurado sobre o piso perto dos pilares
+  placaItq(this, 300, platY(300), placaDe('ITAQUERA'), true);
+  placaItq(this, 300, platY(560), placaDe('ITAQUERA'), true);
+  placaItq(this, 250, platY(740), 'SAÍDA ▼');
   placaItq(this, ITQ_MEIO_X, ITQ.passY0 + 40, '▲ CATRACAS');
   // presas na parede de cima do braço, e não soltas no meio do corredor
   placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 - 6, '◄ A  SHOPPING');
   placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 - 6, 'C/D  RADIAL E ARENA ►');
   placaItq(this, ITQ_MEIO_X, ITQ.passY1 - 90, '▼ B  CPTM E TERMINAL');
+
+  // uns assentos já vêm ocupados; no pico, a maioria
+  this.assentos = assentosItq();
+  for (i = 0; i < this.assentos.length; i++) {
+    var as = this.assentos[i];
+    if (Math.random() > 0.25 + 0.5 * GameState.lotacao()) continue;
+    var sn = new Ator(this, as.x, as.y + 10, sorteiaPax());
+    sn.dir = 'sentadoFrente'; sn.anima(0, false); sn.sp.setDepth(29); sn.fixo = true;
+    as.npc = sn;
+  }
+  this.sentadoPlat = null;
 
   // as portas de plataforma: redesenhadas a cada quadro, porque abrem junto com o trem
   this.gPSD = this.add.graphics().setDepth(21);
@@ -248,14 +281,27 @@ EstacaoScene.prototype.montaItaquera = function () {
    passarela de 88px ela tampava o corredor inteiro ('muito grosseiras',
    foi o veredito). A da Itaquera é a das fotos: chapa vermelha baixa, com
    friso branco em cima e letra de 6px (escala 1, a menor nítida). */
-function placaItq(cena, x, y, texto) {
-  var t = txtC(cena, x, y + 3, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(46);
-  var w = Math.round(t.width) + 12, h = 13;
+/* `emPe`: a placa corre paralela aos trilhos (a do nome da estação, nas
+   fotos); deitada, ela atravessa o caminho (a de SAÍDA). Pendurada, ela
+   mostra os dois ganchos e a sombra cai deslocada no chão: solta no meio
+   do piso, sem nada, lia como jogada ali. */
+function placaItq(cena, x, y, texto, emPe) {
+  var t = txtC(cena, x, y, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(46);
+  var comp = Math.round(t.width) + 12, esp = 13;
+  var w = emPe ? esp : comp, h = emPe ? comp : esp;
+  var x0 = Math.round(x - w / 2), y0 = Math.round(y - h / 2);
+  if (emPe) t.setOrigin(0.5, 0.5).setAngle(90).setPosition(x, y);
+  else t.setOrigin(0.5, 0.5).setPosition(x, y + 1);
   var g = cena.add.graphics().setDepth(45);
-  g.fillStyle(0x000000, 0.35).fillRect(x - w / 2 + 2, y + 2, w, h);        // a sombra no chão
-  g.fillStyle(0x8e1c16, 1).fillRect(x - w / 2, y - 1, w, h + 1);
-  g.fillStyle(0xd9332a, 1).fillRect(x - w / 2 + 1, y, w - 2, h - 1);
-  g.fillStyle(0xffffff, 0.85).fillRect(x - w / 2 + 3, y + 1, w - 6, 1);    // o friso
+  g.fillStyle(0x000000, 0.28).fillRect(x0 + 6, y0 + 8, w, h);               // a sombra, longe: está no alto
+  // os cabos, dos ganchos até o teto (pra cima na tela)
+  g.fillStyle(0x2a2a32, 1);
+  if (emPe) { g.fillRect(x - 1, y0 + 3, 2, 3).fillRect(x - 1, y0 + h - 6, 2, 3); }
+  else { g.fillRect(x0 + 4, y0 - 6, 2, 6).fillRect(x0 + w - 6, y0 - 6, 2, 6); }
+  g.fillStyle(0x8e1c16, 1).fillRect(x0, y0, w, h);
+  g.fillStyle(0xd9332a, 1).fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  g.fillStyle(0xffffff, 0.85);                                                // o friso
+  if (emPe) g.fillRect(x0 + 1, y0 + 3, 1, h - 6); else g.fillRect(x0 + 3, y0 + 1, w - 6, 1);
   return t;
 }
 
@@ -293,8 +339,46 @@ EstacaoScene.prototype.posicionaItaquera = function (noAlto) {
   }
 };
 
+/* ---------- sentar no banco da plataforma ----------
+   O mesmo gesto do vagão: toca perto de um assento livre, senta de
+   frente e o descanso volta no mesmo ritmo de lá (0,0018 por ms).
+   Qualquer direção levanta, e você fica de pé na frente do banco. */
+EstacaoScene.prototype.assentoPerto = function () {
+  if (!this.assentos) return null;
+  var melhor = null, dm = 24;
+  for (var i = 0; i < this.assentos.length; i++) {
+    var a = this.assentos[i];
+    if (a.npc) continue;
+    var d = Math.hypot(this.pl.sp.x - a.x, this.pl.sp.y - (a.y + ITQ_BANCO.prof + 8));
+    if (d < dm) { dm = d; melhor = a; }
+  }
+  return melhor;
+};
+EstacaoScene.prototype.sentaPlat = function (a) {
+  this.sentadoPlat = a;
+  a.npc = 'player';
+  this.pl.sp.x = a.x; this.pl.sp.y = a.y + 10;
+  this.pl.dir = 'sentadoFrente'; this.pl.anima(0, false);
+  GameState.sentado = true;
+  sfx('ok');
+};
+EstacaoScene.prototype.levantaPlat = function () {
+  var a = this.sentadoPlat;
+  if (!a) return;
+  a.npc = null;
+  this.pl.sp.x = a.x; this.pl.sp.y = a.y + ITQ_BANCO.prof + 10;
+  this.pl.dir = 'down'; this.pl.anima(0, false);
+  this.sentadoPlat = null;
+  GameState.sentado = false;
+};
+
 /* ---------- a cada quadro ---------- */
 EstacaoScene.prototype.atualizaItaquera = function (dt) {
+  if (this.sentadoPlat) {
+    GameState.addDescanso(0.0018 * dt);
+    if (Ctrl.left || Ctrl.right || Ctrl.up || Ctrl.down) this.levantaPlat();
+    else { this.pl.dir = 'sentadoFrente'; this.pl.anima(0, false); }
+  }
   this.pintaPSD();
   this.andaPassantes(dt);
 
@@ -447,6 +531,16 @@ EstacaoScene.prototype.andaPassantes = function (dt) {
 /* ---------- o rodapé, fora do mezanino ---------- */
 EstacaoScene.prototype.contextoItq = function () {
   var x = this.pl.sp.x, y = this.pl.sp.y;
+  if (y < ESC_Y) {
+    if (this.sentadoPlat) { this.dica.setText('SENTADO. ANDE PRA LEVANTAR', PAL.cinza); return true; }
+    // a porta aberta e o ambulante mandam mais que o banco
+    if (this.tremNaPorta() || this.ambulantePerto()) return false;
+    var as = this.assentoPerto();
+    if (!as) return false;
+    this.dica.setText(nomeAgir() + ': SENTAR', PAL.amarelo);
+    if (Ctrl.actJust) this.sentaPlat(as);
+    return true;
+  }
   if (!(y > ITQ.passY0 || x < 0 || x > GW) || y < ESC_Y) return false;
   var dica;
   if (this.praCasa) {
