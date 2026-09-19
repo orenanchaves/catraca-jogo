@@ -2422,7 +2422,7 @@ var EstacaoScene = new Phaser.Class({
         t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
           : ('TREM EM ' + t.falta + 'S');
         if (t.t > esp) {
-          t.estado = 'chegando'; t.t = 0; t.repos = false; tocaTremChegando(this);
+          t.estado = 'chegando'; t.t = 0; t.repos = false; t.aud = tocaTremChegando(this);
           /* O relógio anda uma vez por espera, e não uma por trem: com
              dois trens ele andaria em dobro na Sé e a estação sozinha
              comeria o dia. Quem cobra é o da esquerda, que é o único
@@ -2434,6 +2434,7 @@ var EstacaoScene = new Phaser.Class({
         t.y = PLAT_Y - t.alt + (t.t / 1400) * t.alt;
         if (t.y >= PLAT_Y) {
           t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta');
+          calaTremChegando(t.aud); t.aud = null;
           this.desembarca(t);
         }
         t.aviso = 'CHEGANDO';

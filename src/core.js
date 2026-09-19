@@ -2769,8 +2769,9 @@ setInterval(ambienteGravado, 250);
    verdade encostando na plataforma, a cada chegada com o tom e a
    velocidade um pouco diferentes (0,9 a 1,1), pra nenhum trem soar igual
    ao anterior. Alto na plataforma, baixinho de quem ainda está no
-   saguão, e cala quando a cena da estação sai. Sem o arquivo, volta o
-   trem sintetizado de antes. */
+   saguão. Ele toca SÓ durante a chegada ('é só durante a chegada do
+   trem'): quando o trem para e a porta abre, some num fade curto
+   (calaTremChegando). Sem o arquivo, volta o trem sintetizado. */
 var AUDIO_TREM = 'assets/audio/trem_chegando.mp3';
 function tocaTremChegando(cena) {
   if (!SOM_LIGADO || document.hidden) return;
@@ -2783,7 +2784,18 @@ function tocaTremChegando(cena) {
     var pr = a.play();
     if (pr && pr.catch) pr.catch(function () { sfx('trem'); });
     if (cena && cena.events) cena.events.once('shutdown', function () { try { a.pause(); } catch (e) { } });
+    return a;
   } catch (e) { sfx('trem'); }
+  return null;
+}
+function calaTremChegando(a) {
+  if (!a) return;
+  var v0 = a.volume, passos = 12, k = 0;
+  var id = setInterval(function () {
+    k++;
+    try { a.volume = Math.max(0, v0 * (1 - k / passos)); } catch (e) { }
+    if (k >= passos) { clearInterval(id); try { a.pause(); } catch (e) { } }
+  }, 40);
 }
 
 function anuncia(texto) {
