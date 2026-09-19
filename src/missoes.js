@@ -123,7 +123,7 @@ var Missoes = {
   },
 
   conta: function (ev, dados) {
-    if (GameState.treino) return;
+    if (GameState.treino || GameState.explorar) return;
     var e = this.le(), n = NIVEIS[e.nivel];
     if (!n) return;
     dados = dados || {};

@@ -82,6 +82,20 @@ var DESAFIANTES = {
       { nome: 'MA CHE CORNETA!', dano: 10, bloqueia: 'CALMA' }
     ]
   },
+  /* Quem quer a sua barra: não é um tipo de gente, é uma situação. Vem
+     de qualquer passageiro em pé quando você está segurando há um tempo
+     (scene-vagao, cobicaBarra); o boneco é o dele. */
+  barra: {
+    nome: 'QUER A SUA BARRA', sprite: 'np_pax0', pac: 60,
+    fraco: 'LABIA', resiste: 'IRONIA',
+    chega: 'ESSA BARRA É MINHA,\nEU TAVA AQUI ANTES.',
+    sai: 'TÁ BOM, FICA COM ELA.',
+    golpes: [
+      { nome: 'COTOVELADA', dano: 12, bloqueia: 'CALMA' },
+      { nome: 'BAFO NO CANGOTE', dano: 10, bloqueia: 'FONE' },
+      { nome: 'MÃO POR CIMA DA SUA', dano: 14, bloqueia: 'LABIA' }
+    ]
+  },
   saopaulino: {
     nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', pac: 75,
     fraco: 'LABIA', resiste: 'FONE',
@@ -171,7 +185,8 @@ var FX_GOLPE = {
   'VAI CORINTHIANS!': 'torcida', 'BANDO DE LOUCOS': 'torcida',
   'AVANTI PALESTRA': 'torcida', 'MAMMA MIA, QUE GOL!': 'torcida', 'MA CHE CORNETA!': 'audio',
   'TRÊS MUNDIAIS': 'grito', 'SOBERANO!': 'torcida',
-  'O REI PELÉ': 'balao', 'SANTOS É PRAIA': 'torcida'
+  'O REI PELÉ': 'balao', 'SANTOS É PRAIA': 'torcida',
+  'COTOVELADA': 'grito', 'BAFO NO CANGOTE': 'audio', 'MÃO POR CIMA DA SUA': 'papel'
 };
 // o confete de cada torcida
 var CORES_TORCIDA = {

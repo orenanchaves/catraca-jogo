@@ -34,10 +34,14 @@ var TIT = {
    três ferramentas (tutorial, treino, som) ficam numa fileira menor
    embaixo dele. TREINO e não JOGOS: "JOGOS" perto de "► JOGAR" é o
    mesmo verbo duas vezes, e o polegar erra entre os dois. */
-var BOT = { yGr: GH - 106, hGr: 44, xGr: 24, gr: GW - 48, y: GH - 54, h: 38, tut: 44, tre: 120, som: 56, vao: 8 };
-BOT.x0 = Math.round((GW - (BOT.tut + BOT.tre + BOT.som + BOT.vao * 2)) / 2);
+/* A fileira de baixo ganhou o EXPLORAR: o jogo sem relógio, sem ponto e
+   sem missão, pra andar pela estação e pelo trem à toa. 'EXPLORAR' tem 8
+   letras, 96px; o botão tem 104. */
+var BOT = { yGr: GH - 106, hGr: 44, xGr: 24, gr: GW - 48, y: GH - 54, h: 38, tut: 40, tre: 88, exp: 104, som: 48, vao: 6 };
+BOT.x0 = Math.round((GW - (BOT.tut + BOT.tre + BOT.exp + BOT.som + BOT.vao * 3)) / 2);
 BOT.xTre = BOT.x0 + BOT.tut + BOT.vao;
-BOT.xDir = BOT.xTre + BOT.tre + BOT.vao;
+BOT.xExp = BOT.xTre + BOT.tre + BOT.vao;
+BOT.xDir = BOT.xExp + BOT.exp + BOT.vao;
 
 var TitleScene = new Phaser.Class({
   Extends: Phaser.Scene,
@@ -171,6 +175,9 @@ var TitleScene = new Phaser.Class({
     this.tTut = txtC(this, BOT.x0 + BOT.tut / 2, BOT.y + 8, '?', PAL.branco, 8).setDepth(3);
     this.tTre = txtC(this, BOT.xTre + BOT.tre / 2, BOT.y + 8, 'TREINO', PAL.branco, 8).setDepth(3);
     this.tSom = txtC(this, BOT.xDir + BOT.som / 2, BOT.y + 8, 'SOM', PAL.branco, 8).setDepth(3);
+    this.tExp = txtC(this, BOT.xExp + BOT.exp / 2, BOT.y + 8, 'EXPLORAR', PAL.verde, 8).setDepth(3);
+    this.zonaExp = this.add.zone(BOT.xExp, BOT.y, BOT.exp, BOT.h).setOrigin(0, 0).setInteractive();
+    this.zonaExp.on('pointerdown', function () { eu.ignoraAct = true; eu.comeca(true); });
 
     this.zonaTut = this.add.zone(BOT.x0, BOT.y, BOT.tut, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaTut.on('pointerdown', function () {
@@ -399,6 +406,8 @@ var TitleScene = new Phaser.Class({
     // as ferramentas, em azul apagado: ajudam, não são o jogo
     ladrilho(g, BOT.x0, BOT.y, BOT.tut, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
     ladrilho(g, BOT.xTre, BOT.y, BOT.tre, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
+    // o EXPLORAR em verde apagado: é jogo, mas sem valer nada
+    ladrilho(g, BOT.xExp, BOT.y, BOT.exp, BOT.h, 0x10261c, 0x1a3a2a, 0x2a6a48);
     ladrilho(g, BOT.xDir, BOT.y, BOT.som, BOT.h, SOM_LIGADO ? 0x161c2c : 0x111118,
       SOM_LIGADO ? 0x222c44 : 0x1a1a24, SOM_LIGADO ? 0x2e3c60 : 0x26263a);
     this.tSom.setColor(SOM_LIGADO ? PAL.branco : PAL.cinzaEsc);
@@ -414,7 +423,7 @@ var TitleScene = new Phaser.Class({
 
   /* Começar é o mesmo comando em todo lugar: no ladrilho, na tecla e no
      toque fora. No travado ele compra. */
-  comeca: function () {
+  comeca: function (explorar) {
     /* O toque no ladrilho chama isto E acende o Ctrl.act do mesmo dedo,
        que chama de novo no update seguinte: sem a trava o jogo começava
        duas vezes, com dois GameState.init. */
@@ -423,7 +432,9 @@ var TitleScene = new Phaser.Class({
     this.saindo = true;
     audioOn(); sfx('ok');
     GameState.init(this.ordem[this.sel], this.gen[this.ordem[this.sel]]);
-    Missoes.novaCorrida();   // partida de verdade: zera o que era "numa corrida"
+    // EXPLORAR: o mesmo começo, mas sem relógio, sem perder e sem valer ponto
+    GameState.explorar = !!explorar;
+    if (!explorar) Missoes.novaCorrida();   // partida de verdade: zera o que era "numa corrida"
     this.scene.start('Estacao', { onde: 'saguao' });
   },
 

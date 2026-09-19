@@ -229,7 +229,15 @@ var MAX_ATRASOS = 1;
 
 /* onde as duas se cruzam, e o par fixo da corrida */
 var BALDEACAO = 'SÉ';
-var CASA = 'ITAQUERA';         // linha vermelha, ponta leste
+/* A casa de quem joga. Era uma só, Itaquera (a ponta leste da
+   Vermelha), e continua sendo pra quase todo mundo; o torcedor do
+   Palmeiras mora do outro lado da linha, na Barra Funda, colado no
+   Allianz. GameState.init decide (casaDe). */
+var CASA = 'ITAQUERA';
+function casaDe(charKey) {
+  if (CHARS[charKey] && CHARS[charKey].times && leTime() === 'palmeiras') return 'BARRA FUNDA';
+  return 'ITAQUERA';
+}
 
 /* ---------- o nome oficial, onde ele cabe ----------
    Por dentro a estação continua sendo 'ITAQUERA' — a casa, o mapa, as
@@ -669,6 +677,7 @@ var GameState = {
        rotina deste personagem (ver zipzap.js). A perna 0 sai de casa, e
        a última sempre volta pra casa. */
     this.pernaIdx = 0;
+    CASA = casaDe(charKey);
     this.origem = CASA;
     this.compromisso = null;
     this.destino = this.destinoDaRotina();
@@ -679,6 +688,7 @@ var GameState = {
     this.dia = 1;
     this.lixo = false; this.sacouNoDia = 0;      // o papel do lanche e o saque do 24 horas
     this.bateria = 100;                           // o celular sai de casa carregado
+    this.explorar = false;                        // o modo EXPLORAR liga depois do init
     this.mochila = {};                            // o que você comprou e ainda não usou
     this.pernasFeitas = 0;
     this.atrasos = 0;
@@ -839,6 +849,7 @@ var GameState = {
      tira meio, o do meio um, e o grandão dois. Por isso o contador
      virou fracionário e o HUD desenha meio coração. */
   perdeCoracao: function (quanto) {
+    if (this.explorar) return this.coracoes;      // no passeio ninguém perde vida
     this.coracoes = Math.max(0, this.coracoes - (quanto || 1));
     this.stats.minigamesPerdidos++;
     return this.coracoes;
@@ -850,7 +861,7 @@ var GameState = {
        a briga escreve '+0 PONTOS', que é a regra dita na tela em vez de
        um número que não aconteceu. Sem isto a tela de minigames virava
        fazenda de ponto pra destravar o elenco. */
-    if (this.treino) { this.stats.minigamesGanhos++; return 0; }
+    if (this.treino || this.explorar) { this.stats.minigamesGanhos++; return 0; }
     this.stats.minigamesGanhos++;
     var n = pontos || 5;
     this.pontosDaCorrida = (this.pontosDaCorrida || 0) + n;
@@ -1032,6 +1043,9 @@ var GameState = {
 
   /* ---------- relógio ---------- */
   passaTempo: function (min) {
+    /* EXPLORAR não tem relógio: é o mesmo mundo, sem pressa (o horário
+       fica parado no do começo) */
+    if (this.explorar) return;
     this.minutos = (this.minutos + min) % 1440;
     // o celular gasta sozinho: uns 5% por hora de rua, parado no bolso
     if (this.bateria !== undefined) this.bateria = Math.max(0, this.bateria - min * 0.09);
@@ -1070,7 +1084,7 @@ var GameState = {
     /* No treino ninguém perde a partida: perder a briga custa o coração
        e o recado, e a tela volta pra lista. Mandar pro placar de fim de
        jogo quem só queria ver um minigame seria punir a curiosidade. */
-    if (this.treino) return null;
+    if (this.treino || this.explorar) return null;
     /* O atraso vem PRIMEIRO porque ele zera os corações: se a conta do
        coração respondesse antes, quem perdeu por chegar tarde leria que
        o trajeto o moeu, e nunca saberia que quem o matou foi o relógio. */
@@ -2368,19 +2382,42 @@ function tocaPassoLuta(i, t) {
    enquanto o rimador vem e durante a batalha. */
 var BOOMBAP_PASSO = 60 / 90 / 4;
 var BOOMBAP_BUMBO = [0, 10, 16, 23, 26];
-var BOOMBAP_BAIXO = { 0: 45, 6: 48, 10: 43, 16: 45, 22: 50, 26: 48 };
+// o baixo uma oitava abaixo do de antes: é o grave de 808 que dá o peso
+var BOOMBAP_BAIXO = { 0: 33, 6: 36, 10: 31, 16: 33, 22: 38, 26: 36 };
+
+/* 'Tem que ser mais pesado.' O bumbo do boom bap desce de 110 a 38Hz
+   em 0,26s (o da trilha para em 48 e dura metade), com um estalo de
+   ataque em cima; a caixa ganha corpo (um tom de 190Hz embaixo do ruído)
+   e dura o dobro. */
+function bumboPesado(t) {
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(110, t);
+  o.frequency.exponentialRampToValueAtTime(38, t + 0.26);
+  g.gain.value = 0.0001;
+  g.gain.setValueAtTime(0.09, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + 0.36);
+  notaEm(t, 57, 0.02, 'square', 0.01);              // o estalo do batedor
+}
+function caixaPesada(t, atraso) {
+  ruido(0.24, 0.04, 1500, 900, 0.6, 'bandpass', atraso);
+  ruido(0.06, 0.014, 5200, 5200, 0.8, 'highpass', atraso);
+  notaEm(t, 54, 0.12, 'triangle', 0.03);            // o corpo da caixa
+}
 function tocaPassoBoombap(i, t) {
   var p = i % 32, swing = (p % 4 === 2) ? BOOMBAP_PASSO * 0.28 : 0;
   var atraso = Math.max(0, t - AC.currentTime);
-  if (BOOMBAP_BUMBO.indexOf(p) >= 0) { bumboEm(t); bumboEm(t + 0.01); }
-  if (p % 16 === 4 || p % 16 === 12) {
-    ruido(0.16, 0.03, 1800, 1200, 0.7, 'bandpass', atraso);
-    ruido(0.05, 0.012, 5000, 5000, 0.8, 'highpass', atraso);
+  if (BOOMBAP_BUMBO.indexOf(p) >= 0) bumboPesado(t);
+  if (p % 16 === 4 || p % 16 === 12) caixaPesada(t, atraso);
+  if (p % 2 === 0) ruido(0.03, p % 4 ? 0.005 : 0.008, 9000, 9000, 0.7, 'highpass', atraso + swing);
+  if (BOOMBAP_BAIXO[p]) {
+    notaEm(t, BOOMBAP_BAIXO[p], BOOMBAP_PASSO * 5, 'sine', 0.07);
+    notaEm(t, BOOMBAP_BAIXO[p] + 12, BOOMBAP_PASSO * 4, 'triangle', 0.02);   // a oitava de cima, pra aparecer em caixinha de celular
   }
-  if (p % 2 === 0) ruido(0.03, p % 4 ? 0.006 : 0.009, 9000, 9000, 0.7, 'highpass', atraso + swing);
-  if (BOOMBAP_BAIXO[p]) notaEm(t, BOOMBAP_BAIXO[p], BOOMBAP_PASSO * 5, 'triangle', 0.04);
   if (p === 0 || p === 16) {
-    [57, 60, 64, 67].forEach(function (n, k) { notaEm(t + k * 0.012, n, BOOMBAP_PASSO * 7, 'triangle', 0.007); });
+    [57, 60, 64, 67].forEach(function (n, k) { notaEm(t + k * 0.012, n, BOOMBAP_PASSO * 7, 'triangle', 0.006); });
   }
 }
 
@@ -5351,7 +5388,7 @@ var HudScene = new Phaser.Class({
     g.fillRect(px - 6, py - 7, 4, 14); g.fillRect(px + 2, py - 7, 4, 14);
 
     this.tHora.setText(GameState.hora()).setColor(f.cor);
-    this.letreiro(this.tFaixa, f.nome + ' - DIA ' + (GameState.dia || 1), HUDB.hora, time);
+    this.letreiro(this.tFaixa, GameState.explorar ? 'MODO EXPLORAR - SEM PRESSA' : f.nome + ' - DIA ' + (GameState.dia || 1), HUDB.hora, time);
 
     /* O celular: um retângulo com tela, e a bolinha vermelha de não
        lidas por cima. É a linguagem de qualquer aparelho — quem vê

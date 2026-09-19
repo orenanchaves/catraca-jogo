@@ -1190,6 +1190,8 @@ var VagaoScene = new Phaser.Class({
     var e = this.abordagem, eu = this, cam = this.cameras.main;
     if (!e) return;
     if (r === 'ganhou') { e.d.dir = (e.d.sp.y < this.pl.sp.y) ? 'up' : 'down'; e.d.anima(0, false); }
+    // perdeu a briga pela barra: solta ela
+    if (r === 'perdeu' && e.d.desafio && e.d.desafio.pelaBarra && this.segurando) this.soltaBarra();
     e.fase = 'volta';
     this.tweens.add({
       targets: cam, zoom: 1, scrollY: this.pl.sp.y - GH / 2 - Math.round(HUD_H / 2), scrollX: 0,
@@ -1337,6 +1339,31 @@ var VagaoScene = new Phaser.Class({
     // a pessoa vira pra você
     if (a.sp.x !== this.pl.sp.x) { a.dir = a.fixo ? a.dir : (a.sp.x < this.pl.sp.x ? 'right' : 'left'); a.anima(0, false); }
     this.flash(msg);
+  },
+
+  /* ---------- quem quer a sua barra ----------
+     'As batalhas podem rolar quando alguém quer a sua barra.' Segurando
+     há mais de 10 segundos, de vez em quando alguém em pé por perto vem
+     reclamar: sobe o '!', ele chega, e é desafio. Ganhou, a barra é sua;
+     perdeu, você solta. */
+  cobicaBarra: function (dt) {
+    if (!this.segurando || this.abordagem || this.encontro || this.batalha || GameState.treino) { this.tCobica = 0; return; }
+    this.tCobica = (this.tCobica || 0) + dt;
+    if (this.tCobica < 10000 || Math.random() > dt / 9000) return;
+    var melhor = null, dm = 110;
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (!a.sp || !a.sp.active || a.papo === 'barra') continue;
+      var d = Math.hypot(a.sp.x - this.pl.sp.x, a.sp.y - this.pl.sp.y);
+      if (d > 40 && d < dm) { dm = d; melhor = a; }
+    }
+    if (!melhor) return;
+    this.tCobica = 0;
+    // ele sai do balanço da multidão (senão o balanço o puxava de volta pro lugar) e vira desafiante
+    this.npcExtra.splice(this.npcExtra.indexOf(melhor), 1);
+    melhor.papo = 'barra';
+    melhor.desafio = { tipo: 'barra', olha: melhor.sp.y < this.pl.sp.y ? 'down' : 'up', feito: false, pelaBarra: true };
+    this.comecaAbordagem(melhor);
   },
 
   // o tranco derruba: sentado no chão, e custa um coração (menos no treino)
@@ -3433,7 +3460,8 @@ var VagaoScene = new Phaser.Class({
     }
     /* Na volta pra Itaquera o dia não acaba na plataforma: acaba na rua,
        pela saída de casa (estacao-itaquera.js). */
-    if (GameState.perna === 'volta' && aqui === CASA && !this.treino) {
+    // (só a Itaquera tem as saídas de rua; nas outras casas o dia fecha na chegada)
+    if (GameState.perna === 'volta' && aqui === CASA && CASA === 'ITAQUERA' && !this.treino) {
       sfx('ok');
       this.scene.start('Estacao', { onde: 'plataforma', praCasa: true });
       return;
@@ -3494,6 +3522,7 @@ var VagaoScene = new Phaser.Class({
 
     if (this.estado === 'andando') {
       this.atualizaTranco(dt);
+      this.cobicaBarra(dt);
       this.caiDoBolso(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }

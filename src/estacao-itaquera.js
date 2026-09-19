@@ -1017,7 +1017,7 @@ EstacaoScene.prototype.contextoItq = function () {
   if (this.praCasa) {
     var c = SAIDAS_ITQ[saidaDeCasa()];
     dica = 'CASA: ' + c.rotulo + ' ' + c.seta;
-  } else dica = '▲ CATRACAS E PLATAFORMA';
+  } else dica = '';            // 'CATRACAS E PLATAFORMA' repetia o que as placas já dizem
   this.dica.setText(dica, PAL.amarelo);
   return true;
 };

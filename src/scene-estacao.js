@@ -481,7 +481,8 @@ var EstacaoScene = new Phaser.Class({
        que faz valer a pena subir correndo. Fica rente ao rodapé porque
        o alto da tela é da placa da estação, que é do mundo — e as duas
        empilhadas viravam uma tarja só. */
-    this.painel = new Plaqueta(this, GW / 2, GH - 98, { cor: PAL.branco, filete: num(GameState.faixa().cor), depth: 80 });
+    // o painel do trem mora logo embaixo do HUD: no pé da tela ele ficava no meio do caminho
+    this.painel = new Plaqueta(this, GW / 2, HUD_H + 22, { cor: PAL.branco, filete: num(GameState.faixa().cor), depth: 80 });
     this.gMini = this.add.graphics().setDepth(500).setScrollFactor(0).setVisible(false);
     this.tMini = txtC(this, GW / 2, GH / 2 - 54, '', PAL.branco, 8).setDepth(501).setScrollFactor(0).setVisible(false);
     this.tMini2 = txtC(this, GW / 2, GH / 2 + 24, '', PAL.amarelo, 8).setDepth(501).setScrollFactor(0).setVisible(false);

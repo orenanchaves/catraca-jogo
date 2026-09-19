@@ -61,7 +61,14 @@ var ROTINAS = {
   ]
 };
 
-function rotinaDe(k) { return ROTINAS[k] || ROTINAS.clt; }
+/* A perna 'CASA' vai pra casa de quem joga (CASA muda com o personagem:
+   o palmeirense mora na Barra Funda), e não pra que era casa quando a
+   lista foi escrita. */
+function rotinaDe(k) {
+  return (ROTINAS[k] || ROTINAS.clt).map(function (p) {
+    return p.rotulo === 'CASA' ? { rotulo: 'CASA', estacao: CASA, saida: p.saida } : p;
+  });
+}
 
 /* ---------- os contatos ----------
    Cada personagem tem a sua gente, e a gente dele fala do jeito dele.
