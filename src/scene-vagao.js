@@ -490,7 +490,9 @@ var VagaoScene = new Phaser.Class({
        você entrou. */
     this.chao = new Chao(this, 26);
     var euC = this;
-    this.chao.semeia(quantoCaiNoChao(CARROS * 0.9), function () { return euC.pontoDoChao(); });
+    // 2,2 por carro (era 0,9): catar moeda é o que se faz andando pelo trem
+    this.chao.semeia(quantoCaiNoChao(CARROS * 2.2), function () { return euC.pontoDoChao(); });
+    this.tCaiDoBolso = 6000 + Math.random() * 5000;
 
     // a caixinha fica no chão à frente dele: desenha por cima de quem a
     // largou, por baixo de quem está jogando
@@ -1020,9 +1022,13 @@ var VagaoScene = new Phaser.Class({
     this.desafiantes = [];
     this.tDesafio = 0;
     if (!GameState.treino) {
+      /* Dois por carro ('mais duelos'), um em cada metade, pra que dê
+         pra ver um e ainda desviar do outro. */
       for (var c3 = 0; c3 < CARROS; c3++) {
-        this.poeDesafiante(c3, 124 + Math.random() * 72, yDoCarro(c3, 150 + Math.random() * 300),
-          Math.random() < 0.5 ? 'up' : 'down');
+        for (var mt = 0; mt < 2; mt++) {
+          this.poeDesafiante(c3, 124 + Math.random() * 72, yDoCarro(c3, (mt ? 330 : 130) + Math.random() * 130),
+            Math.random() < 0.5 ? 'up' : 'down');
+        }
       }
     }
   },
@@ -1260,9 +1266,63 @@ var VagaoScene = new Phaser.Class({
     else if (this.segurando) this.pl.sp.setRotation(Math.sin(t / 110) * 0.03);
     for (i = 0; i < this.gente.length; i++) {
       a = this.gente[i];
-      if (!a || !a.sp || !a.sp.active || a.sentado || a.bx !== undefined) continue;
+      if (!a || !a.sp || !a.sp.active || a.fixo) continue;     // sentado e desafiante não balançam
       a.sp.setRotation(k < 0 ? 0 : Math.sin(t / 90 + i * 1.7) * (0.03 + 0.07 * k));
     }
+  },
+
+  /* De vez em quando cai uma moeda (às vezes uma nota) do bolso de
+     alguém em pé no seu carro, nos pés da pessoa. É o que faz o chão
+     continuar valendo a pena depois que você já catou o que tinha. */
+  caiDoBolso: function (dt) {
+    this.tCaiDoBolso -= dt;
+    if (this.tCaiDoBolso > 0) return;
+    this.tCaiDoBolso = 7000 + Math.random() * 6000;
+    var meu = carroDe(this.pl.sp.y), cand = [];
+    for (var i = 0; i < this.npcExtra.length; i++) {
+      var a = this.npcExtra[i];
+      if (a.sp && a.sp.active && carroDe(a.sp.y) === meu) cand.push(a);
+    }
+    if (!cand.length) return;
+    var q = cand[Math.floor(Math.random() * cand.length)];
+    var pt = { x: q.sp.x + (Math.random() < 0.5 ? -14 : 14), y: q.sp.y + 6 };
+    limitaVagao(pt);
+    this.chao.poe(pt.x, pt.y, Math.random() < 0.8 ? 'moeda' : 'nota');
+  },
+
+  /* ---------- puxar papo ----------
+     Todo passageiro, sentado ou em pé, pode ser puxado pra conversa uma
+     vez. O que volta é sorte: fone no ouvido, papo bom, uma bala, a
+     dica da baldeação, alguém pedindo um real, ou quem ache você folgado.
+     Carisma é o que o papo mexe, e o descanso de vez em quando. */
+  /* O corredor é quase todo "perto de uma barra", e segurar é o que
+     salva do tranco: perto da barra, o papo só ganha a vez de quem está
+     cara a cara (22px); longe dela, vale até 40. */
+  pessoaPraPapo: function () {
+    var raio = this.barraDoTetoPerto().d <= 30 ? 22 : 40;
+    for (var i = 0; i < this.gente.length; i++) {
+      var a = this.gente[i];
+      if (!a || !a.sp || !a.sp.active || a.desafio || a.papo) continue;
+      if (Math.hypot(this.pl.sp.x - a.sp.x, (this.pl.sp.y - a.sp.y) * 1.4) < raio) return a;
+    }
+    return null;
+  },
+  puxaPapo: function (a) {
+    a.papo = true;
+    var r = Math.random(), msg;
+    if (r < 0.28) { msg = 'TÁ DE FONE.\nNEM OUVIU.'; sfx('nao'); }
+    else if (r < 0.53) { GameState.addCarisma(3); msg = 'FALARAM DO TRÂNSITO.\n+3 CARISMA'; sfx('ok'); }
+    else if (r < 0.68) { GameState.addDescanso(6); msg = 'TE OFERECEU UMA BALA.\n+6 DESCANSO'; sfx('moeda'); }
+    else if (r < 0.80) {
+      GameState.addCarisma(2); this.sabeARota = true;
+      msg = 'TE EXPLICOU O CAMINHO.\n+2 CARISMA'; sfx('ok');
+    } else if (r < 0.93) {
+      if (GameState.dinheiro >= 1) { GameState.gastar(1); GameState.addCarisma(5); msg = 'PEDIU UM REAL. VOCÊ DEU.\n+5 CARISMA'; sfx('moeda'); }
+      else { msg = 'PEDIU UM REAL.\nVOCÊ TAMBÉM NÃO TEM.'; sfx('nao'); }
+    } else { GameState.addCarisma(-2); msg = 'TE ACHOU FOLGADO.\n-2 CARISMA'; sfx('nao'); }
+    // a pessoa vira pra você
+    if (a.sp.x !== this.pl.sp.x) { a.dir = a.fixo ? a.dir : (a.sp.x < this.pl.sp.x ? 'right' : 'left'); a.anima(0, false); }
+    this.flash(msg);
   },
 
   // o tranco derruba: sentado no chão, e custa um coração (menos no treino)
@@ -3419,6 +3479,7 @@ var VagaoScene = new Phaser.Class({
 
     if (this.estado === 'andando') {
       this.atualizaTranco(dt);
+      this.caiDoBolso(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }
       if (this.tCarroAtual && this.t > this.tCarroAtual) {
@@ -3621,6 +3682,9 @@ var VagaoScene = new Phaser.Class({
         } else if (this.passageiroPerto()) {
           dica = nomeAgir() + ': PERGUNTAR (R$ 2)';
           if (Ctrl.actJust) this.perguntaARota();
+        } else if (!this.segurando && this.pessoaPraPapo()) {
+          dica = nomeAgir() + ': PUXAR PAPO';
+          if (Ctrl.actJust) this.puxaPapo(this.pessoaPraPapo());
         } else if (this.podeSentarNoChao() && (this.comSono() || !this.temLugarVago())) {
           dica = nomeAgir() + ': SENTAR NO CHÃO';
           if (Ctrl.actJust) this.sentaNoChao();
