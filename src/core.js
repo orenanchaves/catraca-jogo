@@ -3258,23 +3258,28 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
    e o desafiante que você venceu mostra também a fraqueza. Fica gravado
    entre as partidas (metrosp_dex): 1 é visto, 2 é vencido. */
 var DEX = [
-  { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, desc: 'Manda áudio de 5 minutos. Quer conversar.' },
-  { id: 'pregador', nome: 'PREGADOR', sprite: 'np_pregador', desafio: true, desc: 'Tem um minutinho? Nunca é um minutinho.' },
-  { id: 'corintiano', nome: 'CORINTIANO', sprite: 'np_corintiano', desafio: true, desc: 'Da Sé pra Itaquera. Aqui é Corinthians.' },
-  { id: 'palmeirense', nome: 'PALMEIRENSE', sprite: 'np_torcedor', desafio: true, desc: 'Da Sé pra Barra Funda. Fala meio italiano.' },
-  { id: 'saopaulino', nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', desafio: true, desc: 'Soberano. Lembra três mundiais sem ninguém pedir.' },
-  { id: 'santista', nome: 'SANTISTA', sprite: 'np_santista', desafio: true, desc: 'Moicano de 2010. O Peixe vai voltar.' },
-  { id: 'barra', nome: 'QUER A SUA BARRA', sprite: 'np_pax0', desafio: true, desc: 'Aparece quando você segura a barra demais.' },
-  { id: 'guardinha', nome: 'GUARDINHA', sprite: 'np_guardinha', desc: 'Vigia a catraca. Pego no pulo, meio coração.' },
-  { id: 'guardaMedio', nome: 'SEGURANÇA', sprite: 'np_guarda_medio', desc: 'O do meio. Pego no pulo, um coração.' },
-  { id: 'guardaForte', nome: 'O GRANDÃO', sprite: 'np_guarda_forte', desc: 'Todo de preto. Pego no pulo, dois corações.' },
-  { id: 'ambulante', nome: 'AMBULANTE', sprite: 'np_ambulante_a', desc: 'Metrô, shopping, trem! Vende no vagão.' },
-  { id: 'rimador', nome: 'RIMADOR', sprite: 'np_rimador', desc: 'Chega no boom bap. Batalha de rima no vagão.' },
-  { id: 'pedinte', nome: 'PEDINTE', sprite: 'np_pedinte', desc: 'Fica no saguão. Uma moeda muda o dia dele.' },
-  { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', desc: 'Na bilheteria. Vende a passagem.' },
-  { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', desc: 'Tem prioridade no banco. Ceda o lugar.' },
-  { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', desc: 'Tem prioridade no banco. Ceda o lugar.' }
+  { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Manda áudio de 5 minutos. Quer conversar.' },
+  { id: 'pregador', nome: 'PREGADOR', sprite: 'np_pregador', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Tem um minutinho? Nunca é um minutinho.' },
+  { id: 'corintiano', nome: 'CORINTIANO', sprite: 'np_corintiano', desafio: true, tipo: 'TORCIDA', onde: 'LESTE', desc: 'Da Sé pra Itaquera. Aqui é Corinthians.' },
+  { id: 'palmeirense', nome: 'PALMEIRENSE', sprite: 'np_torcedor', desafio: true, tipo: 'TORCIDA', onde: 'OESTE', desc: 'Da Sé pra Barra Funda. Fala meio italiano.' },
+  { id: 'saopaulino', nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Soberano. Lembra três mundiais sem ninguém pedir.' },
+  { id: 'santista', nome: 'SANTISTA', sprite: 'np_santista', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Moicano de 2010. O Peixe vai voltar.' },
+  { id: 'barra', nome: 'QUER A BARRA', sprite: 'np_pax0', desafio: true, tipo: 'CHATO', onde: 'NA BARRA', desc: 'Aparece quando você segura a barra demais.' },
+  { id: 'guardinha', nome: 'GUARDINHA', sprite: 'np_guardinha', tipo: 'GUARDA', onde: 'CATRACA', pega: 'MEIA VIDA', desc: 'Vigia a catraca. Pego no pulo, meio coração.' },
+  { id: 'guardaMedio', nome: 'SEGURANÇA', sprite: 'np_guarda_medio', tipo: 'GUARDA', onde: 'CATRACA', pega: '1 VIDA', desc: 'O do meio. Pego no pulo, um coração.' },
+  { id: 'guardaForte', nome: 'O GRANDÃO', sprite: 'np_guarda_forte', tipo: 'GUARDA', onde: 'CATRACA', pega: '2 VIDAS', desc: 'Todo de preto. Pego no pulo, dois corações.' },
+  { id: 'ambulante', nome: 'AMBULANTE', sprite: 'np_ambulante_a', tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Metrô, shopping, trem! Vende no vagão.' },
+  { id: 'rimador', nome: 'RIMADOR', sprite: 'np_rimador', tipo: 'RIMADOR', onde: 'VAGÃO', desc: 'Chega no boom bap. Batalha de rima no vagão.' },
+  { id: 'pedinte', nome: 'PEDINTE', sprite: 'np_pedinte', tipo: 'GENTE', onde: 'SAGUÃO', desc: 'Fica no saguão. Uma moeda muda o dia dele.' },
+  { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', tipo: 'METRÔ', onde: 'GUICHÊ', desc: 'Na bilheteria. Vende a passagem.' },
+  { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
+  { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' }
 ];
+// a cor de cada tipo: a da bolinha e a da borda da carta
+var COR_TIPO = {
+  CHATO: 0xf2c14e, TORCIDA: 0x00e676, GUARDA: 0x3a7fd0, VENDEDOR: 0xe8a33c,
+  RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0
+};
 var DEX_POR_SPRITE = {};
 for (var dxi = 0; dxi < DEX.length; dxi++) DEX_POR_SPRITE[DEX[dxi].sprite] = DEX[dxi].id;
 DEX_POR_SPRITE.np_pedinte_b = 'pedinte';

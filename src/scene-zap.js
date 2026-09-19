@@ -194,6 +194,24 @@ var ZapScene = new Phaser.Class({
     });
 
     /* a mochila: uma linha por item, com a figurinha dele e o toque que usa */
+    /* as cartas da METRODEX: quatro na tela, cada uma com seis textos e
+       uma zona de toque (o boneco vem da reserva de figurinhas da mochila) */
+    this.cartasDex = [];
+    for (var cd = 0; cd < 4; cd++) {
+      var meia = function (s) { return s.setScale(ESCALA_TEXTO / 2).setDepth(2404).setVisible(false); };
+      var ct = {
+        num: meia(txt(this, 0, 0, '', PAL.cinza, 8)),
+        nome: txtC(this, 0, 0, '', PAL.branco, 8).setDepth(2404).setVisible(false),
+        r1: meia(txtC(this, 0, 0, '', PAL.cinzaEsc, 8)), v1: meia(txtC(this, 0, 0, '', PAL.branco, 8)),
+        r2: meia(txtC(this, 0, 0, '', PAL.cinzaEsc, 8)), v2: meia(txtC(this, 0, 0, '', PAL.branco, 8)),
+        tipo: meia(txtC(this, 0, 0, '', PAL.cinza, 8))
+      };
+      ct.zona = this.add.zone(0, 0, 10, 10).setOrigin(0, 0);
+      (function (idx) { ct.zona.on('pointerdown', function () {
+        if (self.modo === 'app' && self.aba === 5) { self.sel = self.topoDex + idx; sfx('catraca'); self.pinta(); }
+      }); })(cd);
+      this.cartasDex.push(ct);
+    }
     this.figMochila = []; this.zonasMochila = [];
     for (i = 0; i < 6; i++) {
       this.figMochila.push(this.add.image(ZAP.tx0 + 24, ZAP.topo + i * 56 + 26, '__DEFAULT').setDepth(2403).setVisible(false).setScale(1.2));
@@ -272,6 +290,14 @@ var ZapScene = new Phaser.Class({
         if (d) { self.selApp = (self.selApp + d + nA * 2) % nA; sfx('catraca'); self.pinta(); return; }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') self.abreApp(self.selApp);
         return;
+      }
+      if (self.aba === 5) {
+        var dd = 0;
+        if (c === 'KeyA' || c === 'ArrowLeft') dd = -1;
+        else if (c === 'KeyD' || c === 'ArrowRight') dd = 1;
+        else if (c === 'KeyW' || c === 'ArrowUp') dd = -2;
+        else if (c === 'KeyS' || c === 'ArrowDown') dd = 2;
+        if (dd) { self.sel = Phaser.Math.Clamp(self.sel + dd, 0, DEX.length - 1); sfx('catraca'); self.pinta(); return; }
       }
       if (c === 'KeyA' || c === 'ArrowLeft') { self.trocaAba(-1); return; }
       if (c === 'KeyD' || c === 'ArrowRight') { self.trocaAba(1); return; }
@@ -440,6 +466,11 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
     this.zonaVolta.disableInteractive();
     for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false); }
+    for (i = 0; i < this.cartasDex.length; i++) {
+      var cc = this.cartasDex[i];
+      cc.num.setVisible(false); cc.nome.setVisible(false); cc.r1.setVisible(false); cc.v1.setVisible(false);
+      cc.r2.setVisible(false); cc.v2.setVisible(false); cc.tipo.setVisible(false); cc.zona.disableInteractive();
+    }
     var noInicio = (this.modo !== 'app');
     for (i = 0; i < this.zonas.length; i++) {
       if (this.modo === 'inicio') this.zonas[i].setInteractive(); else this.zonas[i].disableInteractive();
@@ -917,36 +948,60 @@ var ZapScene = new Phaser.Class({
   },
 
   /* ---------- o app da METRODEX ----------
-     Seis fichas na tela, rolando com a escolhida no meio. Cada uma: o
-     boneco (silhueta se ainda não visto), o nome e, pequeno embaixo, o que
-     ele faz; do desafiante vencido, a fraqueza e o que não faz cócega. */
+     Em cartas, como uma pokédex ('tem que ser algo mais assim'): duas por
+     fileira, duas fileiras na tela. Cada carta tem o número numa pílula,
+     a bolinha e a borda na cor do tipo, o boneco grande num círculo
+     escuro, o nome, dois números e o tipo. Do desafiante: a paciência e a
+     fraqueza (que só aparece depois de vencer); dos outros: onde aparece e
+     se já foi visto. Quem nunca passou perto é silhueta com ???. */
   pintaDex: function (g) {
     var dex = leDex(), n = DEX.length, vistos = 0, i;
     for (i = 0; i < n; i++) if (dex[DEX[i].id]) vistos++;
     if (this.sel >= n) this.sel = 0;
-    this.topoDex = Phaser.Math.Clamp(this.sel - 2, 0, n - 6);
-    for (i = 0; i < 6; i++) {
-      var k = this.topoDex + i, e = DEX[k], nivel = dex[e.id] || 0, y = ZAP.topo + i * 56, sel = (k === this.sel);
-      g.fillStyle(sel ? 0x2a1414 : 0x16161f, 1).fillRect(ZAP.tx0, y, ZAP.tx1 - ZAP.tx0, 52);
-      if (sel) g.lineStyle(2, 0xe8362c, 0.9).strokeRect(ZAP.tx0 + 1, y + 1, ZAP.tx1 - ZAP.tx0 - 2, 50);
-      g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0 + 8, y + 4, 32, 44);
-      var fig = this.figMochila[i];
-      fig.setTexture(e.sprite, 0).setScale(0.9).setPosition(ZAP.tx0 + 24, y + 26).setVisible(true);
-      if (nivel) fig.clearTint(); else fig.setTintFill(0x2a2a3a);        // silhueta de quem não foi visto
-      this.zonasMochila[i].setInteractive();
+    var fileiras = Math.ceil(n / 2);
+    this.topoDex = Math.min(Math.floor(this.sel / 2), fileiras - 2) * 2;
+    var W = 128, H = 156, VAO = 8, x0 = ZAP.tx0 + (ZAP.tx1 - ZAP.tx0 - (W * 2 + VAO)) / 2, y0 = ZAP.topo + 4;
+    for (i = 0; i < 4; i++) {
+      var k = this.topoDex + i, ct = this.cartasDex[i], fig = this.figMochila[i];
+      if (k >= n) continue;
+      var e = DEX[k], nivel = dex[e.id] || 0, sel = (k === this.sel);
+      var x = x0 + (i % 2) * (W + VAO), y = y0 + Math.floor(i / 2) * (H + VAO), cx = x + W / 2;
+      var cor = nivel ? (COR_TIPO[e.tipo] || 0xb8bccc) : 0x3a3a4a;
+      // a carta: fundo, borda do tipo (mais grossa na escolhida)
+      g.fillStyle(0x1c1c24, 1).fillRoundedRect(x, y, W, H, 8);
+      g.lineStyle(sel ? 3 : 1.5, cor, sel ? 1 : 0.85).strokeRoundedRect(x + 1, y + 1, W - 2, H - 2, 8);
+      // a pílula do número e a bolinha do tipo
+      g.fillStyle(0x0a0a10, 0.9).fillRoundedRect(x + 5, y + 5, 30, 12, 6);
+      g.fillStyle(cor, 1).fillCircle(x + W - 12, y + 11, 5);
+      // o círculo escuro com o boneco
+      g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 52, 36);
+      g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 46, 28);
+      fig.setTexture(e.sprite, 0).setScale(1.4).setPosition(cx, y + 54).setVisible(true);
+      if (nivel) fig.clearTint(); else fig.setTintFill(0x14141c);
+      ct.num.setVisible(true).setPosition(x + 10, y + 7).setText('#' + (k + 1 < 10 ? '00' : '0') + (k + 1));
+      // o nome, sempre do mesmo tamanho (cheio, 'PREGADOR' encostava nos números embaixo)
       var nome = nivel ? e.nome : '???';
-      this.linhas[i * 2].setVisible(true).setPosition(ZAP.tx0 + 48, y + 5)
-        .setText((k + 1 < 10 ? '0' : '') + (k + 1) + ' ' + (nome.length > 15 ? nome.slice(0, 14) + '.' : nome))
-        .setColor(nivel === 2 ? PAL.verde : (nivel ? PAL.branco : PAL.cinzaEsc));
-      var linha2 = nivel ? e.desc : 'AINDA NÃO VISTO.';
-      if (nivel === 2 && e.desafio && DESAFIANTES[e.id]) {
+      ct.nome.setVisible(true).setPosition(cx, y + 93).setText(nome)
+        .setScale(ESCALA_TEXTO / 2).setColor(nivel ? PAL.branco : PAL.cinzaEsc);
+      var r1, v1, r2, v2;
+      if (e.desafio && DESAFIANTES[e.id]) {
         var d = DESAFIANTES[e.id];
-        linha2 = 'FRACO: ' + nomeResposta(d.fraco) + '  RESISTE: ' + nomeResposta(d.resiste);
+        r1 = 'PACIÊNCIA'; v1 = nivel ? String(d.pac) : '???';
+        r2 = 'FRACO'; v2 = nivel === 2 ? nomeResposta(d.fraco) : '???';
+      } else {
+        r1 = 'ONDE'; v1 = nivel ? e.onde : '???';
+        r2 = e.pega ? 'PEGA' : 'VISTO'; v2 = nivel ? (e.pega || 'SIM') : 'NÃO';
       }
-      this.linhas[i * 2 + 1].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(ZAP.tx0 + 48, y + 26)
-        .setMaxWidth(ZAP.tx1 - ZAP.tx0 - 56).setText(linha2).setColor(PAL.cinza);   // quebra em duas linhas dentro da ficha
+      ct.r1.setVisible(true).setPosition(x + W * 0.28, y + 110).setText(r1);
+      ct.v1.setVisible(true).setPosition(x + W * 0.28, y + 120).setText(v1);
+      ct.r2.setVisible(true).setPosition(x + W * 0.72, y + 110).setText(r2);
+      ct.v2.setVisible(true).setPosition(x + W * 0.72, y + 120).setText(v2).setColor(nivel === 2 ? PAL.verde : PAL.branco);
+      ct.tipo.setVisible(true).setPosition(cx, y + 138).setText('TIPO: ' + (nivel ? e.tipo : '???'));
+      ct.zona.setPosition(x, y).setSize(W, H).setInteractive();
     }
-    this.tRodape.setText('VISTOS ' + vistos + ' DE ' + n);
+    // a carta escolhida conta o que ela faz no rodapé
+    var es = DEX[this.sel], ns = dex[es.id] || 0;
+    this.tRodape.setText(ns ? es.nome + ' ' + (this.sel + 1) + '/' + n : 'VISTOS ' + vistos + ' DE ' + n);
   },
 
   // a faixa de baixo de cada app: o botão de voltar pra tela inicial
