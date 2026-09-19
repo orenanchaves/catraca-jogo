@@ -242,11 +242,22 @@ function avisaMissao(titulo, texto) {
   if (!AVISO_ATIVO) proximoAviso();
 }
 
+/* ---------- onde a faixa pousa ----------
+   No mundo ela desce até embaixo do HUD. No DUELO, o alto da tela é a
+   ficha do adversário e o pé é o menu: a faixa pousa no vão do meio, que
+   é onde não cobre nada ('alguns avisos de vitória na luta se
+   sobrepõem'). */
+function poucoAbaixo(cena) {
+  return (cena && cena.scene && cena.scene.key === 'Desafio') ? 150 : HUD_H + 6;
+}
+
 function proximoAviso() {
   var hud = cenaDoAviso();
   var a = AVISOS.shift();
   if (!a || !hud || !hud.sys || !hud.sys.isActive()) { AVISO_ATIVO = false; AVISOS.length = 0; return; }
   AVISO_ATIVO = true;
+  // a conquista tem faixa própria, com a medalha, mas usa a MESMA fila
+  if (a.conquista) { desenhaConquista(hud, a.conquista, a.xp, a.ganhou); return; }
   sfx('moeda');
   var caixa = hud.add.container(0, -90).setDepth(5000);
   var g = hud.add.graphics();
@@ -265,7 +276,7 @@ function proximoAviso() {
   g.fillStyle(0x0d1018, 1).fillRect(23, 11, 6, 4);
   caixa.add([g, t1, t2]);
   hud.tweens.add({
-    targets: caixa, y: HUD_H + 6, duration: 260, ease: 'Cubic.easeOut',
+    targets: caixa, y: poucoAbaixo(hud), duration: 260, ease: 'Cubic.easeOut',
     hold: 1900, yoyo: true,
     onComplete: function () { caixa.destroy(); proximoAviso(); }
   });

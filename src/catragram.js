@@ -293,9 +293,15 @@ var Catragram = {
    você ir clicar e ver.' Então não é a notificaçãozinha de sempre: é uma
    faixa com a MEDALHA desenhada, o nome da conquista, o XP, e o convite
    pra abrir o Catragram (que já fica com a bolinha vermelha). */
+/* A conquista entra na MESMA fila dos outros avisos (missoes.js): duas
+   conquistas ao mesmo tempo, ou uma conquista junto de um aviso, saíam
+   uma por cima da outra no fim do duelo. */
 function avisaConquista(c, xp, ganhou) {
-  var hud = typeof cenaDoAviso === 'function' ? cenaDoAviso() : null;
-  if (!hud || !hud.sys || !hud.sys.isActive()) { avisaMissao('CATRAGRAM', c.legenda); return; }
+  AVISOS.push({ conquista: c, xp: xp, ganhou: ganhou });
+  if (!AVISO_ATIVO) proximoAviso();
+}
+function desenhaConquista(hud, c, xp, ganhou) {
+  if (!hud || !hud.sys || !hud.sys.isActive()) { AVISO_ATIVO = false; return; }
   var cx = hud.add.container(0, -110).setDepth(5200);
   var g = hud.add.graphics();
   var cor = (CAT_CONQ[c.cat] || CAT_CONQ.rota).cor;
@@ -309,8 +315,8 @@ function avisaConquista(c, xp, ganhou) {
     PAL.verde, 8).setScale(ESCALA_TEXTO / 2);
   cx.add([g, t1, t2, t3]);
   tocaJingle('achou');
-  hud.tweens.add({ targets: cx, y: HUD_H + 6, duration: 280, ease: 'Cubic.easeOut', hold: 2600, yoyo: true,
-    onComplete: function () { cx.destroy(); } });
+  hud.tweens.add({ targets: cx, y: poucoAbaixo(hud), duration: 280, ease: 'Cubic.easeOut', hold: 2600, yoyo: true,
+    onComplete: function () { cx.destroy(); proximoAviso(); } });
 }
 
 function arrobaDe(nome) {
