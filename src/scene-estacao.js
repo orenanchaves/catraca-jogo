@@ -2537,6 +2537,30 @@ var EstacaoScene = new Phaser.Class({
         if (sp.dentro) { sp.y = Phaser.Math.Clamp(sp.y, ESC_BOCA + 4, 262); return; }
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });
+
+    /* ---------- quem anda na passarela também é gente ----------
+       Os passantes da Itaquera (passarela, braço, galeria e rua) moram
+       numa lista própria, fora da de corpos, porque o limite do saguão os
+       puxaria de volta pro mezanino. Só que assim o boneco atravessava
+       todos eles ('a física sumiu, eu passo por cima das pessoas'), e
+       são justamente as primeiras pessoas que se cruza saindo de casa.
+       Contra o jogador eles contam: os dois se afastam, e o jogador não
+       é empurrado pra fora do chão. Entre eles não, que corredor cheio de
+       gente se desviando em fila é o que a rota já faz. */
+    if (this.passantes) {
+      var meuPeso = pesoDaMultidao();
+      for (var k = 0; k < this.passantes.length; k++) {
+        var ps = this.passantes[k];
+        if (!ps || !ps.sp || !ps.sp.active) continue;
+        if (Math.abs(ps.sp.y - this.pl.sp.y) > PERTO_Y) continue;
+        var ax = this.pl.sp.x, ay = this.pl.sp.y;
+        if (separaCorpos(this.pl.sp, ps.sp, 1 - meuPeso, meuPeso) && !this.podeIr(this.pl.sp.x, this.pl.sp.y)) {
+          // encostado na parede, quem sai do lugar é o passante
+          this.pl.sp.x = ax; this.pl.sp.y = ay;
+          separaCorpos(this.pl.sp, ps.sp, 0, 1);
+        }
+      }
+    }
   },
 
   terminaJogo: function () {
