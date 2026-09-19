@@ -154,9 +154,9 @@ var ZapScene = new Phaser.Class({
        y até 26): aquele retângulo é da alça, que agora liga e desliga.
        Duas cenas ouvindo o mesmo toque fechavam e reabriam o aparelho no
        mesmo quadro. */
-    // o botão do celular (que liga e desliga) mora embaixo à direita, por cima do aparelho aberto
+    // o botão do celular (que liga e desliga) fica de fora: é a alça do aparelho
     var fora = [
-      [0, 0, GW, ZAP.y0],
+      [0, 0, HUDB.zap.x - 2, ZAP.y0],
       [0, ZAP.y1, GW, GH - ZAP.y1],
       [0, ZAP.y0, ZAP.x0, ZAP.y1 - ZAP.y0], [ZAP.x1, ZAP.y0, GW - ZAP.x1, ZAP.y1 - ZAP.y0]
     ];

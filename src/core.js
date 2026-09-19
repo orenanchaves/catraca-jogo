@@ -4871,15 +4871,14 @@ function fala(scene, texto, opcoes, cfg) {
    os dois medidores, cada um com o seu ícone), QUANDO (a hora grande, e
    embaixo a faixa do horário e o dia), e os dois botões, pausa e
    celular, cada um no seu quadrado. */
-/* A pausa e o celular desceram pro canto de baixo à direita, lado a
-   lado, logo acima da faixa de dica (que começa 40px antes do fim): é
-   onde o polegar da mão direita já está. Em cima ficaram os dois blocos
-   de leitura, com a largura toda. */
+/* Tudo em cima, os quatro blocos numa fileira só: a pausa e o celular
+   chegaram a descer pro canto de baixo, e ficou melhor aqui, perto do
+   resto ('o HUD localizado em cima, tudo, ficava melhor'). */
 var HUDB = {
-  voce: { x: 4, y: 3, w: 164, h: 43 },
-  hora: { x: 172, y: 3, w: 144, h: 43 },
-  pausa: { x: GW - 84, y: GH - 40 - 48, w: 38, h: 42 },
-  zap: { x: GW - 42, y: GH - 40 - 48, w: 38, h: 42 }
+  voce: { x: 4, y: 3, w: 132, h: 43 },
+  hora: { x: 140, y: 3, w: 98, h: 43 },
+  pausa: { x: 242, y: 3, w: 34, h: 43 },
+  zap: { x: 280, y: 3, w: 36, h: 43 }
 };
 function blocoHud(g, b, aceso) {
   g.fillStyle(0x151522, 1).fillRoundedRect(b.x, b.y, b.w, b.h, 5);
@@ -4950,7 +4949,9 @@ var HudScene = new Phaser.Class({
        primeira linha ficou com uma coisa só — a hora — e o topo parou de
        ser uma fileira de informação disputando espaço. */
     this.tHora = txtC(this, HUDB.hora.x + HUDB.hora.w / 2, HUDB.hora.y + 1, '', PAL.amarelo, 8).setDepth(1001);
-    this.tSemBat = txtC(this, HUDB.zap.x - 45, HUDB.zap.y + 15, 'SEM BATERIA', PAL.branco, 8)
+    this.tBatHud = txt(this, HUDB.voce.x + 105, HUDB.voce.y + 3, '', PAL.branco, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(1001);
+    this.tSemBat = txtC(this, HUDB.zap.x - 7, HUDB.zap.y + HUDB.zap.h + 7, 'SEM BATERIA', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(1001).setVisible(false);
     this.avisoZap = 0;
     // embaixo da hora, pequeno: a faixa do horário e o dia
@@ -5131,6 +5132,7 @@ var HudScene = new Phaser.Class({
     var temJogo = !!GameState.char && HUD_VISIVEL;
     this.tHora.setVisible(temJogo);
     this.tFaixa.setVisible(temJogo);
+    this.tBatHud.setVisible(temJogo);
     if (!temJogo) return;
 
     var f = GameState.faixa();
@@ -5191,16 +5193,23 @@ var HudScene = new Phaser.Class({
       g.fillStyle(0xe8362c, 1).fillCircle(zx + 15, zy + 3, 5);
       g.fillStyle(0xffffff, 1).fillRect(zx + 14, zy + 1, 2, 4);
     }
-    /* a carga, num tracinho embaixo do aparelho: verde, amarela, e
-       vermelha piscando quando está acabando */
+    /* ---------- a bateria ----------
+       No bloco de cima, na linha dos corações e à direita deles: é o
+       estado do celular junto com o seu estado, onde se olha. Um ícone de
+       pilha com a carga e a porcentagem; verde, amarela, e vermelha
+       piscando no fim ('tem que ser melhor localizada': no tracinho
+       embaixo do botão ninguém achava). */
     var bt = Math.max(0, Math.min(1, (GameState.bateria === undefined ? 100 : GameState.bateria) / 100));
     var corB = bt > 0.5 ? 0x00e676 : (bt > 0.15 ? 0xf2c14e : 0xe8362c);
     var pisca = bt <= 0.15 && Math.floor(time / 300) % 2;
-    g.fillStyle(0x0a0a12, 1).fillRect(zx - 2, zy + 24, 20, 5);
-    if (!pisca) g.fillStyle(corB, 1).fillRect(zx - 1, zy + 25, Math.max(1, Math.round(18 * bt)), 3);
+    var bx = HUDB.voce.x + 80, by = HUDB.voce.y + 5;      // logo depois do quinto coração
+    g.fillStyle(0xb8bccc, 1).fillRect(bx, by, 20, 10).fillRect(bx + 20, by + 3, 2, 4);
+    g.fillStyle(0x0a0a12, 1).fillRect(bx + 1, by + 1, 18, 8);
+    if (!pisca) g.fillStyle(corB, 1).fillRect(bx + 2, by + 2, Math.max(1, Math.round(16 * bt)), 6);
+    this.tBatHud.setText(Math.round(bt * 100) + '%').setColor(bt > 0.15 ? PAL.branco : PAL.vermelho);
     if (this.avisoZap > 0) {
       this.avisoZap -= 16;
-      g.fillStyle(0xe8362c, 0.9).fillRoundedRect(HUDB.zap.x - 86, HUDB.zap.y + 12, 82, 18, 4);
+      g.fillStyle(0xe8362c, 0.95).fillRoundedRect(HUDB.zap.x - 50, HUDB.zap.y + HUDB.zap.h + 4, 86, 18, 4);
     }
     this.tSemBat.setVisible(this.avisoZap > 0);
     /* ---------- os dois medidores, empilhados ----------
