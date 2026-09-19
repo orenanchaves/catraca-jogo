@@ -115,17 +115,102 @@ var DESAFIANTES = {
     golpes: [
       { nome: 'O REI PELÉ', dano: 12, bloqueia: 'LABIA' },
       { nome: 'SANTOS É PRAIA', dano: 12, bloqueia: 'FONE' },
-      { nome: 'CORNETA', dano: 10, bloqueia: 'CALMA' }
+      // 'o santista tem que cair, como se fosse uma lesão': o cai-cai
+      { nome: 'CAI-CAI', dano: 10, bloqueia: 'IRONIA', cai: true }
+    ]
+  },
+  /* Os cosplayers da Liberdade: a fantasia sorteada é o boneco (sprites),
+     e a lábia (elogiar a fantasia) derruba. */
+  cosplayer: {
+    nome: 'COSPLAYER', sprite: 'np_cos_naruto', sprites: COSPLAYERS, pac: 70, nivel: 5,
+    fraco: 'LABIA', resiste: 'IRONIA',
+    chega: 'SABE DE QUAL\nANIME EU SOU?',
+    sai: 'VOU PRO EVENTO.\nSAYONARA!',
+    golpes: [
+      { nome: 'JUTSU DOS CLONES', dano: 12, bloqueia: 'CALMA' },
+      { nome: 'FALA EM JAPONÊS', dano: 10, bloqueia: 'FONE' },
+      { nome: 'POSE DE ANIME', dano: 14, bloqueia: 'LABIA' }
+    ]
+  },
+  // o ambulante da plataforma, que insiste ('batalhar com o ambulante')
+  ambulante: {
+    nome: 'AMBULANTE', sprite: 'np_ambulante_a', pac: 65, nivel: 3,
+    fraco: 'FONE', resiste: 'LABIA',
+    chega: 'É DOIS, É CINCO!\nVAI LEVAR OU NÃO VAI?',
+    sai: 'TÁ BOM, FREGUÊS.\nFICA PRA PRÓXIMA.',
+    golpes: [
+      { nome: 'É DOIS, É CINCO!', dano: 12, bloqueia: 'CALMA' },
+      { nome: 'ÁGUA GELADINHA', dano: 10, bloqueia: 'FONE' },
+      { nome: 'ÚLTIMA UNIDADE', dano: 14, bloqueia: 'IRONIA' }
+    ]
+  },
+  /* Os três guardas: quem te pega pulando a catraca vira duelo. Convenceu,
+     ele te deixa passar; perdeu, é o castigo de sempre. */
+  guardinha: {
+    nome: 'GUARDINHA', sprite: 'np_guardinha', pac: 60, nivel: 3,
+    fraco: 'LABIA', resiste: 'IRONIA',
+    chega: 'PULOU A CATRACA,\nNÉ? EU VI.',
+    sai: 'TÁ BOM, VAI.\nMAS EU TÔ DE OLHO.',
+    golpes: [
+      { nome: 'APITO NO OUVIDO', dano: 12, bloqueia: 'FONE' },
+      { nome: 'CADÊ O BILHETE?', dano: 12, bloqueia: 'LABIA' },
+      { nome: 'VOU CHAMAR O CHEFE', dano: 14, bloqueia: 'CALMA' }
+    ]
+  },
+  guardaMedio: {
+    nome: 'SEGURANÇA', sprite: 'np_guarda_medio', pac: 85, nivel: 7,
+    fraco: 'CALMA', resiste: 'IRONIA',
+    chega: 'VEM CÁ VOCÊ.\nDOCUMENTO.',
+    sai: 'PASSA. HOJE EU\nTÔ DE BOM HUMOR.',
+    golpes: [
+      { nome: 'ANOTA O NOME', dano: 14, bloqueia: 'CALMA' },
+      { nome: 'CADÊ O BILHETE?', dano: 12, bloqueia: 'LABIA' },
+      { nome: 'RÁDIO NA CENTRAL', dano: 16, bloqueia: 'FONE' }
+    ]
+  },
+  guardaForte: {
+    nome: 'O GRANDÃO', sprite: 'np_guarda_forte', pac: 110, nivel: 12,
+    fraco: 'CALMA', resiste: 'LABIA',
+    chega: '...',
+    sai: 'SOME DAQUI.',
+    golpes: [
+      { nome: 'OLHAR DE CIMA', dano: 16, bloqueia: 'CALMA' },
+      { nome: 'BRAÇO CRUZADO', dano: 14, bloqueia: 'IRONIA' },
+      { nome: 'RÁDIO NA CENTRAL', dano: 18, bloqueia: 'FONE' }
     ]
   }
 };
+/* o nível de cada um (sem `nivel` na ficha, é 2) e os que sobem com os
+   dias: gente que já te viu passar amanhã vem mais afiada */
+var NIVEL_BASE = { tiozao: 2, pregador: 3, barra: 1, corintiano: 4, palmeirense: 4, saopaulino: 4, santista: 4 };
+function nivelDoDesafiante(tipo) {
+  var q = DESAFIANTES[tipo] || {}, base = q.nivel || NIVEL_BASE[tipo] || 2;
+  var dia = (GameState && GameState.dia) || 1;
+  return Math.max(1, base + Math.floor((dia - 1) / 2) + Math.floor(Math.random() * 3) - 1);
+}
+// o boneco de quem desafia: a fantasia sorteada, no cosplayer
+function spriteDoDesafiante(tipo) {
+  var q = DESAFIANTES[tipo];
+  return q.sprites ? q.sprites[Math.floor(Math.random() * q.sprites.length)] : q.sprite;
+}
+/* 'Se for muito mais alto você pode fugir, se for muito mais baixo você
+   pode fugir': três níveis de diferença, pra qualquer lado. */
+var DSF_FUGA = 3;
 var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor'];
 var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
 function sorteiaDesafiante() {
+  // perto da Liberdade, quem desafia muitas vezes é cosplayer
+  var dl = pertoDaLiberdade();
+  if (dl >= 0 && Math.random() < 0.45 - dl * 0.07) return 'cosplayer';
   var t = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
   if (t !== 'torcedor') return t;
+  /* Itaquera é da Fiel: nas quatro últimas da Vermelha (Patriarca até
+     Itaquera) só aparece corintiano, nem santista, nem são-paulino, nem
+     palmeirense ('santistas não aparecem em Itaquera'). */
+  var lv = GameState.linhaAtual();
+  if (lv === LINHAS.vermelha && GameState.idx >= lv.estacoes.length - 4) return 'corintiano';
   // quem joga de torcedor encontra gente do próprio time, que é o que o poder dele usa
   if (temPoder('torcida') && Math.random() < 0.35) return TIMES[leTime()].desafiante;
   // são-paulino e santista andam pela cidade toda
@@ -186,7 +271,12 @@ var FX_GOLPE = {
   'AVANTI PALESTRA': 'torcida', 'MAMMA MIA, QUE GOL!': 'torcida', 'MA CHE CORNETA!': 'audio',
   'TRÊS MUNDIAIS': 'grito', 'SOBERANO!': 'torcida',
   'O REI PELÉ': 'balao', 'SANTOS É PRAIA': 'torcida',
-  'COTOVELADA': 'grito', 'BAFO NO CANGOTE': 'audio', 'MÃO POR CIMA DA SUA': 'papel'
+  'COTOVELADA': 'grito', 'BAFO NO CANGOTE': 'audio', 'MÃO POR CIMA DA SUA': 'papel',
+  'CAI-CAI': 'caicai',
+  'JUTSU DOS CLONES': 'sombra', 'FALA EM JAPONÊS': 'balao', 'POSE DE ANIME': 'grito',
+  'É DOIS, É CINCO!': 'grito', 'ÁGUA GELADINHA': 'balao', 'ÚLTIMA UNIDADE': 'papel',
+  'APITO NO OUVIDO': 'audio', 'CADÊ O BILHETE?': 'papel', 'VOU CHAMAR O CHEFE': 'grito',
+  'ANOTA O NOME': 'papel', 'RÁDIO NA CENTRAL': 'audio', 'OLHAR DE CIMA': 'sombra', 'BRAÇO CRUZADO': 'grito'
 };
 // o confete de cada torcida
 var CORES_TORCIDA = {
@@ -227,9 +317,15 @@ var DesafioScene = new Phaser.Class({
 
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
     marcaDex(this.dados.tipo, 1);
+    /* os níveis: o seu dá paciência (5 por nível) e força (5%); o dele,
+       paciência (10%) e força nos golpes (6%) */
+    this.nvVc = meuNivel();
+    this.nvEle = this.dados.nivel || nivelDoDesafiante(this.dados.tipo);
+    this.podeFugir = Math.abs(this.nvVc - this.nvEle) >= DSF_FUGA;
+    var maxVc = DSF_VIDA + 5 * (this.nvVc - 1), pacEle = Math.round(this.quem.pac * (1 + 0.1 * (this.nvEle - 1)));
     var fol = Math.max(0.5, GameState.descanso / GameState.char.descansoMax);
-    this.vc = { pac: Math.round(DSF_VIDA * fol), max: DSF_VIDA, mostra: 0 };
-    this.ele = { pac: this.quem.pac, max: this.quem.pac, mostra: this.quem.pac };
+    this.vc = { pac: Math.round(maxVc * fol), max: maxVc, mostra: 0 };
+    this.ele = { pac: pacEle, max: pacEle, mostra: pacEle };
     this.vc.mostra = this.vc.pac;
     this.sel = 0;
     this.fila = [];          // as mensagens da vez, uma por toque
@@ -262,6 +358,21 @@ var DesafioScene = new Phaser.Class({
     this.tEle = txt(this, this.bEle.x + 10, this.bEle.y + 4, this.quem.nome, PAL.branco, 8).setDepth(12);
     this.tVc = txt(this, this.bVc.x + 10, this.bVc.y + 4, nomeDoChar(GameState.charKey, GameState.genero), PAL.branco, 8).setDepth(12);
     this.tVcNum = txt(this, this.bVc.x + this.bVc.w - 10, this.bVc.y + 32, '', PAL.cinza, 8).setOrigin(1, 0).setDepth(12);
+    // o nível de cada um, pequeno, no canto de cima da ficha
+    var corNv = function (a, b) { return a > b + 2 ? PAL.vermelho : (a < b - 2 ? PAL.verde : PAL.amarelo); };
+    txt(this, this.bEle.x + this.bEle.w - 8, this.bEle.y + 6, 'NV ' + this.nvEle, corNv(this.nvEle, this.nvVc), 8)
+      .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2).setDepth(12);
+    txt(this, this.bVc.x + this.bVc.w - 8, this.bVc.y + 6, 'NV ' + this.nvVc, PAL.amarelo, 8)
+      .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2).setDepth(12);
+    /* o FUGIR: no canto de cima da caixa da mensagem, só quando a
+       diferença de nível deixa (F ou ESC no teclado) */
+    this.bFuga = { x: DSF.msg.x + DSF.msg.w - 70, y: DSF.msg.y + 6, w: 62, h: 18 };
+    this.tFuga = txtC(this, this.bFuga.x + this.bFuga.w / 2, this.bFuga.y + 5, 'FUGIR', PAL.branco, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(12).setVisible(false);
+    if (this.podeFugir) {
+      this.add.zone(this.bFuga.x, this.bFuga.y, this.bFuga.w, this.bFuga.h).setOrigin(0, 0).setInteractive().setDepth(14)
+        .on('pointerdown', function () { eu.foge(); });
+    }
     this.tMsg = txt(this, DSF.msg.x + 12, DSF.msg.y + 8, '', PAL.branco, 8).setDepth(12);
     // o aviso do próximo golpe, numa plaquinha embaixo da ficha dele
     // o aviso do golpe fica embaixo da ficha dele, ou em cima quando ela é a de baixo (senão bate na mensagem)
@@ -289,6 +400,7 @@ var DesafioScene = new Phaser.Class({
 
     this.input.keyboard.on('keydown', function (ev) {
       var k = ev.code;
+      if (eu.fase === 'menu' && (k === 'KeyF' || k === 'Escape')) { eu.foge(); return; }
       if (eu.fase === 'menu') {
         if (k === 'KeyA' || k === 'ArrowLeft') eu.move(-1);
         else if (k === 'KeyD' || k === 'ArrowRight') eu.move(1);
@@ -298,7 +410,9 @@ var DesafioScene = new Phaser.Class({
       } else if (k === 'Space' || k === 'Enter' || k === 'KeyZ') eu.avanca();
     });
 
-    this.poe([{ msg: this.quem.nome + '\nQUER CONVERSAR.' }], 'menu');
+    var abre = [{ msg: this.quem.nome + ' (NV ' + this.nvEle + ')\nQUER CONVERSAR.' }];
+    if (this.podeFugir) abre.push({ msg: this.nvEle > this.nvVc ? 'ELE É MUITO MAIS FORTE.\nDÁ PRA FUGIR.' : 'ELE É FRACO DEMAIS PRA VOCÊ.\nDÁ PRA FUGIR.', cor: PAL.amarelo });
+    this.poe(abre, 'menu');
     sfx('apito');
   },
 
@@ -337,7 +451,8 @@ var DesafioScene = new Phaser.Class({
     if (this.depois === 'ele') { this.vezDele(); return; }
     this.fase = 'menu';
     this.tempo = dsfTempo();
-    this.tMsg.setText('O QUE VOCÊ RESPONDE?').setColor(PAL.cinza);
+    // com o FUGIR no canto, a pergunta encolhe pra não encostar nele
+    this.tMsg.setText(this.podeFugir ? 'RESPONDE OU FOGE?' : 'O QUE VOCÊ RESPONDE?').setColor(PAL.cinza);
   },
 
   sorteiaGolpe: function () {
@@ -369,7 +484,7 @@ var DesafioScene = new Phaser.Class({
     this.bloqueou = (this.proximo && this.proximo.bloqueia === r.tipo);
     this.bonus = 1;
     var na = Math.random() < 1 / 12;
-    var dano = Math.round(r.dano * mult * (0.85 + Math.random() * 0.15) * (na ? 1.5 : 1) * (repetiu ? 0.6 : 1));
+    var dano = Math.round(r.dano * mult * (0.85 + Math.random() * 0.15) * (na ? 1.5 : 1) * (repetiu ? 0.6 : 1) * (1 + 0.05 * (this.nvVc - 1)));
     // a paciência dele cai já aqui, pra que o NERVOSO entre na mesma fala
     var depois = Math.max(0, this.ele.pac - dano);
     var eu = this;
@@ -399,7 +514,7 @@ var DesafioScene = new Phaser.Class({
   vezDele: function () {
     var q = this.quem, g = this.proximo || this.sorteiaGolpe();
     var bloq = !!this.bloqueou;
-    var dano = bloq ? 0 : Math.round(g.dano * (0.85 + Math.random() * 0.3) * (this.nervoso ? 1.3 : 1) * (this.bonus || 1));
+    var dano = bloq ? 0 : Math.round(g.dano * (0.85 + Math.random() * 0.3) * (this.nervoso ? 1.3 : 1) * (this.bonus || 1) * (1 + 0.06 * (this.nvEle - 1)));
     var eu = this;
     var msgs = [{ msg: q.nome + ' USOU\n' + g.nome + '!', fx: function () {
       eu.ataque(FX_GOLPE[g.nome] || 'balao', false, bloq, eu.nervoso);
@@ -412,7 +527,7 @@ var DesafioScene = new Phaser.Class({
     if (bloq) {
       DSF_SABE[g.nome] = g.bloqueia;
       msgs.push({ msg: 'VOCÊ CORTOU NA HORA!', cor: PAL.verde });
-    }
+    } else if (g.cai) msgs.push({ msg: 'ELE SE JOGOU NO CHÃO...\nE VOCÊ QUE LEVOU A CULPA.', cor: PAL.cinza });
     this.bloqueou = false; this.bonus = 1;
     this.proximo = this.sorteiaGolpe();
     this.poe(msgs, 'menu');
@@ -427,6 +542,13 @@ var DesafioScene = new Phaser.Class({
     Missoes.conta('venceuDesafio', { tipo: this.dados.tipo });
     var fim = [{ msg: '"' + this.quem.sai + '"' }, { msg: this.quem.nome + '\nDESISTIU DE VOCÊ.', cor: PAL.verde }];
     if (pts) fim.push({ msg: '+' + pts + ' PONTOS', cor: PAL.amarelo });
+    // o XP: mais por quem é mais forte, quase nada por quem é bem mais fraco
+    if (!GameState.treino) {
+      var xp = Math.max(2, 8 + 3 * this.nvEle + 4 * (this.nvEle - this.nvVc));
+      var subiu = ganhaXp(xp);
+      fim.push({ msg: '+' + xp + ' XP', cor: PAL.amarelo });
+      if (subiu) fim.push({ msg: 'SUBIU PRO NÍVEL ' + subiu + '!', cor: PAL.verde, fx: function () { tocaJingle('vitoria'); } });
+    }
     sfx('vitoria');
     this.poe(fim, 'sai');
   },
@@ -437,14 +559,26 @@ var DesafioScene = new Phaser.Class({
     GameState.addDescanso(-8);
     GameState.stats.causos++;
     sfx('derrota');
-    var msgs = [{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: 'O VAGÃO INTEIRO VIU.' }];
+    var msgs = [{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: this.dados.ondeViu || 'O VAGÃO INTEIRO VIU.' }];
+    if (!GameState.treino) { ganhaXp(2); msgs.push({ msg: '+2 XP. DA PRÓXIMA VOCÊ SABE.', cor: PAL.cinza }); }
     /* perder o desafio custa um coração, como perder qualquer outro
        minigame; no treino não, que treino não vale nada */
     if (!GameState.treino) {
-      GameState.perdeCoracao(1);
-      msgs.push({ msg: '-1 CORAÇÃO', cor: PAL.vermelho });
+      var custo = this.dados.custo || 1;
+      GameState.perdeCoracao(custo);
+      msgs.push({ msg: (custo < 1 ? '-MEIO' : '-' + custo) + ' CORAÇ' + (custo > 1 ? 'ÕES' : 'ÃO'), cor: PAL.vermelho });
     }
     this.poe(msgs, 'sai');
+  },
+
+  /* fugir: só com a diferença de nível, e sem castigo nenhum além de um
+     pouco de carisma (quem foge não impressiona ninguém) */
+  foge: function () {
+    if (!this.podeFugir || this.fase !== 'menu') return;
+    this.resultado = 'fugiu';
+    GameState.addCarisma(-2);
+    sfx('empurra');
+    this.poe([{ msg: 'VOCÊ SAIU DE FININHO.', cor: PAL.cinza }], 'sai');
   },
 
   fecha: function () {
@@ -453,7 +587,7 @@ var DesafioScene = new Phaser.Class({
     // a cena morre com piscada e recuo pela metade: devolve os dois como estavam
     var dp = this.dados.pl, de = this.dados.ele;
     if (dp && dp.active) { dp.clearTint(); dp.x = this.xPl; }
-    if (de && de.active) { de.clearTint(); de.x = this.xEle; }
+    if (de && de.active) { de.clearTint(); de.x = this.xEle; de.angle = 0; }
     devolveCenas(this, this.congeladas);
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Desafio');
@@ -512,6 +646,7 @@ var DesafioScene = new Phaser.Class({
     else if (tipo === 'audio') voa('anel', 5, 70, { cor: 0xe8762c });
     else if (tipo === 'balao') voa('balao', 4, 90);
     else if (tipo === 'papel') voa('papel', 5, 70);
+    else if (tipo === 'caicai') { this.cai(this.dados.ele); voa('grito', 1, 0, { dur: 480, bx: A.x, by: A.y }); }
     else if (tipo === 'grito') {
       voa('grito', 2, 150, { dur: 520, bx: A.x, by: A.y });
       voa('balao', 2, 120);
@@ -546,6 +681,8 @@ var DesafioScene = new Phaser.Class({
         vx: Math.cos(an) * v, vy: Math.sin(an) * v, cor: forte ? 0xf2c14e : 0xf2f0ff });
     }
     if (!sp || !sp.active) return;
+    // o santista vai ao chão com qualquer encostada, como se fosse lesão
+    if (sp === this.dados.ele && this.dados.tipo === 'santista') this.cai(sp);
     sp.setTintFill(0xffffff);
     this.time.delayedCall(70, function () { if (sp.active) sp.clearTint(); });
     this.time.delayedCall(140, function () { if (sp.active) sp.setTintFill(0xffffff); });
@@ -553,6 +690,22 @@ var DesafioScene = new Phaser.Class({
     var x0 = sp.x, dx = (pt.x - de.x) > 0 ? 1 : -1;
     this.tweens.add({ targets: sp, x: x0 + dx * (forte ? 5 : 3), duration: 70, yoyo: true,
       onComplete: function () { if (sp.active) sp.x = x0; } });
+  },
+
+  /* deita de lado, fica um tempinho rolando de dor e levanta como se
+     nada tivesse acontecido */
+  cai: function (sp) {
+    if (!sp || !sp.active || this.caindo) return;
+    this.caindo = true;
+    var eu = this, lado = Math.random() < 0.5 ? -1 : 1;
+    this.tweens.add({ targets: sp, angle: 90 * lado, duration: 180, ease: 'Quad.easeIn',
+      onComplete: function () {
+        eu.tweens.add({ targets: sp, angle: 80 * lado, duration: 120, yoyo: true, repeat: 2,
+          onComplete: function () {
+            eu.tweens.add({ targets: sp, angle: 0, duration: 220, ease: 'Back.easeOut',
+              onComplete: function () { eu.caindo = false; } });
+          } });
+      } });
   },
 
   pintaFx: function (dt) {
@@ -663,6 +816,11 @@ var DesafioScene = new Phaser.Class({
       var vw = Math.round(this.tVem.width) + 16;
       g.fillStyle(0x2a0c10, 0.95).fillRect(this.bEle.x, this.yVem, vw, 18);
       g.lineStyle(1, 0xe8362c, 1).strokeRect(this.bEle.x + 0.5, this.yVem + 0.5, vw - 1, 17);
+    }
+    this.tFuga.setVisible(menu && this.podeFugir);
+    if (menu && this.podeFugir) {
+      g.fillStyle(0x2a2410, 1).fillRect(this.bFuga.x, this.bFuga.y, this.bFuga.w, this.bFuga.h);
+      g.lineStyle(1, 0xf2c14e, 1).strokeRect(this.bFuga.x + 0.5, this.bFuga.y + 0.5, this.bFuga.w - 1, this.bFuga.h - 1);
     }
     this.tNervoso.setText(this.nervoso && this.ele.pac > 0 ? 'NERVOSO' : '');
     // com chapa escura atrás: solto, o vermelho sumia no letreiro do vagão

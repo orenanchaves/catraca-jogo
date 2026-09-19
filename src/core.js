@@ -3477,6 +3477,34 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
    você é uma silhueta com ???; quem já passou mostra o nome e o que faz;
    e o desafiante que você venceu mostra também a fraqueza. Fica gravado
    entre as partidas (metrosp_dex): 1 é visto, 2 é vencido. */
+/* ---------- o nível ----------
+   'Acho que cabe evolução de nível.' Cada personagem tem o seu XP,
+   guardado entre as partidas (metrosp_xp): ganhar um duelo rende mais
+   quanto mais alto o nível de quem você venceu. A cada 40 de XP, um
+   nível (até o 30). Nível dá paciência e força no duelo (desafio.js), e
+   é ele que decide quando dá pra fugir. */
+function leXp() {
+  try { return JSON.parse(localStorage.getItem('metrosp_xp') || '{}') || {}; } catch (e) { return {}; }
+}
+function nivelDoXp(x) { return Math.min(30, 1 + Math.floor((x || 0) / 40)); }
+function meuNivel() { return nivelDoXp(leXp()[GameState.charKey]); }
+// soma o XP e devolve o nível novo quando subiu (0 quando não)
+function ganhaXp(n) {
+  var d = leXp(), k = GameState.charKey, antes = nivelDoXp(d[k]);
+  d[k] = (d[k] || 0) + n;
+  try { localStorage.setItem('metrosp_xp', JSON.stringify(d)); } catch (e) { }
+  var depois = nivelDoXp(d[k]);
+  return depois > antes ? depois : 0;
+}
+/* Quantas estações da Liberdade (na Azul), ou -1 fora do alcance dos
+   cosplayers: 'ficam na Liberdade e até mais 4 estações pra cima ou pra
+   baixo na linha azul'. */
+function pertoDaLiberdade() {
+  if (typeof GameState === 'undefined' || !GameState.char || GameState.linha !== 'azul') return -1;
+  var d = Math.abs(GameState.idx - LINHAS.azul.estacoes.indexOf('LIBERDADE'));
+  return d <= 4 ? d : -1;
+}
+
 var COSPLAYERS = ['np_cos_marinheira', 'np_cos_akatsuki', 'np_cos_naruto', 'np_cos_sasuke', 'np_cos_sakura'];
 var DEX = [
   { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Manda áudio de 5 minutos. Quer conversar.' },
@@ -3486,16 +3514,16 @@ var DEX = [
   { id: 'saopaulino', nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Soberano. Lembra três mundiais sem ninguém pedir.' },
   { id: 'santista', nome: 'SANTISTA', sprite: 'np_santista', desafio: true, tipo: 'TORCIDA', onde: 'CIDADE', desc: 'Moicano de 2010. O Peixe vai voltar.' },
   { id: 'barra', nome: 'QUER A BARRA', sprite: 'np_pax0', desafio: true, tipo: 'CHATO', onde: 'NA BARRA', desc: 'Aparece quando você segura a barra demais.' },
-  { id: 'guardinha', nome: 'GUARDINHA', sprite: 'np_guardinha', tipo: 'GUARDA', onde: 'CATRACA', pega: 'MEIA VIDA', desc: 'Vigia a catraca. Pego no pulo, meio coração.' },
-  { id: 'guardaMedio', nome: 'SEGURANÇA', sprite: 'np_guarda_medio', tipo: 'GUARDA', onde: 'CATRACA', pega: '1 VIDA', desc: 'O do meio. Pego no pulo, um coração.' },
-  { id: 'guardaForte', nome: 'O GRANDÃO', sprite: 'np_guarda_forte', tipo: 'GUARDA', onde: 'CATRACA', pega: '2 VIDAS', desc: 'Todo de preto. Pego no pulo, dois corações.' },
-  { id: 'ambulante', nome: 'AMBULANTE', sprite: 'np_ambulante_a', tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Metrô, shopping, trem! Vende no vagão.' },
+  { id: 'guardinha', nome: 'GUARDINHA', sprite: 'np_guardinha', desafio: true, tipo: 'GUARDA', onde: 'CATRACA', pega: 'MEIA VIDA', desc: 'Vigia a catraca. Pego no pulo, meio coração.' },
+  { id: 'guardaMedio', nome: 'SEGURANÇA', sprite: 'np_guarda_medio', desafio: true, tipo: 'GUARDA', onde: 'CATRACA', pega: '1 VIDA', desc: 'O do meio. Pego no pulo, um coração.' },
+  { id: 'guardaForte', nome: 'O GRANDÃO', sprite: 'np_guarda_forte', desafio: true, tipo: 'GUARDA', onde: 'CATRACA', pega: '2 VIDAS', desc: 'Todo de preto. Pego no pulo, dois corações.' },
+  { id: 'ambulante', nome: 'AMBULANTE', sprite: 'np_ambulante_a', desafio: true, tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Metrô, shopping, trem! Vende no vagão.' },
   { id: 'rimador', nome: 'RIMADOR', sprite: 'np_rimador', tipo: 'RIMADOR', onde: 'VAGÃO', desc: 'Chega no boom bap. Batalha de rima no vagão.' },
   { id: 'pedinte', nome: 'PEDINTE', sprite: 'np_pedinte', tipo: 'GENTE', onde: 'SAGUÃO', desc: 'Fica no saguão. Uma moeda muda o dia dele.' },
   { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', tipo: 'METRÔ', onde: 'GUICHÊ', desc: 'Na bilheteria. Vende a passagem.' },
   { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
   { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
-  { id: 'cosplayer', nome: 'COSPLAYER', sprite: 'np_cos_naruto', tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Vai pro evento de anime. Marinheira, Akatsuki, Naruto, Sasuke, Sakura.' }
+  { id: 'cosplayer', nome: 'COSPLAYER', sprite: 'np_cos_naruto', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Vai pro evento de anime. Marinheira, Akatsuki, Naruto, Sasuke, Sakura.' }
 ];
 // a cor de cada tipo: a da bolinha e a da borda da carta
 var COR_TIPO = {

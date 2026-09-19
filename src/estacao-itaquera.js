@@ -718,12 +718,112 @@ EstacaoScene.prototype.montaItaquera = function () {
   this.tPassante = 0;
 };
 
+/* ---------- os duelos da estação ----------
+   'Tem que ter batalhas fora do vagão também.' O mesmo duelo do vagão
+   (desafio.js), com o mesmo ritual: o '!' em cima de quem te chamou, o
+   zoom nos dois, e a luta por cima. Três jeitos de acontecer aqui: o
+   guarda que te pegou pulando (atualizaFlagra), o ambulante que insiste
+   quando você chega perto, e um desafiante parado na plataforma (perto
+   da Liberdade, muitas vezes um cosplayer). Entre um e outro, a mesma
+   folga de 25 s do vagão. */
+EstacaoScene.prototype.duelaNaEstacao = function (a, tipo, extra, aoFim) {
+  if (this.duelo || !a || !a.sp || !a.sp.active) return false;
+  this.duelo = true;
+  var eu = this, cam = this.cameras.main;
+  this.pl.dir = a.sp.y < this.pl.sp.y ? 'up' : 'down'; this.pl.anima(0, false);
+  a.dir = a.sp.y < this.pl.sp.y ? 'down' : 'up'; a.anima(0, false);
+  var ex = txtC(this, a.sp.x, a.sp.y - 46, '!', PAL.amarelo, 16).setDepth(90);
+  sfx('apito');
+  this.time.delayedCall(550, function () {
+    ex.destroy();
+    cam.stopFollow();
+    var mx = (a.sp.x + eu.pl.sp.x) / 2, my = (a.sp.y + eu.pl.sp.y) / 2 - 24 + 31;
+    eu.tweens.add({ targets: cam, zoom: 2.2, scrollX: mx - GW / 2, scrollY: my - GH / 2, duration: 450, ease: 'Cubic.easeInOut',
+      onComplete: function () {
+        var dados = { tipo: tipo, pl: eu.pl.sp, ele: a.sp, cam: cam, ondeViu: 'A ESTAÇÃO INTEIRA VIU.',
+          aoFechar: function (r) { eu.fimDoDuelo(r, aoFim); } };
+        for (var k in (extra || {})) dados[k] = extra[k];
+        eu.scene.launch('Desafio', dados);
+      } });
+  });
+  return true;
+};
+EstacaoScene.prototype.fimDoDuelo = function (r, aoFim) {
+  var eu = this, cam = this.cameras.main;
+  this.tweens.add({ targets: cam, zoom: 1, duration: 350, ease: 'Cubic.easeInOut',
+    onComplete: function () {
+      cam.startFollow(eu.pl.sp, true, 1, 1);
+      cam.setFollowOffset(0, -Math.round(HUD_H / 2));
+      eu.duelo = false;
+      eu.tUltimaLuta = eu.time.now;
+      if (aoFim) aoFim(r);
+    } });
+};
+// um desafiante parado na plataforma, olhando pro trilho, em metade das estações
+EstacaoScene.prototype.montaDesafianteDaEstacao = function () {
+  this.dsfEst = [];
+  if (this.treino || !this.mez || Math.random() > 0.5) return;
+  var tipo = sorteiaDesafiante();
+  if (tipo === 'barra') return;
+  var a = new Ator(this, PLAT_X0 + 12 + Math.random() * (PLAT_X1 - PLAT_X0 - 24),
+    platY(220 + Math.random() * (PLAT_ALT - 420)), spriteDoDesafiante(tipo));
+  a.sp.setDepth(30); a.fixo = true; a.dir = 'left'; a.anima(0, false);
+  a.desafio = { tipo: tipo, feito: false };
+  this.dsfEst.push(a);
+  this.fixos.push(a); this.gente.push(a);
+};
+EstacaoScene.prototype.vigiaDuelos = function () {
+  if (this.duelo || this.treino || this.flagra || this.pulo || this.empurrando || this.noElevador) return;
+  if (this.tUltimaLuta !== undefined && this.time.now - this.tUltimaLuta < ESPERA_ENTRE_LUTAS) return;
+  var px = this.pl.sp.x, py = this.pl.sp.y, eu = this, i;
+  // o ambulante insiste: na primeira vez que você encosta, seis em dez vezes vira duelo
+  var am = this.ambulante;
+  if (am && am.sp && am.sp.active && !this.ambDuelou && Math.hypot(am.sp.x - px, am.sp.y - py) < 40) {
+    this.ambDuelou = true;
+    if (Math.random() < 0.6) {
+      this.duelaNaEstacao(am, 'ambulante', null, function (r) {
+        if (r === 'ganhou') {
+          // venceu a lábia dele: leva um chocolate de graça
+          GameState.ganhar(ITENS.chocolate.preco); GameState.guarda('chocolate');
+          eu.alerta.setText('GANHOU UM CHOCOLATE\nPRA ELE TE DEIXAR EM PAZ');
+        } else if (r === 'perdeu') {
+          // perdeu: comprou a água que nem queria (se tiver dinheiro)
+          var ok = GameState.guarda('agua');
+          eu.alerta.setText(ok === 'ok' ? 'VOCÊ LEVOU UMA ÁGUA\nQUE NEM QUERIA (R$ 3)' : 'SEM DINHEIRO NEM\nPRA ÁGUA');
+        }
+        eu.time.delayedCall(2600, function () { if (eu.alerta) eu.alerta.setText(''); });
+      });
+      return;
+    }
+  }
+  for (i = 0; i < this.dsfEst.length; i++) {
+    var d = this.dsfEst[i];
+    if (d.desafio.feito || !d.sp.active) continue;
+    if (Math.hypot(d.sp.x - px, d.sp.y - py) < 44) {
+      d.desafio.feito = true;
+      this.duelaNaEstacao(d, d.desafio.tipo, null, function (r) {
+        if (r === 'ganhou') { d.dir = 'left'; d.anima(0, false); }
+      });
+      return;
+    }
+  }
+};
+
 /* ---------- o mezanino largo nas outras estações ----------
    As peças do mezanino da Itaquera que não dependem da planta dela: as
    cabines com fila, os quiosques, os cartazes, as tomadas e lixeiras
    nas paredes das pontas. Sem passarela, galeria nem rua: quem chega
    vem pela porta de baixo, no meio, como sempre. */
+/* A porta da rua das estações comuns, no meio do pé do mezanino, de onde
+   o povo chega ('não consigo sair da estação': só a Itaquera tinha rua). */
+var PORTA_RUA = { x0: 116, x1: 204 };
 EstacaoScene.prototype.montaMezanino = function () {
+  var gp = this.add.graphics().setDepth(0.5);
+  gp.fillStyle(0x0a0a10, 1).fillRect(PORTA_RUA.x0, 518, PORTA_RUA.x1 - PORTA_RUA.x0, 58);
+  gp.fillStyle(0x1c1c26, 1).fillRect(PORTA_RUA.x0 + 4, 522, PORTA_RUA.x1 - PORTA_RUA.x0 - 8, 54);
+  gp.fillStyle(GameState.linhaAtual().num, 1).fillRect(PORTA_RUA.x0, 518, 3, 58).fillRect(PORTA_RUA.x1 - 3, 518, 3, 58);
+  placaItq(this, (PORTA_RUA.x0 + PORTA_RUA.x1) / 2, 506, 'SAÍDA ▼', false, false, corDaPlaca());
+  this.naSaida = false;
   var gLojas = this.add.graphics().setDepth(0.6);
   this.pintaBarracas(gLojas);
   this.montaCompradores();
@@ -739,6 +839,16 @@ EstacaoScene.prototype.montaMezanino = function () {
    320px da plataforma quando sobe: desliza, pra não pular. */
 EstacaoScene.prototype.atualizaMezanino = function (dt) {
   atualizaAnuncios(this, dt);
+  // na porta da rua: pergunta se sai (sair é faltar hoje, como na Itaquera)
+  var naPorta = this.pl.sp.y > 536 && this.pl.sp.x > PORTA_RUA.x0 && this.pl.sp.x < PORTA_RUA.x1;
+  if (naPorta && !this.naSaida && !this.dialog) {
+    this.naSaida = true;
+    var eu = this;
+    fala(this, 'Sair da estação?\n\nSaindo agora, você falta hoje\n(-15 de carisma).', [
+      { label: 'Sair e faltar hoje', cb: function () { eu.faltaHoje(); } },
+      { label: 'Voltar pra estação', cb: function () { eu.pl.sp.y = 500; eu.pl.dir = 'up'; } }
+    ]);
+  } else if (!naPorta) this.naSaida = false;
   this.tiraDasCabines();
   this.andaCompradores(dt);
   var noSaguao = this.pl.sp.y > ESC_Y + ESCADA_ALT * 0.6;

@@ -110,9 +110,10 @@ var PESO_TOTAL = 0;
 
 /* sorteia um passageiro respeitando os pesos */
 function sorteiaPax() {
-  /* Na Liberdade, um em cada quatro é cosplayer indo pro evento: na
-     estação e no vagão parado nela */
-  if (typeof GameState !== 'undefined' && GameState.char && GameState.estacaoAtual() === 'LIBERDADE' && Math.random() < 0.25) {
+  /* Na Liberdade, um em cada quatro é cosplayer indo pro evento, e vão
+     rareando até quatro estações pra cada lado da Azul */
+  var dl = pertoDaLiberdade();
+  if (dl >= 0 && Math.random() < 0.25 - dl * 0.045) {
     return COSPLAYERS[Math.floor(Math.random() * COSPLAYERS.length)];
   }
   var r = Math.random() * PESO_TOTAL;

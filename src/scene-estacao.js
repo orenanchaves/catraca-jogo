@@ -304,6 +304,7 @@ var EstacaoScene = new Phaser.Class({
        sentado da Itaquera sobravam na seguinte, e sentar ali prendia o
        boneco, porque só a Itaquera sabe levantar dele */
     this.assentos = null; this.sentadoPlat = null;
+    this.duelo = false; this.dsfEst = []; this.ambDuelou = false; this.tUltimaLuta = undefined;
     this.elevadores = null; this.noElevador = null;
 
     /* ---------- o saguão ---------- */
@@ -460,6 +461,7 @@ var EstacaoScene = new Phaser.Class({
     }
 
     this.montaAmbulante();
+    this.montaDesafianteDaEstacao();
 
     /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
        baldeação ou desceu na estação errada já está lá em cima. */
@@ -682,7 +684,8 @@ var EstacaoScene = new Phaser.Class({
     if (this.mez) {
       var cp = this.itq ? null : corDaPlaca();
       placaItq(this, MEZ.x1 - 13, 380, placaDe(GameState.estacaoAtual()), true, true, cp);
-      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, true, cp);
+      // pendurada, por cima de quem passa ('tem que ficar acima do pessoal')
+      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, false, cp);
     } else {
       var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
       tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
@@ -1738,6 +1741,8 @@ var EstacaoScene = new Phaser.Class({
       if (x > q.x - 6 && x < q.x + q.w + 6 && y > q.y - 4 && y < q.y + q.h + 4) return false;
     }
     if (y >= 244 && y <= 516) return true;
+    // a porta da rua, no pé do mezanino (estacao-itaquera.js, portaDaRua)
+    if (this.mez && !this.itq && y > 516 && y < 548 && x > PORTA_RUA.x0 + 6 && x < PORTA_RUA.x1 - 6) return true;
     if (y >= 116 && y <= 204) return true;
     if (y > 204 && y < 244) {
       /* sair pela catraca é sempre possível, como na estação de verdade:
@@ -1921,9 +1926,14 @@ var EstacaoScene = new Phaser.Class({
       new P(c.ax - topo, c.ay), new P(c.ax + topo, c.ay),
       new P(c.cx + c.meia, c.ay + c.alc), new P(c.cx - c.meia, c.ay + c.alc)
     ];
-    av.fillStyle(0xe8362c, (this.gOlhando ? 0.17 : 0.09) + (vendo ? 0.12 : 0));
+    /* 'Se eu pagar passagem, o segurança fica mais verdinho e não briga
+       comigo': com a passagem paga o cone dele vira verde e claro. Ele
+       continua olhando, mas pra você ele não é mais ameaça. */
+    var cone = this.liberado ? 0x00e676 : 0xe8362c;
+    if (this.liberado) vendo = false;
+    av.fillStyle(cone, (this.gOlhando ? 0.17 : 0.09) + (vendo ? 0.12 : 0));
     av.fillPoints(pontos, true);
-    av.lineStyle(1, 0xe8362c, vendo ? 0.85 : 0.3);
+    av.lineStyle(1, cone, vendo ? 0.85 : 0.3);
     av.strokePoints(pontos, true);
     return vendo;
   },
@@ -2181,8 +2191,14 @@ var EstacaoScene = new Phaser.Class({
     this.pl.dir = 'down';
     this.flagra = { t: 0 };
     sfx('apito');
-    perdeVida(this, this.pl.sp, this.patente.custo);
-    GameState.addCarisma(-6 * this.patente.custo);
+    /* 'Tem que ter como batalhar com o guardinha.' Fora do treino, o
+       flagra vira duelo (atualizaFlagra): convenceu, ele te deixa passar;
+       perdeu, é o castigo da patente dele. No treino da catraca o
+       minigame mede o pulo, e o castigo continua na hora. */
+    if (this.treino) {
+      perdeVida(this, this.pl.sp, this.patente.custo);
+      GameState.addCarisma(-6 * this.patente.custo);
+    }
     GameState.passaTempo(3);
     this.gEstado = 'olha'; this.gTempo = 0; this.gOlhando = true;
     this.alerta.setText('! ' + this.patente.nome + ' TE VIU !');
@@ -2206,6 +2222,21 @@ var EstacaoScene = new Phaser.Class({
     this.flagra = null;
     this.alerta.setText('');
     var self = this;
+    if (!this.treino) {
+      var tipoG = { fraco: 'guardinha', medio: 'guardaMedio', forte: 'guardaForte' }[this.patente.chave] || 'guardinha';
+      this.duelaNaEstacao(g, tipoG, { custo: this.patente.custo }, function (r) {
+        if (r === 'ganhou') {
+          // convenceu: ele libera a catraca, e você passa sem pagar
+          self.liberado = true;
+          self.alerta.setText('LIBERADO. PASSA LOGO.');
+          self.time.delayedCall(2200, function () { if (self.alerta) self.alerta.setText(''); });
+          return;
+        }
+        if (r !== 'fugiu') GameState.addCarisma(-4 * self.patente.custo);
+        self.pl.sp.x = 160; self.pl.sp.y = 512; self.pl.dir = 'up';
+      });
+      return;
+    }
     fala(this, this.patente.fala, [
       {
         label: 'Voltar pro começo', cb: function () {
@@ -2778,6 +2809,7 @@ var EstacaoScene = new Phaser.Class({
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.fim) return;
+    if (this.duelo) { this.pl.anima(dt, false); return; }   // o '!' e o zoom antes do duelo
 
     /* A estação é a primeira cena de cada perna, e é aqui que chega quem
        acabou de ser mandado embora ou de dormir no ponto. Sem esta
@@ -2804,6 +2836,7 @@ var EstacaoScene = new Phaser.Class({
     this.andaSaguao(dt);
     this.andaFila(dt);
     this.andaAmbulante(dt);
+    this.vigiaDuelos();
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
     var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);

@@ -731,11 +731,23 @@ var ZapScene = new Phaser.Class({
     };
     g.fillStyle(som, 1).fillPoints(forma(1), true);
     g.fillStyle(pele, 1).fillPoints(forma(0), true);
-    g.fillStyle(0xb67c55, 1).fillPoints(oval(-9, 1, 8, 7), true);        // a borda da unha
-    g.fillStyle(unha, 1).fillPoints(oval(-8, 1, 6.5, 5.5), true);        // a unha
-    g.fillStyle(0xf6dcc4, 1).fillPoints(oval(-6, -1, 2.5, 2), true);     // o brilho
-    var j0 = gira(-30, -8), j1 = gira(-30, 8), j2 = gira(-34, -6), j3 = gira(-34, 6);
-    g.lineStyle(1, som, 1).lineBetween(j0.x, j0.y, j1.x, j1.y).lineBetween(j2.x, j2.y, j3.x, j3.y);   // a dobra da junta
+    /* A unha como na foto: larga, quase da largura do dedo, acompanhando
+       a ponta redonda e reta embaixo, com a meia-lua clara na base. */
+    var unhaPts = function (enc) {
+      var pts = [], k;
+      for (k = 0; k <= 10; k++) { var an = -Math.PI / 2 + k * Math.PI / 10; pts.push(gira(-10 + Math.cos(an) * (8 - enc), Math.sin(an) * (7 - enc))); }
+      pts.push(gira(-22 + enc, 7 - enc)); pts.push(gira(-22 + enc, -7 + enc));
+      return pts;
+    };
+    g.fillStyle(0xb67c55, 1).fillPoints(unhaPts(0), true);               // a borda da unha
+    g.fillStyle(0xe7b8a6, 1).fillPoints(unhaPts(1), true);               // a unha, rosada
+    var lu = [gira(-21, -5), gira(-18, 0), gira(-21, 5)];
+    g.fillStyle(0xf4dcd0, 1).fillTriangle(lu[0].x, lu[0].y, lu[1].x, lu[1].y, lu[2].x, lu[2].y);   // a meia-lua
+    g.fillStyle(0xfbeee6, 0.8).fillPoints(oval(-8, -3, 2.5, 1.5), true); // o brilho
+    // as rugas da junta, um pouco abaixo da unha
+    var rugas = [[-32, 7], [-35, 8], [-38, 6]];
+    g.lineStyle(1, som, 1);
+    rugas.forEach(function (r) { var u0 = gira(r[0], -r[1]), u1 = gira(r[0], r[1]); g.lineBetween(u0.x, u0.y, u1.x, u1.y); });
     // as pontas dos quatro dedos, do lado direito, o mindinho menor
     for (dd = 0; dd < 4; dd++) {
       var fy = Y - 330 + dd * 26, larg = dd === 3 ? 8 : 11;

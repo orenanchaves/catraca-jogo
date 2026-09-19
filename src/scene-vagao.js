@@ -1044,7 +1044,7 @@ var VagaoScene = new Phaser.Class({
      está olhando e escolher passar ou não. */
   poeDesafiante: function (carro, x, y, olha, tipo) {
     tipo = tipo || sorteiaDesafiante();
-    var a = new Ator(this, x, y, DESAFIANTES[tipo].sprite);
+    var a = new Ator(this, x, y, spriteDoDesafiante(tipo));
     afastaDoPoste(a.sp);
     a.dir = olha; a.anima(0, false);
     a.sp.setDepth(36);
