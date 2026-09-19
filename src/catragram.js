@@ -83,14 +83,35 @@ var CONQUISTAS_NOVAS = [
     se: function (d) { return d.ato === 1; } }
 ];
 
+/* ---------- as antigas ficaram fáceis ----------
+   'As conquistas muito fáceis também.' Elas nasceram pra sair três por
+   vez, uma de cada nível; com todas valendo ao mesmo tempo, metade saía
+   no primeiro dia. Aqui os números novos (e o texto acompanha). */
+var METAS_DURAS = {
+  n0_1: { meta: 10, txt: 'Passe 10 vezes pela catraca', legenda: '10 catracas em ordem' },
+  n0_2: { meta: 3, txt: 'Sente 3 vezes no vagão', legenda: 'Achei banco 3 vezes' },
+  n1_0: { meta: 3, txt: 'Vença 3 desafios no vagão', legenda: '3 desafios vencidos no vagão' },
+  n1_1: { meta: 2, txt: 'Olhe o mapa na parede 2 vezes', legenda: 'Estudei o mapa da parede' },
+  n2_0: { meta: 6, txt: 'Dê o lugar 6 vezes', legenda: 'Cedi o lugar 6 vezes' },
+  n2_1: { meta: 3, txt: 'Compre 3 vezes de ambulante', legenda: '3 compras no vagão' },
+  n3_0: { meta: 8, txt: 'Pule a catraca 8 vezes', legenda: '8 catracas puladas' },
+  n3_1: { meta: 3, txt: 'Escape do guarda 3 vezes', legenda: 'Escapei do guarda 3 vezes' },
+  n3_2: { meta: 20, txt: 'Pegue 20 moedas do chão', legenda: '20 moedas do chão' },
+  n5_1: { meta: 8, txt: 'Vença 8 desafios', legenda: '8 desafios vencidos' },
+  n7_2: { meta: 6, txt: 'Ajude 6 vezes quem pede', legenda: 'Ajudei 6 vezes' },
+  n9_1: { meta: 6, txt: 'Ceda o lugar antes de pedirem 6 vezes', legenda: 'Cedi antes de pedirem, 6 vezes' }
+};
+
 // a lista inteira, montada uma vez: as antigas primeiro, na ordem dos níveis
 var CONQUISTAS = (function () {
   var out = [];
   for (var n = 0; n < NIVEIS.length; n++) {
     for (var i = 0; i < NIVEIS[n].missoes.length; i++) {
       var m = NIVEIS[n].missoes[i];
-      out.push({ id: 'n' + n + '_' + i, txt: m.txt, legenda: (LEGENDAS_ANTIGAS[n] || [])[i] || m.txt,
-        ev: m.ev, meta: m.meta, se: m.se, corrida: m.corrida, xp: 15, cat: CAT_DO_EV[m.ev] || 'rota', antiga: [n, i] });
+      var id = 'n' + n + '_' + i, dura = METAS_DURAS[id] || {};
+      out.push({ id: id, txt: dura.txt || m.txt, legenda: dura.legenda || (LEGENDAS_ANTIGAS[n] || [])[i] || m.txt,
+        ev: m.ev, meta: dura.meta || m.meta, se: m.se, corrida: m.corrida,
+        xp: dura.meta ? 25 : 15, cat: CAT_DO_EV[m.ev] || 'rota', antiga: [n, i] });
     }
   }
   for (var k = 0; k < CONQUISTAS_NOVAS.length; k++) {
@@ -235,7 +256,7 @@ var Catragram = {
       else { destrava(quem); ganhou = nomeDoChar(quem); }
     }
     gravaPontos(lePontos() + pts);
-    avisaMissao('CATRAGRAM: NOVO POST', c.legenda + '\n+' + xp + ' XP' + (ganhou ? ' + ' + ganhou : ''));
+    avisaConquista(c, xp, ganhou);
   },
 
   /* Quem reage: os contatos do ZipZap desse personagem (sem os grupos),
@@ -265,6 +286,31 @@ var Catragram = {
   seguidores: function () { return 37 + 11 * this.quantas() + 3 * Math.abs(GameState.fama || 0); },
   seguindo: function () { return this.quemComenta().length + 12; }
 };
+
+/* ---------- o aviso de conquista ----------
+   'Tem que aparecer de uma forma mais bonita, e notificar no celular pra
+   você ir clicar e ver.' Então não é a notificaçãozinha de sempre: é uma
+   faixa com a MEDALHA desenhada, o nome da conquista, o XP, e o convite
+   pra abrir o Catragram (que já fica com a bolinha vermelha). */
+function avisaConquista(c, xp, ganhou) {
+  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  if (!hud || !hud.sys || !hud.sys.isActive()) { avisaMissao('CATRAGRAM', c.legenda); return; }
+  var cx = hud.add.container(0, -110).setDepth(5200);
+  var g = hud.add.graphics();
+  var cor = (CAT_CONQ[c.cat] || CAT_CONQ.rota).cor;
+  g.fillStyle(0x000000, 0.4).fillRect(14, 6, GW - 24, 66);
+  g.fillStyle(0x0d1018, 0.98).fillRect(12, 0, GW - 24, 66);
+  g.lineStyle(2, cor, 1).strokeRect(12, 0, GW - 24, 66);
+  desenhaMedalha(g, 44, 33, 20, c.cat, true);
+  var t1 = txt(hud, 76, 8, 'CONQUISTA!', PAL.amarelo, 8).setScale(ESCALA_TEXTO / 2);
+  var t2 = txt(hud, 76, 22, c.legenda, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setMaxWidth((GW - 100) / (ESCALA_TEXTO / 2));
+  var t3 = txt(hud, 76, 48, '+' + xp + ' XP' + (ganhou ? '  +' + ganhou : '') + '   VEJA NO CATRAGRAM',
+    PAL.verde, 8).setScale(ESCALA_TEXTO / 2);
+  cx.add([g, t1, t2, t3]);
+  tocaJingle('achou');
+  hud.tweens.add({ targets: cx, y: HUD_H + 6, duration: 280, ease: 'Cubic.easeOut', hold: 2600, yoyo: true,
+    onComplete: function () { cx.destroy(); } });
+}
 
 function arrobaDe(nome) {
   return '@' + String(nome || 'voce').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');

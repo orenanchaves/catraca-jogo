@@ -253,6 +253,42 @@ var DESAFIANTES = {
     ]
   }
 };
+/* ---------- quantos por dia ----------
+   'Não pode se repetir com tanta frequência: tem uma tabela de quantos
+   por dia você pode enfrentar.' Cada tipo tem um teto diário; batido o
+   teto, aquele tipo não aparece mais hoje (e o sorteio procura outro).
+   Os cosplayers são raros (um por dia cada), o guarda é o que mais
+   aparece, porque é você que o procura pulando catraca. */
+var LIMITE_DIA = {
+  tiozao: 2, pregador: 2, barra: 2, ambulante: 2,
+  corintiano: 2, palmeirense: 2, saopaulino: 2, santista: 2,
+  cosLaranja: 1, cosVingador: 1, cosNuvem: 1, cosRosa: 1, cosColegial: 1,
+  guardinha: 3, guardaMedio: 2, guardaForte: 2,
+  fiscal: 1, fiscalDuro: 1
+};
+function duelosDoDia() {
+  if (!GameState.duelosNoDia || GameState.duelosNoDia.dia !== (GameState.dia || 1)) {
+    GameState.duelosNoDia = { dia: GameState.dia || 1 };
+  }
+  return GameState.duelosNoDia;
+}
+function podeDesafiar(tipo) {
+  var d = duelosDoDia();
+  return (d[tipo] || 0) < (LIMITE_DIA[tipo] === undefined ? 2 : LIMITE_DIA[tipo]);
+}
+function contaDuelo(tipo) {
+  var d = duelosDoDia();
+  d[tipo] = (d[tipo] || 0) + 1;
+}
+/* o tema de cada família, tocado quando a conversa começa */
+var TEMA_DSF = {
+  tiozao: 'temaChato', pregador: 'temaChato', barra: 'temaChato', ambulante: 'temaChato',
+  corintiano: 'temaTorcida', palmeirense: 'temaTorcida', saopaulino: 'temaTorcida', santista: 'temaTorcida',
+  guardinha: 'temaGuarda', guardaMedio: 'temaGuarda', guardaForte: 'temaGuarda',
+  cosLaranja: 'temaCosplay', cosVingador: 'temaCosplay', cosNuvem: 'temaCosplay', cosRosa: 'temaCosplay', cosColegial: 'temaCosplay',
+  fiscal: 'temaChefao', fiscalDuro: 'temaChefao'
+};
+
 /* o nível de cada um (sem `nivel` na ficha, é 2) e os que sobem com os
    dias: gente que já te viu passar amanhã vem mais afiada */
 var NIVEL_BASE = { tiozao: 2, pregador: 3, barra: 1, corintiano: 4, palmeirense: 4, saopaulino: 4, santista: 4 };
@@ -275,6 +311,14 @@ var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
 function sorteiaDesafiante() {
+  // o teto do dia: quem já apareceu demais hoje sai do sorteio
+  for (var tent = 0; tent < 8; tent++) {
+    var t = sorteiaDesafianteBruto();
+    if (podeDesafiar(t)) return t;
+  }
+  return null;
+}
+function sorteiaDesafianteBruto() {
   // perto da Liberdade, quem desafia muitas vezes é cosplayer
   var dl = pertoDaLiberdade();
   if (dl >= 0 && Math.random() < 0.45 - dl * 0.07) return TIPOS_COSPLAY[Math.floor(Math.random() * TIPOS_COSPLAY.length)];
@@ -400,6 +444,9 @@ var DesafioScene = new Phaser.Class({
     });
 
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
+    // o teto do dia e o tema da família dele (o chefão tem o próprio)
+    contaDuelo(this.dados.tipo);
+    tocaJingle(TEMA_DSF[this.dados.tipo] || 'temaChato');
     // as quatro respostas: as de sempre, ou as que a cena mandou (o EXTRATO do honesto contra o fiscal)
     this.resps = this.dados.respostas || RESPOSTAS;
     marcaDex(this.dados.dexId || this.dados.tipo, 1);

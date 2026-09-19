@@ -2635,6 +2635,40 @@ var JINGLES = {
     acorde: [[76, 1.4, 1.0], [79, 1.4, 1.0], [72, 1.4, 1.0]],
     bumbo: [0, .4, .8, 1.4], caixa: [1.1, 1.25, 1.4], dur: 2.4
   },
+  /* ---------- o tema de cada adversário ----------
+     'Músicas diferentes pra cada personagem que você enfrenta.' Quatro
+     temas curtos, um por família, que tocam quando o duelo começa: o
+     chato é arrastado, a torcida é marcha, o guarda é grave e o cosplay
+     é agudo e rápido. O chefão tem o dele, mais pesado. */
+  temaChato: {
+    mel: [[64, 0, .16], [63, .18, .16], [64, .36, .16], [59, .54, .3]],
+    baixo: [[40, 0, .5], [38, .5, .34]], acorde: [], bumbo: [0, .5], caixa: [.36], dur: .9
+  },
+  temaTorcida: {
+    mel: [[72, 0, .12], [72, .14, .12], [76, .28, .12], [79, .42, .28]],
+    baixo: [[48, 0, .26], [48, .28, .26], [43, .56, .3]], acorde: [[76, .42, .28]],
+    bumbo: [0, .28, .56], caixa: [.14, .42], dur: .9
+  },
+  temaGuarda: {
+    mel: [[55, 0, .2], [55, .22, .2], [58, .44, .38]],
+    baixo: [[31, 0, .44], [31, .44, .44]], acorde: [], bumbo: [0, .44], caixa: [.22], dur: .95
+  },
+  temaCosplay: {
+    mel: [[84, 0, .1], [88, .1, .1], [91, .2, .1], [88, .3, .1], [93, .4, .3]],
+    baixo: [[52, 0, .4], [57, .4, .3]], acorde: [[88, .4, .3], [84, .4, .3]],
+    bumbo: [0], caixa: [.2, .4], dur: .85
+  },
+  temaChefao: {
+    mel: [[48, 0, .26], [51, .28, .26], [48, .56, .26], [44, .84, .5]],
+    baixo: [[24, 0, .56], [24, .56, .8]], acorde: [[51, .84, .5], [55, .84, .5]],
+    bumbo: [0, .28, .56, .84], caixa: [.84], dur: 1.5, treme: true
+  },
+  // o toque de achar alguma coisa: quatro notas subindo, meio segundo
+  achou: {
+    mel: [[72, 0, .1], [76, .1, .1], [79, .2, .1], [84, .3, .34]],
+    baixo: [[48, 0, .3], [55, .3, .34]], acorde: [[79, .3, .34], [76, .3, .34]],
+    bumbo: [0], caixa: [.3], dur: .8
+  },
   derrota: {
     mel: [[67, 0, .42], [66, .45, .42], [65, .9, .42], [64, 1.35, .85]],
     baixo: [[43, 0, .42], [42, .45, .42], [41, .9, .42], [40, 1.35, .85]],
@@ -4060,6 +4094,15 @@ function perdeVida(scene, sp, quanto) {
 }
 
 var Ctrl = {
+  /* ---------- a trava do toque de fora ----------
+     'Quando pega o celular, a pessoa sai do banco e sai flutuando.' O
+     botão do celular mora no canto de cima do HUD, que é dentro da
+     metade direita da tela — a metade que AGE. O mesmo dedo abria o
+     ZipZap e mandava o boneco levantar do banco. Agora quem abre um
+     botão do HUD tranca a ação por um instante, e o mundo não escuta
+     esse dedo. */
+  _bloqAte: 0,
+  bloqueiaAcao: function (ms) { this._bloqAte = Date.now() + (ms || 350); },
   up: false, down: false, left: false, right: false,
   act: false, actJust: false, back: false, backJust: false,
   pausaJust: false,
@@ -4129,6 +4172,8 @@ var Ctrl = {
       if (!TOQUE.ativo && !TOQUE_DIR.ativo) this._engoleSoltura = false;
     }
     var a = k.SPACE.isDown || k.Z.isDown || k.ENTER.isDown || TOUCH.act || pulso;
+    // dedo que acabou de apertar um botão do HUD não conta como agir no mundo
+    if (Date.now() < this._bloqAte) { a = false; this._pa = true; }
     this.actJust = a && !this._pa; this._pa = a; this.act = a;
     TOUCH.pulso = false;
     var b = k.X.isDown;
@@ -4945,6 +4990,9 @@ Chao.prototype.pega = function (i) {
     if (typeof cabeNaMochila === 'function' && !cabeNaMochila(c.item)) return null;
     if (!GameState.mochila) GameState.mochila = {};
     GameState.mochila[c.item] = (GameState.mochila[c.item] || 0) + 1;
+    if (typeof mostraAchado === 'function') {
+      mostraAchado(this.scene, c.item, 'ACHOU COMIDA!', 'FECHADA. USE PELO CELULAR QUANDO O FÔLEGO APERTAR.');
+    }
   }
   GameState.stats.caidos = (GameState.stats.caidos || 0) + 1;
 
@@ -5068,6 +5116,55 @@ Dialog.prototype.fecha = function () {
 function pinta(c, cor, x, y, w, h) { c.fillStyle = cor; c.fillRect(x, y, w, h); }
 
 var ICONES_ITEM = {
+  /* Os achados do trem (src/achados.js) e a marmita do chão. Mesma
+     grade de 24x24 dos outros: é o desenho que aparece girando no
+     cartão de 'ACHOU'. */
+  isqueiro: function (c) {
+    pinta(c, '#c8302a', 7, 8, 10, 13);
+    pinta(c, '#e8564a', 7, 8, 10, 2);
+    pinta(c, '#9a9ca8', 7, 5, 10, 3);
+    pinta(c, '#f2c14e', 11, 1, 2, 4);
+    pinta(c, '#fff0a8', 11, 0, 2, 2);
+  },
+  guardachuva: function (c) {
+    pinta(c, '#2a4a8a', 3, 7, 18, 4);
+    pinta(c, '#3a6ac0', 5, 5, 14, 3);
+    pinta(c, '#9a9ca8', 11, 8, 2, 12);
+    pinta(c, '#6b4226', 9, 18, 4, 2);
+  },
+  carteira: function (c) {
+    pinta(c, '#5c3a1e', 3, 6, 18, 13);
+    pinta(c, '#7a4f2a', 3, 6, 18, 3);
+    pinta(c, '#f2f0ff', 6, 4, 8, 4);
+    pinta(c, '#f2c14e', 15, 11, 4, 4);
+  },
+  chaveiro: function (c) {
+    pinta(c, '#9a9ca8', 5, 4, 5, 5);
+    pinta(c, '#6a6c78', 6, 5, 3, 3);
+    pinta(c, '#c8cad4', 7, 9, 2, 11);
+    pinta(c, '#c8cad4', 9, 16, 3, 2);
+    pinta(c, '#c8cad4', 9, 19, 3, 2);
+    pinta(c, '#e8362c', 13, 6, 6, 6);
+  },
+  fone: function (c) {
+    pinta(c, '#1c1c24', 4, 6, 4, 10);
+    pinta(c, '#1c1c24', 16, 6, 4, 10);
+    pinta(c, '#3a3a4a', 4, 4, 16, 3);
+    pinta(c, '#c8cad4', 5, 8, 2, 6);
+    pinta(c, '#c8cad4', 17, 8, 2, 6);
+  },
+  notebook: function (c) {
+    pinta(c, '#3a3f52', 2, 5, 20, 12);
+    pinta(c, '#6fa8dc', 4, 7, 16, 8);
+    pinta(c, '#9a9ca8', 2, 17, 20, 3);
+    pinta(c, '#c8cad4', 9, 18, 6, 1);
+  },
+  marmita: function (c) {
+    pinta(c, '#9a9ca8', 3, 8, 18, 11);
+    pinta(c, '#d8d8e8', 3, 6, 18, 3);
+    pinta(c, '#e8362c', 11, 6, 2, 13);
+    pinta(c, '#6a6c78', 3, 17, 18, 2);
+  },
   chocolate: function (c) {
     pinta(c, '#7a2230', 3, 5, 18, 15);
     pinta(c, '#a8303f', 3, 5, 18, 2);
@@ -5789,6 +5886,7 @@ var HudScene = new Phaser.Class({
      boneco baixa a cabeça pro aparelho. */
   abreZap: function () {
     if (this.scene.isActive('Zap') || this.scene.isActive('Pausa') || this.pegandoCelular) return;
+    Ctrl.bloqueiaAcao(500);          // esse dedo é do celular, não do mundo (Ctrl.bloqueiaAcao)
     if (!GameState.char || !HUD_VISIVEL) return;
     if (GameState.bateria !== undefined && GameState.bateria <= 0) {
       sfx('nao');

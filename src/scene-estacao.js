@@ -3223,7 +3223,7 @@ var EstacaoScene = new Phaser.Class({
     var euD = this;
     dicaDeParado(this, dt, mv, function (m) {
       euD.alerta.setText(m);
-      euD.time.delayedCall(2600, function () { if (euD.alerta) euD.alerta.setText(''); });
+      euD.time.delayedCall(5200, function () { if (euD.alerta) euD.alerta.setText(''); });
     });
     this.olhaAFrente(dt);
     this.rodaEscada(dt, mv);

@@ -26,7 +26,7 @@ var Campanha = {
   CAMPOS: ['charKey', 'genero', 'dia', 'pernaIdx', 'perna', 'origem', 'destino', 'minutos',
     'dinheiro', 'carisma', 'descanso', 'coracoes', 'valeRestante', 'mochila', 'extrato', 'bateria',
     'atrasos', 'ultimoAtraso', 'pernasFeitas', 'estacoes', 'pontosDaCorrida', 'stats', 'lixo',
-    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso'],
+    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso', 'duelosNoDia'],
 
   /* 'Se você morre antes da missão, perde tudo que ganhou': o XP e os
      pontos do momento do checkpoint entram no save, e voltar pro

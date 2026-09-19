@@ -169,18 +169,73 @@ function sentaAnimado(a) {
 /* Duas linhas, nenhuma passando de 22 caracteres: na largura da tela
    isso é o limite antes de a placa quebrar em três e ir parar em cima
    do aviso de solavanco. */
-var VERSOS_RIMADOR = [
-  'LICENÇA, SENHORAS\nE SENHORES',
-  'NÃO É ESMOLA NÃO,\nÉ TRABALHO NA LINHA',
-  null,                                  // aqui entra o verso do personagem
-  'GOSTOU, COLABORA.\nNÃO GOSTOU, DESCULPA'
+/* ---------- o repertório, que agora RIMA ----------
+   'Ele não rima, faz umas frases nada a ver. Tem que rimar sempre
+   diferente, e sobre as pessoas em volta.' Então a rima virou DUPLETO:
+   duas linhas que terminam no mesmo som, e nunca menos que isso. Uma
+   apresentação sorteada, o dupleto de quem está jogando, o dupleto de
+   ALGUÉM QUE ESTÁ NO SEU CARRO (o senhor, a gestante, o guarda, o
+   cosplay, a torcida, o tiozão) e o fecho, também sorteado.
+
+   Cada linha cabe em 22 letras, que é o que a plaquinha aguenta. */
+var ABERTURAS_RIMA = [
+  ['LICENÇA, SENHORAS\nE SENHORES', 'HOJE A LINHA TEM\nDOIS TOCADORES'],
+  ['BOA TARDE, VAGÃO,\nDESCULPA O BARULHO', 'É TRABALHO HONESTO,\nE DISSO EU ME ORGULHO'],
+  ['ATENÇÃO, PASSAGEIRO\nDESSE VAGÃO LOTADO', 'SÃO DOIS MINUTINHOS\nE EU JÁ TENHO ACABADO']
 ];
+var FECHOS_RIMA = [
+  ['GOSTOU, COLABORA,\nÉ SÓ UM TROQUINHO', 'NÃO GOSTOU, TUDO BEM,\nSIGO MEU CAMINHO'],
+  ['O QUE VOCÊ PUDER\nJÁ TÁ DE BOM TAMANHO', 'E QUEM NÃO PUDER,\nEU NEM ESTRANHO'],
+  ['DESCE NA PRÓXIMA,\nVAI COM DEUS, PARCEIRO', 'A RIMA É DE GRAÇA,\nCARO É O DINHEIRO']
+];
+// o dupleto de quem está jogando
 var VERSO_DO_JOGADOR = {
-  estudante: 'O ESTUDANTE PAGA MEIA\nE CARREGA O MUNDO',
-  clt: 'O CLT ACORDA CEDO\nPRA CHEGAR ATRASADO',
-  senhor: 'ESSE AÍ NÃO PAGA:\nJÁ PAGOU A VIDA TODA',
-  ambulante: 'ESSE AÍ É DA ÁREA,\nRESPEITO ENTRE COLEGA'
+  estudante: ['O ESTUDANTE PAGA MEIA\nE TÁ NA LUTA', 'CADERNO NA MOCHILA,\nSONHO NA DISPUTA'],
+  clt: ['O CLT ACORDA ANTES\nDO DESPERTADOR', 'CHEGA ATRASADO\nE AINDA PEDE FAVOR'],
+  senhor: ['ESSE AÍ NÃO PAGA,\nJÁ PAGOU A VIDA INTEIRA', 'SENTA NA PREFERENCIAL,\nQUE É LEI VERDADEIRA'],
+  ambulante: ['ESSE É DA ÁREA,\nVENDE BALA NO VAGÃO', 'RESPEITO ENTRE COLEGA\nÉ QUESTÃO DE PROFISSÃO'],
+  gestante: ['A MOÇA TÁ ESPERANDO,\nE NÃO É O TREM', 'CEDE LOGO O LUGAR,\nQUE ISSO FAZ BEM'],
+  turista: ['O GRINGO TIRA FOTO\nDE CATRACA E DE MURO', 'LEVA SÃO PAULO INTEIRA\nNO CELULAR, EU JURO'],
+  torcedor: ['DE CAMISA DO TIME,\nNEM PRECISA FALAR', 'DOMINGO TEM JOGO\nE ELE VAI ESTAR LÁ'],
+  cadeirante: ['ELE ANDA SENTADO\nE CHEGA PRIMEIRO', 'O ELEVADOR É DELE,\nE ISSO É O CERTO']
 };
+/* o dupleto de quem está no seu carro: o rimador cita quem ele vê */
+var VERSO_DA_GENTE = {
+  idoso: ['TEM UM SENHOR AQUI\nQUE JÁ VIU DEMAIS', 'A LINHA MUDOU TODA,\nELE NEM LIGA MAIS'],
+  gestante: ['TEM UMA MOÇA ESPERANDO,\nOLHA O BANCO AÍ', 'QUEM CEDE UM LUGAR\nTAMBÉM GANHA, EU VI'],
+  guardinha: ['O GUARDA TÁ DE OLHO,\nISSO AQUI NÃO É CRIME', 'É TRABALHO, PARCEIRO,\nE O TRABALHO ME EXIME'],
+  tiozao: ['TEM TIO NO VAGÃO\nMANDANDO ÁUDIO DE DEZ', 'NINGUÉM ESCUTA NADA\nE ELE MANDA OUTRA VEZ'],
+  corintiano: ['TEM CAMISA LISTRADA\nSENTADA NO CANTINHO', 'DOMINGO TEM JOGO\nE A FÉ NÃO ANDA SOZINHO'],
+  palmeirense: ['TEM VERDE NO VAGÃO\nFALANDO DE ITÁLIA', 'CADA UM COM SUA FÉ,\nCADA UM COM SUA FALHA'],
+  saopaulino: ['TEM SOBERANO AQUI\nCONTANDO OS TROFÉU', 'TRÊS MUNDIAIS DEPOIS,\nAINDA OLHA PRO CÉU'],
+  santista: ['TEM PEIXE NO VAGÃO\nDE MOICANO ANTIGO', 'O TEMPO PASSOU\nE ELE SEGUE COMIGO'],
+  pedinte: ['TEM GENTE AQUI DO LADO\nCOM MENOS QUE EU', 'SE SOBRAR UM TROCADO,\nDIVIDE O QUE DEU'],
+  ambulante: ['TEM COLEGA DE OFÍCIO\nCOM A CAIXA NA MÃO', 'DOIS TRABALHADORES\nNO MESMO VAGÃO'],
+  cosLaranja: ['TEM NINJA DE LARANJA\nEM PÉ NA PORTA', 'DESCE NA LIBERDADE,\nO EVENTO O CONFORTA'],
+  cosNuvem: ['TEM CAPA DE NUVEM\nVERMELHA ALI NO CANTO', 'SE FOR VILÃO DE VERDADE,\nEU CANTO E ENCANTO']
+};
+// monta a rima desta vez: abertura, você, quem está do lado e o fecho
+function montaRima(cena) {
+  var v = [], ab = ABERTURAS_RIMA[Math.floor(Math.random() * ABERTURAS_RIMA.length)];
+  var fe = FECHOS_RIMA[Math.floor(Math.random() * FECHOS_RIMA.length)];
+  v.push(ab[0], ab[1]);
+  var meu = VERSO_DO_JOGADOR[GameState.charKey];
+  if (meu) v.push(meu[0], meu[1]);
+  // alguém do seu carro entra na rima
+  var meuCarro = carroDe(cena.pl.sp.y), vistos = [];
+  for (var i = 0; i < cena.gente.length; i++) {
+    var a = cena.gente[i];
+    if (!a || !a.sp || !a.sp.active || carroDe(a.sp.y) !== meuCarro) continue;
+    var id = (a.desafio && a.desafio.tipo) || DEX_POR_SPRITE[a.sp.texture && a.sp.texture.key];
+    if (id && VERSO_DA_GENTE[id] && vistos.indexOf(id) < 0) vistos.push(id);
+  }
+  if (vistos.length) {
+    var q = VERSO_DA_GENTE[vistos[Math.floor(Math.random() * vistos.length)]];
+    v.push(q[0], q[1]);
+  }
+  v.push(fe[0], fe[1]);
+  return v;
+}
 
 /* ---------- batalha de rima ----------
    O rimador já entrava, montava a caixinha e mandava quatro versos. O
@@ -1271,14 +1326,24 @@ var VagaoScene = new Phaser.Class({
       tr.fase = 'aviso'; tr.t = 0;
       tr.dur = Math.max(900, 1500 - GameState.dificuldade() * 80);
       sfx('empurra');
+      // solto em pé: o pêndulo do equilíbrio (abaixo) abre junto com o aviso
+      if (!this.segurando && !this.sentadoEm && !this.noChao && !this.cochilando() && !temPoder('cadeira')) {
+        this.abreEquilibrio(tr.dur);
+      }
       return;
     }
     // o trem tremendo: tremor fraco o tempo todo do aviso
     this.cameras.main.shake(70, 0.0022);
     this.balanca(tr.t / tr.dur);
+    this.atualizaEquilibrio(dt);
+    if (this.equil && this.equil.acabou) { tr.fase = 'off'; tr.t = 0; this.balanca(-1); tr.proximo = Math.max(9000, 14000 + Math.random() * 12000 - GameState.dificuldade() * 800); this.fechaEquilibrio(); return; }
     if (tr.t < tr.dur) return;
     tr.fase = 'off'; tr.t = 0;
     this.balanca(-1);
+    // segurou o pêndulo no verde: fica de pé, mesmo solto
+    var equilibrou = this.equil && this.equil.ok;
+    this.fechaEquilibrio();
+    if (equilibrou) { this.cameras.main.shake(200, 0.005); return; }
     tr.proximo = Math.max(9000, 14000 + Math.random() * 12000 - GameState.dificuldade() * 800);
     this.cameras.main.shake(320, 0.008);
     // de cadeira de rodas, com o freio puxado, o tranco não derruba
@@ -1287,6 +1352,62 @@ var VagaoScene = new Phaser.Class({
       return;
     }
     this.caiNoChao();
+  },
+
+  /* ---------- o pêndulo do equilíbrio ----------
+     'Na hora que a pessoa começa a cair, aparece uma barra de equilíbrio,
+     um negócio meio pendular, e você tem que acertar o momento certo pra
+     manter o equilíbrio.' Então o tranco deixou de ser sorte: solto em pé,
+     abre uma barra com a agulha indo e voltando e uma faixa verde no meio.
+     Tocar no verde é firmar o corpo; tocar fora é cair na hora; não tocar
+     é cair quando o tranco chega, como antes.
+
+     A faixa verde encolhe com a dificuldade do dia, e a agulha vai mais
+     rápido: no fim da semana equilibrar é mais difícil. */
+  abreEquilibrio: function (dur) {
+    var dif = GameState.dificuldade();
+    this.equil = {
+      t: 0, dur: dur, ok: false, acabou: false,
+      vel: 0.0055 + 0.0006 * dif,               // radianos por ms: uma ida e volta a cada ~1,1 s
+      zona: Math.max(0.16, 0.34 - 0.02 * dif)   // metade da faixa verde, de 0 a 1
+    };
+    if (!this.gEquil) {
+      this.gEquil = this.add.graphics().setScrollFactor(0).setDepth(700);
+      this.tEquil = txtC(this, GW / 2, 212, '', PAL.branco, 8).setScrollFactor(0).setDepth(701).setScale(ESCALA_TEXTO / 2);
+    }
+    this.gEquil.setVisible(true); this.tEquil.setVisible(true).setText('EQUILIBRE!');
+  },
+  atualizaEquilibrio: function (dt) {
+    var q = this.equil;
+    if (!q || q.acabou) return;
+    q.t += dt;
+    var p = Math.sin(q.t * q.vel), noVerde = Math.abs(p) < q.zona;
+    // no alto (y 232) e não no pé da tela: embaixo ele sumia atrás do cartão do tutorial
+    var L = 200, x0 = GW / 2 - L / 2, y = 232, g = this.gEquil;
+    g.clear();
+    g.fillStyle(0x05050a, 0.8).fillRoundedRect(x0 - 8, y - 10, L + 16, 30, 8);
+    g.fillStyle(0x3a2a2a, 1).fillRect(x0, y, L, 10);
+    g.fillStyle(0x1faa59, 0.9).fillRect(GW / 2 - q.zona * L / 2, y, q.zona * L, 10);
+    g.fillStyle(0x0f5c33, 1).fillRect(GW / 2 - 1, y, 2, 10);
+    // a agulha do pêndulo
+    var ax = GW / 2 + p * L / 2;
+    g.fillStyle(noVerde ? 0x00e676 : 0xf2f0ff, 1).fillTriangle(ax - 6, y - 8, ax + 6, y - 8, ax, y + 2);
+    g.fillRect(ax - 1, y - 8, 2, 20);
+    if (!Ctrl.actJust) return;
+    q.acabou = true;
+    if (noVerde) {
+      q.ok = true;
+      sfx('ok'); GameState.addCarisma(1);
+      this.flash('EQUILIBROU!');
+    } else {
+      sfx('nao');
+      this.caiNoChao();
+    }
+  },
+  fechaEquilibrio: function () {
+    if (!this.equil) return;
+    this.equil = null;
+    if (this.gEquil) { this.gEquil.clear().setVisible(false); this.tEquil.setVisible(false); }
   },
 
   /* A tentativa de equilíbrio: o corpo gira pelos pés (a origem do
@@ -2064,6 +2185,7 @@ var VagaoScene = new Phaser.Class({
   },
 
   senta: function (b) {
+    this.fechaEquilibrio();
     this.sentadoEm = b;
     b.npc = 'player';
     this.pl.pos(b.x, b.y + 24);
@@ -2231,8 +2353,9 @@ var VagaoScene = new Phaser.Class({
       a.anima(dt, true);
       if (r.t > 1500) {
         r.t = 0; r.verso++;
-        if (r.verso >= VERSOS_RIMADOR.length) { this.fechaRimador(); return; }
-        this.rima.setText(VERSOS_RIMADOR[r.verso] || VERSO_DO_JOGADOR[GameState.charKey]);
+        if (!r.versos) r.versos = montaRima(this);
+        if (r.verso >= r.versos.length) { this.fechaRimador(); return; }
+        this.rima.setText(r.versos[r.verso]);
         sfx('batida');
       }
 
@@ -2346,13 +2469,13 @@ var VagaoScene = new Phaser.Class({
     });
   },
 
-  flash: function (msg) {
+  flash: function (msg, dur) {
     // cena parada no meio de um aviso: o objeto ainda existe, mas o
     // texto dele já foi destruído junto com a cena
     if (!this.centro || !this.scene.isActive()) return;
     this.centro.setText(msg);
     var self = this;
-    this.time.delayedCall(900, function () { if (self.centro) self.centro.setText(''); });
+    this.time.delayedCall(dur || 900, function () { if (self.centro) self.centro.setText(''); });
   },
 
   /* ---------- as situações de cada carro ---------- */
@@ -3726,7 +3849,8 @@ var VagaoScene = new Phaser.Class({
     this.vigiaOfertaDeLugar(dt);       // bem quisto e acabado: alguém te chama pra sentar
     this.regeneraSentado(dt);          // descansar sentado devolve coração
     var euD = this;
-    dicaDeParado(this, dt, this.andandoAgora || !!this.sentadoEm, function (m) { euD.flash(m); });
+    // a dica de explorar fica 5 s na tela: 'é muito rápido o aviso quando tá parado'
+    dicaDeParado(this, dt, this.andandoAgora || !!this.sentadoEm, function (m) { euD.flash(m, 5000); });
     mostraLixoNaMao(this, this.pl);
     ondasDoPregao(this, time);
     vigiaDex(this, time);
@@ -3754,7 +3878,7 @@ var VagaoScene = new Phaser.Class({
 
     // tremendo e solto em pé: é a única coisa que importa agora
     if (this.tranco && this.tranco.fase === 'aviso' && !this.segurando && !this.sentadoEm && !this.noChao) {
-      this.dica.setText('TREMENDO! SEGURE NA BARRA', PAL.vermelho);
+      this.dica.setText(this.equil ? nomeAgir() + ': NO VERDE PRA EQUILIBRAR' : 'TREMENDO! SEGURE NA BARRA', PAL.vermelho);
       this.pintaRota();
       return;
     }

@@ -108,6 +108,70 @@ function salvaCheckpointDeMissao() {
   if (typeof Campanha !== 'undefined' && GameState.derrota && !GameState.derrota()) Campanha.salva('missao');
 }
 
+/* ---------- o cartão de ACHOU ----------
+   'Tem que destacar mais o item que foi pego, mostrar ele girando, com
+   uma musiquinha, senão parece muito vago e você clica sem querer.' Então
+   pegar para o jogo por um instante: a tela escurece, o item aparece
+   grande no meio girando (o giro é a escala horizontal indo e voltando,
+   que é como uma moeda vira em 16 bits), com estrelinhas, o nome, e a
+   RECOMENDAÇÃO do que fazer com ele. Toque (ou 2,6 s) fecha.
+
+   Ele se faz passar por diálogo (ativo, update, fecha) porque é assim que
+   toda cena sabe congelar: `if (this.dialog && this.dialog.ativo)`. */
+function CartaoAchado(cena, chave, titulo, recomenda) {
+  var eu = this;
+  this.cena = cena;
+  this.ativo = true;
+  this.t = 0;
+  cena.dialog = this;
+  var g = cena.add.graphics().setScrollFactor(0).setDepth(3000);
+  g.fillStyle(0x05050a, 0.72).fillRect(0, 0, GW, GH);
+  var cy = GH / 2 - 20;
+  // o clarão atrás, e os raios
+  var gr = cena.add.graphics().setScrollFactor(0).setDepth(3001);
+  this.gr = gr; this.cy = cy;
+  var img = cena.add.image(GW / 2, cy, texturaItem(cena, chave)).setScrollFactor(0).setDepth(3002).setScale(0);
+  var t1 = txtC(cena, GW / 2, cy - 78, titulo || 'ACHOU!', PAL.amarelo, 8).setScrollFactor(0).setDepth(3003);
+  var t2 = txtC(cena, GW / 2, cy + 50, nomeDaCoisa(chave), PAL.branco, 16).setScrollFactor(0).setDepth(3003);
+  var t3 = txtC(cena, GW / 2, cy + 96, recomenda || '', PAL.verde, 8).setScrollFactor(0).setDepth(3003)
+    .setScale(ESCALA_TEXTO / 2).setMaxWidth((GW - 40) / (ESCALA_TEXTO / 2));
+  var t4 = txtC(cena, GW / 2, GH - 96, nomeAgir() + ' PRA SEGUIR', PAL.cinza, 8).setScrollFactor(0).setDepth(3003)
+    .setScale(ESCALA_TEXTO / 2);
+  this.coisas = [g, gr, img, t1, t2, t3, t4];
+  this.img = img;
+  // entra crescendo e já girando
+  cena.tweens.add({ targets: img, scale: 5, duration: 260, ease: 'Back.easeOut' });
+  cena.tweens.add({ targets: img, scaleX: { from: 5, to: -5 }, duration: 520, yoyo: true, repeat: 2, delay: 260, ease: 'Sine.easeInOut' });
+  tocaJingle('achou');
+  sfx('moeda');
+}
+CartaoAchado.prototype.update = function (dt) {
+  this.t += dt;
+  // o clarão girando atrás do item
+  var g = this.gr, a = this.t / 600, r = 46 + Math.sin(this.t / 220) * 4;
+  g.clear();
+  g.fillStyle(0xf2c14e, 0.1).fillCircle(GW / 2, this.cy, r + 14);
+  g.fillStyle(0xf2c14e, 0.16).fillCircle(GW / 2, this.cy, r);
+  for (var i = 0; i < 8; i++) {
+    var ang = a + i * Math.PI / 4, d1 = r + 8, d2 = r + 22;
+    g.lineStyle(2, 0xfff0a8, 0.5).lineBetween(
+      GW / 2 + Math.cos(ang) * d1, this.cy + Math.sin(ang) * d1,
+      GW / 2 + Math.cos(ang) * d2, this.cy + Math.sin(ang) * d2);
+  }
+  if (this.t > 2600 || (this.t > 500 && Ctrl.actJust)) this.fecha();
+};
+CartaoAchado.prototype.fecha = function () {
+  if (!this.ativo) return;
+  this.ativo = false;
+  for (var i = 0; i < this.coisas.length; i++) this.coisas[i].destroy();
+  if (this.cena.dialog === this) this.cena.dialog = null;
+  sfx('catraca');
+};
+function mostraAchado(cena, chave, titulo, recomenda) {
+  if (!cena || !cena.add || cena.dialog) return;
+  new CartaoAchado(cena, chave, titulo, recomenda);
+}
+
 /* Guardar o que achou. Bolso cheio: pergunta o que largar, ou deixa o
    achado onde está (ele continua lá, dá pra voltar). `aoGuardar` roda só
    se guardou. */
@@ -118,8 +182,10 @@ function guardaAchado(cena, id, aoGuardar) {
     cena.time.delayedCall(1700, function () { if (cena.dialog) cena.dialog.fecha(); });
   };
   if (cabeNaMochila(id)) {
-    poeGuardado(id); sfx('moeda');
-    fechaSo('ACHOU: ' + g.nome + '!\nGuardou no ' + BOLSOS[b].nome.toLowerCase() + '.');
+    poeGuardado(id);
+    // o cartão: o item girando, o nome, e o que fazer com ele
+    mostraAchado(cena, id, 'ACHOU!', g.entrega ? 'LEVE AO ACHADOS E PERDIDOS DE UMA ESTAÇÃO'
+      : 'GUARDADO NO ' + BOLSOS[b].nome + '. PODE SERVIR MAIS PRA FRENTE.');
     if (aoGuardar) aoGuardar();
     return;
   }
