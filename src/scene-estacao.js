@@ -1088,15 +1088,15 @@ var EstacaoScene = new Phaser.Class({
         this.marcaSentido(g, cx, 186, t.sentido === 'sai' ? 'desce' : 'x');
       }
       if (t.larga) {
-        // o símbolo PCD no chão, na frente dela: quadrado azul e a cadeira em branco
+        // o símbolo PCD no chão, na frente dela, no tom da estação (a cor da linha) e a cadeira em branco
         var pcx = Math.round((t.x0 + t.x1) / 2);
-        g.fillStyle(0x1c5ab4, 1).fillRect(pcx - 6, 256, 13, 13);
+        g.fillStyle(GameState.linhaAtual().num, 1).fillRect(pcx - 6, 256, 13, 13);
         g.fillStyle(0xf0eeff, 1).fillRect(pcx - 1, 258, 2, 2).fillRect(pcx - 1, 261, 2, 4).fillRect(pcx - 1, 264, 4, 1)
           .fillRect(pcx + 3, 264, 1, 3);
         g.lineStyle(1, 0xf0eeff, 1).strokeCircle(pcx - 1, 265, 3);
-        // faixa azul no chão marcando a porta larga
-        g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
-        g.fillStyle(0x3a7fd0, 0.6).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
+        // a faixa no chão marcando a porta larga, também na cor da linha
+        g.fillStyle(GameState.linhaAtual().num, 0.5).fillRect(t.x0, 240, w, 5);
+        g.fillStyle(0xf0eeff, 0.5).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
       }
       if (this.liberado) {
         // pago: o chão do vão acende de leve; o braço continua lá, pra girar
@@ -1984,9 +1984,10 @@ var EstacaoScene = new Phaser.Class({
       g.fillStyle(num(PAL.paredeLuz), 1).fillRect(e.x, e.y, e.w, 2);
       // a placa na cor da linha no alto, com a cadeira de rodas e o indicador de andar
       g.fillStyle(l.num, 1).fillRect(e.x + 2, e.y + 2, e.w - 4, 11);
-      g.fillStyle(0xf0eeff, 1).fillRect(e.x + 4, e.y + 3, 8, 8);
-      g.fillStyle(0x1c5ab4, 1).fillRect(e.x + 5, e.y + 4, 6, 6);
-      g.fillStyle(0xf0eeff, 1).fillRect(e.x + 7, e.y + 5, 1, 1).fillRect(e.x + 7, e.y + 7, 1, 2).fillRect(e.x + 7, e.y + 8, 3, 1);
+      // o símbolo PCD no tom da estação: a cadeira em branco direto na placa da cor da linha
+      g.fillStyle(0xf0eeff, 1).fillRect(e.x + 6, e.y + 4, 2, 2).fillRect(e.x + 6, e.y + 6, 2, 3).fillRect(e.x + 6, e.y + 8, 4, 1)
+        .fillRect(e.x + 9, e.y + 8, 1, 3);
+      g.lineStyle(1, 0xf0eeff, 1).strokeCircle(e.x + 6, e.y + 9, 2);
       g.fillStyle(0xf0eeff, 1).fillRect(e.x + 15, e.y + 5, 22, 2).fillRect(e.x + 15, e.y + 8, 14, 2);
       g.fillStyle(0x14141c, 1).fillRect(e.x + e.w - 14, e.y + 4, 10, 7);
       g.fillStyle(0xf2c14e, 1).fillTriangle(e.x + e.w - 12, e.y + 10, e.x + e.w - 6, e.y + 10, e.x + e.w - 9, e.y + 5);
@@ -2003,7 +2004,7 @@ var EstacaoScene = new Phaser.Class({
       // a plaquinha azul de acessibilidade na folha da esquerda, na altura do olho
       var fx = e.x + 5 + Math.max(2, (pw / 2 - ab) / 2 - 6);
       if (pw / 2 - ab > 12) {
-        g.fillStyle(0x1c5ab4, 1).fillRect(fx, py + 12, 12, 9);
+        g.fillStyle(l.num, 1).fillRect(fx, py + 12, 12, 9);
         g.fillStyle(0xf0eeff, 1).fillRect(fx + 2, py + 14, 2, 2).fillRect(fx + 7, py + 14, 2, 4);
       }
     }
