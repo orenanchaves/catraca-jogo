@@ -186,9 +186,40 @@ function bannerObjetivo(texto) {
   g.fillStyle(0xf2c14e, 1).fillRect(0, GH / 2 - 44, GW, 2).fillRect(0, GH / 2 - 44 + alt - 2, GW, 2);
   c.add([g, t1, t2]);
   c.setAlpha(0);
+  guardaBanner(c);
   hud.tweens.add({ targets: c, alpha: 1, duration: 220, hold: 3000, yoyo: true,
     onComplete: function () { c.destroy(); } });
   sfx('ok');
+}
+
+/* A faixa de chegada: grande, no meio, verde quando deu tempo e vermelha
+   quando não deu. É o aviso de que a perna acabou. */
+function bannerChegada(titulo, sub, ruim) {
+  var hud = (window.jogo && jogo.scene) ? jogo.scene.getScene('Hud') : null;
+  if (!hud || !hud.sys || !hud.sys.isActive()) return;
+  var c = hud.add.container(0, 0).setDepth(4900), g = hud.add.graphics();
+  var cor = ruim ? 0xe8362c : 0x00e676, y0 = GH / 2 - 56;
+  /* O título é medido ANTES de o resto ser posto: 'CHEGOU: O ESTÁGIO' em
+     corpo 16 quebra em duas linhas, e com o sub em y fixo as duas
+     encavalavam. */
+  var t1 = txtC(hud, GW / 2, y0 + 16, titulo, ruim ? PAL.vermelho : PAL.verde, 16).setMaxWidth(GW - 24);
+  var t2 = txtC(hud, GW / 2, y0 + 24 + Math.round(t1.height), sub, PAL.branco, 8)
+    .setScale(ESCALA_TEXTO / 2).setMaxWidth((GW - 40) / (ESCALA_TEXTO / 2));
+  var alt = 40 + Math.round(t1.height) + Math.round(t2.height);
+  g.fillStyle(0x05050a, 0.9).fillRect(0, y0, GW, alt);
+  g.fillStyle(cor, 1).fillRect(0, y0, GW, 3).fillRect(0, y0 + alt - 3, GW, 3);
+  c.add([g, t1, t2]);
+  c.setAlpha(0);
+  guardaBanner(c);
+  hud.tweens.add({ targets: c, alpha: 1, duration: 200, hold: 2200, yoyo: true, onComplete: function () { c.destroy(); } });
+}
+
+/* Uma faixa grande por vez: a de chegada em cima da de objetivo virava
+   duas frases uma por cima da outra. */
+var BANNER_ATIVO = null;
+function guardaBanner(c) {
+  if (BANNER_ATIVO && BANNER_ATIVO.scene) BANNER_ATIVO.destroy();
+  BANNER_ATIVO = c;
 }
 
 function avisaMissao(titulo, texto) {

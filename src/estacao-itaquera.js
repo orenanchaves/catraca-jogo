@@ -210,7 +210,7 @@ EstacaoScene.prototype.contextoTomada = function () {
   var t = this.tomadaPerto();
   if (!t || GameState.bateria >= 99.5) return false;
   this.dica.setText(nomeAgir() + ': CARREGAR (' + Math.floor(GameState.bateria) + '%)', PAL.amarelo);
-  if (Ctrl.actJust) { this.carregando = t; sfx('ok'); }
+  if (Ctrl.actJust) { this.carregando = t; sfx('ok'); Missoes.conta('carregou'); }
   return true;
 };
 EstacaoScene.prototype.atualizaCarga = function (dt, andou) {
@@ -853,6 +853,8 @@ EstacaoScene.prototype.atualizaMezanino = function (dt) {
   if (naPorta && !this.naSaida && !this.dialog) {
     this.naSaida = true;
     var eu = this;
+    // chegando no destino, a porta é a chegada; senão, sair é faltar
+    if (this.chegando) { this.chegaPelaRua(); return; }
     fala(this, 'Sair da estação?\n\nSaindo agora, você falta hoje\n(-15 de carisma).', [
       { label: 'Sair e faltar hoje', cb: function () { eu.faltaHoje(); } },
       { label: 'Voltar pra estação', cb: function () { eu.pl.sp.y = 500; eu.pl.dir = 'up'; } }
@@ -1014,6 +1016,8 @@ EstacaoScene.prototype.saiPor = function (s) {
     eu.time.delayedCall(2600, function () { if (eu.alerta === al) al.setText(''); });
   };
   var porta = SAIDAS_ITQ[s];
+  // chegando de trem no destino: qualquer saída da Itaquera é a chegada
+  if (this.chegando) { this.chegaPelaRua(); return; }
   if (!this.praCasa) {
     /* 'Tenho que conseguir sair da estação quando quiser.' Na ida, sair
        é desistir do dia: pergunta antes, e quem confirma falta hoje. */
@@ -1043,6 +1047,34 @@ EstacaoScene.prototype.faltaHoje = function () {
   GameState.faltaODia();
   sfx('porta');
   this.scene.start('Estacao', { onde: 'saguao' });           // o dia seguinte, saindo de casa
+};
+
+/* ---------- chegou ----------
+   A perna fecha aqui, na porta da rua, e não mais no instante em que o
+   trem parou: 'senão fica muito vago, não parece que você avançou'. E o
+   aviso é grande ('pô, você chegou no estágio a tempo'): uma faixa no
+   meio da tela com o lugar e se deu tempo. */
+EstacaoScene.prototype.chegaPelaRua = function () {
+  if (this.fim || this.chegou) return;
+  this.chegou = true;
+  this.chegando = false;          // a dica de sair para de pedir o que já foi feito
+  var perna = GameState.pernaAtual(), rot = perna ? perna.rotulo : placaDe(GameState.destino);
+  var atrasado = GameState.minutosNaPerna() > LIMITE_ATRASO && GameState.perna === 'ida';
+  GameState.chegouNoDestino();
+  var morte = GameState.derrota();
+  if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); vaiPraOFim(this); return; }
+  sfx(atrasado ? 'erro' : 'vitoria');
+  if (!atrasado) tocaJingle('achou');
+  bannerChegada('CHEGOU: ' + rot, atrasado ? 'ATRASADO. O RELÓGIO NÃO PERDOA.' : 'NO HORÁRIO. ' + GameState.hora() + '.', atrasado);
+  var eu = this;
+  // quem mandou a missão te recebe aqui mesmo, na porta (src/chefao-fiscal.js)
+  if (GameState.recepcao) {
+    this.recebeNaSaida(GameState.recepcao);
+    GameState.recepcao = null;
+    this.time.delayedCall(5200, function () { eu.scene.start('Estacao', { onde: 'saguao' }); });
+    return;
+  }
+  this.time.delayedCall(2200, function () { eu.scene.start('Estacao', { onde: 'saguao' }); });
 };
 
 EstacaoScene.prototype.chegouEmCasa = function () {

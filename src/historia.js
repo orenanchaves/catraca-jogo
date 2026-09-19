@@ -30,7 +30,7 @@
    estudante é o dos dias 1 a 5 (CAMPANHA.md). */
 var HIST_DIAS = {
   estudante: {
-    1: ['est_d1_estagio'],
+    1: ['est_d1_estagio', 'est_d1_bateria'],
     2: ['est_d2_reuniao', 'est_d2_mae'],
     3: ['est_d3_cracha', 'est_d3_bia'],
     4: ['est_d4_cafe', 'est_d4_ralls'],
@@ -85,6 +85,34 @@ var HISTORIA = {
         fim: true
       },
       faltou: { fala: 'Você não apareceu no primeiro dia. Amanhã não falha, tá?', fim: true }
+    }
+  },
+
+  /* A Bia lembrando do celular: é o tutorial da tomada dito por gente, e
+     não por cartão de tutorial ('a namorada recomenda: não esquece de
+     carregar o celular, hein'). */
+  est_d1_bateria: {
+    tipo: 'secundaria', contato: 'BIA ❤',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Amor, não esquece de carregar esse celular, hein? Tem tomada na parede do mezanino: encosta nela e fica parad{o|a} que ele carrega.',
+        escolhas: [
+          { texto: 'Vou carregar agora', vai: 'vai' },
+          { texto: 'Tá cheio, relaxa', vai: 'nao' }
+        ]
+      },
+      vai: {
+        fala: 'Isso. Sem bateria você não vê nem a minha mensagem.',
+        missao: {
+          objetivo: { ev: 'carregou' },
+          recompensa: { xp: 15, carisma: 5 },
+          concluida: [{ vai: 'obrigada' }]
+        },
+        fim: true
+      },
+      obrigada: { fala: 'Pronto! Agora você não some no meio do dia.', fim: true },
+      nao: { fala: 'Tá bom... depois não vem reclamar que descarregou.', fim: true }
     }
   },
 
@@ -423,7 +451,8 @@ var Historia = {
     if (!m) return '';
     var p = (m.passos || [m.objetivo])[0], onde = p.estacao ? placaDe(p.estacao) : '';
     var t = '';
-    if (p.ev === 'chegou') t = 'VÁ ATÉ ' + onde;
+    if (p.ev === 'carregou') t = 'CARREGUE O CELULAR NA TOMADA DO MEZANINO';
+    else if (p.ev === 'chegou') t = 'VÁ ATÉ ' + onde;
     else if (p.ev === 'desceu') t = 'DESÇA EM ' + onde;
     else if (p.ev === 'baldeacao') t = 'PASSE PELA BALDEAÇÃO DA SÉ';
     else t = 'SIGA O QUE PEDIRAM';

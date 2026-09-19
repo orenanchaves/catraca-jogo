@@ -338,6 +338,8 @@ var EstacaoScene = new Phaser.Class({
     this.treino = (dados && dados.treino) || null;
     // desceu na Itaquera na volta: o dia só acaba na saída de casa (estacao-itaquera.js)
     this.praCasa = !!(dados && dados.praCasa);
+    // desceu no destino: agora é atravessar a estação e sair pela rua
+    this.chegando = !!(dados && dados.chegando);
   },
 
   create: function () {
@@ -532,6 +534,10 @@ var EstacaoScene = new Phaser.Class({
     this.montaVulto();
     this.montaChefao();
     this.montaSenhorzinho();          // as compras do senhorzinho (src/achados.js)
+    if (this.chegando) {
+      var rot = GameState.pernaAtual() ? GameState.pernaAtual().rotulo : '';
+      bannerObjetivo('SAIA PELA RUA: ' + (rot || placaDe(GameState.destino)));
+    }
 
     /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
        baldeação ou desceu na estação errada já está lá em cima. */
@@ -3264,6 +3270,11 @@ var EstacaoScene = new Phaser.Class({
     if (this.contextoTomada()) return;
     if (this.contextoElevador()) return;
     if (this.contextoSenhorzinho()) return;
+    if (this.chegando && y > ESC_BOCA) {
+      var rotC = GameState.pernaAtual() ? GameState.pernaAtual().rotulo : '';
+      this.dica.setText('SAIA PELA RUA ▼  ' + rotC, PAL.verde);
+      return;
+    }
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {

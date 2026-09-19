@@ -3696,12 +3696,12 @@ var VagaoScene = new Phaser.Class({
       this.scene.start('Estacao', { onde: 'plataforma', praCasa: true });
       return;
     }
-    var atrasado = GameState.minutosNaPerna() > LIMITE_ATRASO && GameState.perna === 'ida';
-    GameState.chegouNoDestino();
-    var morte = GameState.derrota();
-    if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
-    sfx(atrasado ? 'erro' : 'vitoria');
-    this.scene.start('Estacao', { onde: 'saguao' });            // nova perna: entra no sistema de novo
+    /* 'Tem que descer, sair da estação e entrar na portinha que
+       representa que você chegou.' Descer do trem não é mais chegar:
+       chegar é atravessar a estação e sair pela rua. A perna só fecha na
+       porta (chegaPelaRua, no scene-estacao.js). */
+    sfx('ok');
+    this.scene.start('Estacao', { onde: 'plataforma', chegando: true });
   },
 
   fimDeJogo: function () {
