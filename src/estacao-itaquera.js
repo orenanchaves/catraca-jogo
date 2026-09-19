@@ -228,19 +228,35 @@ EstacaoScene.prototype.montaItaquera = function () {
     v.dir = 'right'; v.anima(0, false); v.sp.setDepth(25);
   }
 
-  // as placas: vermelhas, penduradas, como nas fotos
-  placaSaida(this, 280, platY(300), placaDe('ITAQUERA'), 45);
-  placaSaida(this, 280, platY(700), 'SAÍDA ▼', 45);
-  placaSaida(this, ITQ_MEIO_X, ITQ.passY0 + 40, '▲ CATRACAS', 45);
-  placaSaida(this, ITQ.bracoX0 + 120, ITQ.cruzY0 - 24, SAIDAS_ITQ.A.seta + ' A  SHOPPING', 45);
-  placaSaida(this, ITQ.bracoX1 - 120, ITQ.cruzY0 - 24, 'C/D  ARENA ' + SAIDAS_ITQ.C.seta, 45);
-  placaSaida(this, ITQ_MEIO_X, ITQ.passY1 - 90, '▼ B  CPTM E ÔNIBUS', 45);
+  // as placas: finas, vermelhas, penduradas, como nas fotos
+  placaItq(this, 280, platY(300), placaDe('ITAQUERA'));
+  placaItq(this, 280, platY(700), 'SAÍDA ▼');
+  placaItq(this, ITQ_MEIO_X, ITQ.passY0 + 40, '▲ CATRACAS');
+  placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 + 14, '◄ A  SHOPPING');
+  placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 + 14, 'C/D  RADIAL E ARENA ►');
+  placaItq(this, ITQ_MEIO_X, ITQ.passY1 - 90, '▼ B  CPTM E TERMINAL');
 
   // as portas de plataforma: redesenhadas a cada quadro, porque abrem junto com o trem
   this.gPSD = this.add.graphics().setDepth(21);
   this.passantes = [];
   this.tPassante = 0;
 };
+
+/* ---------- a placa do metrô, fina ----------
+   A placaSaida do resto do jogo é chapa grossa, de letra de 12px: na
+   passarela de 88px ela tampava o corredor inteiro ('muito grosseiras',
+   foi o veredito). A da Itaquera é a das fotos: chapa vermelha baixa, com
+   friso branco em cima e letra de 6px (escala 1, a menor nítida). */
+function placaItq(cena, x, y, texto) {
+  var t = txtC(cena, x, y + 3, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(46);
+  var w = Math.round(t.width) + 12, h = 13;
+  var g = cena.add.graphics().setDepth(45);
+  g.fillStyle(0x000000, 0.35).fillRect(x - w / 2 + 2, y + 2, w, h);        // a sombra no chão
+  g.fillStyle(0x8e1c16, 1).fillRect(x - w / 2, y - 1, w, h + 1);
+  g.fillStyle(0xd9332a, 1).fillRect(x - w / 2 + 1, y, w - 2, h - 1);
+  g.fillStyle(0xffffff, 0.85).fillRect(x - w / 2 + 3, y + 1, w - 6, 1);    // o friso
+  return t;
+}
 
 /* Onde você aparece e como a câmera anda. A câmera segue o y de sempre
    e o x fica por conta da Itaquera: parado em 0 no mezanino (que tem os
