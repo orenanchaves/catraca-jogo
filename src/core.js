@@ -863,6 +863,30 @@ var GameState = {
   /* Chegou onde tinha que chegar. A perna que acabou vira a origem da
      próxima, o compromisso é dado por cumprido, e a caixa do ZipZap é
      nova: cada trecho traz a sua própria confusão. */
+  /* Sair da estação na ida e não ir: o dia acaba ali. Custa carisma
+     (o chefe, a faculdade, quem esperava), mas você passa o resto do dia
+     em casa, e acorda descansado no dia seguinte. */
+  faltaODia: function () {
+    this.faltas = (this.faltas || 0) + 1;
+    this.addCarisma(-15);
+    this.dentroDoSistema = false; this.folgaPerna = 0; this.pulouCatraca = false;
+    this.coracoes = CORACOES_POR_PERNA;
+    this.descanso = this.char.descansoMax;
+    this.compromisso = null;
+    this.pernaIdx = 0;
+    this.dia++;
+    this.valeRestante = this.char.valeTransporte;
+    this.origem = CASA;
+    this.destino = this.destinoDaRotina();
+    this.perna = this.ultimaPerna() ? 'volta' : 'ida';
+    this.minutos = (this.pernaAtual().saida + Math.floor(Math.random() * 21) - 10 + 1440) % 1440;
+    this.bateria = 100;
+    this.zap = montaZap(this.charKey);
+    this.poeNoTrajeto(this.origem);
+    this.minutoSaida = this.minutos;
+    this.faixaAnterior = this.faixa().key;
+  },
+
   chegouNoDestino: function () {
     // guardado antes de o fôlego novo zerar a conta: é a missão dos 5 corações
     var coracoesAoChegar = this.coracoes;

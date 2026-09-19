@@ -834,10 +834,12 @@ EstacaoScene.prototype.saiPor = function (s) {
   };
   var porta = SAIDAS_ITQ[s];
   if (!this.praCasa) {
-    // na ida não se volta pra rua: o dia é pro outro lado
-    sfx('nao');
-    al.setText('O TRABALHO É PRO\nOUTRO LADO ▲');
-    devolve(porta.x, porta.y);
+    /* 'Tenho que conseguir sair da estação quando quiser.' Na ida, sair
+       é desistir do dia: pergunta antes, e quem confirma falta hoje. */
+    fala(this, 'Sair da estação?\n\nSaindo agora, você falta hoje\n(-15 de carisma).', [
+      { label: 'Sair e faltar hoje', cb: function () { eu.faltaHoje(); } },
+      { label: 'Voltar pra estação', cb: function () { devolve(porta.x, porta.y); } }
+    ]);
     return;
   }
   var casa = saidaDeCasa();
@@ -852,6 +854,14 @@ EstacaoScene.prototype.saiPor = function (s) {
     return;
   }
   this.chegouEmCasa();
+};
+
+EstacaoScene.prototype.faltaHoje = function () {
+  if (this.fim) return;
+  this.fim = true;
+  GameState.faltaODia();
+  sfx('porta');
+  this.scene.start('Estacao', { onde: 'saguao' });           // o dia seguinte, saindo de casa
 };
 
 EstacaoScene.prototype.chegouEmCasa = function () {
