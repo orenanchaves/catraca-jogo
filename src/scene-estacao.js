@@ -49,6 +49,24 @@ var ESC_Y = PLAT_Y + PLAT_ALT;                // onde a escada começa
 var ESC_X0 = 112, ESC_X1 = 208;
 var ESC_DIV = 8;                                  // a balaustrada do meio
 var ESC_MEIO = (ESC_X0 + ESC_X1) / 2;
+/* ---------- a escada ROLA ----------
+   Ela era desenho: degrau parado, e subir era andar. Agora os degraus
+   andam (36px/s, a 128 BPM da trilha dá um degrau por colcheia e meia) e
+   levam quem está em cima, e cada escada tem as duas faixas do metrô:
+   parado à DIREITA, andando pela ESQUERDA. A esquerda livre é regra de
+   São Paulo, e aqui ela vale: parar nela atrapalha quem vem subindo.
+   Cada pista tem 44px, duas faixas de 22: um boneco em cada, ombro com
+   ombro, como na escada de verdade. */
+var ESC_VEL = 36;
+var ESC_BOCA = 116;     // onde o degrau some no piso do saguão
+function pistaDaEscada(x) {
+  for (var i = 0; i < ESC_PISTA.length; i++) {
+    if (x >= ESC_PISTA[i].x0 && x <= ESC_PISTA[i].x1) return ESC_PISTA[i];
+  }
+  return null;
+}
+function faixaDaEscada(p, esquerda) { return esquerda ? p.x0 + 11 : p.x1 - 11; }
+
 var ESC_PISTA = [
   { x0: ESC_X0, x1: ESC_MEIO - ESC_DIV / 2, sobe: true },
   { x0: ESC_MEIO + ESC_DIV / 2, x1: ESC_X1, sobe: false }
@@ -552,6 +570,7 @@ var EstacaoScene = new Phaser.Class({
     this.add.image(0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
+    this.montaDegraus();
 
     /* Os letreiros são texto, e texto não entra em textura: eles ficam
        no mundo, cada um na parede a que pertence. */
@@ -660,7 +679,8 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(0x000000, 0.3).fillRect(ESC_X1 + 10, 103, GW - ESC_X1 - 10, 2);
     eu.bocaDaEscada(g, HUD_H, 116);
 
-    eu.piso(g, 0, 116, GW, 92, 0x4a4a60, 0x565670);
+    // o piso de dentro vai até a linha das catracas (240): no vão entre os gabinetes se vê ladrilho, não buraco
+    eu.piso(g, 0, 116, GW, 124, 0x4a4a60, 0x565670);
     eu.piso(g, 0, 240, GW, 280, 0x3f3f52, 0x494960);
     eu.azulejo(g, 0, 520, GW, 56);
 
@@ -753,6 +773,72 @@ var EstacaoScene = new Phaser.Class({
       g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 6, alt);
       g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx, y0, 2, alt);
     }
+  },
+
+  /* Os degraus que andam: um ladrilho de um degrau (44x10) repetido
+     numa TileSprite por pista, e o que anda é só o deslocamento dele —
+     nenhum desenho novo por quadro. Por cima, o que não anda: a seta, a
+     faixa verde da esquerda livre e o pente onde o degrau some. */
+  montaDegraus: function () {
+    if (!this.textures.exists('esc_degrau')) {
+      var t = this.add.graphics();
+      t.fillStyle(0x3d4152, 1).fillRect(0, 0, 44, 7);
+      t.fillStyle(0x4a4f63, 1).fillRect(0, 0, 44, 2);
+      t.fillStyle(0x16181f, 1).fillRect(0, 7, 44, 3);
+      t.generateTexture('esc_degrau', 44, 10);
+      t.destroy();
+    }
+    this.degraus = [];
+    var alt = ESC_BOCA - 8 - ESC_Y, i;
+    for (i = 0; i < ESC_PISTA.length; i++) {
+      var p = ESC_PISTA[i];
+      this.degraus.push(this.add.tileSprite(p.x0, ESC_Y, p.x1 - p.x0, alt, 'esc_degrau')
+        .setOrigin(0, 0).setDepth(1));
+    }
+    var g = this.add.graphics().setDepth(1.5);
+    for (i = 0; i < ESC_PISTA.length; i++) {
+      var q = ESC_PISTA[i], meio = (q.x0 + q.x1) / 2;
+      var cx = (q.x0 + q.x1) / 2;
+      g.fillStyle(q.sobe ? 0x00e676 : 0xe8a33c, 0.32);
+      for (var sy = ESC_Y + 22; sy < ESC_BOCA - 30; sy += 44) {
+        if (q.sobe) g.fillTriangle(cx, sy, cx - 11, sy + 13, cx + 11, sy + 13);
+        else g.fillTriangle(cx, sy + 13, cx - 11, sy, cx + 11, sy);
+      }
+    }
+    this.gPente = g;
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_X0 - 10, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 8);
+    g.fillStyle(num(PAL.amareloSom), 1).fillRect(ESC_X0 - 10, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 3);
+    g.fillStyle(num(PAL.metal), 1);
+    for (var px = ESC_X0 - 8; px < ESC_X1 + 8; px += 4) g.fillRect(px, ESC_BOCA - 5, 2, 5);
+    this.tEsquerda = 0;
+  },
+
+  /* A escada anda, e leva quem está nela. Parado na faixa da esquerda,
+     você atrapalha: 1,2s parado ali e alguém pede licença, e cada vez
+     custa carisma. */
+  rodaEscada: function (dt, andou) {
+    var i, passo = ESC_VEL * dt / 1000;
+    for (i = 0; i < this.degraus.length; i++) {
+      this.degraus[i].tilePositionY += ESC_PISTA[i].sobe ? passo : -passo;
+    }
+    var sp = this.pl.sp;
+    if (this.pulo || sp.y < ESC_Y - 4 || sp.y > ESC_BOCA) { this.tEsquerda = 0; return; }
+    var p = pistaDaEscada(sp.x);
+    if (!p) { this.tEsquerda = 0; return; }
+    var ny = sp.y + (p.sobe ? -passo : passo);
+    if (this.podeIr(sp.x, ny)) sp.y = ny;
+    var naEsquerda = sp.x < (p.x0 + p.x1) / 2;
+    if (naEsquerda && !andou) {
+      this.tEsquerda += dt;
+      if (this.tEsquerda > 1200) {
+        this.tEsquerda = -1800;       // a próxima bronca vem 3s depois
+        GameState.addCarisma(-2);
+        sfx('nao');
+        var al = this.alerta;
+        al.setText('"LICENÇA! A ESQUERDA\nÉ PRA QUEM ANDA."');
+        this.time.delayedCall(1800, function () { if (al) al.setText(''); });
+      }
+    } else if (this.tEsquerda > 0) this.tEsquerda = 0;
   },
 
   bocaDaEscada: function (g, y0, y1) {
@@ -1100,42 +1186,110 @@ var EstacaoScene = new Phaser.Class({
 
      Elas param na frente da catraca antes de passar. Sem essa parada o
      bloqueio não parece bloqueio: parece um risco no chão. */
+  /* ---------- duas filas: a da catraca e a da escada ----------
+     Era cada um indo sozinho até a frente de uma catraca e, passando,
+     sumindo no meio do saguão (y 150), antes da escada. E quem escolhia
+     a mesma porta se embolava no mesmo ponto e travava ali.
+
+     Agora é o que se vê numa estação: fila em cada catraca, um passa
+     por vez (0,8s entre um e outro), e depois da catraca outra fila,
+     curta, na boca da escada rolante. Na escada entra um por vez em
+     cada faixa, com um degrau e meio de folga do da frente, e sobe
+     parado na direita ou andando na esquerda. Some lá em cima, na
+     plataforma. */
   andaSaguao: function (dt) {
-    for (var i = this.plateia.length - 1; i >= 0; i--) {
+    var i, g;
+    for (g = 0; g < this.gates.length; g++) {
+      var gt = this.gates[g];
+      if (!gt.fila) gt.fila = [];
+      if (gt.espera > 0) gt.espera -= dt;
+      for (i = gt.fila.length - 1; i >= 0; i--) if (!gt.fila[i].sp || !gt.fila[i].sp.active) gt.fila.splice(i, 1);
+    }
+    if (!this.filaEsc) this.filaEsc = [[], []];
+    if (!this.ultimoNaEscada) this.ultimoNaEscada = [null, null];
+    for (var f = 0; f < 2; f++) {
+      for (i = this.filaEsc[f].length - 1; i >= 0; i--) if (!this.filaEsc[f][i].sp || !this.filaEsc[f][i].sp.active) this.filaEsc[f].splice(i, 1);
+    }
+    var sobe = ESC_PISTA[0];
+
+    for (i = this.plateia.length - 1; i >= 0; i--) {
       var a = this.plateia[i];
       if (!a.sp || !a.sp.active) { this.plateia.splice(i, 1); continue; }
 
       if (!a.indo) {
-        // escolhe uma porta aberta e vai
-        var abertas = [];
-        for (var g = 0; g < this.gates.length; g++) {
-          if (!this.gates[g].fechada) abertas.push(this.gates[g]);
+        // a porta aberta de fila mais curta
+        var melhor = null;
+        for (g = 0; g < this.gates.length; g++) {
+          var cand = this.gates[g];
+          if (cand.fechada) continue;
+          if (!melhor || cand.fila.length < melhor.fila.length) melhor = cand;
         }
-        if (!abertas.length) { a.anima(dt, false); continue; }
-        var t = abertas[Math.floor(Math.random() * abertas.length)];
-        a.indo = { x: (t.x0 + t.x1) / 2, y: 262, fase: 'fila' };
+        if (!melhor) { a.anima(dt, false); continue; }
+        melhor.fila.push(a);
+        a.indo = { fase: 'fila', gate: melhor };
       }
 
-      var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
-      var d = Math.sqrt(dx * dx + dy * dy);
-      if (d < 4) {
-        if (a.indo.fase === 'fila') {
-          // passou a catraca: o giro do braço e o caminho pra escada
-          a.indo = { x: a.indo.x, y: 150, fase: 'passou' };
-        } else {
+      var alvoX, alvoY, vel = 46, ind = a.indo;
+      if (ind.fase === 'fila') {
+        var k = ind.gate.fila.indexOf(a);
+        alvoX = (ind.gate.x0 + ind.gate.x1) / 2;
+        alvoY = 262 + k * 24;
+        var dFila = Math.hypot(alvoX - a.sp.x, alvoY - a.sp.y);
+        if (k === 0 && dFila < 8 && !(ind.gate.espera > 0)) {
+          ind.gate.fila.shift();
+          ind.gate.espera = 800;
+          a.indo = ind = { fase: 'passou', x: alvoX };
+          a.sp.dentro = true;
+        } else if (dFila < 3) { a.anima(dt, false); a.dir = 'up'; continue; }
+      }
+      if (ind.fase === 'passou') {
+        alvoX = ind.x; alvoY = CATRACA_Y - 14;
+        if (a.sp.y <= CATRACA_Y - 10) {
+          // na escada, três em cada dez vão andando pela esquerda
+          var faixa = Math.random() < 0.3 ? 0 : 1;
+          this.filaEsc[faixa].push(a);
+          a.indo = ind = { fase: 'escada', faixa: faixa };
+        }
+      }
+      if (ind.fase === 'escada') {
+        var kk = this.filaEsc[ind.faixa].indexOf(a);
+        alvoX = faixaDaEscada(sobe, ind.faixa === 0);
+        alvoY = ESC_BOCA + 12 + kk * 22;
+        var livre = this.ultimoNaEscada[ind.faixa];
+        var folga = !livre || !livre.sp || !livre.sp.active || livre.sp.y < ESC_BOCA - 16;
+        if (kk === 0 && Math.hypot(alvoX - a.sp.x, alvoY - a.sp.y) < 8 && folga) {
+          this.filaEsc[ind.faixa].shift();
+          this.ultimoNaEscada[ind.faixa] = a;
+          a.indo = ind = { fase: 'sobe', faixa: ind.faixa };
+          a.sp.naEscada = true;
+          a.sp.x = alvoX;
+        }
+      }
+      if (ind.fase === 'sobe') {
+        // o degrau leva; quem está na esquerda ainda anda por cima dele
+        var anda = ind.faixa === 0;
+        a.sp.y -= (ESC_VEL + (anda ? 40 : 0)) * dt / 1000;
+        a.sp.x = faixaDaEscada(sobe, anda);      // o empurra-empurra não tira ninguém da faixa
+        a.dir = 'up';
+        a.anima(dt, anda);
+        if (a.sp.y < ESC_Y + 6) {
           a.sp.destroy();
           this.plateia.splice(i, 1);
           this.chegaNoSaguao(1);
-          continue;
         }
+        continue;
       }
-      var v = 46 * dt / 1000;
+
+      var dx = alvoX - a.sp.x, dy = alvoY - a.sp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 1) { a.anima(dt, false); continue; }
+      var v = Math.min(d, vel * dt / 1000);
       var yA = a.sp.y;
       a.sp.x += (dx / d) * v;
       a.sp.y += (dy / d) * v;
       /* cruzou a linha: é aqui que a catraca gira e faz barulho, e não
          quando ele ainda estava parado na frente dela */
-      if (a.indo.fase === 'passou' && yA > CATRACA_Y && a.sp.y <= CATRACA_Y) {
+      if (ind.fase === 'passou' && yA > CATRACA_Y && a.sp.y <= CATRACA_Y) {
         this.giraCatracaEm(a.sp.x, 1, Math.abs(a.sp.x - this.pl.sp.x) < 90);
       }
       a.setDir(dx, dy);
@@ -2042,7 +2196,14 @@ var EstacaoScene = new Phaser.Class({
             sp.x = (dEsq < dDir) ? q.x - 10 : q.x + q.w + 10;
           }
         }
+        /* A trava era uma só, a do lado de FORA (y 258..514), e valia
+           até pra quem já tinha passado a catraca: no primeiro esbarrão
+           a pessoa era jogada de volta pra fora, e a fila da escada
+           ficava cheia de gente parada em y 258. Quem está na escada não
+           tem trava (o degrau manda); quem passou fica do lado de dentro. */
+        if (sp.naEscada) return;
         sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
+        if (sp.dentro) { sp.y = Phaser.Math.Clamp(sp.y, ESC_BOCA + 4, 262); return; }
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });
   },
@@ -2111,6 +2272,7 @@ var EstacaoScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    this.rodaEscada(dt, mv);
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
 
