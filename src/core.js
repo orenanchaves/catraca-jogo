@@ -2825,30 +2825,30 @@ function pintaFundoDaLoja(g, b) {
   if (e.parede === 'estufa') {
     // a estufa de vidro com as coxinhas e os pães de queijo
     g.fillStyle(0x9ec4dc, 0.6).fillRect(x + 6, py, w - 12, ph);
-    for (r = 0; r < 2; r++) for (k = 0; k < 6; k++) {
+    for (r = 0; r < 2; r++) for (k = 0; k < Math.floor((w - 18) / 10); k++) {
       g.fillStyle(r ? 0xe8b85a : 0xd8943a, 1).fillRect(x + 10 + k * 10, py + 3 + r * 9, 6, 6);
     }
     g.fillStyle(0xffffff, 0.35).fillRect(x + 7, py, 2, ph);
   } else if (e.parede === 'capinhas') {
     // a parede de capinhas penduradas, e os fones em cima
     var cc = [0x7c3fff, 0xe8362c, 0x00e676, 0xf2c14e, 0x3a7fd0, 0xe28cc0, 0xf2f0ff];
-    for (r = 0; r < 2; r++) for (k = 0; k < 9; k++) {
+    for (r = 0; r < 2; r++) for (k = 0; k < Math.floor((w - 12) / 7); k++) {
       g.fillStyle(cc[(k + r * 3) % cc.length], 1).fillRect(x + 6 + k * 7, py + 8 + r * 10, 5, 8);
     }
     g.fillStyle(0xf2f0ff, 1);
-    for (k = 0; k < 4; k++) g.fillRect(x + 8 + k * 16, py + 1, 8, 2).fillRect(x + 8 + k * 16, py + 3, 2, 3).fillRect(x + 14 + k * 16, py + 3, 2, 3);
+    for (k = 0; k < Math.floor((w - 12) / 16); k++) g.fillRect(x + 8 + k * 16, py + 1, 8, 2).fillRect(x + 8 + k * 16, py + 3, 2, 3).fillRect(x + 14 + k * 16, py + 3, 2, 3);
   } else if (e.parede === 'cartoes') {
     // o cartaz do Bilhete Único e a maquininha
     g.fillStyle(0x1c6fd0, 1).fillRect(x + 8, py, 30, ph);
     g.fillStyle(0xf2f0ff, 1).fillRect(x + 12, py + 4, 22, 3).fillRect(x + 12, py + 10, 16, 2);
     g.fillStyle(0xe8762c, 1).fillRect(x + 12, py + 16, 10, 5);
-    g.fillStyle(0x9a9ca4, 1).fillRect(x + 46, py + 4, 20, 18);
-    g.fillStyle(0x00e676, 1).fillRect(x + 50, py + 7, 12, 5);
+    g.fillStyle(0x9a9ca4, 1).fillRect(x + w - 26, py + 4, 20, 18);
+    g.fillStyle(0x00e676, 1).fillRect(x + w - 22, py + 7, 12, 5);
   } else if (e.parede === 'frascos') {
     // prateleiras verdes com os frascos
     for (r = 0; r < 2; r++) {
       g.fillStyle(0x1f5a40, 1).fillRect(x + 5, py + 9 + r * 11, w - 10, 2);
-      for (k = 0; k < 8; k++) {
+      for (k = 0; k < Math.floor((w - 14) / 8); k++) {
         g.fillStyle(k % 3 ? 0x9ec4dc : 0xe8c96a, 1).fillRect(x + 8 + k * 8, py + 2 + r * 11, 5, 7);
         g.fillStyle(0x2f7d5e, 1).fillRect(x + 9 + k * 8, py + 1 + r * 11, 3, 2);
       }
@@ -2859,7 +2859,7 @@ function pintaFundoDaLoja(g, b) {
     g.fillStyle(0xf2c14e, 1).fillRect(x + 6, py, w - 12, 5);
     g.fillStyle(0x0a0a10, 1).fillRect(x + 14, py + 9, w - 28, 10);
     g.fillStyle(0x00e676, 1);
-    for (k = 0; k < 6; k++) g.fillRect(x + 17 + k * 7, py + 11, 4, 6);
+    for (k = 0; k < Math.floor((w - 32) / 7); k++) g.fillRect(x + 17 + k * 7, py + 11, 4, 6);
   } else if (e.parede === 'geladeira') {
     for (k = 0; k < 2; k++) {
       var fx = k ? x + w - 21 : x + 5;
@@ -2873,7 +2873,7 @@ function pintaFundoDaLoja(g, b) {
     for (r = 0; r < 3; r++) g.fillRect(x + 27, py + 3 + r * 4, w - 54, 1);
   } else if (e.parede === 'revistas') {
     var capas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
-    for (r = 0; r < 3; r++) for (k = 0; k < 7; k++) {
+    for (r = 0; r < 3; r++) for (k = 0; k < Math.floor((w - 8) / 10); k++) {
       g.fillStyle(capas[(k + r * 2) % capas.length], 1).fillRect(x + 5 + k * 10, py + r * 9, 8, 7);
     }
   } else if (e.parede === 'maquina') {
@@ -2963,8 +2963,9 @@ function montaFrenteDaLoja(cena, b) {
   gl.fillStyle(0x0a0a10, 1).fillRect(x - 3, y - 8, w + 6, 18);
   gl.fillStyle(e.cor, 1).fillRect(x - 3, y + 8, w + 6, 2);
   if (e.emblema) {
-    gl.fillStyle(e.emblema, 1).fillCircle(x - 7, y + 1, 7).fillCircle(x + w + 7, y + 1, 7);
-    gl.fillStyle(0xf2c14e, 1).fillCircle(x - 7, y + 1, 3).fillCircle(x + w + 7, y + 1, 3);
+    // de 7 pra 5: com as lojas lado a lado, o emblema de 7 encostava no letreiro do vizinho
+    gl.fillStyle(e.emblema, 1).fillCircle(x - 5, y + 1, 5).fillCircle(x + w + 5, y + 1, 5);
+    gl.fillStyle(0xf2c14e, 1).fillCircle(x - 5, y + 1, 2).fillCircle(x + w + 5, y + 1, 2);
   }
   txtC(cena, x + w / 2, y - 4, e.nome, e.letra, 8).setScale(ESCALA_TEXTO / 2).setDepth(42);
 }

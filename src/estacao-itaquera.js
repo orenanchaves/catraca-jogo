@@ -116,17 +116,20 @@ function lojasDaGaleria() {
   /* O que existe de verdade nas estações grandes: lanche rápido pra quem
      tá com pressa, acessório de celular, banca, caixa 24 horas, recarga
      do Bilhete Único, O Boticário e a lotérica (na transição pro
-     shopping, mas todo mundo conta como "dentro"). Colados um no outro.
-     A esquerda termina em 86: dali até 188 é a boca da passarela. */
+     shopping, mas todo mundo conta como "dentro").
+     Lado a lado, mas não colados ('tá muito junto'): 68 de largura e 14
+     de vão, e o letreiro (3px pra cada lado) ainda deixa 8 de parede
+     entre um e outro (o dog, com os emblemas pra fora, ganha 16). A
+     esquerda termina em 98: dali até 188 é a boca da passarela. */
   var L = [
-    ['dog', -192, 76, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
-    ['salgados', -112, 76, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
-    ['celular', -32, 76, '"Capinha, película, fone.\nCarregador tem também."', ['capinha', 'fone']],
-    ['atm', 48, 38, null, null, 'saque'],
-    ['banca', 196, 76, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
-    ['recarga', 276, 76, null, null, 'recarga'],
-    ['boticario', 356, 76, '"Um perfume pro dia render?"', ['perfume', 'desodorante']],
-    ['loterica', 436, 76, '"Raspadinha, patrão?\nHoje é seu dia."', ['raspadinha']]
+    ['dog', -188, 68, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
+    ['salgados', -104, 68, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
+    ['celular', -22, 68, '"Capinha, película, fone.\nCarregador tem também."', ['capinha', 'fone']],
+    ['atm', 60, 38, null, null, 'saque'],
+    ['banca', 200, 68, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
+    ['recarga', 282, 68, null, null, 'recarga'],
+    ['boticario', 364, 68, '"Um perfume pro dia render?"', ['perfume', 'desodorante']],
+    ['loterica', 446, 68, '"Raspadinha, patrão?\nHoje é seu dia."', ['raspadinha']]
   ];
   var out = [];
   for (var i = 0; i < L.length; i++) {
