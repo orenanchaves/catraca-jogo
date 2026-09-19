@@ -236,8 +236,8 @@
       var l = GameState.linhaAtual();
       el.linha.textContent = l.nome;
       el.linha.style.color = l.cor;
-      el.estacao.textContent = GameState.estacaoAtual();
-      el.proxima.textContent = GameState.proximaEstacaoNome();
+      el.estacao.textContent = placaDe(GameState.estacaoAtual());
+      el.proxima.textContent = placaDe(GameState.proximaEstacaoNome());
       var falta = GameState.faltamEstacoes();
       el.destino.textContent = GameState.alvoAtual() + (falta > 0 ? ' (' + falta + ')' : '');
       el.destino.style.color = falta <= 1 ? '#00e676' : '#f2f0ff';

@@ -230,6 +230,20 @@ var MAX_ATRASOS = 1;
 /* onde as duas se cruzam, e o par fixo da corrida */
 var BALDEACAO = 'SÉ';
 var CASA = 'ITAQUERA';         // linha vermelha, ponta leste
+
+/* ---------- o nome oficial, onde ele cabe ----------
+   Por dentro a estação continua sendo 'ITAQUERA' — a casa, o mapa, as
+   missões e a rota falam esse nome. Na PLACA ela é o que é na vida:
+   CORINTHIANS-ITAQUERA, vinte letras, 240px. Cabe na faixa da parede da
+   plataforma, na placa de sentido, no letreiro do vagão, na pausa e no
+   painel do desktop; não cabe no rodapé 'AQUI:' do celular (268px de
+   tela), na tabela do fim nem no rótulo da ponta do mapa. `max` é o
+   número de letras que o lugar aguenta: passou, fica o curto. */
+var NOME_OFICIAL = { 'ITAQUERA': 'CORINTHIANS-ITAQUERA' };
+function placaDe(n, max) {
+  var o = NOME_OFICIAL[n];
+  return (o && (!max || o.length <= max)) ? o : n;
+}
 var TRABALHO = 'VERGUEIRO';    // linha azul, quatro estações ao sul da Sé
 
 function linhaDaEstacao(nome) {
@@ -2022,7 +2036,7 @@ function tocaPassoAmbiente(i, t, modo) {
 var NOME_FALADO = {
   'PÇA. ÁRVORE': 'Praça da Árvore', 'JD.SÃO PAULO': 'Jardim São Paulo', 'PD. INGLESA': 'Parada Inglesa',
   'MAL. DEODORO': 'Marechal Deodoro', 'STA. CECÍLIA': 'Santa Cecília', 'PEDRO II': 'Pedro Segundo',
-  'BARRA FUNDA': 'Palmeiras Barra Funda', 'ITAQUERA': 'Corinthians Itaquera', 'LIBERDADE': 'Japão Liberdade',
+  'BARRA FUNDA': 'Palmeiras Barra Funda', 'ITAQUERA': 'Corinthians-Itaquera', 'LIBERDADE': 'Japão Liberdade',
   'PORTUGUESA': 'Portuguesa Tietê'
 };
 function nomeFalado(n) {

@@ -230,11 +230,11 @@ function retTrem(g, b, lado, longe, perto, y, alt) {
    verdade, e faz sentido de jogo: e a parede que voce encara chegando da
    rua, antes da catraca, que e exatamente quando ainda da pra mudar de
    ideia sobre o caminho. */
-/* 252 e 790, e não 240 e 660: o nome da estação corre a mesma faixa,
-   centrado em 150, 410 e 670, e um nome de doze letras ocupa 144px em
-   pé. O quadro de 660 caía em cima do terceiro nome (604..736) e cortava
-   as letras. Agora cada quadro mora num vão entre dois nomes. */
-var MAPAS_PLAT = [252, 790];
+/* 300 e 760: o nome da estação corre a mesma faixa, centrado em 150 e
+   560, e o maior deles (CORINTHIANS-ITAQUERA) ocupa 240px em pé: 30..270
+   e 440..680. O quadro de 660 caía em cima de um nome e cortava as
+   letras. Agora cada quadro mora num vão entre nomes. */
+var MAPAS_PLAT = [300, 760];
 var MAPA_PLAT = { x: 298, w: 20, h: 56 };
 var MAPA_SAG = { x: 196, y: 546, w: 84, h: 28 };
 
@@ -611,8 +611,17 @@ var EstacaoScene = new Phaser.Class({
         placaMetro(this, GW / 2, platY(nc), GameState.estacaoAtual(), 45);
       }
     } else {
-      for (var ny = 150; ny < PLAT_ALT - 80; ny += 260) {
-        var tn = txt(this, 309, platY(ny), GameState.estacaoAtual(), PAL.branco, 8);
+      /* Duas vezes, em 150 e 560, e não três a cada 260: com o nome
+         oficial (CORINTHIANS-ITAQUERA, 240px em pé) três repetições
+         encostavam uma na outra e nos quadros de mapa, que agora moram
+         nos vãos (300 e 760). */
+      for (var ny = 150; ny < PLAT_ALT - 80; ny += 410) {
+        var tn = txt(this, 309, platY(ny), placaDe(GameState.estacaoAtual()), PAL.branco, 8);
+        /* Metade do tamanho (6px por letra, escala 1): a fonte é de pixel
+           e só escala inteira fica nítida. Na faixa de 18px o nome do
+           tamanho de sempre era um letreiro gritando; na estação de
+           verdade é uma letra discreta repetida na parede. */
+        tn.setScale(ESCALA_TEXTO / 2);
         tn.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
       }
     }
@@ -657,7 +666,7 @@ var EstacaoScene = new Phaser.Class({
       }
     } else {
       placaSaida(this, GW / 2, platY(26),
-        '► ' + GameState.sentidoAtual(), 3, GameState.linhaAtual().nome);
+        '► ' + placaDe(GameState.sentidoAtual()), 3, GameState.linhaAtual().nome);
     }
 
     this.gCatracas = this.add.graphics().setDepth(2);
@@ -1152,11 +1161,29 @@ var EstacaoScene = new Phaser.Class({
       if (!abriu) t.mandouEntrar = false;
     }
 
+    // quem saiu da cena (embarcou, sumiu) sai também da fila da escada
+    if (this.filaDesce) {
+      for (var fq = 0; fq < 2; fq++) {
+        this.filaDesce[fq] = this.filaDesce[fq].filter(function (q) { return q.sp && q.sp.active && q.indo && q.indo.sai; });
+      }
+    }
     for (i = this.esperando.length - 1; i >= 0; i--) {
       a = this.esperando[i];
       if (!a.sp || !a.sp.active) { this.esperando.splice(i, 1); continue; }
       if (!a.indo) { a.anima(dt, false); continue; }
 
+      /* ---------- a fila pra descer ----------
+         Todo mundo que saía do trem mirava o MESMO ponto em cima da
+         escada, e a escada deixava um por vez numa faixa só: virava um
+         bolo parado no pé da plataforma. Agora são duas filas indianas,
+         uma por faixa, subindo a plataforma 20px por pessoa. */
+      if (a.indo.sai && this.filaDesce) {
+        var fk = this.filaDesce[a.indo.faixa].indexOf(a);
+        if (fk >= 0) {
+          a.indo.x = faixaDaEscada(ESC_PISTA[1], a.indo.faixa === 0);
+          a.indo.y = ESC_Y - 8 - fk * 20;
+        }
+      }
       var dx = a.indo.x - a.sp.x, dy = a.indo.y - a.sp.y;
       var d = Math.sqrt(dx * dx + dy * dy);
       /* ---------- quem sai, sai pela FAIXA e não pelo ponto ----------
@@ -1168,19 +1195,23 @@ var EstacaoScene = new Phaser.Class({
          Só vale pra quem SAI: quem chega nasce nessa mesma faixa e
          sobe, e morreria no berço com a regra pelo y sozinha. */
       if (a.indo.sai && a.sp.y >= ESC_Y - 26) {
-        // um por vez: o da frente tem que ter descido um degrau e meio
-        var ult = this.ultimoDescendo;
-        if (ult && ult.sp && ult.sp.active && ult.indo && ult.indo.fase === 'desce' && ult.sp.y < ESC_Y + 16) {
+        // um por vez EM CADA FAIXA: o da frente tem que ter descido um degrau
+        var fxa = a.indo.faixa || 0;
+        if (!this.ultimoDescendo) this.ultimoDescendo = [null, null];
+        var ult = this.ultimoDescendo[fxa];
+        var naFrente = this.filaDesce && this.filaDesce[fxa][0] === a;
+        if (!naFrente || (ult && ult.sp && ult.sp.active && ult.indo && ult.indo.fase === 'desce' && ult.sp.y < ESC_Y + 12)) {
           a.anima(dt, false);
           continue;
         }
-        this.ultimoDescendo = a;
+        this.filaDesce[fxa].shift();
+        this.ultimoDescendo[fxa] = a;
         // não some: pega a escada que desce, e o saguão cuida dele dali
         this.esperando.splice(i, 1);
         a.sp.naEscada = true;
         a.sp.setDepth(40);
-        a.sp.x = faixaDaEscada(ESC_PISTA[1], false);
-        a.indo = { fase: 'desce' };
+        a.sp.x = faixaDaEscada(ESC_PISTA[1], fxa === 0);
+        a.indo = { fase: 'desce', faixa: fxa };
         this.plateia.push(a);
         this.gente = this.plateia.concat(this.esperando, [this.guarda]);
         continue;
@@ -1318,11 +1349,11 @@ var EstacaoScene = new Phaser.Class({
          direita, sai pela catraca (o braço gira pra fora) e vai embora
          pela rua. Some só lá embaixo, na entrada. */
       if (ind.fase === 'desce') {
-        var desce = ESC_PISTA[1];
-        a.sp.y += ESC_VEL * dt / 1000;
-        a.sp.x = faixaDaEscada(desce, false);
+        var desce = ESC_PISTA[1], andaD = ind.faixa === 0;
+        a.sp.y += (ESC_VEL + (andaD ? 40 : 0)) * dt / 1000;
+        a.sp.x = faixaDaEscada(desce, andaD);
         a.dir = 'down';
-        a.anima(dt, false);
+        a.anima(dt, andaD);
         if (a.sp.y > ESC_BOCA + 6) {
           a.sp.naEscada = false; a.sp.dentro = true;
           var abertas = this.gates.filter(function (q) { return !q.fechada; });
@@ -1505,7 +1536,11 @@ var EstacaoScene = new Phaser.Class({
          intervalo entre trens no pico — a plataforma acumulava três
          levas ao mesmo tempo e o rio virava represa. A 74 são 12s, que
          cabe dentro de um ciclo. */
-      a.indo = { x: faixaDaEscada(ESC_PISTA[1], false), y: ESC_Y - 8, v: 74, sai: true };
+      // três em dez descem andando pela esquerda; o resto, parado na direita
+      var fx = Math.random() < 0.3 ? 0 : 1;
+      a.indo = { x: faixaDaEscada(ESC_PISTA[1], fx === 0), y: ESC_Y - 8, v: 74, sai: true, faixa: fx };
+      if (!this.filaDesce) this.filaDesce = [[], []];
+      this.filaDesce[fx].push(a);
       this.esperando.push(a);
     }
     this.gente = this.plateia.concat(this.esperando, [this.guarda]);

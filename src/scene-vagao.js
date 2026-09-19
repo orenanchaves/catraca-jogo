@@ -521,7 +521,7 @@ var VagaoScene = new Phaser.Class({
     this.sorteiaRitmo();
 
     var self = this;
-    fala(this, GameState.hora() + '. Próxima:\n' + GameState.proximaEstacaoNome(), []);
+    fala(this, GameState.hora() + '. Próxima:\n' + placaDe(GameState.proximaEstacaoNome()), []);
     anuncia(avisoDaProxima());
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
     if (this.treino) this.montaTreino();
@@ -3473,7 +3473,7 @@ var VagaoScene = new Phaser.Class({
        ficha, é alarme: quando a sua estação é a próxima ou é esta. */
     var aqui = GameState.estacaoAtual();
     var parado = (this.estado === 'parado');
-    txto = parado ? aqui : '► ' + GameState.proximaEstacaoNome();
+    txto = parado ? placaDe(aqui) : '► ' + placaDe(GameState.proximaEstacaoNome());
     cor = PAL.amarelo;
 
     if (falta <= 0) { txto += '\nDESÇA AQUI'; cor = PAL.verde; }
