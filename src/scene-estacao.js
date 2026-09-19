@@ -700,10 +700,11 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(0xffffff, 0.03).fillRect(0, 266, GW, 26);
     pontilhado(g, 0, 240, GW, 280, 0x000000, 0.07, 8);
 
-    g.fillStyle(num(PAL.metalSom), 1).fillRect(0, 208, GW, 32);
-    g.fillStyle(num(PAL.metal), 1).fillRect(0, 208, GW, 22);
-    g.fillStyle(num(PAL.metalLuz), 1).fillRect(0, 208, GW, 3);
-    g.fillStyle(0x000000, 0.35).fillRect(0, 240, GW, 6);
+    /* A faixa de metal que atravessava a tela inteira (y 208..240) saiu:
+       atrás dos tripés ela lia como um muro cinza, e catraca de metrô é
+       vazada — entre um gabinete e outro você vê o chão do outro lado. O
+       que sobra do bloqueio (o gradil das pontas) é desenhado junto com
+       as catracas, que sabem onde elas começam e acabam. */
 
     g.fillStyle(num(PAL.paredeSom), 1).fillRect(8, 176, 88, 64);
     g.fillStyle(num(PAL.parede), 1).fillRect(8, 176, 88, 48);
@@ -885,6 +886,11 @@ var EstacaoScene = new Phaser.Class({
   pintaCatracas: function () {
     var g = this.gCatracas; g.clear();
     var i, t, w, k;
+    // o gradil fecha só as pontas: da bilheteria (x 96) ao primeiro gabinete, e do último à parede
+    if (this.gates.length) {
+      this.gradil(g, 96, this.gates[0].x0 - 14);
+      this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, GW);
+    }
     for (i = 0; i < this.gates.length; i++) {
       t = this.gates[i]; w = t.x1 - t.x0;
       if (t.fechada) continue;
@@ -935,6 +941,22 @@ var EstacaoScene = new Phaser.Class({
       g.fillStyle(num(PAL.metalLuz), 1).fillCircle(t.x0 - 2, CATRACA_Y, 3);
       g.fillStyle(num(PAL.metalSom), 1).fillCircle(t.x0 - 2, CATRACA_Y, 1.5);
     }
+  },
+
+  /* Gradil de metrô: corrimão em cima, travessa embaixo e balaústre a
+     cada 8px, com o chão aparecendo entre eles. Barra quem quer passar
+     sem virar parede. */
+  gradil: function (g, a, b) {
+    if (b - a < 2) return;
+    g.fillStyle(0x000000, 0.18).fillRect(a, 240, b - a, 3);             // sombra no chão
+    for (var x = a + 3; x < b - 1; x += 8) {
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(x, 211, 3, 29);
+      g.fillStyle(num(PAL.metal), 1).fillRect(x, 211, 2, 29);
+    }
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(a, 207, b - a, 6);       // corrimão
+    g.fillStyle(num(PAL.metal), 1).fillRect(a, 207, b - a, 4);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(a, 207, b - a, 1);
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(a, 232, b - a, 3);       // travessa de baixo
   },
 
   /* Gira o tripé da catraca debaixo de x. 120° por passagem, pro lado de
