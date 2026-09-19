@@ -394,6 +394,11 @@ EstacaoScene.prototype.pintaMezanino = function (g, l) {
   this.bocaDaEscada(g, HUD_H, 116);
   // a boca da segunda escada, a da plataforma do outro sentido
   if (DUPLA) { g.translateCanvas(ESC2_DX, 0); this.bocaDaEscada(g, HUD_H, 116); g.translateCanvas(-ESC2_DX, 0); }
+  // e a escada fixa de cada uma, emendando com a pintura da escada (pintaEscadaFixa)
+  if (ESCADA_FIXA) {
+    this.pintaEscadaFixa(g, ESCF_X0, HUD_H, 116, HUD_H, false, true);
+    if (DUPLA) this.pintaEscadaFixa(g, espelhaX(ESCF_X1), HUD_H, 116, HUD_H, false, true);
+  }
   this.piso(g, x0, 116, w, 124, 0x4a4a60, 0x565670);
   this.piso(g, x0, 240, w, 280, 0x3f3f52, 0x494960);
   this.azulejo(g, x0, 520, w, 56);

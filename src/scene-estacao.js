@@ -110,14 +110,37 @@ var CENTRAL = false;                        // esta estação é de plataforma c
    sentido +1). A da esquerda é ela ESPELHADA: a mesma pintura virada,
    posta em x -296, e o piso dela cai em -264..-112, com o trem dela (lado
    +1, sentido -1) encostado à direita, de -84 a 4, a 16px do trem de cá.
-   A escada dela é a mesma escada deslocada ESC2_DX, no meio do piso. Nas
-   pontas da linha (Jabaquara, Tucuruvi, Barra Funda, Itaquera) só existe
-   um sentido e continua uma plataforma só; a Sé é central. */
+   A escada dela é a de cá espelhada também (espelhaX), e cai em
+   -184..-88: a 24px da beirada, como a de cá (112 contra o piso em 136).
+   Ela já foi a de cá só deslocada 348px, e isso deixava um vão preto de
+   28px entre as duas pinturas da escada ('meio grosseiro'). Nas pontas da
+   linha (Jabaquara, Tucuruvi, Barra Funda, Itaquera) só existe um sentido
+   e continua uma plataforma só; a Sé é central. */
 var DUPLA = false;
 var OUT_X0 = -264, OUT_X1 = -112;           // o piso da plataforma espelhada
 var DUPLA_IMG_X = -296;                     // onde a pintura espelhada começa
-var ESC2_DX = -348;                         // a segunda escada: a de sempre, 348px à esquerda
+var ESC2_DX = -296;                         // a segunda escada: a de cá espelhada (112..208 vira -184..-88)
 var DIVISA_PISOS = 10;                      // entre os dois pisos (fica no meio das vias)
+// o x de cá, no espelho: a pintura virada começa em DUPLA_IMG_X e tem GW de largura
+function espelhaX(x) { return DUPLA_IMG_X + GW - x; }
+
+/* ---------- a escada fixa ----------
+   'Do lado da escada rolante tem que ter uma escada fixa também.' É a de
+   pedra, colada na rolante, do lado da parede: 36px (o boneco tem 32),
+   corrimão dos dois lados e a faixa amarela no primeiro e no último
+   degrau. Anda-se nela no próprio passo, 30% mais devagar (degrau cansa),
+   e é a saída de quem não quer fila de rolante. O elevador, que morava
+   ali, foi pro lado dela no mezanino e subiu um pouco na plataforma. Não
+   tem na Sé (central, sem lado de parede) nem no treino (saguão estreito). */
+var ESCADA_FIXA = false;
+var ESCF_X0 = ESC_X1 + 10, ESCF_X1 = ESCF_X0 + 36;     // 218..254
+function naEscadaFixa(x) {
+  if (!ESCADA_FIXA) return false;
+  if (x > ESCF_X0 + 4 && x < ESCF_X1 - 4) return true;
+  return DUPLA && x > espelhaX(ESCF_X1) + 4 && x < espelhaX(ESCF_X0) - 4;
+}
+// o meio da escada fixa de cada plataforma (e 1 = a espelhada)
+function meioEscadaFixa(e) { var m = (ESCF_X0 + ESCF_X1) / 2; return e ? espelhaX(m) : m; }
 // de que trem é o piso onde está x: -1 o da direita (e a central à esquerda), +1 o outro
 function ladoDoPiso(x) {
   if (CENTRAL) return x < (PLAT_X0 + PLAT_X1) / 2 ? -1 : 1;
@@ -365,6 +388,7 @@ var EstacaoScene = new Phaser.Class({
     DUPLA = !CENTRAL && !this.itq && !this.treino && GameState.idx > 0 && GameState.idx < nEst - 1;
     // o mezanino cresce pra esquerda, pra caber a segunda escada ('mexer no mezanino pro lado')
     MEZ.x0 = DUPLA ? -300 : -120;
+    ESCADA_FIXA = this.mez && !CENTRAL;
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
     if (this.itq) PLAT_X1 = ITQ.platX1;
@@ -713,7 +737,7 @@ var EstacaoScene = new Phaser.Class({
       this.montaTomadas([{ x: 26, y: 330, lado: 1 }, { x: PLAT_X1 + 12, y: platY(500), lado: -1 }]);
     }
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
-    if (DUPLA) this.add.image(ESC2_DX, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
+    if (DUPLA) this.add.image(DUPLA_IMG_X, ESC_Y, 'est_escada').setOrigin(0, 0).setFlipX(true).setDepth(0);
     this.montaDegraus();
 
     /* Os letreiros são texto, e texto não entra em textura: eles ficam
@@ -1102,15 +1126,41 @@ var EstacaoScene = new Phaser.Class({
      a parede fechando o resto: ela é estreita porque é a única passagem,
      e é isso que dá a sensação de estar atravessando. */
   pintaEscada: function (g) {
-    // a parede dos dois lados da passagem
-    g.fillStyle(num(PAL.paredeSom), 1).fillRect(0, 0, GW, ESCADA_ALT);
-    g.fillStyle(num(PAL.parede), 1).fillRect(0, 0, ESC_X0 - 10, ESCADA_ALT);
-    g.fillStyle(num(PAL.parede), 1).fillRect(ESC_X1 + 10, 0, GW - ESC_X1 - 10, ESCADA_ALT);
-    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(0, 0, ESC_X0 - 10, 3);
-    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(ESC_X1 + 10, 0, GW - ESC_X1 - 10, 3);
+    /* a parede dos dois lados da passagem, no azulejo do mezanino: lisa,
+       numa cor só, ela parecia um bloco cru ('meio grosseiro'). O +6 joga
+       a sombra do pé do azulejo pra fora da textura: aqui embaixo a parede
+       continua no mezanino, sem emenda. */
+    this.azulejo(g, 0, 0, GW, ESCADA_ALT + 6);
+    // a beirada do piso da plataforma, que é onde a parede começa
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(0, 0, GW, 4);
+    g.fillStyle(0x000000, 0.25).fillRect(0, 4, GW, 3);
 
     // as duas pistas: sobe pela esquerda, desce pela direita
     this.pintaDegraus(g, 0, ESCADA_ALT);
+    if (ESCADA_FIXA) this.pintaEscadaFixa(g, ESCF_X0, 0, ESCADA_ALT, ESC_Y, true, false);
+  },
+
+  /* A escada fixa: degraus de pedra de 8px (os da rolante têm 10, e são
+     de metal), corrimão dos dois lados, e a faixa amarela no primeiro e no
+     último degrau. yMundo é onde o y0 cai no mundo, pra os degraus da
+     textura e os do mezanino emendarem no mesmo passo. */
+  pintaEscadaFixa: function (g, x0, y0, y1, yMundo, topo, pe) {
+    var w = ESCF_X1 - ESCF_X0, fase = ((yMundo - ESC_Y) % 8 + 8) % 8;
+    g.fillStyle(0x22252f, 1).fillRect(x0, y0, w, y1 - y0);
+    for (var y = y0 - fase; y < y1; y += 8) {
+      var ya = Math.max(y, y0), yb = Math.min(y + 8, y1);
+      if (yb <= ya) continue;
+      g.fillStyle(0x8c8e9a, 1).fillRect(x0 + 5, ya, w - 10, yb - ya);
+      if (y >= y0) g.fillStyle(0xb4b6c0, 1).fillRect(x0 + 5, y, w - 10, 1);
+      if (y + 6 < y1 && y + 6 >= y0) g.fillStyle(0x5a5c68, 1).fillRect(x0 + 5, y + 6, w - 10, 2);
+    }
+    if (topo) g.fillStyle(num(PAL.amarelo), 1).fillRect(x0 + 5, y0, w - 10, 3);
+    if (pe) g.fillStyle(num(PAL.amarelo), 1).fillRect(x0 + 5, y1 - 3, w - 10, 3);
+    for (var d = 0; d < 2; d++) {
+      var hx = d ? x0 + w - 5 : x0;
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(hx, y0, 5, y1 - y0);
+      g.fillStyle(num(PAL.metalLuz), 1).fillRect(hx + 1, y0, 1, y1 - y0);
+    }
   },
 
   /* ---------- bloqueio ----------
@@ -1427,6 +1477,17 @@ var EstacaoScene = new Phaser.Class({
         this.gente = this.juntaGente();
         continue;
       }
+      if (a.indo.desceFixa && d < 6) {
+        // chegou no alto da escada fixa: desce, e o saguão cuida dele dali
+        this.esperando.splice(i, 1);
+        a.sp.naEscada = true;
+        a.sp.setDepth(40);
+        a.sp.x = meioEscadaFixa(a.indo.e);
+        a.indo = { fase: 'desce', fixa: true, e: a.indo.e };
+        this.plateia.push(a);
+        this.gente = this.juntaGente();
+        continue;
+      }
       if (d < 4) {
         // chegou na porta: entrou, e quem entrou não está mais aqui
         a.sp.destroy();
@@ -1519,10 +1580,24 @@ var EstacaoScene = new Phaser.Class({
              pela esquerda */
           // na dupla, metade vai pra escada da plataforma do outro sentido
           var eS = (DUPLA && Math.random() < 0.5) ? 1 : 0;
-          var f0 = this.filaEsc[2 * eS].length, f1 = this.filaEsc[1 + 2 * eS].length;
-          var faixa = f0 < f1 ? 0 : (f1 < f0 ? 1 : (Math.random() < 0.3 ? 0 : 1));
-          this.filaEsc[faixa + 2 * eS].push(a);
-          a.indo = ind = { fase: 'escada', faixa: faixa, e: eS };
+          /* um em seis vai pela escada fixa, e quatro em dez quando a fila
+             da rolante passa de oito: escada de pedra não tem vez */
+          var filaR = this.filaEsc[2 * eS].length + this.filaEsc[1 + 2 * eS].length;
+          if (ESCADA_FIXA && Math.random() < (filaR > 8 ? 0.4 : 0.16)) {
+            a.indo = ind = { fase: 'fixa', e: eS };
+          } else {
+            var f0 = this.filaEsc[2 * eS].length, f1 = this.filaEsc[1 + 2 * eS].length;
+            var faixa = f0 < f1 ? 0 : (f1 < f0 ? 1 : (Math.random() < 0.3 ? 0 : 1));
+            this.filaEsc[faixa + 2 * eS].push(a);
+            a.indo = ind = { fase: 'escada', faixa: faixa, e: eS };
+          }
+        }
+      }
+      if (ind.fase === 'fixa') {
+        alvoX = meioEscadaFixa(ind.e); alvoY = ESC_BOCA + 10;
+        if (Math.hypot(alvoX - a.sp.x, alvoY - a.sp.y) < 6) {
+          a.indo = ind = { fase: 'sobe', fixa: true, e: ind.e };
+          a.sp.naEscada = true;
         }
       }
       if (ind.fase === 'escada') {
@@ -1550,8 +1625,17 @@ var EstacaoScene = new Phaser.Class({
       if (ind.fase === 'sobe') {
         // o degrau leva; quem está na esquerda ainda anda por cima dele
         var anda = ind.faixa === 0;
-        a.sp.y -= (ESC_VEL + (anda ? 40 : 0)) * dt / 1000;
-        a.sp.x = faixaDaEscada(pistaEsc(0, ind.e), anda);      // o empurra-empurra não tira ninguém da faixa
+        if (ind.fixa) {
+          /* na fixa ninguém leva: é o passo dele, e pela direita dele (+5),
+             pra quem desce passar do outro lado. 48 e não 34: a 34 quem vinha
+             atrás (você) ficava preso subindo a 15px/s */
+          a.sp.y -= 48 * dt / 1000;
+          a.sp.x = meioEscadaFixa(ind.e) + 5;
+          anda = true;
+        } else {
+          a.sp.y -= (ESC_VEL + (anda ? 40 : 0)) * dt / 1000;
+          a.sp.x = faixaDaEscada(pistaEsc(0, ind.e), anda);      // o empurra-empurra não tira ninguém da faixa
+        }
         a.dir = 'up';
         a.anima(dt, anda);
         /* No topo ele não some: sai do degrau e vira passageiro da
@@ -1575,9 +1659,12 @@ var EstacaoScene = new Phaser.Class({
          direita, sai pela catraca (o braço gira pra fora) e vai embora
          pela rua. Some só lá embaixo, na entrada. */
       if (ind.fase === 'desce') {
-        var desce = pistaEsc(1, ind.e), andaD = ind.faixa === 0;
-        a.sp.y += (ESC_VEL + (andaD ? 40 : 0)) * dt / 1000;
-        a.sp.x = faixaDaEscada(desce, andaD);
+        var desce = pistaEsc(1, ind.e), andaD = ind.faixa === 0 || !!ind.fixa;
+        if (ind.fixa) { a.sp.y += 56 * dt / 1000; a.sp.x = meioEscadaFixa(ind.e) - 5; }
+        else {
+          a.sp.y += (ESC_VEL + (andaD ? 40 : 0)) * dt / 1000;
+          a.sp.x = faixaDaEscada(desce, andaD);
+        }
         a.dir = 'down';
         a.anima(dt, andaD);
         if (a.sp.y > ESC_BOCA + 6) {
@@ -1776,6 +1863,12 @@ var EstacaoScene = new Phaser.Class({
          cabe dentro de um ciclo. */
       // três em dez descem andando pela esquerda; o resto, parado na direita
       var fx = Math.random() < 0.3 ? 0 : 1;
+      if (ESCADA_FIXA && Math.random() < 0.16) {
+        // um em seis desce pela escada fixa: sem fila, no próprio passo
+        a.indo = { x: meioEscadaFixa(eT), y: ESC_Y - 8, v: 74, desceFixa: true, e: eT };
+        this.esperando.push(a);
+        continue;
+      }
       a.indo = { x: faixaDaEscada(pistaEsc(1, eT), fx === 0), y: ESC_Y - 8, v: 74, sai: true, faixa: fx, e: eT };
       if (!this.filaDesce) this.filaDesce = [[], [], [], []];
       this.filaDesce[fx + 2 * eT].push(a);
@@ -1811,11 +1904,12 @@ var EstacaoScene = new Phaser.Class({
     // ---- plataforma ----
     if (y < ESC_Y) {
       if (y < platY(80)) return false;
-      if (DUPLA && x >= OUT_X0 && x <= OUT_X1) return true;          // o piso do outro sentido
+      if (DUPLA && x >= OUT_X0 && x <= OUT_X1) return !this.bateNoElevador(x, y);   // o piso do outro sentido
       return x >= PLAT_X0 && x <= PLAT_X1 && !this.bateNoElevador(x, y);
     }
     // ---- escada rolante: a passagem entre os dois andares (a cadeira de rodas vai de elevador) ----
     if (y < 116) {
+      if (naEscadaFixa(x)) return !temPoder('cadeira');            // degrau não é pra cadeira de rodas
       if (DUPLA && x > ESC_X0 + ESC2_DX && x < ESC_X1 + ESC2_DX) return !temPoder('cadeira');
       return x > ESC_X0 && x < ESC_X1 && !(temPoder('cadeira') && this.elevadores);
     }
@@ -2096,14 +2190,23 @@ var EstacaoScene = new Phaser.Class({
      De vidro, com a placa azul de acessibilidade: um no mezanino, na
      parede de cima ao lado da escada, e outro na plataforma, logo acima
      da boca da escada. A porta dos dois é a face de baixo, que é a que se
-     vê. Qualquer um usa; quem está de cadeira de rodas só sobe por ele. */
+     vê. Qualquer um usa; quem está de cadeira de rodas só sobe por ele.
+     Um par por plataforma: na dupla a espelhada tem o dela ('tem que ter
+     dois elevadores'), senão o cadeirante nunca chegava no outro sentido. */
   montaElevadores: function () {
-    // 60x64: no mezanino ocupa a parede de cima inteira (52 a 116), a 20px da escada
-    var x0 = ESC_X1 + 20, w = 60, h = 64;
-    this.elevadores = [
-      { lugar: 'saguao', x: x0, y: 116 - h, w: w, h: h, porta: { x: x0 + w / 2, y: 132 } },
-      { lugar: 'plataforma', x: x0, y: ESC_Y - 24 - h, w: w, h: h, porta: { x: x0 + w / 2, y: ESC_Y - 12 } }
-    ];
+    /* 60x64: no mezanino ocupa a parede de cima inteira (52 a 116). Com a
+       escada fixa ele vai pro lado dela (262), e na plataforma sobe 32px,
+       pra quem sai da escada fixa não dar de cara na caixa. */
+    var w = 60, h = 64, xS = ESCADA_FIXA ? ESCF_X1 + 8 : ESC_X1 + 20, xP = ESC_X1 + 20;
+    var yP = ESC_Y - (ESCADA_FIXA ? 56 : 24) - h;
+    var lst = this.elevadores = [];
+    function par(xs, xp) {
+      var s = lst.length;
+      lst.push({ lugar: 'saguao', x: xs, y: 116 - h, w: w, h: h, porta: { x: xs + w / 2, y: 132 }, par: s + 1 });
+      lst.push({ lugar: 'plataforma', x: xp, y: yP, w: w, h: h, porta: { x: xp + w / 2, y: yP + h + 12 }, par: s });
+    }
+    par(xS, xP);
+    if (DUPLA) par(espelhaX(xS + w), espelhaX(xP + w));
     this.gElev = this.add.graphics().setDepth(3);
     this.gElevP = this.add.graphics().setDepth(38);
     this.pintaElevadores(0);
@@ -2115,9 +2218,9 @@ var EstacaoScene = new Phaser.Class({
      pequena'). */
   pintaElevadores: function (fechando) {
     var lst = this.elevadores || [], l = GameState.linhaAtual();
+    this.gElev.clear(); this.gElevP.clear();
     for (var i = 0; i < lst.length; i++) {
-      var e = lst[i], g = i ? this.gElevP : this.gElev, cx = e.x + e.w / 2;
-      g.clear();
+      var e = lst[i], g = e.lugar === 'saguao' ? this.gElev : this.gElevP, cx = e.x + e.w / 2;
       g.fillStyle(0x000000, 0.3).fillRect(e.x + 3, e.y + 4, e.w, e.h);
       g.fillStyle(num(PAL.paredeSom), 1).fillRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
       g.fillStyle(num(PAL.parede), 1).fillRect(e.x, e.y, e.w, e.h);
@@ -2165,7 +2268,7 @@ var EstacaoScene = new Phaser.Class({
         var sobe = (e.lugar === 'saguao');
         this.dica.setText(nomeAgir() + ': ELEVADOR ' + (sobe ? '▲' : '▼'), PAL.amarelo);
         if (Ctrl.actJust) {
-          this.noElevador = { t: 0, para: lst[sobe ? 1 : 0] };
+          this.noElevador = { t: 0, para: lst[e.par] };
           this.pl.sp.setVisible(false);
           this.pintaElevadores(1);
           sfx('porta');
@@ -2960,6 +3063,8 @@ var EstacaoScene = new Phaser.Class({
     this.vigiaDuelos();
 
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
+    // na escada fixa se sobe no próprio passo, e degrau cansa
+    if (this.pl.sp.y > ESC_Y && this.pl.sp.y < ESC_BOCA && naEscadaFixa(this.pl.sp.x)) vel *= 0.7;
     var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
     var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
     var mv = (dx !== 0 || dy !== 0);
