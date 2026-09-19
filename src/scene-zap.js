@@ -244,7 +244,7 @@ var ZapScene = new Phaser.Class({
     /* as cartas da METRODEX: quatro na tela, cada uma com seis textos e
        uma zona de toque (o boneco vem da reserva de figurinhas da mochila) */
     this.cartasDex = [];
-    DEXC.x0 = ZAP.tx0 + (ZAP.tx1 - ZAP.tx0 - (DEXC.W * 2 + DEXC.VAO)) / 2; DEXC.y0 = ZAP.topo + 44;
+    DEXC.x0 = ZAP.tx0 + (ZAP.tx1 - ZAP.tx0 - (DEXC.W * 2 + DEXC.VAO)) / 2; DEXC.y0 = ZAP.topo + 50;
     this.montaBuscaDex();
     this.dexAberta = -1;
     for (var cd = 0; cd < 4; cd++) {
@@ -261,7 +261,7 @@ var ZapScene = new Phaser.Class({
          largura de dentro dela. */
       var mx = DEXC.x0 + (cd % 2) * (DEXC.W + DEXC.VAO), my = DEXC.y0 + Math.floor(cd / 2) * (DEXC.H + DEXC.VAO);
       var mn = this.make.graphics({ add: false });
-      mn.fillStyle(0xffffff, 1).fillRect(mx + 6, my + 84, DEXC.W - 12, 22);
+      mn.fillStyle(0xffffff, 1).fillRect(mx + 6, my + 78, DEXC.W - 12, 22);
       ct.nome.setMask(mn.createGeometryMask());
       ct.zona = this.add.zone(0, 0, 10, 10).setOrigin(0, 0);
       // tocar na carta abre a ficha dela, com tudo o que se sabe da pessoa
@@ -1463,14 +1463,14 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0x0a0a10, 0.9).fillRoundedRect(x + 5, y + 5, 30, 12, 6);
       g.fillStyle(cor, 1).fillCircle(x + W - 12, y + 11, 5);
       // o círculo escuro com o boneco
-      g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 50, 34);
-      g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 44, 26);
-      fig.setTexture(e.sprite, 0).setScale(1.4).setPosition(cx, y + 52).setVisible(true);
+      g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 46, 31);
+      g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 41, 24);
+      fig.setTexture(e.sprite, 0).setScale(1.3).setPosition(cx, y + 48).setVisible(true);
       if (nivel) fig.clearTint(); else fig.setTintFill(0x14141c);
       ct.num.setVisible(true).setPosition(x + 10, y + 7).setText('#' + (kd + 1 < 10 ? '00' : '0') + (kd + 1));
       // o nome, sempre no tamanho cheio; o que passa da carta vira letreiro (ver update)
       var nome = nivel ? e.nome : '???';
-      ct.nome.setVisible(true).setOrigin(0.5, 0).setPosition(cx, y + 87).setText(nome)
+      ct.nome.setVisible(true).setOrigin(0.5, 0).setPosition(cx, y + 81).setText(nome)
         .setScale(ESCALA_TEXTO).setColor(nivel ? PAL.branco : PAL.cinzaEsc);
       if (ct.nome.width > W - 14) {
         // três vezes com vão de três espaços: a volta não pula e a faixa nunca fica vazia
@@ -1486,11 +1486,11 @@ var ZapScene = new Phaser.Class({
         r1 = 'ONDE'; v1 = nivel ? e.onde : '???';
         r2 = e.pega ? 'PEGA' : 'VISTO'; v2 = nivel ? (e.pega || 'SIM') : 'NÃO';
       }
-      ct.r1.setVisible(true).setPosition(x + W * 0.28, y + 106).setText(r1);
-      ct.v1.setVisible(true).setPosition(x + W * 0.28, y + 116).setText(v1);
-      ct.r2.setVisible(true).setPosition(x + W * 0.72, y + 106).setText(r2);
-      ct.v2.setVisible(true).setPosition(x + W * 0.72, y + 116).setText(v2).setColor(nivel === 2 ? PAL.verde : PAL.branco);
-      ct.tipo.setVisible(true).setPosition(cx, y + 131).setText('TIPO: ' + (nivel ? e.tipo : '???'));
+      ct.r1.setVisible(true).setPosition(x + W * 0.28, y + 104).setText(r1);
+      ct.v1.setVisible(true).setPosition(x + W * 0.28, y + 115).setText(v1);
+      ct.r2.setVisible(true).setPosition(x + W * 0.72, y + 104).setText(r2);
+      ct.v2.setVisible(true).setPosition(x + W * 0.72, y + 115).setText(v2).setColor(nivel === 2 ? PAL.verde : PAL.branco);
+      ct.tipo.setVisible(true).setPosition(cx, y + 132).setText('TIPO: ' + (nivel ? e.tipo : '???'));
       ct.zona.setPosition(x, y).setSize(W, H).setInteractive();
     }
     this.tRodape.setText('VISTOS ' + vistos + ' DE ' + DEX.length);
@@ -1510,7 +1510,7 @@ var ZapScene = new Phaser.Class({
     this.tagsDex = tipos;
     this.gChipsDex = this.add.graphics().setDepth(2401);
     var mk = this.make.graphics({ add: false });
-    mk.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, ZAP.topo + 18, W, 20);
+    mk.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, ZAP.topo + 21, W, 20);
     this.mascChips = mk.createGeometryMask();
     this.gChipsDex.setMask(this.mascChips);
     this.tChipsDex = tipos.map(function () {
@@ -1544,7 +1544,7 @@ var ZapScene = new Phaser.Class({
     this.zBuscaDex = this.add.zone(ZAP.tx0 + 6, ZAP.topo - 6, W - 12, 22).setOrigin(0, 0);
     this.zBuscaDex.on('pointerdown', function () { if (self.modo === 'app' && self.aba === 5 && self.dexAberta < 0) inp.focus(); });
     // as tags: arrastar rola, tocar escolhe
-    this.zChipsDex = this.add.zone(ZAP.tx0, ZAP.topo + 18, W, 20).setOrigin(0, 0);
+    this.zChipsDex = this.add.zone(ZAP.tx0, ZAP.topo + 21, W, 20).setOrigin(0, 0);
     this.zChipsDex.on('pointerdown', function (pt) { self._arrChip = { x: pt.x, x0: self.dexChipX, andou: false }; });
     this.input.on('pointermove', function (pt) {
       var a = self._arrChip;
@@ -1593,9 +1593,9 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.tagsDex.length; i++) {
       var tg = this.tagsDex[i], on = tg === this.dexTag, w = tg.length * 6 + 16;
       var cor = tg === 'TODOS' ? 0x00e676 : (COR_TIPO[tg] || 0xb8bccc);
-      gc.fillStyle(on ? cor : 0x1c1c24, 1).fillRoundedRect(x, T + 19, w, 17, 8);
-      if (!on) gc.lineStyle(1, cor, 0.8).strokeRoundedRect(x + 0.5, T + 19.5, w - 1, 16, 8);
-      this.tChipsDex[i].setVisible(true).setPosition(x + w / 2, T + 24).setText(tg).setColor(on ? '#0a0a12' : PAL.branco);
+      gc.fillStyle(on ? cor : 0x1c1c24, 1).fillRoundedRect(x, T + 22, w, 17, 8);
+      if (!on) gc.lineStyle(1, cor, 0.8).strokeRoundedRect(x + 0.5, T + 22.5, w - 1, 16, 8);
+      this.tChipsDex[i].setVisible(true).setPosition(x + w / 2, T + 27).setText(tg).setColor(on ? '#0a0a12' : PAL.branco);
       pos.push({ x: x, w: w });
       x += w + 5;
     }
