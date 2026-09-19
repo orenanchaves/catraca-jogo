@@ -3121,6 +3121,12 @@ function audioOn() {
   if (AC && AC.state === 'suspended') AC.resume();
   comecaMusica();
 }
+/* o toque de mensagem: dois bipes rápidos subindo, o 'plim-plim' de zap */
+function tocaNotificacao() {
+  if (!SOM_LIGADO) return;
+  try { tom(1318, 0.07, 'sine', 0.18); setTimeout(function () { tom(1760, 0.1, 'sine', 0.18); }, 110); } catch (e) { }
+}
+
 function tom(f, d, tipo, vol) {
   if (!AC) return;
   var o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
@@ -3526,7 +3532,7 @@ var DEX = [
   // os cinco cosplayers, cada um com o seu jeito de ser derrotado
   { id: 'cosLaranja', nome: 'COSPLAY LARANJA', sprite: 'np_cos_naruto', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Macacão laranja e bandana. Não desiste nunca.' },
   { id: 'cosVingador', nome: 'COSPLAY VINGADOR', sprite: 'np_cos_sasuke', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Quimono branco, cara fechada. Só responde hmph.' },
-  { id: 'cosNuvem', nome: 'COSPLAY NUVEM', sprite: 'np_cos_akatsuki', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Capa preta de nuvens vermelhas. O mais forte do evento.' },
+  { id: 'cosNuvem', nome: 'ACATSUQUI', sprite: 'np_cos_akatsuki', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Capa preta de nuvens vermelhas. O mais forte do evento.' },
   { id: 'cosRosa', nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Cabelo rosa e soco que racha o chão.' },
   { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' }
 ];
@@ -5711,6 +5717,28 @@ var HudScene = new Phaser.Class({
        lidas por cima. É a linguagem de qualquer aparelho — quem vê
        bolinha vermelha sabe que tem recado esperando. */
     var zx = HUDB.zap.x + 9, zy = HUDB.zap.y + 10;
+    /* ---------- mensagem nova ----------
+       'Barulho de celular e o celular vibrando na tela, pro jogador
+       entender que tem que acessar o celular.' Chegou mensagem: o toque de
+       notificação, o aparelho de verdade vibra (quando o navegador
+       deixa), e o celular do HUD treme por um segundo e meio com as
+       ondinhas de vibração dos dois lados. */
+    if (time - (this._tZapChk || 0) > 500) {
+      this._tZapChk = time;
+      if (GameState.char && typeof entregaZap === 'function' && entregaZap() > 0) {
+        this.vibraZap = 1500;
+        tocaNotificacao();
+        try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch (e) { }
+      }
+    }
+    if (this.vibraZap > 0) {
+      this.vibraZap -= 16;
+      zx += Math.round(Math.sin(time / 22) * 2);
+      var ondas = Math.floor(time / 90) % 2;
+      g.lineStyle(2, 0xf2c14e, 0.9);
+      g.beginPath(); g.arc(zx + 8, zy + 11, 14 + ondas * 3, Math.PI * 0.75, Math.PI * 1.25); g.strokePath();
+      g.beginPath(); g.arc(zx + 8, zy + 11, 14 + ondas * 3, -Math.PI * 0.25, Math.PI * 0.25); g.strokePath();
+    }
     g.fillStyle(0x2c2c3a, 1).fillRect(zx, zy, 16, 22);
     g.fillStyle(0x0d1a14, 1).fillRect(zx + 2, zy + 3, 12, 15);
     g.fillStyle(0x00e676, 0.75).fillRect(zx + 3, zy + 5, 10, 2);

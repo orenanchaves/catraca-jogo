@@ -355,7 +355,34 @@ function montaZap(charKey) {
   }
 
   Phaser.Utils.Array.Shuffle(caixa);
+  /* 'As mensagens têm que ir aparecendo de acordo com o horário.' A
+     primeira chega logo que a perna começa; as outras vão pingando ao
+     longo do trajeto, de 12 a 30 minutos de jogo uma da outra. Cada uma
+     sabe quantos minutos depois do começo ela chega (`atraso`); o HUD
+     marca o começo (`base`) na primeira vez que olha. */
+  var soma = 0;
+  for (i = 0; i < caixa.length; i++) {
+    caixa[i].atraso = i === 0 ? 0 : (soma += 12 + Math.floor(Math.random() * 19));
+    caixa[i].chegou = false;
+  }
   return caixa;
+}
+/* as que já chegaram (as antigas, sem hora marcada, contam como chegadas) */
+function chegaram(caixa) {
+  return (caixa || []).filter(function (f) { return f.chegou !== false; });
+}
+/* confere quem chegou agora; devolve quantas chegaram nesta conferida */
+function entregaZap() {
+  var caixa = GameState.zap || [], novas = 0;
+  for (var i = 0; i < caixa.length; i++) {
+    var f = caixa[i];
+    if (f.chegou !== false) continue;
+    if (f.base === undefined) f.base = GameState.minutos;
+    var passou = (GameState.minutos - f.base + 1440) % 1440;
+    // no EXPLORAR o relógio não anda: chega tudo de uma vez
+    if (passou >= f.atraso || GameState.explorar) { f.chegou = true; f.lida = false; novas++; }
+  }
+  return novas;
 }
 
 /* a voz do personagem da vez, pra quando a conversa não traz resposta
@@ -384,6 +411,6 @@ function novoFio(item, temVai) {
 
 function naoLidas(caixa) {
   var n = 0;
-  for (var i = 0; i < (caixa || []).length; i++) if (!caixa[i].lida) n++;
+  for (var i = 0; i < (caixa || []).length; i++) if (caixa[i].chegou !== false && !caixa[i].lida) n++;
   return n;
 }

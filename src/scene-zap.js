@@ -186,9 +186,14 @@ var ZapScene = new Phaser.Class({
        o ZipZap era uma sala sem porta. Agora há três portas, e todas
        são as que a pessoa já procuraria sozinha: o ✕ na barra de
        status, o botão embaixo do aparelho, e tocar fora dele. */
-    this.zonaX = this.add.zone(ZAP.tx1 - 34, ZAP.status - 2, 38, 28)
+    /* 'Inverte o X e o início' e 'tem que ser um botão de voltar': em
+       cima, onde era o ✕, mora o ◄ VOLTAR (um passo pra trás: da conversa
+       pra lista, da ficha pras cartas, do app pra tela inicial); o ✕
+       FECHAR desceu pra barra de baixo, que era do INÍCIO. */
+    this.zonaX = this.add.zone(ZAP.tx1 - 76, ZAP.status - 2, 80, 26)
       .setOrigin(0, 0).setInteractive();
-    this.zonaX.on('pointerdown', function () { self.fecha(); });
+    this.zonaX.on('pointerdown', function () { if (self.modo === 'app') self.voltar(); });
+    this.tVoltar = txtC(this, ZAP.tx1 - 38, ZAP.status + 7, '◄ VOLTAR', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2413).setVisible(false);
 
     this.zonaBotao = this.add.zone(GW / 2 - 60, ZAP.ty1, 120, ZAP.y1 - ZAP.ty1)
       .setOrigin(0, 0).setInteractive();
@@ -226,7 +231,7 @@ var ZapScene = new Phaser.Class({
     }
     // o INÍCIO, na faixa de baixo de cada app
     this.zonaInicio = this.add.zone(ZAP.tx0, ZAP.abas, ZAP.tx1 - ZAP.tx0, 40).setOrigin(0, 0);
-    this.zonaInicio.on('pointerdown', function () { if (self.dexAberta >= 0) self.fechaFicha(); else self.vaiInicio(); });
+    this.zonaInicio.on('pointerdown', function () { if (self.modo !== 'bloqueio') self.fecha(); });
     // o cabeçalho da conversa volta pra lista
     this.zonaVolta = this.add.zone(ZAP.tx0, ZAP.topo - 10, ZAP.tx1 - ZAP.tx0, 30)
       .setOrigin(0, 0).setInteractive();
@@ -542,7 +547,7 @@ var ZapScene = new Phaser.Class({
 
   /* os filtros de cima da lista, como os do zap: TODAS, NÃO LIDAS, GRUPOS */
   caixaZap: function () {
-    var c = GameState.zap || [], f = this.filtroZap || 'todas';
+    var c = chegaram(GameState.zap), f = this.filtroZap || 'todas';
     if (f === 'todas') return c;
     return c.filter(function (m) { return f === 'grupos' ? !!m.grupo : !m.lida; });
   },
@@ -633,7 +638,8 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.zonas.length; i++) {
       if (this.modo === 'inicio') this.zonas[i].setInteractive(); else this.zonas[i].disableInteractive();
     }
-    if (this.modo === 'app') this.zonaInicio.setInteractive(); else this.zonaInicio.disableInteractive();
+    if (this.modo !== 'bloqueio') this.zonaInicio.setInteractive(); else this.zonaInicio.disableInteractive();
+    if (this.modo === 'app') this.zonaX.setInteractive(); else this.zonaX.disableInteractive();
     this.tRodape.setText('').setColor(PAL.cinzaEsc);
 
     // o mundo lá fora, escurecido: você parou de olhar pra frente
@@ -658,7 +664,7 @@ var ZapScene = new Phaser.Class({
     var sx0 = ZAP.tx0 - 4, sx1 = ZAP.tx1 + 4, sy0 = Y0 + 8, sy1 = Y1 - 8;
     g.fillStyle(0x0a0a12, 1).fillRoundedRect(sx0, sy0, sx1 - sx0, sy1 - sy0, 14);
 
-    if (noInicio) this.pintaInicio(g);
+    if (noInicio) { this.pintaInicio(g); if (this.modo === 'inicio') this.barraFechar(g); }
     else {
       // o cabeçalho do app, na cor dele, com o nome
       var zapClaro = this.aba === 0 && !this.fio;
@@ -781,12 +787,12 @@ var ZapScene = new Phaser.Class({
     /* O ✕ não existe na fonte do jogo, então ele é dois riscos — que é
        tudo que um ✕ é. Com moldura e branco, que é o que separa um
        enfeite de um botão. */
-    var xc = ZAP.tx1 - 15, yc = ZAP.status + 11;
-    g.fillStyle(0x2a1418, 1).fillRect(xc - 13, yc - 10, 26, 20);
-    g.lineStyle(1, 0xe8362c, 1).strokeRect(xc - 13, yc - 10, 26, 20);
-    g.lineStyle(2, 0xf2f0ff, 1);
-    g.beginPath(); g.moveTo(xc - 5, yc - 5); g.lineTo(xc + 5, yc + 5); g.strokePath();
-    g.beginPath(); g.moveTo(xc + 5, yc - 5); g.lineTo(xc - 5, yc + 5); g.strokePath();
+    // o ◄ VOLTAR, no canto de cima, só dentro de um app
+    this.tVoltar.setVisible(this.modo === 'app');
+    if (this.modo === 'app') {
+      g.fillStyle(0x0a0a12, 0.55).fillRoundedRect(ZAP.tx1 - 74, ZAP.status + 1, 72, 20, 6);
+      g.lineStyle(1, 0xf2f0ff, 0.8).strokeRoundedRect(ZAP.tx1 - 73.5, ZAP.status + 1.5, 71, 19, 6);
+    }
     // o risco de "home" no pé da tela
     g.fillStyle(0xd8d8e8, 0.85).fillRoundedRect(GW / 2 - 34, sy1 - 9, 68, 4, 2);
 
@@ -1666,10 +1672,23 @@ var ZapScene = new Phaser.Class({
     this.tWHora.setVisible(false); this.tWDia.setVisible(false); this.tWDest.setVisible(false);
     for (var i = 0; i < this.tApps.length; i++) this.tApps[i].setVisible(false);
     this.tBadge.setVisible(false);
+    this.barraFechar(g);
+  },
+  // a barra de baixo: o ✕ FECHAR (guarda o celular)
+  barraFechar: function (g) {
     g.fillStyle(0x111119, 1).fillRect(ZAP.tx0, ZAP.abas, ZAP.tx1 - ZAP.tx0, 40);
     g.fillStyle(0x2a2a3a, 1).fillRect(ZAP.tx0, ZAP.abas, ZAP.tx1 - ZAP.tx0, 2);
-    this.linhas[14].setVisible(true).setOrigin(0.5, 0).setPosition(GW / 2, ZAP.abas + 12)
-      .setText('◄ INÍCIO').setColor(PAL.cinza);
+    var xc = GW / 2 - 44, yc = ZAP.abas + 20;
+    g.lineStyle(2, 0xe8362c, 1);
+    g.beginPath(); g.moveTo(xc - 5, yc - 5); g.lineTo(xc + 5, yc + 5); g.strokePath();
+    g.beginPath(); g.moveTo(xc + 5, yc - 5); g.lineTo(xc - 5, yc + 5); g.strokePath();
+    this.linhas[14].setVisible(true).setOrigin(0.5, 0).setPosition(GW / 2 + 10, ZAP.abas + 12)
+      .setText('FECHAR').setColor(PAL.cinza);
+  },
+  voltar: function () {
+    if (this.fio) { this.fio = null; sfx('catraca'); this.pinta(); return; }
+    if (this.dexAberta >= 0) { this.fechaFicha(); return; }
+    this.vaiInicio();
   },
 
   /* E desce antes de o mundo voltar: o aparelho some por baixo, o jogo

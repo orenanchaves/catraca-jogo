@@ -146,7 +146,7 @@ var DESAFIANTES = {
     ]
   },
   cosNuvem: {
-    nome: 'COSPLAY NUVEM', sprite: 'np_cos_akatsuki', pac: 85, nivel: 8,
+    nome: 'ACATSUQUI', sprite: 'np_cos_akatsuki', pac: 85, nivel: 8,
     fraco: 'CALMA', resiste: 'LABIA',
     chega: 'VOCÊ JÁ ESTÁ\nNA MINHA ILUSÃO.',
     sai: 'PERDOE-ME.\nFICA PRA PRÓXIMA.',
