@@ -986,6 +986,10 @@ var GameState = {
     this.poeNoTrajeto(this.origem);
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
+    /* o checkpoint (src/campanha.js): chegou no destino de pé, grava. Chegada
+       que derrubou (o atraso zera os corações) não grava, senão voltar pra
+       ela seria cair de novo. */
+    if (typeof Campanha !== 'undefined' && !this.derrota()) Campanha.salva('chegou');
   },
 
   /* Comer devolve fôlego e custa minutos. O dogão é o único que devolve
@@ -3514,8 +3518,8 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
    'Acho que cabe evolução de nível.' Cada personagem tem o seu XP,
    guardado entre as partidas (metrosp_xp): ganhar um duelo rende mais
    quanto mais alto o nível de quem você venceu. Cada nível pede um
-   pouco mais que o anterior (xpPraSubir), até o 30. Nível dá paciência e força no duelo (desafio.js), e
-   é ele que decide quando dá pra fugir. */
+   pouco mais que o anterior (xpPraSubir), até o 30. Nível dá paciência
+   e força no duelo (desafio.js), e é ele que decide quando dá pra fugir. */
 function leXp() {
   try { return JSON.parse(localStorage.getItem('metrosp_xp') || '{}') || {}; } catch (e) { return {}; }
 }
@@ -4590,6 +4594,8 @@ function puxaAchados() {
    tenha acabado — continuam ali atrás. A cena do fim é quem depois mata
    as congeladas, porque quem sai da tela de fim vai pra outro lugar. */
 function vaiPraOFim(scene) {
+  // na campanha não tem fim de jogo: volta pro último checkpoint (src/campanha.js)
+  if (typeof voltaAoCheckpoint === 'function' && voltaAoCheckpoint(scene)) return;
   var congeladas = [];
   scene.scene.manager.getScenes(true).forEach(function (sc) {
     var k = sc.scene.key;

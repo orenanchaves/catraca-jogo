@@ -521,7 +521,13 @@ var EstacaoScene = new Phaser.Class({
       this.scene.launch('Tutorial');
     }
 
-    if (!noAlto) {
+    if (GameState.checkpointAviso) {
+      // voltou do checkpoint: o recado da queda no lugar da fala de abertura
+      fala(this, GameState.checkpointAviso, []);
+      GameState.checkpointAviso = null;
+      var selfCk = this;
+      this.time.delayedCall(4200, function () { if (selfCk.dialog) selfCk.dialog.fecha(); });
+    } else if (!noAlto) {
       var f = GameState.faixa();
       var cabec = GameState.hora() + ', ' + f.nome.toLowerCase() + '.\n';
       var msg = GameState.char.gratuidade

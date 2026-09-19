@@ -431,10 +431,26 @@ var TitleScene = new Phaser.Class({
     if (this.tentaComprar()) return;
     this.saindo = true;
     audioOn(); sfx('ok');
-    GameState.init(this.ordem[this.sel], this.gen[this.ordem[this.sel]]);
+    var k = this.ordem[this.sel], eu = this;
+    /* Tem checkpoint deste personagem: pergunta se continua de onde parou
+       ou se começa a campanha de novo, do dia 1 (src/campanha.js). */
+    var salvo = !explorar && Campanha.tem(k);
+    if (salvo) {
+      fala(this, 'Você parou no DIA ' + salvo.dia + ',\nem ' + placaDe(salvo.origem) + '.', [
+        { label: 'Continuar do dia ' + salvo.dia, cb: function () {
+          GameState.init(k, salvo.genero);
+          GameState.explorar = false;
+          Campanha.aplica(salvo);
+          eu.scene.start('Estacao', { onde: 'saguao' });
+        } },
+        { label: 'Começar do dia 1', cb: function () { Campanha.apaga(); eu.saindo = false; eu.comeca(false); } }
+      ]);
+      return;
+    }
+    GameState.init(k, this.gen[k]);
     // EXPLORAR: o mesmo começo, mas sem relógio, sem perder e sem valer ponto
     GameState.explorar = !!explorar;
-    if (!explorar) Missoes.novaCorrida();   // partida de verdade: zera o que era "numa corrida"
+    if (!explorar) { Missoes.novaCorrida(); Campanha.salva('inicio'); }   // o primeiro checkpoint é a porta de casa
     this.scene.start('Estacao', { onde: 'saguao' });
   },
 
@@ -442,6 +458,8 @@ var TitleScene = new Phaser.Class({
     Ctrl.update();
     // ?teste= no endereço: pula o título e abre a sala de teste (src/teste.js)
     if (TESTE && !abreSalaDeTeste.feito && this.ordem) { abreSalaDeTeste(this); return; }
+    // a pergunta do checkpoint (continuar ou começar de novo) é uma fala
+    if (this.dialog && this.dialog.ativo) { this.dialog.update(delta); return; }
     this.tempoAnim += delta;
     if (this.avisoT > 0) {
       this.avisoT -= delta;
