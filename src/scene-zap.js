@@ -82,6 +82,10 @@ MAPA_CEL.pos = function (linha, nome) {
   return { x: MAPA_CEL.BX, y: MAPA_CEL.yDe(i) };
 };
 
+/* A lista do ZipZap no desenho do zap claro: a pesquisa, os filtros, e
+   as conversas começando em `topo`, de 52 em 52. */
+var ZAP_LISTA = { buscaY: 0, chipY: 28, topo: 54, alt: 52 };
+var ZAP_FILTROS = [{ x: 34, w: 56, t: 'TODAS' }, { x: 96, w: 80, t: 'NÃO LIDAS' }, { x: 182, w: 62, t: 'GRUPOS' }];
 var ZAP = {
   x0: 16, x1: 304, y0: 36, y1: 552,   // moldura
   tx0: 26, tx1: 294,                  // tela útil
@@ -272,13 +276,23 @@ var ZapScene = new Phaser.Class({
     }
 
     // uma zona por linha da lista, pra abrir conversa no toque
+    this.filtroZap = 'todas';
+    this.zonasFiltro = [];
+    ['todas', 'naolidas', 'grupos'].forEach(function (fz, k) {
+      var zf = self.add.zone(ZAP_FILTROS[k].x, ZAP.topo + ZAP_LISTA.chipY, ZAP_FILTROS[k].w, 18).setOrigin(0, 0);
+      zf.on('pointerdown', function () {
+        if (self.aba !== 0 || self.fio || self.modo !== 'app') return;
+        self.filtroZap = fz; self.sel = 0; sfx('catraca'); self.pinta();
+      });
+      self.zonasFiltro.push(zf);
+    });
     this.zonasLinha = [];
     for (i = 0; i < 6; i++) {
       var zl = this.add.zone(ZAP.tx0, ZAP.topo + i * 62, ZAP.tx1 - ZAP.tx0, 58).setOrigin(0, 0).setInteractive();
       (function (idx) {
         zl.on('pointerdown', function () {
           if (self.aba !== 0 || self.fio) return;
-          var caixa = GameState.zap || [];
+          var caixa = self.caixaZap();
           if (idx >= caixa.length) return;
           self.sel = idx; self.abre();
         });
@@ -460,15 +474,22 @@ var ZapScene = new Phaser.Class({
       this.pinta();
       return;
     }
-    var n = this.aba === 4 ? this.itensDaMochila().length : (this.aba === 5 ? DEX.length : (GameState.zap || []).length);
+    var n = this.aba === 4 ? this.itensDaMochila().length : (this.aba === 5 ? DEX.length : this.caixaZap().length);
     if ((this.aba !== 0 && this.aba !== 4 && this.aba !== 5) || !n) return;
     this.sel = (this.sel + d + n) % n;
     sfx('catraca');
     this.pinta();
   },
 
+  /* os filtros de cima da lista, como os do zap: TODAS, NÃO LIDAS, GRUPOS */
+  caixaZap: function () {
+    var c = GameState.zap || [], f = this.filtroZap || 'todas';
+    if (f === 'todas') return c;
+    return c.filter(function (m) { return f === 'grupos' ? !!m.grupo : !m.lida; });
+  },
+
   abre: function () {
-    var caixa = GameState.zap || [];
+    var caixa = this.caixaZap();
     if (this.aba !== 0 || !caixa.length) return;
     this.fio = caixa[Math.min(this.sel, caixa.length - 1)];
     this.fio.lida = true;
@@ -528,6 +549,7 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.linhas.length; i++) this.linhas[i].setVisible(false).setOrigin(0, 0).setMaxWidth(0).setScale(ESCALA_TEXTO).setLeftAlign();
     // toque só no que está na tela: a lista e as respostas voltam ligadas pelo pintaZap
     for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].disableInteractive();
+    for (i = 0; i < this.zonasFiltro.length; i++) this.zonasFiltro[i].disableInteractive();
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
     this.zonaVolta.disableInteractive();
     for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false); }
@@ -573,8 +595,9 @@ var ZapScene = new Phaser.Class({
     if (noInicio) this.pintaInicio(g);
     else {
       // o cabeçalho do app, na cor dele, com o nome
-      g.fillStyle(APPS_ZAP[this.aba].cab, 1).fillRect(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, 22);
-      this.tStatus.setText(APPS_ZAP[this.aba].nome).setColor(PAL.branco);
+      var zapClaro = this.aba === 0 && !this.fio;
+      g.fillStyle(zapClaro ? 0xffffff : APPS_ZAP[this.aba].cab, 1).fillRect(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, 22);
+      this.tStatus.setText(zapClaro ? 'ZipZap' : APPS_ZAP[this.aba].nome).setColor(zapClaro ? '#1da851' : PAL.branco);
       if (this.aba === 0) this.pintaZap(g);
       else if (this.aba === 1) this.pintaMapa(g);
       else if (this.aba === 2) this.pintaGrana(g);
@@ -785,25 +808,30 @@ var ZapScene = new Phaser.Class({
       for (var py = ZAP.topo + 30; py < ZAP.abas - 100; py += 18) {
         for (var px = x0 + 10 + ((py / 18) % 2) * 9; px < x1 - 6; px += 18) g.fillRect(px, py, 2, 2);
       }
-      // o cabeçalho: voltar, a foto, o nome e o online
-      g.fillStyle(0x1f2c34, 1).fillRect(x0, ZAP.topo - 8, W, 34);
+      // o cabeçalho claro, como o da foto: voltar, a foto, o nome e o online
+      g.fillStyle(0xf0f2f5, 1).fillRect(x0, ZAP.topo - 8, W, 34);
+      g.fillStyle(0xd1d7db, 1).fillRect(x0, ZAP.topo + 25, W, 1);
       g.fillStyle(f0.grupo ? 0x3a5a8a : 0x4a4a5e, 1).fillCircle(x0 + 30, ZAP.topo + 9, 11);
       g.fillStyle(0x7a7a90, 1).fillCircle(x0 + 30, ZAP.topo + 5, 4).fillRect(x0 + 24, ZAP.topo + 11, 12, 6);
-      this.linha(0, ZAP.topo - 6, '◄', PAL.verde).setPosition(x0 + 4, ZAP.topo + 1);
-      this.linha(1, ZAP.topo - 6, (f0.grupo ? '# ' : '') + f0.nome, PAL.branco).setPosition(x0 + 48, ZAP.topo - 5);
-      this.linha(2, ZAP.topo, f0.grupo ? 'GRUPO' : 'ONLINE', PAL.verde).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 48, ZAP.topo + 13);
+      this.linha(0, ZAP.topo - 6, '◄', '#3b4a54').setPosition(x0 + 4, ZAP.topo + 1);
+      this.linha(1, ZAP.topo - 6, (f0.grupo ? '# ' : '') + f0.nome, '#111b21').setPosition(x0 + 48, ZAP.topo - 5);
+      this.linha(2, ZAP.topo, f0.grupo ? 'GRUPO' : 'ONLINE', '#667781').setScale(ESCALA_TEXTO / 2).setPosition(x0 + 48, ZAP.topo + 13);
+      // a pílula do dia, no alto da conversa
+      g.fillStyle(0x1f2c34, 1).fillRoundedRect(x0 + W / 2 - 22, ZAP.topo + 32, 44, 14, 5);
+      this.linha(9, ZAP.topo + 35, 'HOJE', '#8696a0').setScale(ESCALA_TEXTO / 2).setOrigin(0.5, 0).setPosition(x0 + W / 2, ZAP.topo + 35);
 
       var hora = GameState.hora ? GameState.hora() : '';
-      var y = ZAP.topo + 38, eu = this;
+      var y = ZAP.topo + 56, eu = this;
       // um balão: o texto quebra dentro dele; a hora (e o ✓✓ no seu) no canto de baixo
       var bal = function (iTxt, iHora, texto, meu) {
         var t = eu.linhas[iTxt], th = eu.linhas[iHora], esc = ESCALA_TEXTO / 2, maxW = W - 64;
-        t.setVisible(true).setOrigin(0, 0).setScale(esc).setMaxWidth(maxW / esc).setText(texto).setColor(PAL.branco);
+        t.setVisible(true).setOrigin(0, 0).setScale(esc).setMaxWidth(maxW / esc).setText(texto).setColor('#111b21');
         var tw = Math.min(maxW, Math.ceil(t.width)), tHt = Math.ceil(t.height);
-        th.setVisible(true).setOrigin(1, 0).setScale(esc).setText(hora + (meu ? ' ✓✓' : '')).setColor(meu ? '#7fd8ff' : PAL.cinza);
+        th.setVisible(true).setOrigin(1, 0).setScale(esc).setText(hora + (meu ? ' ✓✓' : '')).setColor(meu ? '#2f8fd0' : '#667781');
         var bw = Math.max(tw, Math.ceil(th.width) + 4) + 16, bh = tHt + 22;
         var bx = meu ? x1 - 10 - bw : x0 + 10;
-        g.fillStyle(meu ? 0x005c4b : 0x1f2c34, 1).fillRoundedRect(bx, y, bw, bh, 6);
+        // o recebido branco, o seu verde-clarinho (as cores da foto)
+        g.fillStyle(meu ? 0xd9fdd3 : 0xffffff, 1).fillRoundedRect(bx, y, bw, bh, 6);
         // o biquinho, no canto de cima do lado de quem fala
         if (meu) g.fillTriangle(bx + bw - 6, y, bx + bw + 6, y, bx + bw - 6, y + 10);
         else g.fillTriangle(bx + 6, y, bx - 6, y, bx + 6, y + 10);
@@ -845,34 +873,74 @@ var ZapScene = new Phaser.Class({
       return;
     }
 
+    /* ---------- a lista, no zap claro ----------
+       As fotos que vieram: fundo branco, a pesquisa, os filtros em
+       pílula (o escolhido em verde-clarinho), e cada conversa com a foto
+       redonda colorida com a inicial, o nome escuro, a prévia cinza, a
+       hora à direita e a bolinha verde com o número de não lidas. */
+    var X0 = ZAP.tx0, X1 = ZAP.tx1, W = X1 - X0, T = ZAP.topo, eu = this;
+    g.fillStyle(0xffffff, 1).fillRect(X0, T - 8, W, ZAP.abas - T + 8);
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
     this.zonaVolta.disableInteractive();
-    for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].setInteractive();
+    // a pesquisa
+    g.fillStyle(0xf0f2f5, 1).fillRoundedRect(X0 + 8, T + ZAP_LISTA.buscaY - 4, W - 16, 22, 11);
+    g.lineStyle(2, 0x667781, 1).strokeCircle(X0 + 22, T + ZAP_LISTA.buscaY + 6, 4);
+    g.lineBetween(X0 + 25, T + ZAP_LISTA.buscaY + 9, X0 + 29, T + ZAP_LISTA.buscaY + 13);
+    this.linhas[19].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(X0 + 36, T + ZAP_LISTA.buscaY + 3)
+      .setText('PESQUISAR').setColor('#8696a0');
+    // os filtros
+    var filtros = ['todas', 'naolidas', 'grupos'];
+    for (i = 0; i < 3; i++) {
+      var ff = ZAP_FILTROS[i], on = (this.filtroZap === filtros[i]);
+      g.fillStyle(on ? 0xd9fdd3 : 0xf0f2f5, 1).fillRoundedRect(ff.x, T + ZAP_LISTA.chipY, ff.w, 18, 9);
+      this.linhas[16 + i].setVisible(true).setScale(ESCALA_TEXTO / 2).setOrigin(0.5, 0)
+        .setPosition(ff.x + ff.w / 2, T + ZAP_LISTA.chipY + 5).setText(ff.t).setColor(on ? '#15803d' : '#54656f');
+      this.zonasFiltro[i].setInteractive();
+    }
 
+    var caixa = this.caixaZap();
+    for (i = 0; i < this.zonasLinha.length; i++) {
+      this.zonasLinha[i].setPosition(X0, T + ZAP_LISTA.topo + i * ZAP_LISTA.alt).setSize(W, ZAP_LISTA.alt);
+      if (i < caixa.length) this.zonasLinha[i].setInteractive(); else this.zonasLinha[i].disableInteractive();
+    }
     if (!caixa.length) {
-      this.linha(0, ZAP.topo + 40, '  NENHUMA MENSAGEM.', PAL.cinzaEsc);
+      this.linha(0, T + ZAP_LISTA.topo + 20, 'NENHUMA CONVERSA', '#8696a0').setOrigin(0.5, 0).setPosition(X0 + W / 2, T + ZAP_LISTA.topo + 20);
       this.tRodape.setText('');
       return;
     }
-
-    for (i = 0; i < caixa.length && i < 6; i++) {
-      var f = caixa[i], y2 = ZAP.topo + i * 62, sel = (i === this.sel);
-      g.fillStyle(sel ? 0x1b2a22 : 0x121820, 1).fillRect(ZAP.tx0, y2, ZAP.tx1 - ZAP.tx0, 58);
-      g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0, y2 + 58, ZAP.tx1 - ZAP.tx0, 2);
-      if (sel) g.lineStyle(2, 0x00e676, 0.9).strokeRect(ZAP.tx0 + 1, y2 + 1, ZAP.tx1 - ZAP.tx0 - 2, 56);
-      // a bolinha da foto do contato
-      g.fillStyle(f.grupo ? 0x3a5a8a : 0x4a4a5e, 1).fillCircle(ZAP.tx0 + 22, y2 + 28, 15);
-      g.fillStyle(0x6a6a80, 1).fillCircle(ZAP.tx0 + 22, y2 + 23, 6);
-      g.fillStyle(0x6a6a80, 1).fillRect(ZAP.tx0 + 13, y2 + 31, 18, 10);
-      this.linhas[i * 2].setVisible(true).setPosition(ZAP.tx0 + 46, y2 + 6)
-        .setText((f.grupo ? '# ' : '') + f.nome).setColor(f.lida ? PAL.cinza : PAL.branco);
-      this.linhas[i * 2 + 1].setVisible(true).setPosition(ZAP.tx0 + 46, y2 + 30)
-        .setText(this.previa(f)).setColor(f.vai && !f.aceito ? PAL.amarelo : PAL.cinzaEsc);
-      if (!f.lida) {
-        g.fillStyle(0x00e676, 1).fillCircle(ZAP.tx1 - 16, y2 + 28, 6);
+    var CORES_FOTO = [0x25d366, 0x34b7f1, 0xf15c6d, 0xa47cff, 0xf2a93b, 0x00a884];
+    var hora = GameState.hora ? GameState.hora() : '';
+    if (this.sel >= caixa.length) this.sel = 0;
+    for (i = 0; i < caixa.length && i < 5; i++) {
+      var f = caixa[i], y2 = T + ZAP_LISTA.topo + i * ZAP_LISTA.alt, sel = (i === this.sel);
+      if (sel) g.fillStyle(0xf0f2f5, 1).fillRect(X0, y2, W, ZAP_LISTA.alt);
+      // a foto: a cor sai do nome, e a inicial vai no meio (grupo leva o desenho de gente)
+      var cf = CORES_FOTO[(f.nome.charCodeAt(0) + f.nome.length) % CORES_FOTO.length], fx = X0 + 24, fy = y2 + 26;
+      g.fillStyle(f.grupo ? 0xdfe5e7 : cf, 1).fillCircle(fx, fy, 17);
+      if (f.grupo) {
+        g.fillStyle(0xffffff, 1).fillCircle(fx - 5, fy - 4, 4).fillCircle(fx + 6, fy - 3, 3.5)
+          .fillRoundedRect(fx - 12, fy + 2, 14, 8, 3).fillRoundedRect(fx + 1, fy + 3, 11, 7, 3);
       }
+      var ini = this.linhas[12 + (i % 4)];
+      if (!f.grupo && i < 4) ini.setVisible(true).setScale(ESCALA_TEXTO).setOrigin(0.5, 0.5).setPosition(fx, fy + 1)
+        .setText(f.nome.replace(/[^A-ZÀ-Ú]/g, '').charAt(0) || '?').setColor('#ffffff');
+      // o nome e a prévia
+      this.linhas[i * 2].setVisible(true).setPosition(X0 + 48, y2 + 8)
+        .setText((f.grupo ? '# ' : '') + f.nome).setColor('#111b21');
+      var prev = this.previa(f);
+      this.linhas[i * 2 + 1].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(X0 + 48, y2 + 30)
+        .setText(prev).setColor(f.vai && !f.aceito ? '#15803d' : '#667781');
+      // a hora e a bolinha das não lidas
+      if (!f.lida) {
+        g.fillStyle(0x25d366, 1).fillCircle(X1 - 16, y2 + 32, 7);
+        g.fillStyle(0xffffff, 1).fillRect(X1 - 17, y2 + 28, 2, 8);    // o '1'
+      }
+      g.fillStyle(0xe9edef, 1).fillRect(X0 + 48, y2 + ZAP_LISTA.alt - 1, W - 48, 1);
     }
-    this.tRodape.setText(naoLidas(caixa) + ' NÃO LIDA(S)');
+    this.tRodape.setText('');
+    // a hora da mais recente, no canto da primeira
+    this.linhas[11].setVisible(true).setScale(ESCALA_TEXTO / 2).setOrigin(1, 0)
+      .setPosition(X1 - 8, T + ZAP_LISTA.topo + 10).setText(hora).setColor(!caixa[0].lida ? '#1da851' : '#667781');
   },
 
   /* Um balão. Recebido nasce na margem esquerda; enviado é empurrado
@@ -895,8 +963,8 @@ var ZapScene = new Phaser.Class({
     var m = f.respondido && f.enviadas.length
       ? '► ' + f.enviadas[f.enviadas.length - 1]
       : (f.msgs[0] || '');
-    // 16 caracteres: a linha começa em 72 e a bolinha de não lida em 272
-    return m.length > 16 ? m.slice(0, 13) + '...' : m;
+    // em letra pequena cabem 30: a linha começa em 74 e a bolinha de não lida em 270
+    return m.length > 30 ? m.slice(0, 27) + '...' : m;
   },
 
   /* ---------- aba 2: o mapa ----------
