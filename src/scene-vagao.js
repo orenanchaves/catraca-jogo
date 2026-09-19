@@ -784,6 +784,16 @@ var VagaoScene = new Phaser.Class({
   desenhaBarrasDoCarro: function (g) {
     for (var i = 0; i < 2; i++) {
       var cx = BARRAS_X[i] + 4;
+      /* A barra corrida do teto voltou ('as barras sumiram'): fina, e por
+         trás das pessoas (a imagem das barras mora na camada 20), porque é
+         a de cima — quem passa, passa por baixo dela. Os balaústres ficam
+         em cima dela, e são eles que têm colisão. */
+      for (var by = HUD_H; by < GH; by += 2) {
+        if (i && naPorta(by, 8)) continue;
+        g.fillStyle(0x000000, 0.18).fillRect(cx + 4, by, 2, 2);            // a sombra no chão
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(cx - 2, by, 4, 2);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(cx - 1, by, 1, 2);
+      }
       for (var ay = POSTE_Y0; ay < GH - 40; ay += POSTE_PASSO) {
         if (!temPoste(i, ay)) continue;
         // o poste visto de cima: base escura, tubo de inox, brilho da luz de cima-esquerda

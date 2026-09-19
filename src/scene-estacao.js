@@ -521,6 +521,8 @@ var EstacaoScene = new Phaser.Class({
      a coluna esquerda do saguão. Barraca ali estrangulava justamente a
      passagem de quem vai comprar passagem. */
   montaBarracas: function () {
+    // na Itaquera as lojas moram na galeria, lado a lado (estacao-itaquera.js)
+    if (this.itq) { this.barracas = lojasDaGaleria(); return; }
     this.barracas = [
       {
         chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
@@ -567,83 +569,11 @@ var EstacaoScene = new Phaser.Class({
      textura do saguão (0), o atendente em 39, e balcão e letreiro por
      cima dele (40 e 41). */
   pintaBarracas: function (g) {
-    for (var i = 0; i < this.barracas.length; i++) {
-      var b = this.barracas[i], x = b.x, y = b.y, w = b.w, h = b.h, k;
-      var dog = (b.chave === 'dog');
-      g.fillStyle(0x000000, 0.35).fillRect(x + 4, y + 6, w, h);
-      // a caixa e a parede do fundo
-      g.fillStyle(dog ? 0x2a2320 : 0x1f3a2a, 1).fillRect(x, y, w, h);
-      g.fillStyle(0x14141a, 1).fillRect(x + 3, y + 12, w - 6, h - 30);
-      if (dog) {
-        // duas geladeiras de vidro com latinhas, e o cardápio no meio
-        for (k = 0; k < 2; k++) {
-          var fx = k ? x + w - 21 : x + 5;
-          g.fillStyle(0x9ec4dc, 1).fillRect(fx, y + 14, 16, h - 34);
-          g.fillStyle(0xe8362c, 1);
-          for (var r = 0; r < 3; r++) g.fillRect(fx + 2, y + 17 + r * 8, 12, 4);
-          g.fillStyle(0xffffff, 0.4).fillRect(fx + 1, y + 14, 2, h - 34);
-        }
-        g.fillStyle(0x0a0a10, 1).fillRect(x + 24, y + 14, w - 48, 14);
-        g.fillStyle(0xf2f0ff, 0.7);
-        for (var c = 0; c < 3; c++) g.fillRect(x + 27, y + 17 + c * 4, w - 54, 1);
-      } else {
-        // a parede de revistas: uma grade de capas coloridas
-        var capas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
-        for (var ry = 0; ry < 3; ry++) {
-          for (var rx = 0; rx < 6; rx++) {
-            g.fillStyle(capas[(rx + ry * 2) % capas.length], 1).fillRect(x + 6 + rx * 10, y + 14 + ry * 9, 8, 7);
-          }
-        }
-      }
-      // a luz do quiosque no chão da frente
-      g.fillStyle(0xf2c14e, 0.1).fillRect(x - 4, y + h, w + 8, 20);
-    }
+    for (var i = 0; i < this.barracas.length; i++) pintaFundoDaLoja(g, this.barracas[i]);
   },
 
   montaVendedores: function () {
-    for (var i = 0; i < this.barracas.length; i++) {
-      var b = this.barracas[i], x = b.x, y = b.y, w = b.w, h = b.h, k;
-      var dog = (b.chave === 'dog');
-      // o atendente: de frente, com as pernas escondidas atrás do balcão
-      var ven = new Ator(this, x + w / 2, y + h - 4, dog ? 'np_ambulante_c' : 'np_ambulante_b');
-      ven.dir = 'down'; ven.anima(0, false);
-      ven.sp.setDepth(39);
-
-      // o balcão, na frente dele
-      var gb = this.add.graphics().setDepth(40);
-      var by = y + h - 20;
-      gb.fillStyle(0x9a9ca4, 1).fillRect(x - 2, by, w + 4, 4);                 // o tampo
-      gb.fillStyle(dog ? 0xe8b21e : 0x2c5a3c, 1).fillRect(x, by + 4, w, 16);
-      gb.fillStyle(0x000000, 0.25).fillRect(x, by + 17, w, 3);
-      if (dog) {
-        // a foto do lanche no painel amarelo: dois dogões
-        for (k = 0; k < 2; k++) {
-          var hx = x + 12 + k * 28;
-          gb.fillStyle(0xd99a4e, 1).fillEllipse(hx + 8, by + 12, 18, 8);
-          gb.fillStyle(0xa8401c, 1).fillEllipse(hx + 8, by + 11, 16, 4);
-          gb.fillStyle(0xf2c14e, 1).fillRect(hx + 2, by + 10, 12, 1);          // a mostarda
-        }
-        // bisnagas em cima do tampo
-        gb.fillStyle(0xe8362c, 1).fillRect(x + 4, by - 6, 3, 6);
-        gb.fillStyle(0xf2c14e, 1).fillRect(x + 9, by - 6, 3, 6);
-      } else {
-        // revistas abertas em leque em cima do balcão
-        var cores = [0xf2f0ff, 0xe8362c, 0x3a7fd0, 0xf2c14e, 0xd05a8a];
-        for (k = 0; k < 5; k++) gb.fillStyle(cores[k], 1).fillRect(x + 6 + k * 12, by - 3, 9, 7);
-      }
-
-      // o letreiro em cima: preto, nome colorido, os emblemas nas pontas
-      var gl = this.add.graphics().setDepth(41);
-      gl.fillStyle(0x0a0a10, 1).fillRect(x - 3, y - 8, w + 6, 18);
-      gl.fillStyle(dog ? 0xe8362c : 0xf2f0ff, 1).fillRect(x - 3, y + 8, w + 6, 2);
-      if (dog) {
-        // os emblemas ficam pra fora da chapa, pra não comer o nome
-        gl.fillStyle(0xe8762c, 1).fillCircle(x - 7, y + 1, 7).fillCircle(x + w + 7, y + 1, 7);
-        gl.fillStyle(0xf2c14e, 1).fillCircle(x - 7, y + 1, 3).fillCircle(x + w + 7, y + 1, 3);
-      }
-      txtC(this, x + w / 2, y - 4, b.nome, dog ? PAL.amarelo : PAL.branco, 8)
-        .setScale(ESCALA_TEXTO / 2).setDepth(42);
-    }
+    for (var i = 0; i < this.barracas.length; i++) montaFrenteDaLoja(this, this.barracas[i]);
   },
 
   /* ---------- o cenário, em três faixas ----------
@@ -847,7 +777,7 @@ var EstacaoScene = new Phaser.Class({
     g.fillStyle(num(PAL.amarelo), 1).fillRect(14, 226, bw - 12, 5);
     g.fillStyle(num(PAL.amareloSom), 1).fillRect(14, 231, bw - 12, 2);
 
-    eu.pintaBarracas(g);
+    if (!eu.itq) eu.pintaBarracas(g);
   },
 
   /* o vão por onde a escada entra no saguão: mesmo desenho da escada,
@@ -1077,6 +1007,7 @@ var EstacaoScene = new Phaser.Class({
 
     // fora de serviço: a porta larga é a última a fechar
     var abertas = Phaser.Math.Clamp(Math.round(TOTAL * f.catracas), 2, TOTAL);
+    if (this.itq) abertas = TOTAL;      // a Itaquera tem as seis abertas, sempre
     var todas = [];
     for (var q = 0; q < TOTAL; q++) todas.push(q);
     var ordem = Phaser.Utils.Array.Shuffle(todas).sort(function (a, b) {

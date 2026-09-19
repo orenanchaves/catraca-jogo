@@ -63,6 +63,12 @@ function dentroDe(r, x, y) { return x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1
    com a câmera presa em você, ela aparece embaixo da tela. */
 var ARENA = { x: 250, y: 1040, w: 500, h: 300 };
 var ITQ_PISA = 6;                   // o boneco não encosta na parede da passarela
+/* ---------- a galeria ----------
+   Um corredor largo logo embaixo do saguão, atravessando de um lado a
+   outro, com as lojas lado a lado na parede de cima (a parede do fim do
+   saguão vira a fachada delas), viradas pra galeria. A passarela desce
+   do meio dela. Três lojas de cada lado da boca da passarela. */
+var GAL = { x0: -196, x1: 516, lojaY: 520, lojaH: 58, piso0: 578, piso1: 668 };
 var ITQ_MEIO_X = (ITQ.passX0 + ITQ.passX1) / 2;
 var ITQ_MEIO_Y = (ITQ.cruzY0 + ITQ.cruzY1) / 2;
 
@@ -98,11 +104,32 @@ function assentosItq() {
   return out;
 }
 
+/* As seis lojas: o que cada uma vende, e onde fica. Vendem só o que o
+   jogo já sabe vender (ITENS do core). */
+function lojasDaGaleria() {
+  var L = [
+    ['dog', -170, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
+    ['banca', -90, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
+    ['cafe', -10, '"Um cafezinho pra acordar?"', ['cafe', 'doce']],
+    ['doceria', 196, '"Doce pra levar pra casa."', ['chocolate', 'doce']],
+    ['padaria', 276, '"Pão na chapa não tem,\nmas tem café."', ['cafe', 'doce', 'agua']],
+    ['agua', 356, '"Água gelada, suco natural!"', ['agua']]
+  ];
+  var out = [];
+  for (var i = 0; i < L.length; i++) {
+    var e = ESTILO_LOJA[L[i][0]];
+    out.push({ chave: L[i][0], nome: e.nome, cor: e.cor, x: L[i][1], y: GAL.lojaY, w: 76, h: GAL.lojaH,
+      lado: 0, titulo: L[i][2], cardapio: L[i][3] });
+  }
+  return out;
+}
+
 /* ---------- o que é chão ---------- */
 EstacaoScene.prototype.naPassarela = function (x, y) {
   var tronco = x > ITQ.passX0 + ITQ_PISA && x < ITQ.passX1 - ITQ_PISA && y >= ITQ.passY0 - 4 && y < ITQ.passY1;
   var braco = y > ITQ.cruzY0 + ITQ_PISA && y < ITQ.cruzY1 - ITQ_PISA && x > ITQ.bracoX0 && x < ITQ.bracoX1 + 12;
-  if (tronco || braco) return true;
+  var galeria = x > GAL.x0 + 6 && x < GAL.x1 - 6 && y > GAL.piso0 + 2 && y < GAL.piso1 - 4;
+  if (tronco || braco || galeria) return true;
   // lá fora: calçada, faixa, subidona e esplanada — mas a Arena é parede
   if (dentroDe(FORA.calcada, x, y) || dentroDe(FORA.descida, x, y) ||
       dentroDe(FORA.faixa, x, y) || dentroDe(FORA.rampa, x, y)) return true;
@@ -233,6 +260,19 @@ EstacaoScene.prototype.pintaPassarela = function (g) {
   corredor(ITQ.passX0, ITQ.passY0 - 4, ITQ.passX1 - ITQ.passX0, ITQ.passY1 - ITQ.passY0 + 4, false);
   corredor(ITQ.bracoX0, ITQ.cruzY0, ITQ.passX0 - ITQ.bracoX0 + 6, ITQ.cruzY1 - ITQ.cruzY0, true);
   corredor(ITQ.passX1 - 6, ITQ.cruzY0, ITQ.bracoX1 - ITQ.passX1 + 6, ITQ.cruzY1 - ITQ.cruzY0, true);
+  // a galeria: piso claro de shopping, a parede de vidro embaixo e as pontas
+  g.fillStyle(0xd9d6cf, 1).fillRect(GAL.x0, GAL.lojaY - 4, GAL.x1 - GAL.x0, GAL.piso1 - GAL.lojaY + 4);
+  for (var gy = GAL.piso0; gy < GAL.piso1 - 6; gy += 16) {
+    for (var gx = GAL.x0 + 6; gx < GAL.x1 - 6; gx += 16) {
+      g.fillStyle((((gx - GAL.x0) / 16 + (gy - GAL.piso0) / 16) % 2) ? 0xbcb8b0 : 0xc8c4bc, 1);
+      g.fillRect(gx + 1, gy + 1, Math.min(14, GAL.x1 - 6 - gx - 1), Math.min(14, GAL.piso1 - 6 - gy - 1));
+    }
+  }
+  g.fillStyle(0xffffff, 0.12).fillRect(GAL.x0 + 6, GAL.piso0 + 30, GAL.x1 - GAL.x0 - 12, 8);   // o reflexo das luzes
+  g.fillStyle(0x7fa8c8, 0.6).fillRect(GAL.x0, GAL.piso1 - 6, GAL.x1 - GAL.x0, 3);            // o vidro de baixo
+  g.fillStyle(0xe8362c, 1).fillRect(GAL.x0, GAL.piso1 - 2, GAL.x1 - GAL.x0, 2);
+  // e a passarela continua descendo do meio dela
+  g.fillStyle(0x9a948a, 1).fillRect(ITQ.passX0 + 6, GAL.piso1 - 6, ITQ.passX1 - ITQ.passX0 - 12, 8);
   // o cruzamento: o piso passa por cima da emenda
   g.fillStyle(0x9a948a, 1).fillRect(ITQ.passX0 + 6, ITQ.cruzY0 + 6, ITQ.passX1 - ITQ.passX0 - 12, ITQ.cruzY1 - ITQ.cruzY0 - 12);
   g.fillStyle(0xe8362c, 0.25).fillCircle(ITQ_MEIO_X, ITQ_MEIO_Y, 24);
@@ -363,6 +403,9 @@ EstacaoScene.prototype.montaItaquera = function () {
   texturaDeCena(this, 'est_itq_passarela', ITQ.mundoX1 - ITQ.mundoX0, ITQ.fundoY - y0,
     function (g) { eu.pintaPassarela(g); });
   this.add.image(ITQ.mundoX0, y0, 'est_itq_passarela').setOrigin(0, 0).setDepth(-1);
+
+  var gLojas = this.add.graphics().setDepth(0.6);
+  this.pintaBarracas(gLojas);
 
   // a boca da passarela na parede de baixo do saguão
   var boca = this.add.graphics().setDepth(0.5);
@@ -684,6 +727,7 @@ EstacaoScene.prototype.contextoItq = function () {
     return true;
   }
   if (!(y > ITQ.passY0 || x < 0 || x > GW) || y < ESC_Y) return false;
+  if (this.barracaPerto(x, y)) return false;     // na frente de uma loja, quem fala é a loja
   var dica;
   if (this.praCasa) {
     var c = SAIDAS_ITQ[saidaDeCasa()];

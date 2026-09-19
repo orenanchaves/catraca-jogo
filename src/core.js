@@ -2768,6 +2768,111 @@ function empurraoNaMarra(cena, gente, limita) {
   return true;
 }
 
+/* ---------- as lojas, de frente ----------
+   Um quiosque é sempre a mesma peça: letreiro em cima, a parede de dentro
+   (o que muda de loja pra loja), o atendente, e o balcão na frente com o
+   produto à mostra. O estilo diz as cores, a parede e o produto. */
+var ESTILO_LOJA = {
+  dog: { nome: 'DOG DO CÃO', cor: 0xe8362c, fundo: 0x2a2320, parede: 'geladeira', balcao: 0xe8b21e, produto: 'dog', letra: '#f2c14e', emblema: 0xe8762c, ven: 'np_ambulante_c' },
+  banca: { nome: 'BANCA', cor: 0xf2f0ff, fundo: 0x1f3a2a, parede: 'revistas', balcao: 0x2c5a3c, produto: 'revista', letra: '#f2f0ff', ven: 'np_ambulante_b' },
+  cafe: { nome: 'CAFÉ', cor: 0xc8752a, fundo: 0x2a1e16, parede: 'maquina', balcao: 0x6b4226, produto: 'xicara', letra: '#f2c14e', ven: 'np_pax5' },
+  doceria: { nome: 'DOCERIA', cor: 0xe28cc0, fundo: 0x2a1c26, parede: 'vitrine', balcao: 0xc85a9a, produto: 'bolo', letra: '#f2f0ff', ven: 'np_pax3' },
+  padaria: { nome: 'PADARIA', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'paes', balcao: 0xb07a3a, produto: 'pao', letra: '#f2c14e', ven: 'np_pax4' },
+  agua: { nome: 'ÁGUA E SUCO', cor: 0x3a7fd0, fundo: 0x16223a, parede: 'geladeira', balcao: 0x2f6fb8, produto: 'garrafa', letra: '#f2f0ff', ven: 'np_pax0' }
+};
+
+function pintaFundoDaLoja(g, b) {
+  var e = ESTILO_LOJA[b.chave] || ESTILO_LOJA.banca, x = b.x, y = b.y, w = b.w, h = b.h, k, r;
+  g.fillStyle(0x000000, 0.35).fillRect(x + 4, y + 6, w, h);
+  g.fillStyle(e.fundo, 1).fillRect(x, y, w, h);
+  g.fillStyle(0x14141a, 1).fillRect(x + 3, y + 12, w - 6, h - 30);
+  var py = y + 14, ph = h - 34;
+  if (e.parede === 'geladeira') {
+    for (k = 0; k < 2; k++) {
+      var fx = k ? x + w - 21 : x + 5;
+      g.fillStyle(0x9ec4dc, 1).fillRect(fx, py, 16, ph);
+      g.fillStyle(b.chave === 'agua' ? 0x3a7fd0 : 0xe8362c, 1);
+      for (r = 0; r < 3; r++) g.fillRect(fx + 2, py + 3 + r * 8, 12, 4);
+      g.fillStyle(0xffffff, 0.4).fillRect(fx + 1, py, 2, ph);
+    }
+    g.fillStyle(0x0a0a10, 1).fillRect(x + 24, py, w - 48, 14);
+    g.fillStyle(0xf2f0ff, 0.7);
+    for (r = 0; r < 3; r++) g.fillRect(x + 27, py + 3 + r * 4, w - 54, 1);
+  } else if (e.parede === 'revistas') {
+    var capas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
+    for (r = 0; r < 3; r++) for (k = 0; k < 7; k++) {
+      g.fillStyle(capas[(k + r * 2) % capas.length], 1).fillRect(x + 5 + k * 10, py + r * 9, 8, 7);
+    }
+  } else if (e.parede === 'maquina') {
+    // a máquina de café, prateada, e as xícaras na prateleira
+    g.fillStyle(0x9a9ca4, 1).fillRect(x + 8, py, 26, ph);
+    g.fillStyle(0x3a3a44, 1).fillRect(x + 12, py + 4, 18, 6);
+    g.fillStyle(0xc8752a, 1).fillRect(x + 14, py + 12, 4, 4).fillRect(x + 24, py + 12, 4, 4);
+    g.fillStyle(0xf2f0ff, 1);
+    for (k = 0; k < 4; k++) g.fillRect(x + 42 + k * 8, py + 4, 6, 5);
+    g.fillStyle(0x6b4226, 1).fillRect(x + 40, py + 10, w - 46, 2);
+  } else if (e.parede === 'vitrine') {
+    // a vitrine de bolos
+    g.fillStyle(0x9ec4dc, 0.7).fillRect(x + 6, py, w - 12, ph);
+    var bolos = [0xf2f0ff, 0x7a3a1c, 0xe28cc0, 0xf2c14e];
+    for (k = 0; k < 4; k++) {
+      g.fillStyle(bolos[k], 1).fillCircle(x + 16 + k * 15, py + 7, 5);
+      g.fillStyle(0xe8362c, 1).fillRect(x + 15 + k * 15, py + 2, 2, 2);
+    }
+  } else {
+    // pães nas prateleiras
+    for (r = 0; r < 2; r++) {
+      g.fillStyle(0x5a3f22, 1).fillRect(x + 6, py + 5 + r * 10, w - 12, 2);
+      for (k = 0; k < 6; k++) g.fillStyle(0xd99a4e, 1).fillEllipse(x + 12 + k * 11, py + 3 + r * 10, 9, 5);
+    }
+  }
+  g.fillStyle(0xf2c14e, 0.1).fillRect(x - 4, y + h, w + 8, 20);          // a luz no chão da frente
+}
+
+function montaFrenteDaLoja(cena, b) {
+  var e = ESTILO_LOJA[b.chave] || ESTILO_LOJA.banca, x = b.x, y = b.y, w = b.w, h = b.h, k;
+  // o atendente, de frente, com as pernas atrás do balcão
+  var ven = new Ator(cena, x + w / 2, y + h - 4, e.ven);
+  ven.dir = 'down'; ven.anima(0, false); ven.sp.setDepth(39);
+  // o balcão
+  var gb = cena.add.graphics().setDepth(40), by = y + h - 20;
+  gb.fillStyle(0x9a9ca4, 1).fillRect(x - 2, by, w + 4, 4);
+  gb.fillStyle(e.balcao, 1).fillRect(x, by + 4, w, 16);
+  gb.fillStyle(0x000000, 0.25).fillRect(x, by + 17, w, 3);
+  for (k = 0; k < 2; k++) {
+    var hx = x + 12 + k * (w - 40), hy = by + 11;
+    if (e.produto === 'dog') {
+      gb.fillStyle(0xd99a4e, 1).fillEllipse(hx + 8, hy + 1, 18, 8);
+      gb.fillStyle(0xa8401c, 1).fillEllipse(hx + 8, hy, 16, 4);
+      gb.fillStyle(0xf2c14e, 1).fillRect(hx + 2, hy - 1, 12, 1);
+    } else if (e.produto === 'revista') {
+      gb.fillStyle(0xf2f0ff, 1).fillRect(hx + 2, hy - 4, 10, 8);
+      gb.fillStyle(0xe8362c, 1).fillRect(hx + 4, hy - 2, 6, 2);
+    } else if (e.produto === 'xicara') {
+      gb.fillStyle(0xf2f0ff, 1).fillRect(hx + 3, hy - 3, 9, 7).fillRect(hx + 12, hy - 1, 2, 3);
+      gb.fillStyle(0x6b4226, 1).fillRect(hx + 4, hy - 3, 7, 2);
+    } else if (e.produto === 'bolo') {
+      gb.fillStyle(0xf2f0ff, 1).fillRect(hx + 2, hy - 2, 12, 6);
+      gb.fillStyle(0xe28cc0, 1).fillRect(hx + 2, hy - 4, 12, 2);
+    } else if (e.produto === 'pao') {
+      gb.fillStyle(0xd99a4e, 1).fillEllipse(hx + 8, hy, 16, 7);
+      gb.fillStyle(0xf2c14e, 0.6).fillRect(hx + 3, hy - 1, 10, 1);
+    } else {
+      gb.fillStyle(0x9ec4dc, 1).fillRect(hx + 5, hy - 5, 5, 10);
+      gb.fillStyle(0x3a7fd0, 1).fillRect(hx + 5, hy - 1, 5, 3);
+    }
+  }
+  // o letreiro em cima, com o nome
+  var gl = cena.add.graphics().setDepth(41);
+  gl.fillStyle(0x0a0a10, 1).fillRect(x - 3, y - 8, w + 6, 18);
+  gl.fillStyle(e.cor, 1).fillRect(x - 3, y + 8, w + 6, 2);
+  if (e.emblema) {
+    gl.fillStyle(e.emblema, 1).fillCircle(x - 7, y + 1, 7).fillCircle(x + w + 7, y + 1, 7);
+    gl.fillStyle(0xf2c14e, 1).fillCircle(x - 7, y + 1, 3).fillCircle(x + w + 7, y + 1, 3);
+  }
+  txtC(cena, x + w / 2, y - 4, e.nome, e.letra, 8).setScale(ESCALA_TEXTO / 2).setDepth(42);
+}
+
 function perdeVida(scene, sp, quanto) {
   var n = GameState.perdeCoracao(quanto);
   if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40, quanto);
