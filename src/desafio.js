@@ -226,14 +226,28 @@ var DesafioScene = new Phaser.Class({
     // onde cada um estava: o recuo do golpe é desfeito na saída, mesmo no meio
     this.xPl = this.dados.pl ? this.dados.pl.x : 0;
     this.xEle = this.dados.ele ? this.dados.ele.x : 0;
-    this.tEle = txt(this, DSF.ele.x + 10, DSF.ele.y + 4, this.quem.nome, PAL.branco, 8).setDepth(12);
-    this.tVc = txt(this, DSF.vc.x + 10, DSF.vc.y + 4, nomeDoChar(GameState.charKey, GameState.genero), PAL.branco, 8).setDepth(12);
-    this.tVcNum = txt(this, DSF.vc.x + DSF.vc.w - 10, DSF.vc.y + 32, '', PAL.cinza, 8).setOrigin(1, 0).setDepth(12);
+    /* ---------- de quem é cada ficha ----------
+       A ficha de cima é de quem está em cima na tela, e a de baixo de quem
+       está embaixo ('tem que mudar a ordem quando muda a posição'). O
+       desafiante pode vir de cima ou de baixo; com as fichas fixas, a sua
+       ficha ficava longe do seu boneco. Em cima à esquerda, embaixo à
+       direita, como no Pokémon; só troca quem mora em cada uma. */
+    var voceEmCima = this.dados.pl && this.dados.ele && this.dados.pl.y < this.dados.ele.y;
+    var cima = { x: 8, y: 60, w: 204 }, baixo = { x: 108, y: 334, w: 204 };
+    this.bEle = voceEmCima ? { x: baixo.x, y: baixo.y, w: baixo.w, h: DSF.ele.h } : { x: cima.x, y: cima.y, w: cima.w, h: DSF.ele.h };
+    this.bVc = voceEmCima ? { x: cima.x, y: cima.y, w: cima.w, h: DSF.vc.h } : { x: baixo.x, y: baixo.y, w: baixo.w, h: DSF.vc.h };
+    this.eleEmBaixo = voceEmCima;
+    this.tEle = txt(this, this.bEle.x + 10, this.bEle.y + 4, this.quem.nome, PAL.branco, 8).setDepth(12);
+    this.tVc = txt(this, this.bVc.x + 10, this.bVc.y + 4, nomeDoChar(GameState.charKey, GameState.genero), PAL.branco, 8).setDepth(12);
+    this.tVcNum = txt(this, this.bVc.x + this.bVc.w - 10, this.bVc.y + 32, '', PAL.cinza, 8).setOrigin(1, 0).setDepth(12);
     this.tMsg = txt(this, DSF.msg.x + 12, DSF.msg.y + 8, '', PAL.branco, 8).setDepth(12);
     // o aviso do próximo golpe, numa plaquinha embaixo da ficha dele
-    this.tVem = txt(this, DSF.ele.x + 8, DSF.ele.y + DSF.ele.h + 7, '', PAL.branco, 8)
+    // o aviso do golpe fica embaixo da ficha dele, ou em cima quando ela é a de baixo (senão bate na mensagem)
+    this.yVem = this.eleEmBaixo ? this.bEle.y - 20 : this.bEle.y + this.bEle.h + 2;
+    this.tVem = txt(this, this.bEle.x + 8, this.yVem + 5, '', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(12);
-    this.tNervoso = txt(this, DSF.ele.x + DSF.ele.w + 6, DSF.ele.y + 18, '', PAL.vermelho, 8)
+    // o NERVOSO do lado de fora da ficha dele: à direita da de cima, à esquerda da de baixo
+    this.tNervoso = txt(this, this.eleEmBaixo ? this.bEle.x - 50 : this.bEle.x + this.bEle.w + 6, this.bEle.y + 18, '', PAL.vermelho, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(12);
     this.tMenu = [];
     for (i = 0; i < 4; i++) {
@@ -611,8 +625,8 @@ var DesafioScene = new Phaser.Class({
 
   pinta: function () {
     var g = this.g; g.clear();
-    this.ficha(g, DSF.ele, this.ele.mostra / this.ele.max, this.tremeEle);
-    this.ficha(g, DSF.vc, this.vc.mostra / this.vc.max, this.tremeVc);
+    this.ficha(g, this.bEle, this.ele.mostra / this.ele.max, this.tremeEle);
+    this.ficha(g, this.bVc, this.vc.mostra / this.vc.max, this.tremeVc);
     this.tVcNum.setText(Math.max(0, Math.round(this.vc.mostra)) + '/' + this.vc.max);
 
     g.fillStyle(0x0b0b12, 0.95).fillRect(DSF.msg.x, DSF.msg.y, DSF.msg.w, DSF.msg.h);
@@ -624,8 +638,8 @@ var DesafioScene = new Phaser.Class({
     this.tVem.setText(vem ? 'VEM AÍ: ' + this.proximo.nome : '');
     if (vem) {
       var vw = Math.round(this.tVem.width) + 16;
-      g.fillStyle(0x2a0c10, 0.95).fillRect(DSF.ele.x, DSF.ele.y + DSF.ele.h + 2, vw, 18);
-      g.lineStyle(1, 0xe8362c, 1).strokeRect(DSF.ele.x + 0.5, DSF.ele.y + DSF.ele.h + 2.5, vw - 1, 17);
+      g.fillStyle(0x2a0c10, 0.95).fillRect(this.bEle.x, this.yVem, vw, 18);
+      g.lineStyle(1, 0xe8362c, 1).strokeRect(this.bEle.x + 0.5, this.yVem + 0.5, vw - 1, 17);
     }
     this.tNervoso.setText(this.nervoso && this.ele.pac > 0 ? 'NERVOSO' : '');
     // com chapa escura atrás: solto, o vermelho sumia no letreiro do vagão

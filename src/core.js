@@ -1221,6 +1221,7 @@ var CORPO_BASE = {
 
 // a pose de segurar parte do de frente; o braço sobe depois das camadas (bracoPraCima)
 CORPO_BASE.segurando = CORPO_BASE.down;
+CORPO_BASE.segurandoCostas = CORPO_BASE.up;      // segurando de costas: olhando pra onde vai
 
 /* pernas: os quadros de caminhada trocam as últimas linhas do corpo */
 var PERNAS_PADRAO = {
@@ -1680,7 +1681,7 @@ var CORPOS = {
   rabo_santos: { mods: [CABELO_RABO], pos: camisaDeTime('santos') }
 };
 
-var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas', 'segurando'];
+var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas', 'segurando', 'segurandoCostas'];
 
 /* ---------- segurando a barra do teto ----------
    A pose nasce do boneco de frente DEPOIS de todas as camadas (cabelo,
@@ -1708,7 +1709,7 @@ function bracoPraCima(art) {
    comprido que só precisa mexer no olho perderia o resto. */
 var DIR_HERDA = {
   diagDown: 'down', diagUp: 'up', sentado: 'side',
-  sentadoFrente: 'down', sentadoCostas: 'up', segurando: 'down'
+  sentadoFrente: 'down', sentadoCostas: 'up', segurando: 'down', segurandoCostas: 'up'
 };
 
 function aplicaDir(alvo, nome, linhas) {
@@ -1809,10 +1810,12 @@ function quadrosDoCorpo(key) {
   var out = {};
   for (var d = 0; d < DIRS.length; d++) {
     var nome = DIRS[d], parado = r[nome];
-    if (nome === 'segurando') {
-      /* os três quadros do de frente (parado e as duas passadas) com o
-         braço pra cima: dá pra ir andando com a mão correndo na barra */
-      out[nome] = r.poseUnica ? out.down.slice(0) : out.down.map(bracoPraCima);
+    if (nome === 'segurando' || nome === 'segurandoCostas') {
+      /* os três quadros do de frente (ou do de costas) com o braço pra
+         cima: dá pra ir andando com a mão correndo na barra, olhando pra
+         onde vai */
+      var base = nome === 'segurando' ? out.down : out.up;
+      out[nome] = r.poseUnica ? base.slice(0) : base.map(bracoPraCima);
       continue;
     }
     var passos = (nome === 'side') ? r.pernas.lado : r.pernas.frente;
@@ -2154,9 +2157,10 @@ var FILEIRA_DIR = {
   // vagão, ou olhando pra quem está do outro lado do joelho
   sentadoFrente: 18, sentadoCostas: 21,
   // de frente, com a mão na barra: à direita dele, ou à esquerda (espelhado)
-  segurandoR: 24, segurandoL: 24
+  segurandoR: 24, segurandoL: 24,
+  segurandoCostasR: 27, segurandoCostasL: 27
 };
-var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1, segurandoL: 1 };
+var ESPELHA_DIR = { left: 1, diagDownL: 1, diagUpL: 1, sentadoL: 1, segurandoL: 1, segurandoCostasL: 1 };
 var DIAGONAL_MIN = 0.42;   // o eixo fraco precisa disso do forte pra virar diagonal
 
 Ator.prototype.setDir = function (dx, dy) {
@@ -2355,6 +2359,31 @@ function tocaPassoLuta(i, t) {
   ruido(0.03, pc % 2 ? 0.007 : 0.004, 9000, 9000, 0.7, 'highpass', atraso);
 }
 
+/* ---------- o boom bap do rimador ----------
+   'Tem que ter uma batida de boom bap quando chega o rimador.' 90 BPM,
+   em semicolcheias, dois compassos: bumbo pesado no 1 e no "e" do 3, a
+   caixa estalada no 2 e no 4, chimbal com swing (o do contratempo
+   atrasado), o baixo em lá menor andando por baixo e um acorde de piano
+   empoeirado (lá menor com sétima) no começo de cada compasso. Toca
+   enquanto o rimador vem e durante a batalha. */
+var BOOMBAP_PASSO = 60 / 90 / 4;
+var BOOMBAP_BUMBO = [0, 10, 16, 23, 26];
+var BOOMBAP_BAIXO = { 0: 45, 6: 48, 10: 43, 16: 45, 22: 50, 26: 48 };
+function tocaPassoBoombap(i, t) {
+  var p = i % 32, swing = (p % 4 === 2) ? BOOMBAP_PASSO * 0.28 : 0;
+  var atraso = Math.max(0, t - AC.currentTime);
+  if (BOOMBAP_BUMBO.indexOf(p) >= 0) { bumboEm(t); bumboEm(t + 0.01); }
+  if (p % 16 === 4 || p % 16 === 12) {
+    ruido(0.16, 0.03, 1800, 1200, 0.7, 'bandpass', atraso);
+    ruido(0.05, 0.012, 5000, 5000, 0.8, 'highpass', atraso);
+  }
+  if (p % 2 === 0) ruido(0.03, p % 4 ? 0.006 : 0.009, 9000, 9000, 0.7, 'highpass', atraso + swing);
+  if (BOOMBAP_BAIXO[p]) notaEm(t, BOOMBAP_BAIXO[p], BOOMBAP_PASSO * 5, 'triangle', 0.04);
+  if (p === 0 || p === 16) {
+    [57, 60, 64, 67].forEach(function (n, k) { notaEm(t + k * 0.012, n, BOOMBAP_PASSO * 7, 'triangle', 0.007); });
+  }
+}
+
 /* ---------- as vinhetas de vitória e de derrota ----------
    'Tem que ter uma música de vitória quando ganha e de derrota quando
    perde.' Tocadas no mesmo chip da trilha (quadrada na melodia,
@@ -2413,7 +2442,14 @@ function tocaJingle(nome) {
 }
 
 function agendaMusica() {
-  if (!MUSICA_LIGADA || !SOM_LIGADO || !AC) return;
+  if (!SOM_LIGADO || !AC) return;
+  // música desligada não cala o mundo: o ambulante continua gritando
+  if (!MUSICA_LIGADA) {
+    var mm = modoDoSom(), ag = Date.now();
+    if (mm !== 'vagao' && mm !== 'estacao') { paraPregao(); return; }
+    if (ag - _ultPregaoChk > 1000) { _ultPregaoChk = ag; gritaAmbulante(mm); }
+    return;
+  }
   /* Rede de seguranca: se por algum motivo nenhum evento avisou que a
      janela saiu de cena, o proprio relogio da musica percebe e se
      desliga. Um `setInterval` continua rodando em aba de fundo — so
@@ -2423,16 +2459,18 @@ function agendaMusica() {
   // ficou pra trás (contexto suspenso, aba voltando): retoma do agora, sem rajada
   if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
   var modo = modoDoSom();
-  if (modo === 'musica' || modo === 'luta') paraPregao();     // menu e luta calam o ambulante
+  if (modo === 'musica' || modo === 'luta' || modo === 'boombap') paraPregao();     // menu, luta e rima calam o ambulante
   // a música volta sempre do começo da frase, não do meio de onde parou
-  if ((modo === 'musica' || modo === 'luta') && _musModo !== modo) _musPasso = 0;
+  if ((modo === 'musica' || modo === 'luta' || modo === 'boombap') && _musModo !== modo) _musPasso = 0;
   _musModo = modo;
-  var luta = (modo === 'luta');
-  var passo = luta ? LUTA_COLCHEIA : MUS_COLCHEIA, volta = luta ? LUTA_MELODIA.length : MUS_MELODIA.length;
+  var luta = (modo === 'luta'), rap = (modo === 'boombap');
+  var passo = rap ? BOOMBAP_PASSO : (luta ? LUTA_COLCHEIA : MUS_COLCHEIA);
+  var volta = rap ? 32 : (luta ? LUTA_MELODIA.length : MUS_MELODIA.length);
   while (_musProx < AC.currentTime + 0.15) {
     // durante a vinheta a trilha anda calada, e volta do começo da frase depois
     if (_musProx < _jingleAte) { _musPasso = 0; _musProx += passo; continue; }
-    if (luta) tocaPassoLuta(_musPasso, _musProx);
+    if (rap) tocaPassoBoombap(_musPasso, _musProx);
+    else if (luta) tocaPassoLuta(_musPasso, _musProx);
     else if (modo === 'musica') tocaPassoMusica(_musPasso, _musProx);
     else tocaPassoAmbiente(_musPasso, _musProx, modo);
     _musPasso = (_musPasso + 1) % volta;
@@ -2449,6 +2487,10 @@ var _musModo = null, _gentePerto;
 function modoDoSom() {
   var m = window.jogo && jogo.scene;
   if (!m) return 'musica';
+  // o rimador chegando, ou a batalha de rima rolando: boom bap
+  var vg = m.getScene('Vagao');
+  if (vg && (m.isActive('Vagao') || m.isPaused('Vagao')) &&
+      (vg.batalha || (vg.encontro && vg.encontro.tipo === 'rima'))) return 'boombap';
   // a luta tem trilha própria, mais rápida e em menor
   if (m.isActive('Desafio') || m.isActive('Briga') || m.isActive('Encarada') || m.isActive('Disputa')) return 'luta';
   if (m.isActive('Title') || m.isActive('Treino') || m.isActive('Fim')) return 'musica';
@@ -2589,16 +2631,41 @@ function falaGente(texto, rapido) {
 
 /* O ambulante grita quando está perto: a cada 8 a 14s, se houver um a
    menos de 170px de você. É o pregão do trem de SP. */
-var PREGOES = ['Metrô, shopping, trem!', 'Olha a água geladinha!', 'Chocolate, é dois é cinco!', 'Metrô, shopping, trem, é só aqui!'];
 var _tPregao = 0;
+/* ---------- quem está gritando ----------
+   'O ambulante tem que ser destacado quando vem, aparecer uns sons
+   sendo emitidos dele.' Enquanto o pregão toca, saem ondas de som dos
+   dois lados da cabeça dele e notinhas subindo, e um anel amarelo pulsa
+   nos pés: é ele. Cada cena chama isto no update. */
+function ondasDoPregao(cena, time) {
+  if (!cena._gPregao) cena._gPregao = cena.add.graphics().setDepth(55);
+  var g = cena._gPregao; g.clear();
+  var sp = _ambFonte;
+  if (!_audAmb || _audAmb.paused || !sp || !sp.active || sp.scene !== cena) return;
+  var x = sp.x, y = sp.y - 38, k;
+  var pulso = 0.5 + 0.5 * Math.sin(time / 180);
+  g.lineStyle(2, 0xf2c14e, 0.4 + 0.4 * pulso).strokeEllipse(x, sp.y - 1, 26, 9);
+  for (k = 0; k < 3; k++) {
+    var f = ((time / 650) + k / 3) % 1, r = 7 + f * 20;
+    g.lineStyle(2, 0xf2c14e, (1 - f) * 0.9);
+    g.beginPath(); g.arc(x, y, r, -0.7, 0.7); g.strokePath();
+    g.beginPath(); g.arc(x, y, r, Math.PI - 0.7, Math.PI + 0.7); g.strokePath();
+  }
+  // duas notinhas subindo, uma de cada lado
+  for (k = 0; k < 2; k++) {
+    var fn = ((time / 900) + k / 2) % 1, nx = x + (k ? 14 : -16) + Math.sin(time / 200 + k) * 2, ny = y - 6 - fn * 22;
+    g.fillStyle(0xf2c14e, 1 - fn).fillCircle(nx, ny, 2.5).fillRect(nx + 1.5, ny - 8, 1.5, 8).fillRect(nx + 1.5, ny - 8, 4, 1.5);
+  }
+}
+
 /* ---------- o pregão gravado ----------
    'Usa esses áudios pros ambulantes.' Dois pregões de verdade, em
    assets/audio: tocam quando um ambulante está perto, com o volume caindo
    com a distância, e param quando ele fica pra trás, quando o jogo vai
-   pra menu ou luta, e quando o som é desligado. Sem o arquivo (ou com o
-   navegador recusando tocar), volta o pregão falado de antes. */
+   pra menu ou luta, e quando o som é desligado. A voz sintetizada de
+   antes saiu de vez ('esquece a voz robótica'): sem o arquivo, silêncio. */
 var AUDIO_AMBULANTE = ['assets/audio/ambulante_metro.mp3', 'assets/audio/ambulante_vendedor.mp3'];
-var _audAmb = null;
+var _audAmb = null, _ambFonte = null, _ultPregaoChk = 0;
 function paraPregao() {
   if (_audAmb) { try { _audAmb.pause(); } catch (e) { } _audAmb = null; }
 }
@@ -2606,13 +2673,15 @@ function gritaAmbulante(modo) {
   var agora = Date.now();
   var sc = window.jogo && jogo.scene.getScene(modo === 'vagao' ? 'Vagao' : 'Estacao');
   if (!sc || !sc.pl || !sc.pl.sp || !SOM_LIGADO || document.hidden) { paraPregao(); return; }
-  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), dist = 1e9;
+  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), dist = 1e9, fonte = null;
   for (var i = 0; i < lista.length; i++) {
     var a = lista[i];
     if (!a || !a.sp || !a.sp.active || !a.sp.texture) continue;
     if (a.sp.texture.key.indexOf('np_ambulante') !== 0) continue;
-    dist = Math.min(dist, Math.hypot(a.sp.x - sc.pl.sp.x, a.sp.y - sc.pl.sp.y));
+    var d = Math.hypot(a.sp.x - sc.pl.sp.x, a.sp.y - sc.pl.sp.y);
+    if (d < dist) { dist = d; fonte = a.sp; }
   }
+  if (fonte) _ambFonte = fonte;
   var vol = Phaser.Math.Clamp(1 - dist / 240, 0, 1) * 0.55;
   if (_audAmb && !_audAmb.paused && !_audAmb.ended) {
     if (vol <= 0.02) paraPregao(); else _audAmb.volume = vol;
@@ -2625,10 +2694,9 @@ function gritaAmbulante(modo) {
     _audAmb = new Audio(AUDIO_AMBULANTE[Math.floor(Math.random() * AUDIO_AMBULANTE.length)]);
     _audAmb.volume = vol;
     var pr = _audAmb.play();
-    if (pr && pr.catch) pr.catch(function () { _audAmb = null; falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3); });
+    if (pr && pr.catch) pr.catch(function () { _audAmb = null; });
   } catch (e) {
     _audAmb = null;
-    falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3);
   }
 }
 

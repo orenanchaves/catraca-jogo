@@ -1704,7 +1704,11 @@ var EstacaoScene = new Phaser.Class({
     if (y >= 244 && y <= 516) return true;
     if (y >= 116 && y <= 204) return true;
     if (y > 204 && y < 244) {
-      if (!this.liberado) return false;
+      /* sair pela catraca é sempre possível, como na estação de verdade:
+         só ENTRAR pede passagem. Quem pulou (e não está liberado) ficava
+         preso do lado de dentro, sem conseguir sair nunca mais. */
+      var saindo = this._indo > 0 && this._yDe <= 204;
+      if (!this.liberado && !saindo) return false;
       for (var i = 0; i < this.gates.length; i++) {
         var t = this.gates[i];
         if (t.fechada) continue;
@@ -2764,6 +2768,7 @@ var EstacaoScene = new Phaser.Class({
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
+    ondasDoPregao(this, time);
     this.atualizaCarga(dt, mv);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
 

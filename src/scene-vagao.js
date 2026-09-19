@@ -869,7 +869,7 @@ var VagaoScene = new Phaser.Class({
     if (!s) return;
     this.pl.sp.x = s.x + s.lado * MAO_DA_BARRA;
     this.pl.sp.y = s.y;
-    this.pl.dir = s.lado < 0 ? 'segurandoR' : 'segurandoL';
+    this.pl.dir = (s.olha === 'costas' ? 'segurandoCostas' : 'segurando') + (s.lado < 0 ? 'R' : 'L');
     this.pl.anima(s.andando ? (dt || 16) : 0, s.andando);
     var pl = PELES[GameState.charKey + (GameState.genero === 'f' ? 'F' : '')] || PELES[GameState.charKey];
     var cor = pl ? num(pl.k) : 0xe0b088;
@@ -886,6 +886,8 @@ var VagaoScene = new Phaser.Class({
      e quem quiser seguir solta a barra andando pro lado. */
   andaNaBarra: function (dy, vel, dt) {
     var s = this.segurando;
+    // subindo o carro, fica de costas, olhando pra onde vai; descendo, de frente
+    s.olha = dy < 0 ? 'costas' : 'frente';
     var ny = s.y + dy * vel * 0.6 * dt / 1000;
     var fim = (s.col === 1 && naPorta(ny, 8)) || apertoSanfona(ny) > 0 ||
       ny < 84 || ny > fundoDoTrem() - 20;
@@ -3584,6 +3586,7 @@ var VagaoScene = new Phaser.Class({
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
+    ondasDoPregao(this, time);
 
     if (this.fuga) this.atualizaFuga(dt);
 
