@@ -2699,6 +2699,27 @@ var EstacaoScene = new Phaser.Class({
     a.anima(dt, true);
   },
 
+  /* ---------- a câmera que olha à frente ----------
+     (skill 2d-games, 'look-ahead') A câmera vai um pouco na frente de
+     quem anda: no saguão largo, pro lado em que você caminha (até 36px);
+     na plataforma comprida, pra cima ou pra baixo (até 60px), que é pra
+     onde o trem e a escada estão. Desliza devagar e volta ao centro
+     quando você para, pra não embrulhar o estômago. */
+  olhaAFrente: function (dt) {
+    if (this.duelo || this.empurrando || this.noElevador) return;
+    var cam = this.cameras.main, sp = this.pl.sp;
+    var dx = sp.x - (this._olhoX === undefined ? sp.x : this._olhoX), dy = sp.y - (this._olhoY === undefined ? sp.y : this._olhoY);
+    this._olhoX = sp.x; this._olhoY = sp.y;
+    var naPlat = sp.y < ESC_Y, alvoX = 0, alvoY = 0;
+    if (Math.abs(dx) > 0.2 && !naPlat) alvoX = dx > 0 ? 36 : -36;
+    if (Math.abs(dy) > 0.2 && naPlat) alvoY = dy > 0 ? 60 : -60;
+    var k = Math.min(1, dt / 500);
+    this._olhaX = (this._olhaX || 0) + (alvoX - (this._olhaX || 0)) * k;
+    this._olhaY = (this._olhaY || 0) + (alvoY - (this._olhaY || 0)) * k;
+    // o offset do Phaser é subtraído do alvo: pra olhar à direita, ele vai negativo
+    cam.setFollowOffset(-Math.round(this._olhaX), -Math.round(HUD_H / 2) - Math.round(this._olhaY));
+  },
+
   juntaGente: function () {
     var f = (this.fixos || []).filter(function (a) { return a && a.sp && a.sp.active; });
     return this.plateia.concat(this.esperando, [this.guarda], f);
@@ -2857,6 +2878,7 @@ var EstacaoScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    this.olhaAFrente(dt);
     this.rodaEscada(dt, mv);
     var eu = this;
     empurraoNaMarra(this, this.gente, function (sp) { return eu.podeIr(sp.x, sp.y); });
