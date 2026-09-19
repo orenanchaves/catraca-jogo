@@ -70,24 +70,52 @@ var DESAFIANTES = {
       { nome: 'CORNETA', dano: 10, bloqueia: 'CALMA' }
     ]
   },
+  // o palmeirense fala meio italiano, que é o Palestra de onde o time veio
   palmeirense: {
     nome: 'PALMEIRENSE', sprite: 'np_torcedor', pac: 75,
     fraco: 'IRONIA', resiste: 'CALMA',
-    chega: 'E AÍ, É PORCO\nOU NÃO É?',
-    sai: 'AVANTI, PALESTRA.',
+    chega: 'E AÍ, BAMBINO?\nÉ PORCO OU NÃO É?',
+    sai: 'CIAO, BAMBINO.\nAVANTI, PALESTRA!',
     golpes: [
       { nome: 'AVANTI PALESTRA', dano: 12, bloqueia: 'LABIA' },
-      { nome: 'GRITO DE GOL', dano: 14, bloqueia: 'FONE' },
+      { nome: 'MAMMA MIA, QUE GOL!', dano: 14, bloqueia: 'FONE' },
+      { nome: 'MA CHE CORNETA!', dano: 10, bloqueia: 'CALMA' }
+    ]
+  },
+  saopaulino: {
+    nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', pac: 75,
+    fraco: 'LABIA', resiste: 'FONE',
+    chega: 'SOBERANO, MEU CARO.\nTRICOLOR É OUTRO NÍVEL.',
+    sai: 'VOU PRO MORUMBI.\nSALVE O TRICOLOR.',
+    golpes: [
+      { nome: 'TRÊS MUNDIAIS', dano: 14, bloqueia: 'IRONIA' },
+      { nome: 'SOBERANO!', dano: 12, bloqueia: 'FONE' },
+      { nome: 'CORNETA', dano: 10, bloqueia: 'CALMA' }
+    ]
+  },
+  santista: {
+    nome: 'SANTISTA', sprite: 'np_santista', pac: 70,
+    fraco: 'CALMA', resiste: 'IRONIA',
+    chega: 'O PEIXE VAI VOLTAR,\nPODE ESCREVER.',
+    sai: 'VOU DESCER PRA\nVILA BELMIRO.',
+    golpes: [
+      { nome: 'O REI PELÉ', dano: 12, bloqueia: 'LABIA' },
+      { nome: 'SANTOS É PRAIA', dano: 12, bloqueia: 'FONE' },
       { nome: 'CORNETA', dano: 10, bloqueia: 'CALMA' }
     ]
   }
 };
 var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor'];
+var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
 function sorteiaDesafiante() {
   var t = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
   if (t !== 'torcedor') return t;
+  // quem joga de torcedor encontra gente do próprio time, que é o que o poder dele usa
+  if (temPoder('torcida') && Math.random() < 0.35) return TIMES[leTime()].desafiante;
+  // são-paulino e santista andam pela cidade toda
+  if (Math.random() < 0.3) return Math.random() < 0.5 ? 'saopaulino' : 'santista';
   var l = GameState.linhaAtual(), se = l.estacoes.indexOf(BALDEACAO);
   if (l === LINHAS.vermelha && GameState.idx > se) return 'corintiano';
   if (l === LINHAS.vermelha && GameState.idx < se) return 'palmeirense';
@@ -141,7 +169,14 @@ var FX_GOLPE = {
   'NOTÍCIA DUVIDOSA': 'papel',
   'VERSÍCULO NO GRITO': 'grito', 'O FIM ESTÁ PRÓXIMO': 'sombra',
   'VAI CORINTHIANS!': 'torcida', 'BANDO DE LOUCOS': 'torcida',
-  'AVANTI PALESTRA': 'torcida', 'GRITO DE GOL': 'torcida'
+  'AVANTI PALESTRA': 'torcida', 'MAMMA MIA, QUE GOL!': 'torcida', 'MA CHE CORNETA!': 'audio',
+  'TRÊS MUNDIAIS': 'grito', 'SOBERANO!': 'torcida',
+  'O REI PELÉ': 'balao', 'SANTOS É PRAIA': 'torcida'
+};
+// o confete de cada torcida
+var CORES_TORCIDA = {
+  corintiano: [0xf2f0ff, 0x26262c], palmeirense: [0x12783c, 0xf2f0ff],
+  saopaulino: [0xd8302a, 0x1c1c22, 0xf2f0ff], santista: [0xf2f0ff, 0x1c1c22]
 };
 var FX_CHEGA = 460;      // ms até o ataque chegar no outro
 
@@ -289,6 +324,10 @@ var DesafioScene = new Phaser.Class({
     var r = RESPOSTAS[i], q = this.quem;
     var mult = multiplicador(r, q);
     if (mult > 1 && this.nervoso) mult = 3;           // nervoso, a fraqueza dói o triplo
+    /* torcedor contra torcedor de outro time: a ironia vem com gosto */
+    var rival = temPoder('torcida') && r.tipo === 'IRONIA' && TORCEDORES.indexOf(this.dados.tipo) >= 0 &&
+      TIMES[leTime()].desafiante !== this.dados.tipo;
+    if (rival) mult *= 1.5;
     var repetiu = (this.ultima === r.tipo);
     this.ultima = r.tipo;
     this.bloqueou = (this.proximo && this.proximo.bloqueia === r.tipo);
@@ -309,6 +348,7 @@ var DesafioScene = new Phaser.Class({
     if (mult > 2) msgs.push({ msg: 'ACABOU COM ELE!', cor: PAL.verde });
     else if (mult > 1) msgs.push({ msg: 'PEGOU EM CHEIO!', cor: PAL.verde });
     else if (mult < 1) msgs.push({ msg: 'NEM FEZ CÓCEGA...', cor: PAL.cinza });
+    if (rival) msgs.push({ msg: 'É RIVALIDADE!', cor: PAL.amarelo });
     if (repetiu) msgs.push({ msg: 'DE NOVO? JÁ ESPERAVA.', cor: PAL.cinza });
     if (depois > 0 && !this.nervoso && depois / this.ele.max < DSF_NERVOSO) {
       this.nervoso = true;
@@ -359,7 +399,7 @@ var DesafioScene = new Phaser.Class({
     GameState.addCarisma(-8);
     GameState.addDescanso(-8);
     GameState.stats.causos++;
-    sfx('nao');
+    sfx('derrota');
     var msgs = [{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: 'O VAGÃO INTEIRO VIU.' }];
     /* perder o desafio custa um coração, como perder qualquer outro
        minigame; no treino não, que treino não vale nada */
@@ -442,11 +482,11 @@ var DesafioScene = new Phaser.Class({
       voa('sombra', 1, 0, { dur: 700 });
       voa('anel', 3, 120, { cor: 0x6a1a1a });
     } else if (tipo === 'torcida') {
-      var cores = this.dados.tipo === 'palmeirense' ? [0x0a7a42, 0xf2f0ff] : [0xf2f0ff, 0x26262c];
+      var cores = CORES_TORCIDA[this.dados.tipo] || [0xf2f0ff, 0x26262c];
       voa('grito', 1, 0, { dur: 480, bx: A.x, by: A.y, cor: cores[0] });
       for (i = 0; i < 16; i++) {
         f.push({ k: 'confete', t: -120, dur: 900, ax: alvo.x, ay: alvo.y - 30, bx: 0, by: 0,
-          vx: (Math.random() - 0.5) * 0.22, vy: -0.05 - Math.random() * 0.12, cor: cores[i % 2], gira: Math.random() * 6 });
+          vx: (Math.random() - 0.5) * 0.22, vy: -0.05 - Math.random() * 0.12, cor: cores[i % cores.length], gira: Math.random() * 6 });
       }
     } else voa('balao', 3, 90);
 

@@ -25,6 +25,8 @@ var TIT = {
   genY: 284,
   poderY: 318,
   descY: 340,
+  // o torcedor ganha a fileira dos times embaixo do gênero, e o poder desce
+  timeY: 314, poderYTime: 346, descYTime: 368,
   fichaY: 392, fichaH: 70
 };
 
@@ -46,7 +48,7 @@ var TitleScene = new Phaser.Class({
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = true;
     this.sel = 0;
     this.saindo = false;
-    this.ordem = ['estudante', 'clt', 'senhor', 'ambulante', 'gestante', 'turista'];
+    this.ordem = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor', 'gestante', 'turista'];
     // o gênero de cada um, como ficou gravado da última partida
     this.gen = {};
     for (var q = 0; q < this.ordem.length; q++) this.gen[this.ordem[q]] = leGenero(this.ordem[q]);
@@ -122,6 +124,21 @@ var TitleScene = new Phaser.Class({
       (function (gg) { zg.on('pointerdown', function () { eu.poeGenero(gg); }); })(i ? 'f' : 'm');
       this.zonaGen.push(zg);
     }
+
+    /* ---------- o time ----------
+       Só pro torcedor: quatro botões com a cor da camisa e o apelido do
+       time. Tocar troca a camisa na hora; no teclado a tecla é T. */
+    this.gTimes = this.add.graphics().setDepth(1);
+    this.tTimes = []; this.zonaTimes = [];
+    for (i = 0; i < ORDEM_TIMES.length; i++) {
+      var cx = this.xDoTime(i);
+      this.tTimes.push(txtC(this, cx + 32, TIT.timeY + 5, TIMES[ORDEM_TIMES[i]].nome, PAL.branco, 8)
+        .setScale(ESCALA_TEXTO / 2).setDepth(3));
+      var zt = this.add.zone(cx, TIT.timeY, 64, 22).setOrigin(0, 0);
+      (function (t) { zt.on('pointerdown', function () { eu.poeTime(t); }); })(ORDEM_TIMES[i]);
+      this.zonaTimes.push(zt);
+    }
+    this.teclaT = this.input.keyboard.addKey('T');
 
     // o verbo que só este personagem tem, e como ele funciona
     this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.verde, 8);
@@ -207,6 +224,17 @@ var TitleScene = new Phaser.Class({
     gravaGenero(k, g);
     sfx('catraca');
     this.ignoraAct = true;
+    this.atualiza();
+  },
+
+  // os quatro botões de time: 64 de largura e 4 de vão, 268 no total
+  xDoTime: function (i) { return Math.round((GW - (64 * 4 + 4 * 3)) / 2) + i * 68; },
+
+  poeTime: function (t) {
+    this.ignoraAct = true;
+    if (leTime() === t) return;
+    gravaTime(t);
+    sfx('catraca');
     this.atualiza();
   },
 
@@ -304,6 +332,23 @@ var TitleScene = new Phaser.Class({
         .strokeRect(zx + 1, this.genY + 1, GEN_ABA.w - 2, GEN_ABA.h - 2);
     }
 
+    // o time, só pro torcedor
+    var gt = this.gTimes; gt.clear();
+    var temTime = !!c.times, meuTime = leTime();
+    for (i = 0; i < ORDEM_TIMES.length; i++) {
+      var T = TIMES[ORDEM_TIMES[i]], tx = this.xDoTime(i), aqui2 = (ORDEM_TIMES[i] === meuTime);
+      this.tTimes[i].setVisible(temTime);
+      if (temTime) this.zonaTimes[i].setInteractive(); else this.zonaTimes[i].disableInteractive();
+      if (!temTime) continue;
+      gt.fillStyle(T.cor, 1).fillRect(tx, TIT.timeY, 64, 22);
+      gt.fillStyle(T.cor2, 1).fillRect(tx, TIT.timeY + 18, 64, 4);          // a faixa da segunda cor
+      gt.lineStyle(2, aqui2 ? 0xf2c14e : 0x2a2a3a, 1).strokeRect(tx + 1, TIT.timeY + 1, 62, 20);
+      // camisa clara pede letra escura
+      this.tTimes[i].setColor(T.cor === 0xf0eeff ? '#14141c' : PAL.branco).setAlpha(aqui2 ? 1 : 0.7);
+    }
+    this.tPoder.setY(temTime ? TIT.poderYTime : TIT.poderY);
+    this.tDesc.setY(temTime ? TIT.descYTime : TIT.descY);
+
     /* Dois personagens dividem o mesmo verbo e não jogam igual: quando
        o personagem tem rótulo próprio, é o dele que aparece. */
     var pd = PODERES[c.poder] || {};
@@ -400,6 +445,10 @@ var TitleScene = new Phaser.Class({
     if (Ctrl.rightJust) this.passa(1);
 
     if (this.teclaG && Phaser.Input.Keyboard.JustDown(this.teclaG)) { this.trocaGenero(); return; }
+    if (this.teclaT && Phaser.Input.Keyboard.JustDown(this.teclaT) && CHARS[this.ordem[this.sel]].times) {
+      this.poeTime(ORDEM_TIMES[(ORDEM_TIMES.indexOf(leTime()) + 1) % ORDEM_TIMES.length]);
+      return;
+    }
 
     if (Ctrl.actJust) {
       if (this.ignoraAct) { this.ignoraAct = false; return; }

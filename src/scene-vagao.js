@@ -1067,7 +1067,16 @@ var VagaoScene = new Phaser.Class({
       if (Math.abs(px - d.sp.x) > 22) continue;
       var dy = py - d.sp.y;
       var viu = d.desafio.olha === 'down' ? (dy > 0 && dy < 120) : (dy < 0 && dy > -120);
-      if (viu) { this.comecaAbordagem(d); return; }
+      if (!viu) continue;
+      /* o torcedor encontrou gente do próprio time: não é desafio, é força */
+      if (temPoder('torcida') && d.desafio.tipo === TIMES[leTime()].desafiante) {
+        d.desafio.feito = true;
+        GameState.addCarisma(3);
+        sfx('apito');
+        this.flash('É DO MEU TIME!\n+3 CARISMA');
+        continue;
+      }
+      this.comecaAbordagem(d); return;
     }
   },
 

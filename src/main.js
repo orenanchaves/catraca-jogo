@@ -13,6 +13,16 @@ function fichasDosJogaveis() {
     for (var i = 0; i < gs.length; i++) {
       g = gs[i];
       var v = CHARS[k].visual[g];
+      if (CHARS[k].times) {
+        for (var t in TIMES) {
+          out.push({
+            key: 'ch_' + k + '_' + g + '_' + t,
+            file: 'assets/chars/' + k + '_' + g + '_' + t + '.png',
+            pal: paletaDoTime(PELES[v.pal], t, g), corpo: corpoDoTorcedor(g, t)
+          });
+        }
+        continue;
+      }
       out.push({
         key: 'ch_' + k + '_' + g,
         file: 'assets/chars/' + k + '_' + g + '.png',
@@ -65,8 +75,10 @@ var ASSETS = {
        como se aprende a ler treinador no Pokémon. Provisórios até a arte. */
     { key: 'np_tiozao', file: 'assets/npcs/tiozao.png', pal: PELES.tiozao, corpo: 'careca_celular' },
     { key: 'np_pregador', file: 'assets/npcs/pregador.png', pal: PELES.pregador, corpo: 'padrao' },
-    { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'bone' },
-    { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'bone' }
+    { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'palmeiras' },
+    { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'touca_corinthians' },
+    { key: 'np_saopaulino', file: 'assets/npcs/saopaulino.png', pal: PELES.saopaulino, corpo: 'careca_saopaulo' },
+    { key: 'np_santista', file: 'assets/npcs/santista.png', pal: PELES.santista, corpo: 'moicano_santos' }
   ]
 };
 

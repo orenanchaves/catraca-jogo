@@ -44,6 +44,11 @@ var ROTINAS = {
     { rotulo: 'A CONSULTA', estacao: 'SANTA CRUZ', saida: 15 * 60 },
     { rotulo: 'CASA', estacao: CASA, saida: 18 * 60 + 50 }
   ],
+  torcedor: [
+    { rotulo: 'O TRAMPO', estacao: 'BRÁS', saida: 7 * 60 },
+    { rotulo: 'O BAR DO JOGO', estacao: 'TATUAPÉ', saida: 17 * 60 + 30 },
+    { rotulo: 'CASA', estacao: CASA, saida: 22 * 60 }
+  ],
   turista: [
     { rotulo: 'A PINACOTECA', estacao: 'LUZ', saida: 9 * 60 + 30 },
     { rotulo: 'O MERCADÃO', estacao: 'PEDRO II', saida: 14 * 60 },
@@ -75,7 +80,8 @@ var RESPOSTA_PADRAO = {
   senhor: { sim: 'Pode deixar', nao: 'Hoje não, filho', ok: 'Que bom' },
   ambulante: { sim: 'tamo junto', nao: 'hj tô na correria', ok: 'salve salve' },
   gestante: { sim: 'Tá bom, eu vou', nao: 'Hoje não dá, amor', ok: 'Obrigada' },
-  turista: { sim: 'Ok! I go there', nao: 'Not today, sorry', ok: 'Nice!' }
+  turista: { sim: 'Ok! I go there', nao: 'Not today, sorry', ok: 'Nice!' },
+  torcedor: { sim: 'bora, tô indo', nao: 'hj não, mano', ok: 'é nóis' }
 };
 function respostaPadrao(k) { return RESPOSTA_PADRAO[k] || RESPOSTA_PADRAO.clt; }
 
@@ -237,6 +243,28 @@ var CONTATOS = {
         { msgs: ['Meninas, decidimos:', 'chá no Tatuapé sábado'],
           vai: { rotulo: 'O CHÁ DE BEBÊ', estacao: 'TATUAPÉ' } },
         { msgs: ['que fofoooo', '(imagem)'] }
+      ]
+    }
+  ],
+
+  torcedor: [
+    {
+      nome: 'A TORCIDA', grupo: true, conversas: [
+        { msgs: ['Domingo tem jogo!', 'Concentração no bar'],
+          vai: { rotulo: 'O BAR', estacao: 'TATUAPÉ' } },
+        { msgs: ['Quem vai de camisa?', 'Todo mundo de camisa'] }
+      ]
+    },
+    {
+      nome: 'MÃE', conversas: [
+        { msgs: ['Lava essa camisa', 'antes do jogo, hein'] },
+        { msgs: ['Passa na Sé e traz', 'pão de queijo'],
+          vai: { rotulo: 'A SÉ', estacao: 'SÉ' } }
+      ]
+    },
+    {
+      nome: 'CHEFE', conversas: [
+        { msgs: ['Hoje não é dia de', 'camisa de time'] }
       ]
     }
   ],

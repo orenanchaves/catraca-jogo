@@ -394,6 +394,10 @@ var PODERES = {
   perdido: {
     nome: 'NÃO SABE A LINHA',
     como: 'Só vê a rota de perto.'
+  },
+  torcida: {
+    nome: 'TORCIDA JUNTO',
+    como: 'O time te dá força.'
   }
 };
 
@@ -453,6 +457,19 @@ var CHARS = {
     poder: 'perdido',
     visual: { m: { corpo: 'bone_mochila', pal: 'turista' }, f: { corpo: 'mochila_longo', pal: 'turistaF' } },
     preco: 150
+  },
+  /* O torcedor: escolhe o time (Corinthians, Palmeiras, São Paulo ou
+     Santos) além do gênero. Quem é do mesmo time no vagão não desafia,
+     dá força; torcedor rival apanha mais de ironia. A camisa sai do time
+     escolhido (paletaDoTime + camisaDeTime), e cada combinação vira uma
+     folha: ch_torcedor_m_santos. */
+  torcedor: {
+    nome: 'TORCEDOR', nomeF: 'TORCEDORA', asset: 'torcedor',
+    desc: 'Vai pro jogo. Faz amizade fácil.',
+    tarifa: 5.20, dinheiro: 18.00, carisma: 70, descanso: 85, descansoMax: 100,
+    dreno: 1.05, velocidade: 104, empurraoMult: 1.1, gratuidade: false, valeTransporte: 0,
+    poder: 'torcida', times: true,
+    visual: { m: { corpo: 'touca_corinthians', pal: 'torcedorJog' }, f: { corpo: 'longo_corinthians', pal: 'torcedoraJog' } }
   }
 };
 
@@ -488,7 +505,11 @@ function outroGenero(k, g) {
   if (l.length < 2) return g;
   return l[(l.indexOf(generoValido(k, g)) + 1) % l.length];
 }
-function spriteChar(k, g) { return 'ch_' + k + '_' + generoValido(k, g); }
+function spriteChar(k, g) {
+  var base = 'ch_' + k + '_' + generoValido(k, g);
+  // o torcedor tem uma folha por time: ch_torcedor_f_palmeiras
+  return (CHARS[k] && CHARS[k].times) ? base + '_' + leTime() : base;
+}
 function spriteJogador() { return spriteChar(GameState.charKey, GameState.genero); }
 function nomeDoChar(k, g) {
   var c = CHARS[k];
@@ -572,7 +593,7 @@ function estaCalor() {
    O elenco que já existia continua aberto. Cobrar por ele seria tirar
    de quem já jogava, e comprar tem que abrir coisa nova, não retirar o
    que estava lá. Os pontos abrem os dois que entraram junto com eles. */
-var LIVRES_DE_SAIDA = ['estudante', 'clt', 'senhor', 'ambulante'];
+var LIVRES_DE_SAIDA = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor'];
 
 function lePontos() {
   try { return parseInt(localStorage.getItem('metrosp_pontos') || '0', 10) || 0; } catch (e) { return 0; }
@@ -1387,6 +1408,82 @@ var CABELO_BONE = {
   }
 };
 
+/* ---------- a touca ----------
+   Gorro de lã preto com a barra dobrada branca, cobrindo a cabeça até a
+   testa: é o corintiano da arquibancada. Ele sobe um pixel acima da
+   cabeça (a linha 0), que é o volume da lã. */
+var CABELO_TOUCA = {
+  down: {
+    0: '.....oooooo.....', 1: '....ojjjjjjo....', 2: '...ojjjjjjjjo...', 3: '...ojjjjjjjjo...',
+    4: '..owwwwwwwwwwo..'
+  },
+  up: {
+    0: '.....oooooo.....', 1: '....ojjjjjjo....', 2: '...ojjjjjjjjo...', 3: '...ojjjjjjjjo...',
+    4: '..owwwwwwwwwwo..'
+  },
+  side: {
+    0: '......oooo......', 1: '.....ojjjjo.....', 2: '....ojjjjjjjo...', 3: '....ojjjjjjjo...',
+    4: '...owwwwwwwwo...'
+  }
+};
+
+/* ---------- o calvo ----------
+   A cabeça inteira lisa, sem a coroa de cabelo do careca: é o
+   são-paulino, que é pra lembrar o Rogério Ceni. */
+var CABELO_CALVO = {
+  down: { 2: '...okkkkkkkko...', 3: '...okkkkkkkko...', 4: '...okkkkkkkko...', 5: '...okkkkkkkko...' },
+  up: {
+    2: '...okkkkkkkko...', 3: '...okkkkkkkko...', 4: '...okkkkkkkko...', 5: '...okkkkkkkko...',
+    6: '...okkkkkkkko...', 7: '...okkkkkkkko...', 8: '...okkkkkkkko...', 9: '....okkkkkko....'
+  },
+  side: {
+    2: '....okkkkkkko...', 3: '....okkkkkkko...', 4: '....okkkkkkko...', 5: '....okkkkkkko...',
+    6: '....okkokkkko...'
+  }
+};
+
+/* O magro: o tronco perde uma coluna de cada lado nas vistas de frente
+   e de costas (a de lado já é estreita). As mãos ficam uma coluna pra
+   dentro. Roda antes da camisa, pra listra e faixa caírem no corpo novo. */
+function afina(alvo) {
+  var vistas = ['down', 'up', 'diagDown', 'diagUp', 'sentadoFrente', 'sentadoCostas'];
+  for (var d = 0; d < vistas.length; d++) {
+    var a = alvo[vistas[d]];
+    if (!a) continue;
+    a = a.slice(0);
+    for (var y = 11; y <= 17; y++) {
+      var r = a[y], n = '.' + r[0] + r.substr(2, 12) + r[15] + '.';
+      var c = n.split('');
+      if (c[2] !== '.') c[2] = 'o';
+      if (c[13] !== '.') c[13] = 'o';
+      if ((y === 15 || y === 16) && c[3] === 'j') { c[3] = 'k'; c[12] = 'k'; }
+      a[y] = c.join('');
+    }
+    alvo[vistas[d]] = a;
+  }
+}
+
+/* ---------- o moicano ----------
+   O do santista, o do Neymar de 2010: crista alta e espetada, escura na
+   base ('a') com as pontas douradas ('e'), laterais raspadas (vira pele)
+   e o mullet caindo na nuca. De lado a nuca fica à esquerda (o boneco
+   de lado olha pra direita), e é por ali que o mullet sai. */
+var CABELO_MOICANO = {
+  down: {
+    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...okaaaaaako...', 3: '...okkaaaakko...',
+    4: '...okkkaakkko...', 5: '...okkkkkkkko...'
+  },
+  up: {
+    0: '.....oeoeoeo....', 1: '....oaeeeeao....', 2: '...okaaaaaako...', 3: '...okkaaaakko...',
+    4: '...okkaaaakko...', 5: '...okkaaaakko...', 6: '...okkaaaakko...', 7: '...okaaaaaako...',
+    8: '...oaaaaaaaao...', 9: '....oaaaaaao....', 10: '.....oaaaao.....'
+  },
+  side: {
+    0: '.....oeoeoeo....', 1: '....oaeeeeeao...', 2: '....oaakkkkko...', 3: '....oakkkkkko...',
+    4: '....oakkkkkko...', 5: '....oakkkkkko...', 7: '...oaakkkkkko...', 8: '....oaokkkko....'
+  }
+};
+
 /* ---------- acessórios ----------
    Mesma silhueta, gente diferente: quem carrega mochila, quem leva
    bolsa a tiracolo e quem vai o trajeto inteiro no celular. */
@@ -1479,7 +1576,18 @@ var CORPOS = {
   celular: { mods: [MOD_CELULAR] },
   celular_longo: { herda: 'longo', mods: [MOD_CELULAR] },
   saia_bolsa: { herda: 'saia', mods: [MOD_BOLSA] },
-  pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE }
+  pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE },
+  /* os torcedores, cada um com a camisa do time: o corintiano de touca,
+     os outros sem nada na cabeça; e a versão de cabelo comprido de cada um */
+  touca_corinthians: { mods: [CABELO_TOUCA], pos: camisaDeTime('corinthians') },
+  palmeiras: { pos: camisaDeTime('palmeiras') },
+  // o são-paulino: calvo e magro, pra lembrar o Rogério Ceni
+  careca_saopaulo: { mods: [CABELO_CALVO], pos: function (a) { afina(a); camisaDeTime('saopaulo')(a); } },
+  moicano_santos: { mods: [CABELO_MOICANO], pos: camisaDeTime('santos') },     // o santista, de moicano
+  longo_corinthians: { herda: 'longo', pos: camisaDeTime('corinthians') },
+  longo_palmeiras: { herda: 'longo', pos: camisaDeTime('palmeiras') },
+  longo_saopaulo: { herda: 'longo', pos: camisaDeTime('saopaulo') },
+  rabo_santos: { mods: [CABELO_RABO], pos: camisaDeTime('santos') }
 };
 
 var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas', 'segurando'];
@@ -1541,7 +1649,57 @@ function resolveCorpo(key) {
   aplicaCamada(alvo, c);
   var mods = c.mods || [];
   for (var i = 0; i < mods.length; i++) aplicaCamada(alvo, mods[i]);
+  if (c.pos) c.pos(alvo);
   return alvo;
+}
+
+/* ---------- camisa de time ----------
+   Troca pixel da camisa ('j') depois de todas as camadas, em todas as
+   vistas, porque listra e gola não são linhas inteiras que uma camada
+   substitui: são pontos no meio do tronco.
+   - Corinthians (a retrô das fotos): preta com listras brancas finas em
+     pé, a cada 3 pixels de desenho; gola redonda e punho brancos; o
+     escudo vermelho no peito.
+   - Palmeiras (a das fotos, sem patrocínio): verde, gola polo branca
+     que desce em V, punho branco e o escudo branco no peito.
+   - São Paulo (a retrô das fotos): branca, faixa vermelha e preta no
+     meio do peito só no tronco, com o escudinho branco em cima da faixa;
+     gola em V e punho vermelhos.
+   - Santos (a clássica das fotos): toda branca, gola redonda branca, e
+     só o escudo preto e branco no peito.
+   O escudo fica no peito esquerdo de quem veste, à direita de quem olha.
+   As cores moram na paleta ('j' a camisa, 'e' o vermelho, 'z' o preto). */
+var VISTA_FRENTE = ['down', 'diagDown', 'sentadoFrente'], VISTA_COSTAS = ['up', 'diagUp', 'sentadoCostas'];
+function camisaDeTime(time) {
+  var gola = { corinthians: 'w', palmeiras: 'w', saopaulo: 'e' }[time];
+  var escudo = { corinthians: 'e', palmeiras: 'w', santos: 'z' }[time];
+  return function (alvo) {
+    for (var d = 0; d < DIRS.length; d++) {
+      var nome = DIRS[d];
+      if (!alvo[nome]) continue;
+      var a = alvo[nome].slice(0), x, y;
+      var poe = function (yy, xx, ch) {
+        if (a[yy] && a[yy][xx] === 'j') a[yy] = a[yy].substr(0, xx) + ch + a[yy].substr(xx + 1);
+      };
+      if (time === 'corinthians') for (y = 11; y <= 17; y++) for (x = 3; x < 16; x += 3) poe(y, x, 'w');
+      if (time === 'saopaulo') {
+        for (x = 3; x <= 12; x++) { poe(13, x, 'e'); poe(14, x, 'z'); }
+        if (VISTA_FRENTE.indexOf(nome) >= 0) {
+          a[13] = a[13].substr(0, 7) + 'ww' + a[13].substr(9);      // o escudo, na faixa
+          a[14] = a[14].substr(0, 7) + 'w' + a[14].substr(8);
+        }
+      }
+      var frente = VISTA_FRENTE.indexOf(nome) >= 0, costas = VISTA_COSTAS.indexOf(nome) >= 0;
+      if ((frente || costas) && gola) {
+        for (x = 6; x <= 9; x++) poe(11, x, gola);     // a gola
+        poe(14, 2, gola); poe(14, 13, gola);           // o punho das duas mangas
+      }
+      if (frente && time === 'palmeiras') { poe(12, 7, 'w'); poe(12, 8, 'w'); }   // o V da gola polo
+      if (frente && escudo) poe(13, 10, escudo);                                  // o escudo
+      if (frente && time === 'santos') poe(12, 10, 'z');                           // o do Santos é mais alto
+      alvo[nome] = a;
+    }
+  };
 }
 
 var CACHE_CORPOS = {};
@@ -1633,8 +1791,49 @@ var PELES = {
   pregador: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#f0eeff', '#14141c', '#14141c', '#14141c'),
   torcedor: pele('#0a0a12', '#c99a70', '#2a2a30', '#0a7a42', '#e8e8f0', '#14141c', '#f0eeff'),
   // camisa preta com detalhe branco, bermuda branca: o do Corinthians
-  corintiano: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#26262c', '#e8e8f0', '#14141c', '#f0eeff')
+  corintiano: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#1c1c22', '#e8e8f0', '#14141c', '#f0eeff')
 };
+PELES.corintiano.e = '#d8302a';     // o vermelho do escudo
+PELES.torcedor.j = '#12783c';       // o verde da camisa das fotos
+PELES.torcedor.k = '#f0c8a0';       // o palmeirense é branco
+PELES.saopaulino = pele('#0a0a12', '#f0c8a0', '#3a2a22', '#f0eeff', '#1c1c22', '#14141c', '#f0eeff');
+PELES.saopaulino.e = '#d8302a'; PELES.saopaulino.z = '#1c1c22';
+PELES.santista = pele('#0a0a12', '#8a5a3c', '#4a2c18', '#f0eeff', '#f0eeff', '#14141c', '#f0eeff');
+PELES.santista.z = '#1c1c22'; PELES.santista.e = '#e8b83c';   // a base escura e a ponta dourada da crista
+// o torcedor jogável: pele, cabelo e jeans; a camisa vem do time escolhido
+PELES.torcedorJog = pele('#0a0a12', '#6b4228', '#1a1a22', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
+PELES.torcedoraJog = pele('#0a0a12', '#c99a70', '#3a2418', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
+
+/* ---------- os quatro times ----------
+   O torcedor escolhe o time além do gênero. Cada time tem a cor da
+   camisa, o apelido que vai no botão e o desafiante do vagão que é do
+   mesmo time (esse não te desafia: te dá força). */
+var TIMES = {
+  // pele: a do torcedor (homem) de cada time, como o desafiante dele
+  corinthians: { nome: 'TIMÃO', desafiante: 'corintiano', j: '#1c1c22', e: '#d8302a', cor: 0x1c1c22, cor2: 0xf0eeff },
+  palmeiras: { nome: 'VERDÃO', desafiante: 'palmeirense', j: '#12783c', k: '#f0c8a0', cor: 0x12783c, cor2: 0xf0eeff },
+  saopaulo: { nome: 'TRICOLOR', desafiante: 'saopaulino', j: '#f0eeff', e: '#d8302a', z: '#1c1c22', k: '#f0c8a0', cor: 0xf0eeff, cor2: 0xd8302a },
+  santos: { nome: 'PEIXE', desafiante: 'santista', j: '#f0eeff', z: '#1c1c22', a: '#4a2c18', e: '#e8b83c', k: '#b07d52', cor: 0xf0eeff, cor2: 0x1c1c22 }
+};
+var ORDEM_TIMES = ['corinthians', 'palmeiras', 'saopaulo', 'santos'];
+function paletaDoTime(base, t, g) {
+  var p = {}, k, T = TIMES[t];
+  for (k in base) p[k] = base[k];
+  p.j = T.j; if (T.e) p.e = T.e; if (T.z) p.z = T.z;
+  if (T.a && g !== 'f') p.a = T.a;   // a crista do santista; a santista, cabelo escuro como a Marta
+  if (T.k && g !== 'f') p.k = T.k;   // a pele do torcedor de cada time
+  return p;
+}
+function corpoDoTorcedor(g, t) {
+  // a santista de rabo de cavalo, como a Marta; as outras de cabelo solto
+  if (g === 'f') return t === 'santos' ? 'rabo_santos' : 'longo_' + t;
+  return { corinthians: 'touca_corinthians', saopaulo: 'careca_saopaulo', santos: 'moicano_santos' }[t] || t;
+}
+function leTime() {
+  try { var t = localStorage.getItem('metrosp_time'); if (TIMES[t]) return t; } catch (e) { }
+  return 'corinthians';
+}
+function gravaTime(t) { try { localStorage.setItem('metrosp_time', t); } catch (e) { } }
 
 /* desenha um quadro 32x48 a partir da silhueta 16x24, com sombreamento */
 /* quantos pixels faltam até a beirada da forma, andando numa direção.
@@ -1952,6 +2151,7 @@ function hzDe(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 function notaEm(t, n, dur, tipo, vol) {
   var o = AC.createOscillator(), g = AC.createGain();
   o.type = tipo; o.frequency.value = hzDe(n);
+  g.gain.value = 0.0001;              // nasce mudo (ver ruido)
   g.gain.setValueAtTime(0.0001, t);
   g.gain.linearRampToValueAtTime(vol, t + 0.008);
   g.gain.setValueAtTime(vol * 0.8, t + dur * 0.6);
@@ -1965,6 +2165,7 @@ function bumboEm(t) {
   o.type = 'sine';
   o.frequency.setValueAtTime(150, t);
   o.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+  g.gain.value = 0.0001;              // nasce mudo (ver ruido)
   g.gain.setValueAtTime(0.035, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
   o.connect(g); g.connect(AC.destination);
@@ -2003,6 +2204,104 @@ function tocaPassoMusica(i, t) {
   if (passoNoCompasso % 2 === 1) ruido(0.035, 0.006, 9000, 9000, 0.7, 'highpass', atraso);
 }
 
+/* ---------- a trilha da luta ----------
+   'A música tem que ser mais de luta.' A da luta era a mesma do menu,
+   alegre e em dó maior. Esta é outra: 150 BPM, lá menor, oito compassos
+   (Am Am F G / Am Am F E) — o mi maior no fim puxa de volta pro começo,
+   que é o que faz a luta parecer que não acaba. O baixo bate colcheia
+   por colcheia com a oitava em cima (quadrada baixinha junto, pra ter
+   grão), o riff sobe em cima dele, e a bateria tem bumbo sincopado
+   (1, o "e" do 2 e o 3), caixa no 2 e no 4 e chimbal em toda colcheia. */
+var LUTA_COLCHEIA = 60 / 150 / 2;
+var LUTA_MELODIA = [
+  69, 0, 72, 69, 76, -1, 74, 72,   71, 72, 74, -1, 72, 71, 69, -1,
+  65, 0, 69, 65, 72, -1, 71, 69,   67, 69, 71, -1, 74, -1, 71, 67,
+  76, -1, 76, 74, 76, -1, 79, 76,  74, -1, 72, 74, 76, -1, 72, 69,
+  77, -1, 76, 74, 72, -1, 74, 76,  68, 71, 76, -1, 80, -1, 76, 71
+];
+var LUTA_ACORDES = [
+  [45, [57, 60, 64]], [45, [57, 60, 64]], [41, [57, 60, 65]], [43, [55, 59, 62]],
+  [45, [57, 60, 64]], [45, [57, 60, 64]], [41, [57, 60, 65]], [40, [56, 59, 64]]
+];
+var LUTA_BAIXO = [0, 12, 0, 12, 0, 12, 0, 12];
+function tocaPassoLuta(i, t) {
+  var c = LUTA_COLCHEIA, n = LUTA_MELODIA.length;
+  var pc = i % 8, acorde = LUTA_ACORDES[Math.floor(i / 8) % LUTA_ACORDES.length];
+  var m = LUTA_MELODIA[i % n];
+  if (m > 0) {
+    var seg = 1;
+    while (LUTA_MELODIA[(i + seg) % n] === -1) seg++;
+    notaEm(t, m, c * seg * 0.92, 'square', 0.012);
+  }
+  var b = acorde[0] + LUTA_BAIXO[pc];
+  notaEm(t, b, c * 0.7, 'triangle', 0.032);
+  notaEm(t, b + 12, c * 0.5, 'square', 0.004);
+  var tri = acorde[1], ordem = [0, 1, 2, 1], k = (i * 2) % 4;
+  notaEm(t, tri[ordem[k]] + 12, c * 0.4, 'square', 0.003);
+  notaEm(t + c / 2, tri[ordem[k + 1]] + 12, c * 0.4, 'square', 0.003);
+  var atraso = Math.max(0, t - AC.currentTime);
+  if (pc === 0 || pc === 3 || pc === 4) bumboEm(t);
+  if (pc === 2 || pc === 6) ruido(0.10, 0.014, 2000, 1500, 0.8, 'bandpass', atraso);
+  ruido(0.03, pc % 2 ? 0.007 : 0.004, 9000, 9000, 0.7, 'highpass', atraso);
+}
+
+/* ---------- as vinhetas de vitória e de derrota ----------
+   'Tem que ter uma música de vitória quando ganha e de derrota quando
+   perde.' Tocadas no mesmo chip da trilha (quadrada na melodia,
+   triângulo no baixo, o bumbo e a caixa de ruído), e com hora marcada no
+   relógio do áudio. Enquanto uma toca, a trilha da luta se cala: as duas
+   juntas brigavam de tom.
+   - Vitória: arpejo subindo até o dó agudo, a escadinha lá-si-dó-ré e o
+     mi segurado em cima do acorde de dó, com bumbo marcando. ~2,4s.
+   - Derrota: o 'uén uén uén uééén' descendo em semitom (sol, fá#, fá,
+     mi), o último tremendo, com o baixo descendo junto. ~2,2s. */
+var _jingleAte = 0;
+var JINGLES = {
+  vitoria: {
+    mel: [[67, 0, .1], [72, .1, .1], [76, .2, .1], [79, .3, .1], [84, .4, .36],
+      [81, .8, .14], [83, .95, .14], [84, 1.1, .14], [86, 1.25, .14], [88, 1.4, 1.0]],
+    baixo: [[48, 0, .38], [53, .4, .38], [55, .8, .58], [48, 1.4, 1.0]],
+    acorde: [[76, 1.4, 1.0], [79, 1.4, 1.0], [72, 1.4, 1.0]],
+    bumbo: [0, .4, .8, 1.4], caixa: [1.1, 1.25, 1.4], dur: 2.4
+  },
+  derrota: {
+    mel: [[67, 0, .42], [66, .45, .42], [65, .9, .42], [64, 1.35, .85]],
+    baixo: [[43, 0, .42], [42, .45, .42], [41, .9, .42], [40, 1.35, .85]],
+    acorde: [], bumbo: [1.35], caixa: [], dur: 2.2, treme: true
+  }
+};
+function tocaJingle(nome) {
+  var j = JINGLES[nome];
+  if (!j || !SOM_LIGADO || !AC || AC.state !== 'running') return false;
+  var t0 = AC.currentTime + 0.04, i, n;
+  for (i = 0; i < j.mel.length; i++) {
+    n = j.mel[i];
+    var ultima = j.treme && i === j.mel.length - 1;
+    if (!ultima) { notaEm(t0 + n[1], n[0], n[2], 'square', 0.014); continue; }
+    // o último "uéén" treme: a nota com vibrato largo, caindo no fim
+    var o = AC.createOscillator(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
+    o.type = 'square'; o.frequency.value = hzDe(n[0]);
+    lfo.frequency.value = 6; lg.gain.value = hzDe(n[0]) * 0.03;
+    lfo.connect(lg); lg.connect(o.frequency);
+    var ts = t0 + n[1];
+    g.gain.value = 0.0001;
+    g.gain.setValueAtTime(0.0001, ts);
+    g.gain.linearRampToValueAtTime(0.014, ts + 0.01);
+    g.gain.setValueAtTime(0.012, ts + n[2] * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, ts + n[2]);
+    o.frequency.setValueAtTime(hzDe(n[0]), ts + n[2] * 0.6);
+    o.frequency.linearRampToValueAtTime(hzDe(n[0] - 1), ts + n[2]);
+    o.connect(g); g.connect(AC.destination);
+    o.start(ts); lfo.start(ts); o.stop(ts + n[2] + 0.02); lfo.stop(ts + n[2] + 0.02);
+  }
+  for (i = 0; i < j.baixo.length; i++) { n = j.baixo[i]; notaEm(t0 + n[1], n[0], n[2], 'triangle', 0.034); }
+  for (i = 0; i < j.acorde.length; i++) { n = j.acorde[i]; notaEm(t0 + n[1], n[0], n[2], 'square', 0.005); }
+  for (i = 0; i < j.bumbo.length; i++) bumboEm(t0 + j.bumbo[i]);
+  for (i = 0; i < j.caixa.length; i++) ruido(0.10, 0.012, 1900, 1400, 0.8, 'bandpass', t0 + j.caixa[i] - AC.currentTime);
+  _jingleAte = t0 + j.dur;
+  return true;
+}
+
 function agendaMusica() {
   if (!MUSICA_LIGADA || !SOM_LIGADO || !AC) return;
   /* Rede de seguranca: se por algum motivo nenhum evento avisou que a
@@ -2015,13 +2314,18 @@ function agendaMusica() {
   if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
   var modo = modoDoSom();
   // a música volta sempre do começo da frase, não do meio de onde parou
-  if (modo === 'musica' && _musModo !== 'musica') _musPasso = 0;
+  if ((modo === 'musica' || modo === 'luta') && _musModo !== modo) _musPasso = 0;
   _musModo = modo;
+  var luta = (modo === 'luta');
+  var passo = luta ? LUTA_COLCHEIA : MUS_COLCHEIA, volta = luta ? LUTA_MELODIA.length : MUS_MELODIA.length;
   while (_musProx < AC.currentTime + 0.15) {
-    if (modo === 'musica') tocaPassoMusica(_musPasso, _musProx);
+    // durante a vinheta a trilha anda calada, e volta do começo da frase depois
+    if (_musProx < _jingleAte) { _musPasso = 0; _musProx += passo; continue; }
+    if (luta) tocaPassoLuta(_musPasso, _musProx);
+    else if (modo === 'musica') tocaPassoMusica(_musPasso, _musProx);
     else tocaPassoAmbiente(_musPasso, _musProx, modo);
-    _musPasso = (_musPasso + 1) % MUS_MELODIA.length;
-    _musProx += MUS_COLCHEIA;
+    _musPasso = (_musPasso + 1) % volta;
+    _musProx += passo;
   }
 }
 
@@ -2034,7 +2338,9 @@ var _musModo = null, _gentePerto;
 function modoDoSom() {
   var m = window.jogo && jogo.scene;
   if (!m) return 'musica';
-  if (m.isActive('Desafio') || m.isActive('Title') || m.isActive('Treino') || m.isActive('Fim')) return 'musica';
+  // a luta tem trilha própria, mais rápida e em menor
+  if (m.isActive('Desafio') || m.isActive('Briga') || m.isActive('Encarada') || m.isActive('Disputa')) return 'luta';
+  if (m.isActive('Title') || m.isActive('Treino') || m.isActive('Fim')) return 'musica';
   if (m.isActive('Vagao') || m.isPaused('Vagao')) return 'vagao';
   return 'estacao';
 }
@@ -2381,6 +2687,10 @@ function ruido(dur, vol, f0, f1, q, tipo, atraso) {
   filtro.frequency.setValueAtTime(f0, t);
   filtro.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
   var g = AC.createGain();
+  /* Nasce mudo. O ganho vale 1 até o primeiro evento agendado, e com t
+     quebrado (0.05 + 3 * 0.2 = 0.6500000000000001) a fonte começava um
+     sample antes do evento: um clique de 0,63, dez vezes a música. */
+  g.gain.value = 0.0001;
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.12, dur * 0.3));
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -2462,7 +2772,10 @@ function sfx(n) {
     case 'batida': tom(70, .09, 'sine', .09); setTimeout(function () { tom(1300, .03, 'square', .028); }, 95); break;
     case 'erro': tom(200, .1, 'square', .06); setTimeout(function () { tom(120, .22, 'square', .06); }, 100); break;
     case 'fim': [392, 330, 262, 196].forEach(function (f, i) { setTimeout(function () { tom(f, .22, 'triangle', .07); }, i * 160); }); break;
-    case 'vitoria': [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tom(f, .14); }, i * 110); }); break;
+    case 'vitoria':
+      if (!tocaJingle('vitoria')) [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tom(f, .14); }, i * 110); });
+      break;
+    case 'derrota': if (!tocaJingle('derrota')) tom(150, .4, 'sawtooth'); break;
   }
 }
 
