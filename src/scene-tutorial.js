@@ -71,6 +71,39 @@ var PASSOS_TUT = [
     txt: 'NA CATRACA: PAGUE, OU\nPULE QUANDO ELE NÃO\nESTIVER OLHANDO.',
     dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
   },
+  /* O resto do que o jogo passou a ter (sabatina de 19/09): os
+     medidores, o descanso que vira vida, o carisma como crédito, o que
+     se acha no trem, a mochila por bolsos, as terciárias e o
+     checkpoint. Sete cartões, e o botão de pular fica na tela o tempo
+     todo — quem já sabe não precisa ler. */
+  {
+    txt: 'FÔLEGO, CARISMA E\nGRANA: ZERAR FÔLEGO\nOU CARISMA DERRUBA.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'SENTE NO VAGÃO: ISSO\nDESCANSA E DEVOLVE\nCORAÇÃO. COMER TAMBÉM.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'CARISMA É CRÉDITO:\nPEDE PRO GUARDA, PEDE\nLUGAR, FIA O LANCHE.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'ANDE PELOS OITO\nCARROS: TEM COISA\nESQUECIDA BRILHANDO.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'O QUE ACHA VAI PRA\nMOCHILA, POR BOLSO.\nABRA ELA NO CELULAR.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'AJUDE QUEM PEDE: É\nMISSÃO RÁPIDA, DÁ\nCARISMA E SALVA O JOGO.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
+  {
+    txt: 'CAIU? VOLTA PRO\nCHECKPOINT E PERDE O\nQUE GANHOU DEPOIS.',
+    dica: 'toque pra seguir', dicaPc: 'clique pra seguir'
+  },
   {
     txt: 'CINCO CORAÇÕES POR\nTRAJETO. BOA SORTE.',
     dica: 'toque pra começar', dicaPc: 'clique pra começar'

@@ -1732,6 +1732,17 @@ var VagaoScene = new Phaser.Class({
         }
       },
       {
+        // o carisma como crédito: quem sabe pedir passa (src/carisma.js)
+        // 21 letras é o que cabe no balão (o resto sai pela borda)
+        label: podePedir('guarda') ? 'Pedir pra passar: -20' : 'Pedir: falta carisma',
+        cb: function () {
+          if (!pedeFavor('guarda')) { sfx('nao'); eu.flash('ELE NEM OLHOU NA SUA CARA.'); eu.revista(r); return; }
+          eu.flash('"VAI, MAS NÃO ME APARECE DE NOVO."');
+          GameState.stats.causos++;
+          eu.terminaRonda();
+        }
+      },
+      {
         label: 'Correr pro outro vagão', cb: function () {
           /* Correr e o caminho do ambulante: a perseguicao ja existe
              inteira, com fole, banco e cansaco. Aqui ela so ganha outro
@@ -3712,6 +3723,7 @@ var VagaoScene = new Phaser.Class({
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     this.vigiaAchado(dt);
+    this.vigiaOfertaDeLugar(dt);       // bem quisto e acabado: alguém te chama pra sentar
     this.regeneraSentado(dt);          // descansar sentado devolve coração
     var euD = this;
     dicaDeParado(this, dt, this.andandoAgora || !!this.sentadoEm, function (m) { euD.flash(m); });

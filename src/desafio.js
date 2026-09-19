@@ -411,7 +411,10 @@ var DesafioScene = new Phaser.Class({
     this.podeFugir = !this.quem.chefao && Math.abs(this.nvVc - this.nvEle) >= DSF_FUGA;
     var maxVc = DSF_VIDA + 5 * (this.nvVc - 1), pacEle = Math.round(this.quem.pac * (1 + 0.1 * (this.nvEle - 1)));
     var fol = Math.max(0.5, GameState.descanso / GameState.char.descansoMax);
-    this.vc = { pac: Math.round(maxVc * fol), max: maxVc, mostra: 0 };
+    /* o carisma vira fôlego na conversa: quem é bem quisto começa
+       ganhando (src/carisma.js) */
+    var car = typeof folegoDoCarisma === 'function' ? folegoDoCarisma() : 0;
+    this.vc = { pac: Math.round(maxVc * fol) + car, max: maxVc + car, mostra: 0 };
     this.ele = { pac: pacEle, max: pacEle, mostra: pacEle };
     this.vc.mostra = this.vc.pac;
     this.sel = 0;
