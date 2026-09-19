@@ -290,6 +290,44 @@ function limitaVagao(sp) {
   var k = apertoSanfona(sp.y), dir = bordaVagao(sp.y), esq = bordaEsqVagao(sp.y);
   sp.x = Phaser.Math.Clamp(sp.x, esq + (SANFONA_X0 - esq) * k, dir + (SANFONA_X1 - dir) * k);
   sp.y = Phaser.Math.Clamp(sp.y, 84, fundoDoTrem() - 20);
+  afastaDoPoste(sp);
+}
+
+/* ---------- balaústres, e não uma barra corrida ----------
+   A barra era uma faixa de metal correndo o carro inteiro nas duas
+   colunas do corredor. Vista de cima ela não tinha altura: desenhada
+   por cima das pessoas, parecia um poste atravessando o corpo; por
+   baixo, parecia que o boneco andava por cima dela. Agora são postes,
+   como os do metrô: um círculo de metal a cada 64px nas mesmas duas
+   colunas (x 108 e 216), e ninguém atravessa um poste — quem encosta
+   é empurrado pra fora, a 10px do centro (meia largura de pé).
+   Na coluna da direita não há poste na frente das portas: é por onde
+   se entra. */
+var POSTE_Y0 = 96, POSTE_PASSO = 64, POSTE_RAIO = 10;
+function temPoste(i, ay) {
+  if (ay < POSTE_Y0 || ay >= GH - 40) return false;
+  return !(i && naPorta(ay, 8));
+}
+// o poste mais perto deste ponto, em coordenadas do mundo, ou null
+function postePerto(x, y) {
+  var base = carroDe(y) * PASSO_CARRO, yl = y - base;
+  var ay = POSTE_Y0 + Math.round((yl - POSTE_Y0) / POSTE_PASSO) * POSTE_PASSO;
+  var melhor = null, dm = 1e9;
+  for (var i = 0; i < BARRAS_X.length; i++) {
+    if (!temPoste(i, ay)) continue;
+    var cx = BARRAS_X[i] + 4, cy = base + ay;
+    var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+    if (d < dm) { dm = d; melhor = { x: cx, y: cy, d: d }; }
+  }
+  return melhor;
+}
+function afastaDoPoste(sp) {
+  var p = postePerto(sp.x, sp.y);
+  if (!p || p.d >= POSTE_RAIO) return;
+  var dx = sp.x - p.x, dy = sp.y - p.y, d = p.d;
+  if (d < 0.5) { dx = (sp.x < GW / 2) ? -1 : 1; dy = 0; d = 1; }
+  sp.x = p.x + dx / d * POSTE_RAIO;
+  sp.y = p.y + dy / d * POSTE_RAIO;
 }
 
 /* ---------- o que cada carro guarda ----------
@@ -745,20 +783,14 @@ var VagaoScene = new Phaser.Class({
      verdade ela também não passa ali. */
   desenhaBarrasDoCarro: function (g) {
     for (var i = 0; i < 2; i++) {
-      var px = BARRAS_X[i];
-      for (var by = HUD_H; by < GH; by++) {
-        if (i && naPorta(by, 8)) continue;
-        g.fillStyle(0x000000, 0.25).fillRect(px + 8, by, 3, 1);   // sombra no chão
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(px, by, 8, 1);
-        g.fillStyle(num(PAL.metal), 1).fillRect(px, by, 5, 1);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(px + 1, by, 2, 1);
-      }
-      // alças penduradas
-      g.fillStyle(num(PAL.metalSom), 1);
-      for (var ay = 96; ay < GH - 40; ay += 64) {
-        if (i && naPorta(ay, 8)) continue;
-        g.fillRect(px + (i ? -12 : 8), ay, 12, 3);
-        g.fillRect(px + (i ? -12 : 18), ay, 3, 14);
+      var cx = BARRAS_X[i] + 4;
+      for (var ay = POSTE_Y0; ay < GH - 40; ay += POSTE_PASSO) {
+        if (!temPoste(i, ay)) continue;
+        // o poste visto de cima: base escura, tubo de inox, brilho da luz de cima-esquerda
+        g.fillStyle(0x000000, 0.3).fillCircle(cx + 2, ay + 2, 6);
+        g.fillStyle(num(PAL.metalSom), 1).fillCircle(cx, ay, 5);
+        g.fillStyle(num(PAL.metal), 1).fillCircle(cx, ay, 4);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(cx - 2, ay - 3, 2, 2);
       }
     }
   },
@@ -776,14 +808,8 @@ var VagaoScene = new Phaser.Class({
   /* Quem é a barra mais perto, e a que distância. É o que decide se dá
      pra segurar e onde a mão vai parar. */
   barraPerto: function () {
-    var melhor = null, d = 1e9;
-    for (var i = 0; i < BARRAS_X.length; i++) {
-      var bx = BARRAS_X[i] + 4;
-      if (i && naPorta(this.pl.sp.y, 8)) continue;   // ali a barra não existe
-      var dd = Math.abs(this.pl.sp.x - bx);
-      if (dd < d) { d = dd; melhor = bx; }
-    }
-    return { x: melhor, d: d };
+    var p = postePerto(this.pl.sp.x, this.pl.sp.y);
+    return p ? { x: p.x, d: p.d } : { x: null, d: 1e9 };
   },
 
   /* As duas portas de um carro. Quem entra em cena entra pela porta
@@ -894,6 +920,7 @@ var VagaoScene = new Phaser.Class({
         var p = new Ator(this, 108 + Math.random() * 104,
           yDoCarro(c2, 120 + Math.random() * 400), sorteiaPax());
         p.dir = Math.random() < 0.5 ? 'left' : 'right';
+        afastaDoPoste(p.sp);            // ninguém nasce dentro de um poste
         p.anima(0, false); p.sp.setDepth(35);
         sentaAnimado(p);                // em pé também olha em volta
         this.npcExtra.push(p);
@@ -920,6 +947,7 @@ var VagaoScene = new Phaser.Class({
   poeDesafiante: function (carro, x, y, olha, tipo) {
     tipo = tipo || TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
     var a = new Ator(this, x, y, DESAFIANTES[tipo].sprite);
+    afastaDoPoste(a.sp);
     a.dir = olha; a.anima(0, false);
     a.sp.setDepth(36);
     a.fixo = true;
