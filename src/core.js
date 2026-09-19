@@ -3513,13 +3513,28 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
 /* ---------- o nível ----------
    'Acho que cabe evolução de nível.' Cada personagem tem o seu XP,
    guardado entre as partidas (metrosp_xp): ganhar um duelo rende mais
-   quanto mais alto o nível de quem você venceu. A cada 40 de XP, um
-   nível (até o 30). Nível dá paciência e força no duelo (desafio.js), e
+   quanto mais alto o nível de quem você venceu. Cada nível pede um
+   pouco mais que o anterior (xpPraSubir), até o 30. Nível dá paciência e força no duelo (desafio.js), e
    é ele que decide quando dá pra fugir. */
 function leXp() {
   try { return JSON.parse(localStorage.getItem('metrosp_xp') || '{}') || {}; } catch (e) { return {}; }
 }
-function nivelDoXp(x) { return Math.min(30, 1 + Math.floor((x || 0) / 40)); }
+/* A curva (skill rpg): os primeiros níveis rápidos e os de cima mais
+   lentos. Do nível n pro n+1 pede 30 + 10n de XP: 40, 50, 60... Uma vitória
+   típica rende uns 20 a 40, então o nível 2 sai no primeiro dia e o 10 lá
+   pela metade do mês. */
+function xpPraSubir(n) { return 30 + 10 * n; }
+function nivelDoXp(x) {
+  var n = 1, resto = x || 0;
+  while (n < 30 && resto >= xpPraSubir(n)) { resto -= xpPraSubir(n); n++; }
+  return n;
+}
+// quanto do nível atual já foi (0 a 1), pra barrinha do HUD
+function progressoXp(x) {
+  var n = 1, resto = x || 0;
+  while (n < 30 && resto >= xpPraSubir(n)) { resto -= xpPraSubir(n); n++; }
+  return n >= 30 ? 1 : resto / xpPraSubir(n);
+}
 function meuNivel() { return nivelDoXp(leXp()[GameState.charKey]); }
 // soma o XP e devolve o nível novo quando subiu (0 quando não)
 function ganhaXp(n) {
@@ -5840,14 +5855,14 @@ var HudScene = new Phaser.Class({
        borrão): a estrela laranja é o carisma, a lua verde o descanso */
     var bx0 = HUDB.voce.x + 20, by0 = HUDB.voce.y + 20, bw0 = HUDB.voce.w - 60;
     /* O nível mora na ponta das barras: a pílula NV, e embaixo dela a
-       barrinha do XP que falta pro próximo (40 por nível, como no
-       nivelDoXp). As barras encolheram 34px pra ela caber. */
+       barrinha do XP que falta pro próximo (a curva do nivelDoXp). As
+       barras encolheram 34px pra ela caber. */
     var xpHud = (typeof leXp === 'function' && GameState.charKey) ? (leXp()[GameState.charKey] || 0) : 0;
     var nvHud = nivelDoXp(xpHud), px0 = HUDB.voce.x + HUDB.voce.w - 32;
     g.fillStyle(0x2a2410, 1).fillRoundedRect(px0, by0 - 3, 30, 11, 4);
     g.lineStyle(1, 0xf2c14e, 0.8).strokeRoundedRect(px0 + 0.5, by0 - 2.5, 29, 10, 4);
     this.tNivelHud.setText('NV ' + nvHud).setPosition(px0 + 15, by0 - 1);
-    barra(g, px0, by0 + 11, 30, 5, nvHud >= 30 ? 1 : (xpHud % 40) / 40, 0xf2c14e);
+    barra(g, px0, by0 + 11, 30, 5, progressoXp(xpHud), 0xf2c14e);
     var ix = HUDB.voce.x + 8;
     g.fillStyle(0xe8a33c, 1);
     g.fillRect(ix + 2, by0 - 2, 2, 8).fillRect(ix - 1, by0 + 1, 8, 2).fillRect(ix + 1, by0, 4, 4);
