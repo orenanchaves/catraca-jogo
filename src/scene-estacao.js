@@ -1958,33 +1958,50 @@ var EstacaoScene = new Phaser.Class({
      da boca da escada. A porta dos dois é a face de baixo, que é a que se
      vê. Qualquer um usa; quem está de cadeira de rodas só sobe por ele. */
   montaElevadores: function () {
-    var x0 = ESC_X1 + 14, w = 36;
+    // 48x52 ('aumenta o elevador'), a 20px da escada
+    var x0 = ESC_X1 + 20, w = 48, h = 52;
     this.elevadores = [
-      { lugar: 'saguao', x: x0, y: 76, w: w, h: 40, porta: { x: x0 + w / 2, y: 132 } },
-      { lugar: 'plataforma', x: x0, y: ESC_Y - 64, w: w, h: 40, porta: { x: x0 + w / 2, y: ESC_Y - 12 } }
+      { lugar: 'saguao', x: x0, y: 116 - h, w: w, h: h, porta: { x: x0 + w / 2, y: 132 } },
+      { lugar: 'plataforma', x: x0, y: ESC_Y - 24 - h, w: w, h: h, porta: { x: x0 + w / 2, y: ESC_Y - 12 } }
     ];
     this.gElev = this.add.graphics().setDepth(3);
     this.gElevP = this.add.graphics().setDepth(38);
     this.pintaElevadores(0);
   },
+  /* Como o das fotos da linha: uma caixa de concreto, a porta de inox em
+     duas folhas com a costura no meio e a plaquinha azul de acessibilidade,
+     o indicador de andar em cima da porta e a placa verde-água de SAÍDA
+     com a cadeira de rodas. As folhas correm pros lados quando abre. */
   pintaElevadores: function (fechando) {
     var lst = this.elevadores || [];
     for (var i = 0; i < lst.length; i++) {
-      var e = lst[i], g = i ? this.gElevP : this.gElev;
+      var e = lst[i], g = i ? this.gElevP : this.gElev, cx = e.x + e.w / 2;
       g.clear();
       g.fillStyle(0x000000, 0.3).fillRect(e.x + 3, e.y + 4, e.w, e.h);
-      g.fillStyle(num(PAL.metalSom), 1).fillRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
-      g.fillStyle(0x9ec4dc, 0.55).fillRect(e.x, e.y, e.w, e.h);                // o vidro
-      g.fillStyle(0xffffff, 0.3).fillRect(e.x + 3, e.y + 2, 3, e.h - 4);
-      // a porta, embaixo: duas folhas que se fecham quando alguém está viajando
-      var ab = fechando ? 0 : 8;
-      g.fillStyle(num(PAL.metal), 1).fillRect(e.x + 4, e.y + e.h - 16, e.w / 2 - 4 - ab / 2, 16)
-        .fillRect(e.x + e.w / 2 + ab / 2, e.y + e.h - 16, e.w / 2 - 4 - ab / 2, 16);
-      g.fillStyle(0x14141c, 1).fillRect(e.x + e.w / 2 - ab / 2, e.y + e.h - 16, ab, 16);
-      // a placa azul com a cadeira de rodas, em cima da porta
-      g.fillStyle(0x1c5ab4, 1).fillRect(e.x + e.w / 2 - 6, e.y + 4, 12, 12);
-      g.fillStyle(0xf0eeff, 1).fillRect(e.x + e.w / 2 - 1, e.y + 6, 2, 2).fillRect(e.x + e.w / 2 - 1, e.y + 9, 2, 3);
-      g.lineStyle(1, 0xf0eeff, 1).strokeCircle(e.x + e.w / 2 - 1, e.y + 12, 3);
+      // o concreto, com as marcas da forma
+      g.fillStyle(0x8f897f, 1).fillRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
+      g.fillStyle(0xa8a298, 1).fillRect(e.x, e.y, e.w, e.h);
+      g.fillStyle(0x9a948a, 1).fillRect(e.x, e.y + 14, e.w, 1).fillRect(e.x, e.y + 30, e.w, 1);
+      // a placa verde-água de saída, com a cadeira de rodas
+      g.fillStyle(0x1a8a7a, 1).fillRect(cx - 16, e.y + 2, 32, 11);
+      g.fillStyle(0xf0eeff, 1).fillRect(cx - 14, e.y + 4, 7, 7);
+      g.fillStyle(0x1c5ab4, 1).fillRect(cx - 13, e.y + 5, 5, 5);
+      g.fillStyle(0xf0eeff, 1).fillRect(cx - 5, e.y + 6, 18, 1).fillRect(cx - 5, e.y + 9, 12, 1);
+      // o indicador de andar, preto, com a seta
+      g.fillStyle(0x14141c, 1).fillRect(cx - 4, e.y + 15, 8, 5);
+      g.fillStyle(0xf2c14e, 1).fillTriangle(cx - 2, e.y + 19, cx + 2, e.y + 19, cx, e.y + 16);
+      // a porta de inox: o batente e as duas folhas
+      var py = e.y + 21, ph = e.h - 21, pw = e.w - 12;
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(e.x + 5, py, e.w - 10, ph);
+      var ab = fechando ? 0 : 10;
+      g.fillStyle(0x14141c, 1).fillRect(cx - ab, py + 1, ab * 2, ph - 1);     // o vão, quando abre
+      g.fillStyle(0xc8cad4, 1).fillRect(e.x + 6, py + 1, pw / 2 - ab, ph - 1)
+        .fillRect(cx + ab, py + 1, pw / 2 - ab, ph - 1);
+      g.fillStyle(0xe8e8f0, 1).fillRect(e.x + 7, py + 2, 1, ph - 3).fillRect(cx + ab + 1, py + 2, 1, ph - 3);
+      if (!ab) g.fillStyle(0x6a6c78, 1).fillRect(cx, py + 1, 1, ph - 1);      // a costura
+      // a plaquinha azul de acessibilidade na folha
+      g.fillStyle(0x1c5ab4, 1).fillRect(e.x + 9, py + 8, 10, 7);
+      g.fillStyle(0xf0eeff, 1).fillRect(e.x + 11, py + 10, 2, 2).fillRect(e.x + 15, py + 10, 2, 3);
     }
   },
   bateNoElevador: function (x, y) {

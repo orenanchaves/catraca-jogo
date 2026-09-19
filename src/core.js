@@ -2195,6 +2195,7 @@ try {
 } catch (e) { }
 function ligaSom(v) {
   SOM_LIGADO = !!v;
+  if (!SOM_LIGADO && typeof paraPregao === 'function') paraPregao();
   try { localStorage.setItem('metrosp_som', SOM_LIGADO ? '1' : '0'); } catch (e) { }
   if (SOM_LIGADO) { audioOn(); return; }
   /* SOM: DESLIGADO desligava só o `sfx`: a música roda num relógio
@@ -2422,6 +2423,7 @@ function agendaMusica() {
   // ficou pra trás (contexto suspenso, aba voltando): retoma do agora, sem rajada
   if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
   var modo = modoDoSom();
+  if (modo === 'musica' || modo === 'luta') paraPregao();     // menu e luta calam o ambulante
   // a música volta sempre do começo da frase, não do meio de onde parou
   if ((modo === 'musica' || modo === 'luta') && _musModo !== modo) _musPasso = 0;
   _musModo = modo;
@@ -2589,21 +2591,45 @@ function falaGente(texto, rapido) {
    menos de 170px de você. É o pregão do trem de SP. */
 var PREGOES = ['Metrô, shopping, trem!', 'Olha a água geladinha!', 'Chocolate, é dois é cinco!', 'Metrô, shopping, trem, é só aqui!'];
 var _tPregao = 0;
+/* ---------- o pregão gravado ----------
+   'Usa esses áudios pros ambulantes.' Dois pregões de verdade, em
+   assets/audio: tocam quando um ambulante está perto, com o volume caindo
+   com a distância, e param quando ele fica pra trás, quando o jogo vai
+   pra menu ou luta, e quando o som é desligado. Sem o arquivo (ou com o
+   navegador recusando tocar), volta o pregão falado de antes. */
+var AUDIO_AMBULANTE = ['assets/audio/ambulante_metro.mp3', 'assets/audio/ambulante_vendedor.mp3'];
+var _audAmb = null;
+function paraPregao() {
+  if (_audAmb) { try { _audAmb.pause(); } catch (e) { } _audAmb = null; }
+}
 function gritaAmbulante(modo) {
   var agora = Date.now();
-  if (agora < _tPregao) return;
   var sc = window.jogo && jogo.scene.getScene(modo === 'vagao' ? 'Vagao' : 'Estacao');
-  if (!sc || !sc.pl || !sc.pl.sp) return;
-  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), perto = false;
+  if (!sc || !sc.pl || !sc.pl.sp || !SOM_LIGADO || document.hidden) { paraPregao(); return; }
+  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), dist = 1e9;
   for (var i = 0; i < lista.length; i++) {
     var a = lista[i];
     if (!a || !a.sp || !a.sp.active || !a.sp.texture) continue;
     if (a.sp.texture.key.indexOf('np_ambulante') !== 0) continue;
-    if (Math.abs(a.sp.x - sc.pl.sp.x) < 170 && Math.abs(a.sp.y - sc.pl.sp.y) < 170) { perto = true; break; }
+    dist = Math.min(dist, Math.hypot(a.sp.x - sc.pl.sp.x, a.sp.y - sc.pl.sp.y));
   }
-  if (!perto) return;
-  _tPregao = agora + 8000 + Math.random() * 6000;
-  falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3);
+  var vol = Phaser.Math.Clamp(1 - dist / 240, 0, 1) * 0.55;
+  if (_audAmb && !_audAmb.paused && !_audAmb.ended) {
+    if (vol <= 0.02) paraPregao(); else _audAmb.volume = vol;
+    return;
+  }
+  _audAmb = null;
+  if (dist > 170 || agora < _tPregao) return;
+  _tPregao = agora + 22000 + Math.random() * 12000;
+  try {
+    _audAmb = new Audio(AUDIO_AMBULANTE[Math.floor(Math.random() * AUDIO_AMBULANTE.length)]);
+    _audAmb.volume = vol;
+    var pr = _audAmb.play();
+    if (pr && pr.catch) pr.catch(function () { _audAmb = null; falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3); });
+  } catch (e) {
+    _audAmb = null;
+    falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3);
+  }
 }
 
 function anuncia(texto) {

@@ -30,11 +30,12 @@ var ANUNCIOS = {
    ('vertical') ele é girado 90 graus pra caber na parede da plataforma. */
 function espacosItaquera() {
   return [
-    // na parede de cima do mezanino, dos dois lados da boca da escada
-    { id: 'ITQ-MEZ-1', x: MEZ.x0 + 60, y: 78, tipo: 'estatico', anuncios: ['ceda'] },
-    { id: 'ITQ-MEZ-2', x: 54, y: 78, tipo: 'digital', anuncios: ['ond', 'loto', 'ingles'] },
-    // o elevador ocupa de 222 a 258, do lado da escada: à direita dele cabe um cartaz só
-    { id: 'ITQ-MEZ-3', x: 318, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
+    /* Na parede de cima do mezanino, um painel de cada lado da escada, no
+       meio do espaço que sobra ('melhora o espaçamento'): à esquerda, da
+       parede (-94) à boca da escada (102); à direita, do elevador (276) à
+       parede (414). Dois de cada lado ficavam encostados. */
+    { id: 'ITQ-MEZ-1', x: 4, y: 78, tipo: 'digital', anuncios: ['ond', 'ceda', 'loto', 'ingles'] },
+    { id: 'ITQ-MEZ-2', x: 345, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
     /* Na parede da plataforma não: em pé, girado, o cartaz brigava com a
        faixa do nome e o mapa, e ficava feio ('não rola tanto'). */
   ];
