@@ -662,6 +662,8 @@ EstacaoScene.prototype.montaItaquera = function () {
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
   this.montaCompradores();
+  // os cartazes: nas paredes, por baixo de quem passa (anuncios.js)
+  montaAnuncios(this, espacosItaquera(), 3);
   /* tomadas: nas paredes do mezanino e na da plataforma, perto dos
      bancos, e longe das lixeiras ('perde o sentido' carregar o celular
      do lado do lixo) */
@@ -799,6 +801,7 @@ EstacaoScene.prototype.atualizaItaquera = function (dt) {
     else { this.pl.dir = 'sentadoFrente'; this.pl.anima(0, false); }
   }
   this.pintaPSD();
+  atualizaAnuncios(this, dt);
   this.andaPassantes(dt);
   this.andaCompradores(dt);
 
