@@ -41,40 +41,40 @@ var FimScene = new Phaser.Class({
     var m = txtC(this, GW / 2, 134, GameState.motivoFim || 'A cidade venceu hoje.', PAL.cinza, 8);
     m.setWordWrapWidth(GW - 48).setAlign('center');
 
-    /* O placar é em dias inteiros — ida e volta feitas. Estação virou
-       coisa de trajeto, não de placar: são trinta por dia. */
-    txtC(this, GW / 2, 206, 'VOCÊ FEZ O TRAJETO', PAL.cinzaEsc, 8);
-    txtC(this, GW / 2, 220, String(GameState.diasInteiros()), PAL.branco, 32);
-    txtC(this, GW / 2, 296, GameState.diasInteiros() === 1 ? 'DIA INTEIRO' : 'DIAS INTEIROS', PAL.cinza, 8);
+    /* ---------- menos é mais ----------
+       Eram dezessete linhas de texto entre o título e os botões: motivo,
+       placar, recorde, uma tabela de nove números e a frase. "Muito
+       poluída", foi o veredito, e com razão — a tabela tinha passo de
+       17px pra uma tinta de 14, e o motivo de três linhas (até y 206)
+       entrava em cima do 'VOCÊ FEZ O TRAJETO' (206). Ninguém lê nove
+       números depois de perder: lê o placar e toca em DE NOVO.
+
+       Ficam o motivo, o PLACAR, o recorde, a frase — que é o resumo da
+       partida em uma linha — e três fatos: onde, quando e com quanto
+       você parou. Atrasos, lugares dados, disfarces, catracas e achados
+       viraram missão, e as missões moram no celular. */
+    var dias = GameState.diasInteiros();
+    txtC(this, GW / 2, 214, String(dias), PAL.branco, 32);
+    txtC(this, GW / 2, 306, dias === 1 ? 'DIA INTEIRO' : 'DIAS INTEIROS', PAL.cinza, 8);
     /* O recorde mora colado no placar, como o TOP do Crossy Road mora
-       embaixo do número da vez. Ele estava lá embaixo, na altura em que
-       depois nasceram os ladrilhos, e sumiu por baixo deles. */
-    txtC(this, GW / 2, 316, 'RECORDE: ' + GameState.recorde(), PAL.cinzaEsc, 8);
+       embaixo do número da vez. */
+    txtC(this, GW / 2, 326, 'RECORDE: ' + GameState.recorde(), PAL.cinzaEsc, 8);
+
+    txtC(this, GW / 2, 366, this.titulo(s), PAL.amarelo, 8)
+      .setWordWrapWidth(GW - 32).setAlign('center');
 
     var linhas = [
       ['PAROU EM', GameState.estacaoAtual()],
-      ['INDO PRA', GameState.rotuloDaPerna()],
-      ['PAROU ÀS', GameState.hora()],
-      ['ATRASOS', GameState.atrasos + ' de ' + MAX_ATRASOS],
-      ['LUGARES DADOS', String(s.cedidos)],
-      ['DISFARCES OK', s.disfarcesOk + '/' + s.disfarces],
-      ['CATRACAS PULADAS', String(s.catracasPuladas)],
-      ['ACHADO NO CHÃO', String(s.caidos || 0)],
+      ['ÀS', GameState.hora()],
       ['SALDO', 'R$ ' + GameState.dinheiro.toFixed(2).replace('.', ',')]
     ];
-    /* Nove linhas no lugar de oito: o passo caiu de 19 pra 17 pra a
-       tabela não encostar no título lá embaixo. */
-    g.fillStyle(0x11111c, 1).fillRect(24, 340, GW - 48, linhas.length * 17 + 12);
-    g.fillStyle(0x1c1c2c, 1).fillRect(24, 340, GW - 48, 2);
+    // 22 de passo: a caixa do texto tem 24, e 17 empilhava uma linha na outra
+    g.fillStyle(0x11111c, 1).fillRect(24, 402, GW - 48, linhas.length * 22 + 8);
     for (var i = 0; i < linhas.length; i++) {
-      var y = 348 + i * 17;
-      if (i % 2) g.fillStyle(0xffffff, 0.025).fillRect(26, y - 1, GW - 52, 16);
+      var y = 406 + i * 22;
       txt(this, 36, y, linhas[i][0], PAL.cinza, 8);
       txt(this, GW - 36, y, linhas[i][1], PAL.branco, 8).setOrigin(1, 0);
     }
-
-    txtC(this, GW / 2, 504, this.titulo(s), PAL.amarelo, 8)
-      .setWordWrapWidth(GW - 32).setAlign('center');
 
     /* ---------- voltar sem passar pelo menu ----------
        Isto era uma linha de texto que levava pro título, e de lá você
