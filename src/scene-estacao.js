@@ -2770,6 +2770,7 @@ var EstacaoScene = new Phaser.Class({
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
     ondasDoPregao(this, time);
+    vigiaDex(this, time);
     this.atualizaCarga(dt, mv);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
 

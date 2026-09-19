@@ -3616,6 +3616,7 @@ var VagaoScene = new Phaser.Class({
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
     ondasDoPregao(this, time);
+    vigiaDex(this, time);
 
     if (this.fuga) this.atualizaFuga(dt);
 

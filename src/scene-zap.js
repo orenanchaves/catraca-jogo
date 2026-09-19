@@ -14,7 +14,7 @@
    Como a cena de jogo fica pausada por baixo, aqui o teclado é ouvido
    direto por evento — cena pausada não atualiza tecla nenhuma. */
 
-var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA'];
+var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA', 'METRODEX'];
 
 /* ---------- a tela inicial ----------
    As abas embaixo viraram aplicativos: o celular abre bloqueado, o
@@ -27,7 +27,8 @@ var APPS_ZAP = [
   { nome: 'MAPA', cor: 0xf2f0ff, cab: 0x1c2a4a },
   { nome: 'BANCO', cor: 0x14284a, cab: 0x14284a },
   { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 },
-  { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 }
+  { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 },
+  { nome: 'METRODEX', cor: 0xe8362c, cab: 0x5a1414 }
 ];
 /* Com a MOCHILA são cinco: três por fileira, ícones de 60 (os de 72 em
    2x2 não cabiam mais). 'MISSÕES' e 'MOCHILA' têm 84px de nome, e as
@@ -106,7 +107,9 @@ var ZapScene = new Phaser.Class({
     this.tApps = [];
     for (var ia = 0; ia < APPS_ZAP.length; ia++) {
       var la = lugarDoApp(ia);
-      this.tApps.push(txtC(this, la.x + ICONE_APP / 2, la.y + ICONE_APP + 6, APPS_ZAP[ia].nome, PAL.branco, 8).setDepth(2402));
+      // o nome em meia escala (6px por letra), como nome de app de verdade: 'METRODEX' cheio tinha 96px
+      this.tApps.push(txtC(this, la.x + ICONE_APP / 2, la.y + ICONE_APP + 6, APPS_ZAP[ia].nome, PAL.branco, 8)
+        .setScale(ESCALA_TEXTO / 2).setDepth(2402));
     }
     this.tBadge = txtC(this, 0, 0, '', PAL.branco, 8).setDepth(2403);
     this.modo = 'bloqueio';
@@ -195,7 +198,13 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < 6; i++) {
       this.figMochila.push(this.add.image(ZAP.tx0 + 24, ZAP.topo + i * 56 + 26, '__DEFAULT').setDepth(2403).setVisible(false).setScale(1.2));
       var zm = this.add.zone(ZAP.tx0, ZAP.topo + i * 56, ZAP.tx1 - ZAP.tx0, 52).setOrigin(0, 0);
-      (function (idx) { zm.on('pointerdown', function () { if (self.aba === 4 && self.modo === 'app') self.usaItem(idx); }); })(i);
+      (function (idx) {
+        zm.on('pointerdown', function () {
+          if (self.modo !== 'app') return;
+          if (self.aba === 4) self.usaItem(idx);
+          else if (self.aba === 5) { self.sel = self.topoDex + idx; sfx('catraca'); self.pinta(); }
+        });
+      })(i);
       this.zonasMochila.push(zm);
     }
 
@@ -360,8 +369,8 @@ var ZapScene = new Phaser.Class({
       this.pinta();
       return;
     }
-    var n = this.aba === 4 ? this.itensDaMochila().length : (GameState.zap || []).length;
-    if ((this.aba !== 0 && this.aba !== 4) || !n) return;
+    var n = this.aba === 4 ? this.itensDaMochila().length : (this.aba === 5 ? DEX.length : (GameState.zap || []).length);
+    if ((this.aba !== 0 && this.aba !== 4 && this.aba !== 5) || !n) return;
     this.sel = (this.sel + d + n) % n;
     sfx('catraca');
     this.pinta();
@@ -425,7 +434,7 @@ var ZapScene = new Phaser.Class({
     // âncora de volta ao padrão: as mesmas linhas são reusadas em abas
     // que alinham à esquerda, à direita e ao centro
     // a largura de quebra também volta: a aba das missões quebra linha, as outras não
-    for (i = 0; i < this.linhas.length; i++) this.linhas[i].setVisible(false).setOrigin(0, 0).setMaxWidth(0);
+    for (i = 0; i < this.linhas.length; i++) this.linhas[i].setVisible(false).setOrigin(0, 0).setMaxWidth(0).setScale(ESCALA_TEXTO);
     // toque só no que está na tela: a lista e as respostas voltam ligadas pelo pintaZap
     for (i = 0; i < this.zonasLinha.length; i++) this.zonasLinha[i].disableInteractive();
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
@@ -469,7 +478,8 @@ var ZapScene = new Phaser.Class({
       else if (this.aba === 1) this.pintaMapa(g);
       else if (this.aba === 2) this.pintaGrana(g);
       else if (this.aba === 3) this.pintaMissoes(g);
-      else this.pintaMochila(g);
+      else if (this.aba === 4) this.pintaMochila(g);
+      else this.pintaDex(g);
       this.pintaAbas(g);
     }
     this.pintaTopo(gt, sy0, sy1);
@@ -529,6 +539,16 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xb8862a, 1).fillCircle(cx + 14, cy + 12, 11);
       g.fillStyle(0xf2c14e, 1).fillCircle(cx + 14, cy + 12, 9);
       g.fillStyle(0xb8862a, 1).fillRect(cx + 13, cy + 6, 2, 12);
+    } else if (i === 5) {
+      // Metrodex: o aparelho vermelho, a lente azul grande e as três luzinhas
+      g.fillStyle(0xa8201a, 1).fillRoundedRect(cx - 18, cy - 22, 36, 44, 6);
+      g.fillStyle(0xf0eeff, 1).fillCircle(cx - 8, cy - 12, 8);
+      g.fillStyle(0x3a9ae8, 1).fillCircle(cx - 8, cy - 12, 6);
+      g.fillStyle(0xcfe8ff, 1).fillCircle(cx - 10, cy - 14, 2);
+      g.fillStyle(0xf2c14e, 1).fillCircle(cx + 5, cy - 16, 2.5);
+      g.fillStyle(0x00e676, 1).fillCircle(cx + 12, cy - 16, 2.5);
+      g.fillStyle(0x14141c, 1).fillRect(cx - 12, cy + 2, 24, 14);
+      g.fillStyle(0x00e676, 0.8).fillRect(cx - 9, cy + 5, 12, 2).fillRect(cx - 9, cy + 9, 8, 2);
     } else if (i === 4) {
       // Mochila: o corpo marrom, o bolso da frente e as alças
       g.fillStyle(0x6b4226, 1).fillRoundedRect(cx - 16, cy - 18, 32, 38, 8);
@@ -861,7 +881,8 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(sel ? 0x2a2014 : 0x16161f, 1).fillRect(ZAP.tx0, y, ZAP.tx1 - ZAP.tx0, 52);
       if (sel) g.lineStyle(2, 0xf2c14e, 0.9).strokeRect(ZAP.tx0 + 1, y + 1, ZAP.tx1 - ZAP.tx0 - 2, 50);
       g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0 + 8, y + 10, 32, 32);
-      this.figMochila[i].setTexture(texturaItem(this, k)).setVisible(true);
+      this.figMochila[i].setTexture(texturaItem(this, k)).clearTint().setScale(1.2)
+        .setPosition(ZAP.tx0 + 24, y + 26).setVisible(true);
       this.zonasMochila[i].setInteractive();
       var ef = [];
       if (it.descanso) ef.push('+' + it.descanso + ' DESC');
@@ -893,6 +914,39 @@ var ZapScene = new Phaser.Class({
     sfx(r === 'nada' ? 'nao' : 'moeda');
     this.pinta();
     this.tRodape.setText(msg);
+  },
+
+  /* ---------- o app da METRODEX ----------
+     Seis fichas na tela, rolando com a escolhida no meio. Cada uma: o
+     boneco (silhueta se ainda não visto), o nome e, pequeno embaixo, o que
+     ele faz; do desafiante vencido, a fraqueza e o que não faz cócega. */
+  pintaDex: function (g) {
+    var dex = leDex(), n = DEX.length, vistos = 0, i;
+    for (i = 0; i < n; i++) if (dex[DEX[i].id]) vistos++;
+    if (this.sel >= n) this.sel = 0;
+    this.topoDex = Phaser.Math.Clamp(this.sel - 2, 0, n - 6);
+    for (i = 0; i < 6; i++) {
+      var k = this.topoDex + i, e = DEX[k], nivel = dex[e.id] || 0, y = ZAP.topo + i * 56, sel = (k === this.sel);
+      g.fillStyle(sel ? 0x2a1414 : 0x16161f, 1).fillRect(ZAP.tx0, y, ZAP.tx1 - ZAP.tx0, 52);
+      if (sel) g.lineStyle(2, 0xe8362c, 0.9).strokeRect(ZAP.tx0 + 1, y + 1, ZAP.tx1 - ZAP.tx0 - 2, 50);
+      g.fillStyle(0x0a0a12, 1).fillRect(ZAP.tx0 + 8, y + 4, 32, 44);
+      var fig = this.figMochila[i];
+      fig.setTexture(e.sprite, 0).setScale(0.9).setPosition(ZAP.tx0 + 24, y + 26).setVisible(true);
+      if (nivel) fig.clearTint(); else fig.setTintFill(0x2a2a3a);        // silhueta de quem não foi visto
+      this.zonasMochila[i].setInteractive();
+      var nome = nivel ? e.nome : '???';
+      this.linhas[i * 2].setVisible(true).setPosition(ZAP.tx0 + 48, y + 5)
+        .setText((k + 1 < 10 ? '0' : '') + (k + 1) + ' ' + (nome.length > 15 ? nome.slice(0, 14) + '.' : nome))
+        .setColor(nivel === 2 ? PAL.verde : (nivel ? PAL.branco : PAL.cinzaEsc));
+      var linha2 = nivel ? e.desc : 'AINDA NÃO VISTO.';
+      if (nivel === 2 && e.desafio && DESAFIANTES[e.id]) {
+        var d = DESAFIANTES[e.id];
+        linha2 = 'FRACO: ' + nomeResposta(d.fraco) + '  RESISTE: ' + nomeResposta(d.resiste);
+      }
+      this.linhas[i * 2 + 1].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(ZAP.tx0 + 48, y + 26)
+        .setMaxWidth(ZAP.tx1 - ZAP.tx0 - 56).setText(linha2).setColor(PAL.cinza);   // quebra em duas linhas dentro da ficha
+    }
+    this.tRodape.setText('VISTOS ' + vistos + ' DE ' + n);
   },
 
   // a faixa de baixo de cada app: o botão de voltar pra tela inicial

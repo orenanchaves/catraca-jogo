@@ -232,10 +232,13 @@ var BALDEACAO = 'SÉ';
 /* A casa de quem joga. Era uma só, Itaquera (a ponta leste da
    Vermelha), e continua sendo pra quase todo mundo; o torcedor do
    Palmeiras mora do outro lado da linha, na Barra Funda, colado no
-   Allianz. GameState.init decide (casaDe). */
+   Allianz. O são-paulino e o santista saem da Sé por enquanto (o do São
+   Paulo vai morar no Morumbi quando a linha Amarela existir).
+   GameState.init decide (casaDe). */
 var CASA = 'ITAQUERA';
+var CASA_DO_TIME = { corinthians: 'ITAQUERA', palmeiras: 'BARRA FUNDA', saopaulo: 'SÉ', santos: 'SÉ' };
 function casaDe(charKey) {
-  if (CHARS[charKey] && CHARS[charKey].times && leTime() === 'palmeiras') return 'BARRA FUNDA';
+  if (CHARS[charKey] && CHARS[charKey].times) return CASA_DO_TIME[leTime()] || 'ITAQUERA';
   return 'ITAQUERA';
 }
 
@@ -3247,6 +3250,60 @@ function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
 /* o verbo que só este personagem tem */
 function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
+
+/* ---------- a METRODEX ----------
+   'Tem que ter meio que uma pokedex dos personagens pra entender sobre
+   eles.' Cada gente do jogo tem uma ficha: quem ainda não passou perto de
+   você é uma silhueta com ???; quem já passou mostra o nome e o que faz;
+   e o desafiante que você venceu mostra também a fraqueza. Fica gravado
+   entre as partidas (metrosp_dex): 1 é visto, 2 é vencido. */
+var DEX = [
+  { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, desc: 'Manda áudio de 5 minutos. Quer conversar.' },
+  { id: 'pregador', nome: 'PREGADOR', sprite: 'np_pregador', desafio: true, desc: 'Tem um minutinho? Nunca é um minutinho.' },
+  { id: 'corintiano', nome: 'CORINTIANO', sprite: 'np_corintiano', desafio: true, desc: 'Da Sé pra Itaquera. Aqui é Corinthians.' },
+  { id: 'palmeirense', nome: 'PALMEIRENSE', sprite: 'np_torcedor', desafio: true, desc: 'Da Sé pra Barra Funda. Fala meio italiano.' },
+  { id: 'saopaulino', nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', desafio: true, desc: 'Soberano. Lembra três mundiais sem ninguém pedir.' },
+  { id: 'santista', nome: 'SANTISTA', sprite: 'np_santista', desafio: true, desc: 'Moicano de 2010. O Peixe vai voltar.' },
+  { id: 'barra', nome: 'QUER A SUA BARRA', sprite: 'np_pax0', desafio: true, desc: 'Aparece quando você segura a barra demais.' },
+  { id: 'guardinha', nome: 'GUARDINHA', sprite: 'np_guardinha', desc: 'Vigia a catraca. Pego no pulo, meio coração.' },
+  { id: 'guardaMedio', nome: 'SEGURANÇA', sprite: 'np_guarda_medio', desc: 'O do meio. Pego no pulo, um coração.' },
+  { id: 'guardaForte', nome: 'O GRANDÃO', sprite: 'np_guarda_forte', desc: 'Todo de preto. Pego no pulo, dois corações.' },
+  { id: 'ambulante', nome: 'AMBULANTE', sprite: 'np_ambulante_a', desc: 'Metrô, shopping, trem! Vende no vagão.' },
+  { id: 'rimador', nome: 'RIMADOR', sprite: 'np_rimador', desc: 'Chega no boom bap. Batalha de rima no vagão.' },
+  { id: 'pedinte', nome: 'PEDINTE', sprite: 'np_pedinte', desc: 'Fica no saguão. Uma moeda muda o dia dele.' },
+  { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', desc: 'Na bilheteria. Vende a passagem.' },
+  { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', desc: 'Tem prioridade no banco. Ceda o lugar.' },
+  { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', desc: 'Tem prioridade no banco. Ceda o lugar.' }
+];
+var DEX_POR_SPRITE = {};
+for (var dxi = 0; dxi < DEX.length; dxi++) DEX_POR_SPRITE[DEX[dxi].sprite] = DEX[dxi].id;
+DEX_POR_SPRITE.np_pedinte_b = 'pedinte';
+DEX_POR_SPRITE.np_atendenteF = 'atendente';
+function leDex() {
+  try { return JSON.parse(localStorage.getItem('metrosp_dex') || '{}') || {}; } catch (e) { return {}; }
+}
+function marcaDex(id, nivel) {
+  var d = leDex();
+  if ((d[id] || 0) >= nivel) return;
+  d[id] = nivel;
+  try { localStorage.setItem('metrosp_dex', JSON.stringify(d)); } catch (e) { }
+}
+/* Quem passou a menos de 140px de você entra na METRODEX como visto.
+   Conferido duas vezes por segundo, só com quem está na lista de gente. */
+function vigiaDex(cena, time) {
+  if (!cena.pl || !cena.pl.sp || (cena._tDex && time - cena._tDex < 500)) return;
+  cena._tDex = time;
+  var lista = [].concat(cena.gente || [], cena.ambulante ? [cena.ambulante] : [], cena.desafiantes || []);
+  var px = cena.pl.sp.x, py = cena.pl.sp.y;
+  for (var i = 0; i < lista.length; i++) {
+    var a = lista[i];
+    if (!a || !a.sp || !a.sp.active || !a.sp.texture) continue;
+    var id = DEX_POR_SPRITE[a.sp.texture.key];
+    if (a.desafio && a.desafio.tipo && a.desafio.tipo !== 'barra') id = a.desafio.tipo;
+    if (!id) continue;
+    if (Math.abs(a.sp.x - px) < 140 && Math.abs(a.sp.y - py) < 140) marcaDex(id, 1);
+  }
+}
 
 /* ---------- o lixo na mão ----------
    Quem comeu fica com o papel na mão (GameState.lixo) até achar uma

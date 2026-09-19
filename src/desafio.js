@@ -195,6 +195,12 @@ var CORES_TORCIDA = {
 };
 var FX_CHEGA = 460;      // ms até o ataque chegar no outro
 
+// o nome da resposta (LÁBIA, IRONIA...) pelo tipo, pra quem mostra a fraqueza
+function nomeResposta(tipo) {
+  for (var i = 0; i < RESPOSTAS.length; i++) if (RESPOSTAS[i].tipo === tipo) return RESPOSTAS[i].nome;
+  return tipo;
+}
+
 function multiplicador(resp, quem) {
   if (quem.fraco === resp.tipo) return 2;
   if (quem.resiste === resp.tipo) return 0.5;
@@ -220,6 +226,7 @@ var DesafioScene = new Phaser.Class({
     });
 
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
+    marcaDex(this.dados.tipo, 1);
     var fol = Math.max(0.5, GameState.descanso / GameState.char.descansoMax);
     this.vc = { pac: Math.round(DSF_VIDA * fol), max: DSF_VIDA, mostra: 0 };
     this.ele = { pac: this.quem.pac, max: this.quem.pac, mostra: this.quem.pac };
@@ -412,6 +419,7 @@ var DesafioScene = new Phaser.Class({
   },
 
   venceu: function () {
+    marcaDex(this.dados.tipo, 2);      // vencido: a METRODEX passa a mostrar a fraqueza
     this.resultado = 'ganhou';
     var pts = GameState.ganhaMinigame(6);
     GameState.addCarisma(6);
