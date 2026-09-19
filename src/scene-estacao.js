@@ -827,6 +827,15 @@ var EstacaoScene = new Phaser.Class({
     if (!p) { this.tEsquerda = 0; return; }
     var ny = sp.y + (p.sobe ? -passo : passo);
     if (this.podeIr(sp.x, ny)) sp.y = ny;
+    /* A saída de cima. Na plataforma lateral o piso começa em x 136, e a
+       faixa da esquerda da escada vai de 112 a 134: quem subia por ela
+       chegava no topo e ficava preso no canto, com a escada empurrando
+       contra a parede (medido: parado em y -96, x 124, segurando pra
+       cima). No último degrau a escada põe você no piso, de lado, como a
+       saída de uma escada de verdade. */
+    if (p.sobe && sp.y < ESC_Y + 24 && sp.x < PLAT_X0 + 10) {
+      sp.x = Math.min(PLAT_X0 + 10, sp.x + 70 * dt / 1000);
+    }
     var naEsquerda = sp.x < (p.x0 + p.x1) / 2;
     if (naEsquerda && !andou) {
       this.tEsquerda += dt;
