@@ -568,6 +568,8 @@ var ITENS = {
   /* o que a galeria da Itaquera vende: a lista do que existe de verdade
      nas estações (salgado, capinha e fone, perfume, raspadinha) */
   coxinha: { nome: 'COXINHA', preco: 7.00, descanso: 18, min: 2 },
+  // o power bank da loja de acessórios: +60% de bateria na hora
+  powerbank: { nome: 'POWER BANK', preco: 15.00, descanso: 0, min: 1, bateria: 60 },
   paoQueijo: { nome: 'PÃO DE QUEIJO', preco: 5.00, descanso: 14, min: 1 },
   fone: { nome: 'FONE DE OUVIDO', preco: 20.00, descanso: 14, min: 2, carisma: 2 },
   capinha: { nome: 'CAPINHA', preco: 12.00, descanso: 0, min: 2, carisma: 5 },
@@ -661,6 +663,7 @@ var GameState = {
     this.estacoes = 0;
     this.dia = 1;
     this.lixo = false; this.sacouNoDia = 0;      // o papel do lanche e o saque do 24 horas
+    this.bateria = 100;                           // o celular sai de casa carregado
     this.pernasFeitas = 0;
     this.atrasos = 0;
     this.ultimoAtraso = 0;
@@ -940,6 +943,11 @@ var GameState = {
     var ganho = it.descanso * ((it.noCalor && estaCalor()) ? it.noCalor : 1);
     this.addDescanso(ganho);
     if (it.carisma) this.addCarisma(it.carisma);
+    if (it.bateria) {
+      this.bateria = Math.min(100, (this.bateria || 0) + it.bateria);
+      this.stats.comprou = (this.stats.comprou || 0) + 1;
+      return 'bateria';
+    }
     if (it.sorte) {
       this.stats.comprou = (this.stats.comprou || 0) + 1;
       if (Math.random() < it.sorte) { this.dinheiro += it.premio; return 'premio'; }
@@ -959,6 +967,8 @@ var GameState = {
   /* ---------- relógio ---------- */
   passaTempo: function (min) {
     this.minutos = (this.minutos + min) % 1440;
+    // o celular gasta sozinho: uns 5% por hora de rua, parado no bolso
+    if (this.bateria !== undefined) this.bateria = Math.max(0, this.bateria - min * 0.09);
   },
   faixa: function () { return faixaDe(this.minutos); },
   hora: function () { return horaTexto(this.minutos); },
@@ -1584,6 +1594,9 @@ var CORPOS = {
   // o são-paulino: calvo e magro, pra lembrar o Rogério Ceni
   careca_saopaulo: { mods: [CABELO_CALVO], pos: function (a) { afina(a); camisaDeTime('saopaulo')(a); } },
   moicano_santos: { mods: [CABELO_MOICANO], pos: camisaDeTime('santos') },     // o santista, de moicano
+  // o uniforme do metrô: azul-marinho, com o crachá amarelo no peito
+  atendente: { pos: crachaDoMetro },
+  atendente_coque: { herda: 'longo', mods: [CABELO_COQUE], pos: crachaDoMetro },
   longo_corinthians: { herda: 'longo', pos: camisaDeTime('corinthians') },
   longo_palmeiras: { herda: 'longo', pos: camisaDeTime('palmeiras') },
   longo_saopaulo: { herda: 'longo', pos: camisaDeTime('saopaulo') },
@@ -1670,6 +1683,15 @@ function resolveCorpo(key) {
    O escudo fica no peito esquerdo de quem veste, à direita de quem olha.
    As cores moram na paleta ('j' a camisa, 'e' o vermelho, 'z' o preto). */
 var VISTA_FRENTE = ['down', 'diagDown', 'sentadoFrente'], VISTA_COSTAS = ['up', 'diagUp', 'sentadoCostas'];
+function crachaDoMetro(alvo) {
+  for (var d = 0; d < VISTA_FRENTE.length; d++) {
+    var a = alvo[VISTA_FRENTE[d]];
+    if (!a || a[13][10] !== 'j') continue;
+    a = a.slice(0);
+    a[13] = a[13].substr(0, 10) + 'w' + a[13].substr(11);
+    alvo[VISTA_FRENTE[d]] = a;
+  }
+}
 function camisaDeTime(time) {
   var gola = { corinthians: 'w', palmeiras: 'w', saopaulo: 'e' }[time];
   var escudo = { corinthians: 'e', palmeiras: 'w', santos: 'z' }[time];
@@ -1794,6 +1816,9 @@ var PELES = {
   corintiano: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#1c1c22', '#e8e8f0', '#14141c', '#f0eeff')
 };
 PELES.corintiano.e = '#d8302a';     // o vermelho do escudo
+// quem atende no guichê: uniforme azul-marinho do metrô e o crachá amarelo
+PELES.atendente = pele('#0a0a12', '#c99a70', '#2a2a30', '#1c2c54', '#1c2c54', '#14141c', '#f2c14e');
+PELES.atendenteF = pele('#0a0a12', '#8a5a3c', '#1a1a22', '#1c2c54', '#1c2c54', '#14141c', '#f2c14e');
 PELES.torcedor.j = '#12783c';       // o verde da camisa das fotos
 PELES.torcedor.k = '#f0c8a0';       // o palmeirense é branco
 PELES.saopaulino = pele('#0a0a12', '#f0c8a0', '#3a2a22', '#f0eeff', '#1c1c22', '#14141c', '#f0eeff');
@@ -3163,8 +3188,8 @@ var ESTILO_LOJA = {
   loterica: { nome: 'LOTÉRICA', cor: 0xf2c14e, fundo: 0x14284a, parede: 'bilhetes', balcao: 0x1c4a8a, produto: 'bilhete', letra: '#f2c14e', ven: 'np_pax9' },
   /* as cabines do mezanino: a bilheteria (duas, cada uma com o seu
      atendente) e o achados e perdidos, no mesmo molde das lojas */
-  bilheteria: { nome: 'BILHETERIA', cor: 0x1c5ab4, fundo: 0x2a3550, parede: 'guiche', balcao: 0x6a7080, produto: 'bilhete', letra: '#f2f0ff', ven: 'np_pax5' },
-  achados: { nome: 'ACHADOS', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'achados', balcao: 0x6b4226, produto: 'caixa', letra: '#f2c14e', ven: 'np_pax4' },
+  bilheteria: { nome: 'BILHETERIA', cor: 0x1c5ab4, fundo: 0x2a3550, parede: 'guiche', balcao: 0x6a7080, produto: 'bilhete', letra: '#f2f0ff', ven: 'np_atendente' },
+  achados: { nome: 'ACHADOS', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'achados', balcao: 0x6b4226, produto: 'caixa', letra: '#f2c14e', ven: 'np_atendente' },
   // o caixa eletrônico: máquina, sem balcão e sem ninguém atrás
   atm: { nome: 'CAIXA 24H', letreiro: '24H', cor: 0xe8362c, fundo: 0x3a3a44, parede: 'atm', maquina: true, letra: '#f2f0ff' }
 };
@@ -4404,6 +4429,12 @@ var ICONES_ITEM = {
     pinta(c, '#d8d8e8', 16, 12, 5, 7);
     pinta(c, '#8b90a6', 11, 14, 2, 8);
   },
+  powerbank: function (c) {
+    pinta(c, '#2a2a32', 6, 4, 12, 17);
+    pinta(c, '#4a4a58', 7, 5, 10, 15);
+    pinta(c, '#00e676', 9, 8, 6, 2); pinta(c, '#00e676', 9, 11, 6, 2); pinta(c, '#00e676', 9, 14, 4, 2);
+    pinta(c, '#8b90a6', 10, 20, 4, 2);
+  },
   capinha: function (c) {
     pinta(c, '#7c3fff', 7, 3, 11, 19);
     pinta(c, '#a070ff', 8, 4, 3, 17);
@@ -4587,6 +4618,7 @@ MenuComida.prototype.compra = function () {
   if (r === 'coracao') msg = it.nome + ' na veia.\nVocê recuperou um coração.';
   else if (r === 'premio') msg = 'RASPOU E GANHOU!\n+R$ ' + it.premio + ',00';
   else if (r === 'nada') msg = 'Raspou... e nada.\nFica pra próxima.';
+  else if (r === 'bateria') msg = 'Ligou no power bank.\nCelular em ' + Math.round(GameState.bateria) + '%.';
   else if (!it.descanso && it.carisma) msg = it.nome + '.\nTá se sentindo outra pessoa.';
   // quem comeu fica com o papel na mão: é o que a lixeira da Itaquera recebe
   if (it.descanso && !it.carisma && !it.sorte) GameState.lixo = true;
@@ -4832,6 +4864,29 @@ function fala(scene, texto, opcoes, cfg) {
 }
 
 /* ---------- HUD ---------- */
+/* ---------- o HUD em blocos ----------
+   'Tem que ficar mais subdividido.' Era tudo solto numa faixa escura:
+   corações, duas barras sem nome, a hora e dois ícones boiando. Agora
+   são quatro blocos com moldura, cada um com um assunto: VOCÊ (vida e
+   os dois medidores, cada um com o seu ícone), QUANDO (a hora grande, e
+   embaixo a faixa do horário e o dia), e os dois botões, pausa e
+   celular, cada um no seu quadrado. */
+/* A pausa e o celular desceram pro canto de baixo à direita, lado a
+   lado, logo acima da faixa de dica (que começa 40px antes do fim): é
+   onde o polegar da mão direita já está. Em cima ficaram os dois blocos
+   de leitura, com a largura toda. */
+var HUDB = {
+  voce: { x: 4, y: 3, w: 164, h: 43 },
+  hora: { x: 172, y: 3, w: 144, h: 43 },
+  pausa: { x: GW - 84, y: GH - 40 - 48, w: 38, h: 42 },
+  zap: { x: GW - 42, y: GH - 40 - 48, w: 38, h: 42 }
+};
+function blocoHud(g, b, aceso) {
+  g.fillStyle(0x151522, 1).fillRoundedRect(b.x, b.y, b.w, b.h, 5);
+  g.lineStyle(1, aceso ? 0x3d5180 : 0x262638, 1).strokeRoundedRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 5);
+  g.fillStyle(0xffffff, 0.04).fillRect(b.x + 3, b.y + 1, b.w - 6, 1);
+}
+
 var HudScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function HudScene() { Phaser.Scene.call(this, { key: 'Hud', active: false }); },
@@ -4870,14 +4925,14 @@ var HudScene = new Phaser.Class({
        quiser conferir o que é cada cor tem a legenda na pausa. */
     var eu = this;
     // a zona de toque é maior que o desenho: dedo não acerta 12 pixels
-    this.zonaPausa = this.add.zone(286, 0, 34, 26).setOrigin(0, 0).setInteractive();
+    this.zonaPausa = this.add.zone(HUDB.pausa.x - 2, HUDB.pausa.y - 2, HUDB.pausa.w + 4, HUDB.pausa.h + 4).setOrigin(0, 0).setInteractive();
     this.zonaPausa.on('pointerdown', function () { eu.abrePausa(); });
 
     /* A alça do celular, no canto direito da segunda linha. Grana e dia
        moravam no topo e foram pra dentro dele: eram as duas coisas que
        não mudam nenhuma decisão no meio de um vagão, e eram justamente
        as que espremiam o resto. */
-    this.zonaZap = this.add.zone(268, 26, 52, 26).setOrigin(0, 0).setInteractive();
+    this.zonaZap = this.add.zone(HUDB.zap.x - 2, HUDB.zap.y - 2, GW - HUDB.zap.x + 2, HUDB.zap.h + 4).setOrigin(0, 0).setInteractive();
     /* A alça LIGA E DESLIGA. Quem abre o celular tocando aqui tenta
        fechá-lo tocando aqui de novo — é o que qualquer aplicativo faz — e
        antes esse toque não fazia nada, o que dava exatamente a sensação
@@ -4894,8 +4949,35 @@ var HudScene = new Phaser.Class({
        quem perdeu o letreiro tem o mapinha no celular. Com ela fora, a
        primeira linha ficou com uma coisa só — a hora — e o topo parou de
        ser uma fileira de informação disputando espaço. */
-    this.tHora = txt(this, 284, 4, '', PAL.amarelo, 8).setDepth(1001).setOrigin(1, 0);
+    this.tHora = txtC(this, HUDB.hora.x + HUDB.hora.w / 2, HUDB.hora.y + 1, '', PAL.amarelo, 8).setDepth(1001);
+    this.tSemBat = txtC(this, HUDB.zap.x - 45, HUDB.zap.y + 15, 'SEM BATERIA', PAL.branco, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(1001).setVisible(false);
+    this.avisoZap = 0;
+    // embaixo da hora, pequeno: a faixa do horário e o dia
+    this.tFaixa = txtC(this, HUDB.hora.x + HUDB.hora.w / 2, HUDB.hora.y + 25, '', PAL.cinza, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(1001);
+    /* Frase que não cabe no bloco roda, como letreiro de LED: recortada
+       na largura de dentro do bloco, ela passa da direita pra esquerda
+       e volta pelo começo. Frase que cabe fica parada, no meio. */
+    var mf = this.make.graphics({ add: false });
+    mf.fillStyle(0xffffff, 1).fillRect(HUDB.hora.x + 6, HUDB.hora.y + 22, HUDB.hora.w - 12, 18);
+    this.tFaixa.setMask(mf.createGeometryMask());
+    this._faixaTxt = null;
     this.montaToque();
+  },
+
+  /* O letreiro rolante, como o painel de LED do trem: a frase roda
+     sempre, da direita pra esquerda ('deixa ela rodando que nem um cartaz
+     interativo'). Ela é escrita três vezes com um vão, e desliza um
+     comprimento: a volta não pula, e o bloco nunca fica vazio. */
+  letreiro: function (t, frase, bloco, time) {
+    if (this._faixaTxt !== frase) {
+      this._faixaTxt = frase;
+      t.setOrigin(0, 0).setText(frase);
+      t._passo = t.width + 30;                     // o vão: 5 espaços a 6px
+      t.setText(frase + '     ' + frase + '     ' + frase);
+    }
+    t.setX(bloco.x + 6 - ((time * 0.03) % t._passo));
   },
 
   /* o toque precisa existir em toda tela, inclusive no título, por isso
@@ -4960,6 +5042,11 @@ var HudScene = new Phaser.Class({
   abreZap: function () {
     if (this.scene.isActive('Zap') || this.scene.isActive('Pausa') || this.pegandoCelular) return;
     if (!GameState.char || !HUD_VISIVEL) return;
+    if (GameState.bateria !== undefined && GameState.bateria <= 0) {
+      sfx('nao');
+      this.avisoZap = 1600;          // o botão pisca "SEM BATERIA"
+      return;
+    }
     audioOn();
     var cenas = this.scene.manager.getScenes(true), alvo = null;
     for (var i = 0; i < cenas.length; i++) {
@@ -5043,6 +5130,7 @@ var HudScene = new Phaser.Class({
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
     this.tHora.setVisible(temJogo);
+    this.tFaixa.setVisible(temJogo);
     if (!temJogo) return;
 
     var f = GameState.faixa();
@@ -5051,11 +5139,10 @@ var HudScene = new Phaser.Class({
     if (PAINEL) PAINEL.hora(GameState.hora(), f);
 
     var l = GameState.linhaAtual();
-    g.fillStyle(0x0e0e18, 1); g.fillRect(0, 0, GW, HUD_H);
-    g.fillStyle(0x1c1c2c, 1); g.fillRect(0, 0, GW, 2);
-    g.fillStyle(0x000000, 0.35); g.fillRect(0, 25, GW, 1);        // separa as duas linhas
+    g.fillStyle(0x0a0a12, 1); g.fillRect(0, 0, GW, HUD_H);
     g.fillStyle(l.num, 1); g.fillRect(0, HUD_H - 4, GW, 4);
     g.fillStyle(num(clarear(l.cor, 0.35)), 1); g.fillRect(0, HUD_H - 4, GW, 1);
+    blocoHud(g, HUDB.voce); blocoHud(g, HUDB.hora); blocoHud(g, HUDB.pausa, true); blocoHud(g, HUDB.zap, true);
 
     /* Coração é desenho, não letra: cinco letras 'V' não leem como
        vida, e a fonte não tem o glifo. Eles abrem a segunda linha, que
@@ -5068,7 +5155,7 @@ var HudScene = new Phaser.Class({
          tinha tudo — e duas linhas desequilibradas leem tão apertado
          quanto uma linha cheia. Agora é vida em cima, medidores
          embaixo, e um vão de verdade entre elas. */
-      var hx = 8 + c * 14, hy = 7;
+      var hx = HUDB.voce.x + 6 + c * 14, hy = HUDB.voce.y + 5;
       var sobra = GameState.coracoes - c;
       // o guardinha menorzinho tira meio coração: metade acesa, metade não
       var meio = (sobra > 0 && sobra < 1);
@@ -5083,16 +5170,18 @@ var HudScene = new Phaser.Class({
       if (sobra >= 1 || meio) g.fillStyle(0xff8a80, 1).fillRect(hx + 1, hy, 2, 2);
     }
 
-    // o ícone de pausa: duas barrinhas, no canto de cima à direita
-    g.fillStyle(0x5a5f74, 1);
-    g.fillRect(300, 6, 3, 12); g.fillRect(306, 6, 3, 12);
+    // o ícone de pausa: duas barrinhas no meio do botão dele
+    var px = HUDB.pausa.x + HUDB.pausa.w / 2, py = HUDB.pausa.y + HUDB.pausa.h / 2;
+    g.fillStyle(0xb8bccc, 1);
+    g.fillRect(px - 6, py - 7, 4, 14); g.fillRect(px + 2, py - 7, 4, 14);
 
     this.tHora.setText(GameState.hora()).setColor(f.cor);
+    this.letreiro(this.tFaixa, f.nome + ' - DIA ' + (GameState.dia || 1), HUDB.hora, time);
 
     /* O celular: um retângulo com tela, e a bolinha vermelha de não
        lidas por cima. É a linguagem de qualquer aparelho — quem vê
        bolinha vermelha sabe que tem recado esperando. */
-    var zx = 286, zy = 29;
+    var zx = HUDB.zap.x + 10, zy = HUDB.zap.y + 10;
     g.fillStyle(0x2c2c3a, 1).fillRect(zx, zy, 16, 22);
     g.fillStyle(0x0d1a14, 1).fillRect(zx + 2, zy + 3, 12, 15);
     g.fillStyle(0x00e676, 0.75).fillRect(zx + 3, zy + 5, 10, 2);
@@ -5102,6 +5191,18 @@ var HudScene = new Phaser.Class({
       g.fillStyle(0xe8362c, 1).fillCircle(zx + 15, zy + 3, 5);
       g.fillStyle(0xffffff, 1).fillRect(zx + 14, zy + 1, 2, 4);
     }
+    /* a carga, num tracinho embaixo do aparelho: verde, amarela, e
+       vermelha piscando quando está acabando */
+    var bt = Math.max(0, Math.min(1, (GameState.bateria === undefined ? 100 : GameState.bateria) / 100));
+    var corB = bt > 0.5 ? 0x00e676 : (bt > 0.15 ? 0xf2c14e : 0xe8362c);
+    var pisca = bt <= 0.15 && Math.floor(time / 300) % 2;
+    g.fillStyle(0x0a0a12, 1).fillRect(zx - 2, zy + 24, 20, 5);
+    if (!pisca) g.fillStyle(corB, 1).fillRect(zx - 1, zy + 25, Math.max(1, Math.round(18 * bt)), 3);
+    if (this.avisoZap > 0) {
+      this.avisoZap -= 16;
+      g.fillStyle(0xe8362c, 0.9).fillRoundedRect(HUDB.zap.x - 86, HUDB.zap.y + 12, 82, 18, 4);
+    }
+    this.tSemBat.setVisible(this.avisoZap > 0);
     /* ---------- os dois medidores, empilhados ----------
        Lado a lado eles disputavam a largura com os corações e com a
        alça do celular, e o que sobrava pra cada um eram 60 pixels — a
@@ -5114,13 +5215,22 @@ var HudScene = new Phaser.Class({
 
        O de cima é sempre o carisma. Quem quiser conferir a cor tem a
        legenda na pausa. */
-    barra(g, 8, 29, 104, 8, GameState.carisma / 100, 0xe8a33c);
+    /* cada medidor com o seu ícone, desenhado (letra solta lia como
+       borrão): a estrela laranja é o carisma, a lua verde o descanso */
+    var bx0 = HUDB.voce.x + 20, by0 = HUDB.voce.y + 20, bw0 = HUDB.voce.w - 26;
+    var ix = HUDB.voce.x + 8;
+    g.fillStyle(0xe8a33c, 1);
+    g.fillRect(ix + 2, by0 - 2, 2, 8).fillRect(ix - 1, by0 + 1, 8, 2).fillRect(ix + 1, by0, 4, 4);
+    barra(g, bx0, by0 - 1, bw0, 7, GameState.carisma / 100, 0xe8a33c);
 
     /* O medidor de descanso era verde até o último pixel: cheio e
        quase vazio tinham a mesma cor, e a única diferença era um
        comprimento que ninguém compara de relance. Agora ele esquenta
        conforme baixa, e pisca quando o sono está pra bater. */
     var pd = GameState.descanso / GameState.char.descansoMax;
-    barra(g, 8, 40, 104, 8, pd, corDescanso(pd, time));
+    var cd = corDescanso(pd, time), my = by0 + 12;
+    g.fillStyle(cd, 1).fillCircle(ix + 3, my + 2, 4);
+    g.fillStyle(0x151522, 1).fillCircle(ix + 5, my + 1, 3.5);      // a lua: um círculo mordido
+    barra(g, bx0, my - 1, bw0, 7, pd, cd);
   }
 });

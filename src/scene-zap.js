@@ -36,9 +36,8 @@ var DIAS_SEMANA = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 
 /* A bateria acompanha o dia: cheia às 5h, e perde um pouco a cada hora
    de rua, como a de todo mundo que vive no metrô. */
 function bateriaDoCelular() {
-  if (!GameState.char) return 0.8;
-  var m = GameState.minutos < 300 ? GameState.minutos + 1440 : GameState.minutos;
-  return Phaser.Math.Clamp(1 - (m - 300) / (19 * 60), 0.06, 1);
+  if (!GameState.char || GameState.bateria === undefined) return 0.8;
+  return Phaser.Math.Clamp(GameState.bateria / 100, 0, 1);
 }
 
 /* a moldura e as faixas: tudo medido uma vez só, e todo mundo lê daqui */
@@ -155,8 +154,9 @@ var ZapScene = new Phaser.Class({
        y até 26): aquele retângulo é da alça, que agora liga e desliga.
        Duas cenas ouvindo o mesmo toque fechavam e reabriam o aparelho no
        mesmo quadro. */
+    // o botão do celular (que liga e desliga) mora embaixo à direita, por cima do aparelho aberto
     var fora = [
-      [0, 0, 268, ZAP.y0], [268, 0, GW - 268, 26],
+      [0, 0, GW, ZAP.y0],
       [0, ZAP.y1, GW, GH - ZAP.y1],
       [0, ZAP.y0, ZAP.x0, ZAP.y1 - ZAP.y0], [ZAP.x1, ZAP.y0, GW - ZAP.x1, ZAP.y1 - ZAP.y0]
     ];
@@ -889,6 +889,11 @@ var ZapScene = new Phaser.Class({
     // fechar pelo botão do celular, pelo X, ou tocando fora do aparelho
     if (Ctrl.pausaJust) { Ctrl.pausaJust = false; this.fecha(); }
     var dt = Math.min(delta || 16, 50);
+    // tela acesa gasta: 1% a cada 3 segundos com o celular aberto, e apaga no zero
+    if (GameState.bateria !== undefined && !this.saindo) {
+      GameState.bateria = Math.max(0, GameState.bateria - dt / 3000);
+      if (GameState.bateria <= 0) { sfx('nao'); this.fecha(); return; }
+    }
     // bloqueado: o cadeado se abre sozinho logo depois de o aparelho subir
     if (this.modo === 'bloqueio' && !this.abrindo) {
       this.tBloq += dt;

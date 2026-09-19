@@ -77,6 +77,8 @@ var ASSETS = {
     { key: 'np_pregador', file: 'assets/npcs/pregador.png', pal: PELES.pregador, corpo: 'padrao' },
     { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'palmeiras' },
     { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'touca_corinthians' },
+    { key: 'np_atendente', file: 'assets/npcs/atendente.png', pal: PELES.atendente, corpo: 'atendente' },
+    { key: 'np_atendenteF', file: 'assets/npcs/atendente_f.png', pal: PELES.atendenteF, corpo: 'atendente_coque' },
     { key: 'np_saopaulino', file: 'assets/npcs/saopaulino.png', pal: PELES.saopaulino, corpo: 'careca_saopaulo' },
     { key: 'np_santista', file: 'assets/npcs/santista.png', pal: PELES.santista, corpo: 'moicano_santos' }
   ]

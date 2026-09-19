@@ -614,6 +614,8 @@ var EstacaoScene = new Phaser.Class({
         { x: PLAT_X1 - 8, y: platY(320) }, { x: PLAT_X1 - 8, y: platY(700) }];
       var gLx = this.add.graphics().setDepth(2.5);
       for (var lx = 0; lx < this.lixeiras.length; lx++) pintaLixeira(gLx, this.lixeiras[lx].x, this.lixeiras[lx].y);
+      // e as tomadas: parede da esquerda do saguão e parede da plataforma
+      this.montaTomadas([{ x: 24, y: 470 }, { x: PLAT_X1 + 10, y: platY(500) }]);
     }
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
     this.montaDegraus();
@@ -1065,7 +1067,8 @@ var EstacaoScene = new Phaser.Class({
     var i, t, w, k;
     // o gradil fecha só as pontas: da bilheteria (x 96) ao primeiro gabinete, e do último à parede
     if (this.gates.length) {
-      this.gradil(g, this.itq ? MEZ.x0 + 58 : 96, this.gates[0].x0 - 14);
+      // na Itaquera o gradil vai da parede (a bilheteria saiu dela e virou cabine)
+      this.gradil(g, this.itq ? MEZ.x0 + 26 : 96, this.gates[0].x0 - 14);
       this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, this.itq ? MEZ.x1 : GW);
     }
     for (i = 0; i < this.gates.length; i++) {
@@ -2648,6 +2651,7 @@ var EstacaoScene = new Phaser.Class({
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
+    this.atualizaCarga(dt, mv);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
@@ -2673,6 +2677,7 @@ var EstacaoScene = new Phaser.Class({
   contexto: function (vendo) {
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
     if (this.contextoLixo()) return;
+    if (this.contextoTomada()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {

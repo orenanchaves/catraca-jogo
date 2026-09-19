@@ -124,7 +124,7 @@ function lojasDaGaleria() {
   var L = [
     ['dog', -188, 68, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
     ['salgados', -104, 68, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
-    ['celular', -22, 68, '"Capinha, película, fone.\nCarregador tem também."', ['capinha', 'fone']],
+    ['celular', -22, 68, '"Capinha, película, fone.\nPower bank tem também."', ['powerbank', 'capinha', 'fone']],
     ['atm', 60, 38, null, null, 'saque'],
     ['banca', 200, 68, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
     ['recarga', 282, 68, null, null, 'recarga'],
@@ -168,6 +168,59 @@ EstacaoScene.prototype.bateNaLixeira = function (x, y) {
   }
   return false;
 };
+/* ---------- as tomadas ----------
+   'Tem que ter tomada pra carregar o celular.' Na parede, na altura do
+   chão de quem passa: encosta, toca, e o boneco fica ali carregando, com
+   o fio ligado na tomada, 4% por segundo. Andar desliga. */
+function pintaTomada(g, x, y) {
+  g.fillStyle(0x000000, 0.3).fillRect(x - 4, y - 5, 10, 12);
+  g.fillStyle(0xe8e8f0, 1).fillRect(x - 5, y - 6, 10, 12);
+  g.fillStyle(0xb8bac4, 1).fillRect(x - 5, y + 4, 10, 2);
+  g.fillStyle(0x2a2a32, 1).fillRect(x - 3, y - 2, 2, 3).fillRect(x + 1, y - 2, 2, 3).fillRect(x - 1, y + 2, 2, 1);
+}
+EstacaoScene.prototype.montaTomadas = function (lista) {
+  this.tomadas = lista;
+  var g = this.add.graphics().setDepth(2.6);
+  for (var i = 0; i < lista.length; i++) pintaTomada(g, lista[i].x, lista[i].y);
+  this.gCabo = this.add.graphics().setDepth(39);
+  this.carregando = null;
+};
+EstacaoScene.prototype.tomadaPerto = function () {
+  if (!this.tomadas) return null;
+  for (var i = 0; i < this.tomadas.length; i++) {
+    var t = this.tomadas[i];
+    if (Math.hypot(this.pl.sp.x - t.x, this.pl.sp.y - (t.y + 16)) < 30) return t;
+  }
+  return null;
+};
+EstacaoScene.prototype.contextoTomada = function () {
+  if (this.carregando) {
+    this.dica.setText('CARREGANDO ' + Math.floor(GameState.bateria) + '%', PAL.verde);
+    if (Ctrl.actJust) this.carregando = null;
+    return true;
+  }
+  var t = this.tomadaPerto();
+  if (!t || GameState.bateria >= 99.5) return false;
+  this.dica.setText(nomeAgir() + ': CARREGAR (' + Math.floor(GameState.bateria) + '%)', PAL.amarelo);
+  if (Ctrl.actJust) { this.carregando = t; sfx('ok'); }
+  return true;
+};
+EstacaoScene.prototype.atualizaCarga = function (dt, andou) {
+  var g = this.gCabo;
+  if (!g) return;
+  g.clear();
+  var t = this.carregando;
+  if (!t) return;
+  if (andou || GameState.bateria >= 100) { this.carregando = null; if (GameState.bateria >= 100) sfx('moeda'); return; }
+  GameState.bateria = Math.min(100, GameState.bateria + dt * 0.004);
+  // o fio: da tomada até a mão, caindo um pouco no meio
+  var hx = this.pl.sp.x + 8, hy = this.pl.sp.y - 16, mx = (t.x + hx) / 2, my = Math.max(t.y, hy) + 10;
+  g.lineStyle(2, 0xf0eeff, 0.9);
+  g.beginPath(); g.moveTo(t.x, t.y + 2); g.lineTo(mx, my); g.lineTo(hx, hy); g.strokePath();
+  g.fillStyle(0x2a2a32, 1).fillRect(hx - 3, hy - 5, 6, 9);
+  g.fillStyle(0x00e676, Math.floor(this.time.now / 400) % 2 ? 1 : 0.4).fillRect(hx - 1, hy - 3, 2, 2);
+};
+
 // perto de uma lixeira com o papel na mão: jogar é a única coisa a dizer
 EstacaoScene.prototype.contextoLixo = function () {
   if (!GameState.lixo || !this.lixeiraPerto()) return false;
@@ -199,8 +252,8 @@ EstacaoScene.prototype.lixeiraPerto = function () {
 function cabinesDoMezanino() {
   var y = 300, h = 58;
   return [
-    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 34, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_pax5' },
-    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 100, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_pax1' },
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 34, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendente' },
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 100, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendenteF' },
     { chave: 'achados', nome: 'ACHADOS', x: MEZ.x1 - 110, y: y, w: 76, h: h, lado: 0, acao: 'achados' }
   ];
 }
@@ -608,6 +661,11 @@ EstacaoScene.prototype.montaItaquera = function () {
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
   this.montaCompradores();
+  // tomadas: nas paredes do mezanino, e na parede da plataforma, perto dos bancos
+  this.montaTomadas([
+    { x: MEZ.x0 + 22, y: 450 }, { x: MEZ.x1 - 22, y: 470 },
+    { x: ITQ.paredeX - 4, y: PLAT_Y + 300 }, { x: ITQ.paredeX - 4, y: PLAT_Y + 700 }
+  ]);
   this.lixeiras = lixeirasItq();
   var gLixo = this.add.graphics().setDepth(2.5);
   for (var li = 0; li < this.lixeiras.length; li++) pintaLixeira(gLixo, this.lixeiras[li].x, this.lixeiras[li].y);
