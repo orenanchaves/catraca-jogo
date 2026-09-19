@@ -5524,6 +5524,9 @@ var HudScene = new Phaser.Class({
     this.tHora = txtC(this, HUDB.hora.x + HUDB.hora.w / 2, HUDB.hora.y + 1, '', PAL.amarelo, 8).setDepth(1001);
     this.tBatHud = txt(this, HUDB.voce.x + 114, HUDB.voce.y + 3, '', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(1001);
+    // o nível, na ponta das barras ('tem que ter o nível de alguma forma no HUD')
+    this.tNivelHud = txtC(this, HUDB.voce.x + HUDB.voce.w - 16, HUDB.voce.y + 18, '', PAL.amarelo, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(1001);
     this.tSemBat = txtC(this, HUDB.zap.x - 7, HUDB.zap.y + HUDB.zap.h + 7, 'SEM BATERIA', PAL.branco, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(1001).setVisible(false);
     this.avisoZap = 0;
@@ -5821,7 +5824,16 @@ var HudScene = new Phaser.Class({
        legenda na pausa. */
     /* cada medidor com o seu ícone, desenhado (letra solta lia como
        borrão): a estrela laranja é o carisma, a lua verde o descanso */
-    var bx0 = HUDB.voce.x + 20, by0 = HUDB.voce.y + 20, bw0 = HUDB.voce.w - 26;
+    var bx0 = HUDB.voce.x + 20, by0 = HUDB.voce.y + 20, bw0 = HUDB.voce.w - 60;
+    /* O nível mora na ponta das barras: a pílula NV, e embaixo dela a
+       barrinha do XP que falta pro próximo (40 por nível, como no
+       nivelDoXp). As barras encolheram 34px pra ela caber. */
+    var xpHud = (typeof leXp === 'function' && GameState.charKey) ? (leXp()[GameState.charKey] || 0) : 0;
+    var nvHud = nivelDoXp(xpHud), px0 = HUDB.voce.x + HUDB.voce.w - 32;
+    g.fillStyle(0x2a2410, 1).fillRoundedRect(px0, by0 - 3, 30, 11, 4);
+    g.lineStyle(1, 0xf2c14e, 0.8).strokeRoundedRect(px0 + 0.5, by0 - 2.5, 29, 10, 4);
+    this.tNivelHud.setText('NV ' + nvHud).setPosition(px0 + 15, by0 - 1);
+    barra(g, px0, by0 + 11, 30, 5, nvHud >= 30 ? 1 : (xpHud % 40) / 40, 0xf2c14e);
     var ix = HUDB.voce.x + 8;
     g.fillStyle(0xe8a33c, 1);
     g.fillRect(ix + 2, by0 - 2, 2, 8).fillRect(ix - 1, by0 + 1, 8, 2).fillRect(ix + 1, by0, 4, 4);
