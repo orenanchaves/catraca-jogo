@@ -524,13 +524,13 @@ var EstacaoScene = new Phaser.Class({
     this.barracas = [
       {
         chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c,
-        x: 242, y: 300, w: 50, h: 58, lado: -1,
+        x: 224, y: 352, w: 68, h: 58, lado: 0,
         titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."',
         cardapio: ['dogao', 'agua', 'chocolate']
       },
       {
         chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0,
-        x: 242, y: 430, w: 50, h: 54, lado: -1,
+        x: 224, y: 446, w: 68, h: 54, lado: 0,
         titulo: '"Jornal, bala, pururuca."',
         cardapio: ['pururuca', 'doce', 'jornal', 'agua']
       }
@@ -542,73 +542,107 @@ var EstacaoScene = new Phaser.Class({
   barracaPerto: function (x, y) {
     for (var i = 0; i < this.barracas.length; i++) {
       var b = this.barracas[i];
+      // de frente (lado 0): o balcão dá pra baixo, e se compra chegando por baixo
+      if (!b.lado) {
+        if (x > b.x - 8 && x < b.x + b.w + 8 && y > b.y + b.h && y < b.y + b.h + 34) return b;
+        continue;
+      }
       var bx = b.lado > 0 ? b.x + b.w : b.x;          // onde fica o balcão
       if (Math.abs(x - bx) < 34 && y > b.y - 10 && y < b.y + b.h + 10) return b;
     }
     return null;
   },
 
-  /* ---------- barraca que parece barraca ----------
-     Primeiro era um retângulo escuro com uma tirinha listrada; depois um
-     toldo listrado cobrindo tudo com o vendedor por cima dele, que lia
-     como alguém deitado num lençol. Barraca de estação vista de cima é
-     um QUIOSQUE ABERTO: a prateleira no fundo cheia de mercadoria
-     colorida, o chão de dentro onde o vendedor fica em pé, e o balcão de
-     vidro na frente, virado pro corredor. O toldo listrado é só a franja
-     de cima, com o babado. `lado` -1: o balcão fica à esquerda. */
+  /* ---------- o quiosque, de frente ----------
+     De lado a barraca não conversava com o jogo: tudo aqui é desenhado
+     em 3/4, de frente, como os bonecos. Agora o quiosque encara quem
+     passa, como os das estações de verdade (o DOG DO CÃO é o Monster Dog
+     das fotos): letreiro preto em cima com o nome colorido e dois
+     emblemas redondos; lá dentro as geladeiras de vidro e o cardápio; o
+     atendente atrás; e o balcão na frente, cobrindo as pernas dele, com
+     a foto do lanche. A banca é a mesma peça em metal verde, com revista
+     na parede e no balcão.
+
+     Três camadas, porque o atendente fica ENTRE elas: o fundo vai na
+     textura do saguão (0), o atendente em 39, e balcão e letreiro por
+     cima dele (40 e 41). */
   pintaBarracas: function (g) {
     for (var i = 0; i < this.barracas.length; i++) {
-      var b = this.barracas[i];
-      // x medido a partir do balcão: d=0 é a frente, d=b.w é o fundo
-      var X = function (d, w) { return b.lado < 0 ? b.x + d : b.x + b.w - d - w; };
-      g.fillStyle(0x000000, 0.35).fillRect(b.x + 4, b.y + 4, b.w, b.h);
-      // a caixa: laterais na cor da barraca
-      g.fillStyle(0x2a2430, 1).fillRect(b.x, b.y, b.w, b.h);
-      g.fillStyle(b.cor, 1).fillRect(b.x, b.y, b.w, 3).fillRect(b.x, b.y + b.h - 3, b.w, 3);
-      // o chão de dentro
-      g.fillStyle(0x4a3a2c, 1).fillRect(X(11, b.w - 24), b.y + 3, b.w - 24, b.h - 6);
-      g.fillStyle(0x5a4834, 1);
-      for (var fy = b.y + 6; fy < b.y + b.h - 4; fy += 8) g.fillRect(X(11, b.w - 24), fy, b.w - 24, 1);
-      // a prateleira do fundo, com a mercadoria em fileira
-      g.fillStyle(0x3a2a1c, 1).fillRect(X(b.w - 13, 13), b.y + 3, 13, b.h - 6);
-      var cores = b.chave === 'dog' ? [0xf2c14e, 0xe8362c, 0x7fd6a0, 0xc8752a, 0xf2f0ff] : [0xe8a33c, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
-      for (var m = 0; m < 6; m++) {
-        g.fillStyle(cores[m % cores.length], 1).fillRect(X(b.w - 11, 9), b.y + 6 + m * 8, 9, 6);
-        g.fillStyle(0x000000, 0.25).fillRect(X(b.w - 11, 9), b.y + 11 + m * 8, 9, 1);
+      var b = this.barracas[i], x = b.x, y = b.y, w = b.w, h = b.h, k;
+      var dog = (b.chave === 'dog');
+      g.fillStyle(0x000000, 0.35).fillRect(x + 4, y + 6, w, h);
+      // a caixa e a parede do fundo
+      g.fillStyle(dog ? 0x2a2320 : 0x1f3a2a, 1).fillRect(x, y, w, h);
+      g.fillStyle(0x14141a, 1).fillRect(x + 3, y + 12, w - 6, h - 30);
+      if (dog) {
+        // duas geladeiras de vidro com latinhas, e o cardápio no meio
+        for (k = 0; k < 2; k++) {
+          var fx = k ? x + w - 21 : x + 5;
+          g.fillStyle(0x9ec4dc, 1).fillRect(fx, y + 14, 16, h - 34);
+          g.fillStyle(0xe8362c, 1);
+          for (var r = 0; r < 3; r++) g.fillRect(fx + 2, y + 17 + r * 8, 12, 4);
+          g.fillStyle(0xffffff, 0.4).fillRect(fx + 1, y + 14, 2, h - 34);
+        }
+        g.fillStyle(0x0a0a10, 1).fillRect(x + 24, y + 14, w - 48, 14);
+        g.fillStyle(0xf2f0ff, 0.7);
+        for (var c = 0; c < 3; c++) g.fillRect(x + 27, y + 17 + c * 4, w - 54, 1);
+      } else {
+        // a parede de revistas: uma grade de capas coloridas
+        var capas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0xd05a8a, 0x6ac06a, 0xf2f0ff];
+        for (var ry = 0; ry < 3; ry++) {
+          for (var rx = 0; rx < 6; rx++) {
+            g.fillStyle(capas[(rx + ry * 2) % capas.length], 1).fillRect(x + 6 + rx * 10, y + 14 + ry * 9, 8, 7);
+          }
+        }
       }
-      // o balcão da frente: madeira embaixo, vidro em cima, mercadoria à mostra
-      g.fillStyle(0x5a3f22, 1).fillRect(X(0, 11), b.y + 3, 11, b.h - 6);
-      g.fillStyle(0x9ec4dc, 0.55).fillRect(X(1, 9), b.y + 5, 9, b.h - 10);
-      var vitrine = b.chave === 'dog' ? [0xc8752a, 0xc8752a, 0xf2c14e] : [0xf2f0ff, 0xe8a33c, 0xd05a8a];
-      for (var v = 0; v < 5; v++) {
-        g.fillStyle(vitrine[v % vitrine.length], 1).fillRect(X(3, 5), b.y + 8 + v * 9, 5, 4);
-      }
-      // o toldo: só a franja de cima, listrada, com o babado caindo
-      for (var f = 0; f < b.w; f += 6) {
-        var c = ((f / 6) % 2) ? b.cor : 0xf2f0ff;
-        g.fillStyle(c, 1).fillRect(b.x + f, b.y - 8, Math.min(6, b.w - f), 8);
-        g.fillCircle(b.x + f + 3, b.y, 3);
-      }
-      // a luz amarela que a barraca joga no chão da frente
-      g.fillStyle(0xf2c14e, 0.12).fillRect(b.lado < 0 ? b.x - 24 : b.x + b.w, b.y + 2, 24, b.h - 4);
+      // a luz do quiosque no chão da frente
+      g.fillStyle(0xf2c14e, 0.1).fillRect(x - 4, y + h, w + 8, 20);
     }
   },
 
-  /* O vendedor em pé no chão de dentro, virado pro balcão, e a
-     plaquinha com o nome em cima do toldo. */
   montaVendedores: function () {
     for (var i = 0; i < this.barracas.length; i++) {
-      var b = this.barracas[i];
-      var vx = b.lado < 0 ? b.x + 24 : b.x + b.w - 24;
-      var ven = new Ator(this, vx, b.y + b.h - 8,
-        b.chave === 'dog' ? 'np_ambulante_c' : 'np_ambulante_b');
-      ven.dir = b.lado < 0 ? 'left' : 'right'; ven.anima(0, false);
+      var b = this.barracas[i], x = b.x, y = b.y, w = b.w, h = b.h, k;
+      var dog = (b.chave === 'dog');
+      // o atendente: de frente, com as pernas escondidas atrás do balcão
+      var ven = new Ator(this, x + w / 2, y + h - 4, dog ? 'np_ambulante_c' : 'np_ambulante_b');
+      ven.dir = 'down'; ven.anima(0, false);
       ven.sp.setDepth(39);
-      var t = txtC(this, b.x + b.w / 2, b.y - 21, b.nome, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(41);
-      var w = Math.round(t.width) + 10;
-      var gp = this.add.graphics().setDepth(40);
-      gp.fillStyle(0x14141c, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 24, w, 12);
-      gp.fillStyle(b.cor, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 14, w, 2);
+
+      // o balcão, na frente dele
+      var gb = this.add.graphics().setDepth(40);
+      var by = y + h - 20;
+      gb.fillStyle(0x9a9ca4, 1).fillRect(x - 2, by, w + 4, 4);                 // o tampo
+      gb.fillStyle(dog ? 0xe8b21e : 0x2c5a3c, 1).fillRect(x, by + 4, w, 16);
+      gb.fillStyle(0x000000, 0.25).fillRect(x, by + 17, w, 3);
+      if (dog) {
+        // a foto do lanche no painel amarelo: dois dogões
+        for (k = 0; k < 2; k++) {
+          var hx = x + 12 + k * 28;
+          gb.fillStyle(0xd99a4e, 1).fillEllipse(hx + 8, by + 12, 18, 8);
+          gb.fillStyle(0xa8401c, 1).fillEllipse(hx + 8, by + 11, 16, 4);
+          gb.fillStyle(0xf2c14e, 1).fillRect(hx + 2, by + 10, 12, 1);          // a mostarda
+        }
+        // bisnagas em cima do tampo
+        gb.fillStyle(0xe8362c, 1).fillRect(x + 4, by - 6, 3, 6);
+        gb.fillStyle(0xf2c14e, 1).fillRect(x + 9, by - 6, 3, 6);
+      } else {
+        // revistas abertas em leque em cima do balcão
+        var cores = [0xf2f0ff, 0xe8362c, 0x3a7fd0, 0xf2c14e, 0xd05a8a];
+        for (k = 0; k < 5; k++) gb.fillStyle(cores[k], 1).fillRect(x + 6 + k * 12, by - 3, 9, 7);
+      }
+
+      // o letreiro em cima: preto, nome colorido, os emblemas nas pontas
+      var gl = this.add.graphics().setDepth(41);
+      gl.fillStyle(0x0a0a10, 1).fillRect(x - 3, y - 8, w + 6, 18);
+      gl.fillStyle(dog ? 0xe8362c : 0xf2f0ff, 1).fillRect(x - 3, y + 8, w + 6, 2);
+      if (dog) {
+        // os emblemas ficam pra fora da chapa, pra não comer o nome
+        gl.fillStyle(0xe8762c, 1).fillCircle(x - 7, y + 1, 7).fillCircle(x + w + 7, y + 1, 7);
+        gl.fillStyle(0xf2c14e, 1).fillCircle(x - 7, y + 1, 3).fillCircle(x + w + 7, y + 1, 3);
+      }
+      txtC(this, x + w / 2, y - 4, b.nome, dog ? PAL.amarelo : PAL.branco, 8)
+        .setScale(ESCALA_TEXTO / 2).setDepth(42);
     }
   },
 

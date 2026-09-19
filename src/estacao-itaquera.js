@@ -37,8 +37,31 @@ var ITQ = {
   passY0: 516, passY1: 1150,        // do pé do saguão até a Saída B
   cruzY0: 820, cruzY1: 904,         // a faixa dos dois braços
   bracoX0: -340, bracoX1: 628,      // até onde os braços vão
-  mundoX0: -380, mundoX1: 680
+  mundoX0: -380, mundoX1: 880,
+  fundoY: 1440,                     // o fim do mundo embaixo: passa do estacionamento da Arena
+  radialY: 930                      // a Radial Leste corre entre a passarela e a Arena
 };
+/* ---------- o lado de fora, que dá pra andar ----------
+   Da Saída C/D a escada desce pra calçada, a faixa de pedestre atravessa
+   a Radial, a SUBIDONA (a rampa comprida dos mapas de acesso) leva à
+   esplanada, e a esplanada contorna a Arena até o estacionamento. A rua
+   de verdade, pra quem mora pra esse lado, é o pé do estacionamento. */
+/* Os trechos se sobrepõem uns pixels de propósito: colados na mesma
+   linha, sobrava um fio sem chão entre eles, e o boneco travava ali.
+   A calçada continua o braço pra fora e desce pelo lado LESTE da Arena:
+   com a Arena grande, a subidona não cabe entre ela e a passarela. */
+var FORA = {
+  calcada: { x0: 632, x1: 836, y0: 824, y1: 906 },
+  descida: { x0: 768, x1: 836, y0: 824, y1: 936 },
+  faixa: { x0: 772, x1: 832, y0: 926, y1: 1000 },
+  rampa: { x0: 772, x1: 832, y0: 990, y1: 1090 },
+  esplanada: { x0: 200, x1: 850, y0: 996, y1: 1430 }
+};
+function dentroDe(r, x, y) { return x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1; }
+/* A Arena, vista de fora e de cima. Fica ABAIXO do braço da Saída C/D,
+   do outro lado da Radial, como nos mapas de acesso: andando pelo braço,
+   com a câmera presa em você, ela aparece embaixo da tela. */
+var ARENA = { x: 250, y: 1040, w: 500, h: 300 };
 var ITQ_PISA = 6;                   // o boneco não encosta na parede da passarela
 var ITQ_MEIO_X = (ITQ.passX0 + ITQ.passX1) / 2;
 var ITQ_MEIO_Y = (ITQ.cruzY0 + ITQ.cruzY1) / 2;
@@ -48,7 +71,7 @@ var ITQ_MEIO_Y = (ITQ.cruzY0 + ITQ.cruzY1) / 2;
 var SAIDAS_ITQ = {
   A: { rotulo: 'SAÍDA A', lugar: 'SHOPPING', x: ITQ.bracoX0 + 34, y: ITQ_MEIO_Y, dir: 'right', seta: '◄' },
   B: { rotulo: 'SAÍDA B', lugar: 'CPTM E TERMINAL', x: ITQ_MEIO_X, y: ITQ.passY1 - 34, dir: 'up', seta: '▼' },
-  C: { rotulo: 'SAÍDA C/D', lugar: 'RADIAL E ARENA', x: ITQ.bracoX1 - 34, y: ITQ_MEIO_Y, dir: 'left', seta: '►' }
+  C: { rotulo: 'SAÍDA C/D', lugar: 'RADIAL E ARENA', x: 800, y: 1398, dir: 'up', seta: '►' }
 };
 /* Pra que lado cada um mora. O estudante vem de ônibus (terminal); o
    senhor e a gestante moram do lado do shopping; o CLT e o ambulante,
@@ -78,8 +101,16 @@ function assentosItq() {
 /* ---------- o que é chão ---------- */
 EstacaoScene.prototype.naPassarela = function (x, y) {
   var tronco = x > ITQ.passX0 + ITQ_PISA && x < ITQ.passX1 - ITQ_PISA && y >= ITQ.passY0 - 4 && y < ITQ.passY1;
-  var braco = y > ITQ.cruzY0 + ITQ_PISA && y < ITQ.cruzY1 - ITQ_PISA && x > ITQ.bracoX0 && x < ITQ.bracoX1;
-  return tronco || braco;
+  var braco = y > ITQ.cruzY0 + ITQ_PISA && y < ITQ.cruzY1 - ITQ_PISA && x > ITQ.bracoX0 && x < ITQ.bracoX1 + 12;
+  if (tronco || braco) return true;
+  // lá fora: calçada, faixa, subidona e esplanada — mas a Arena é parede
+  if (dentroDe(FORA.calcada, x, y) || dentroDe(FORA.descida, x, y) ||
+      dentroDe(FORA.faixa, x, y) || dentroDe(FORA.rampa, x, y)) return true;
+  if (dentroDe(FORA.esplanada, x, y)) {
+    // o prédio oeste passa 22px pra cima, a fachada leste 12 pra baixo, e os degraus do sul 42 pra direita
+    return !(x > ARENA.x - 8 && x < ARENA.x + ARENA.w + 44 && y > ARENA.y - 26 && y < ARENA.y + ARENA.h + 16);
+  }
+  return false;
 };
 
 /* true/false quando a Itaquera decide; null quando vale a regra de sempre */
@@ -163,15 +194,21 @@ EstacaoScene.prototype.pintaPlataformaItq = function (g, l) {
 
 /* ---------- a passarela e os braços ---------- */
 EstacaoScene.prototype.pintaPassarela = function (g) {
-  var x0 = ITQ.mundoX0, y0 = ITQ.passY0 - 60, larg = ITQ.mundoX1 - ITQ.mundoX0, alt = ITQ.passY1 + 90 - y0;
+  var x0 = ITQ.mundoX0, y0 = ITQ.passY0 - 60, larg = ITQ.mundoX1 - ITQ.mundoX0, alt = ITQ.fundoY - y0;
   g.translateCanvas(-x0, -y0);
 
   // lá fora: grama, e o asfalto da Radial correndo por baixo
   g.fillStyle(0x2b3d2c, 1).fillRect(x0, y0, larg, alt);
   pontilhado(g, x0, y0, larg, alt, 0x000000, 0.12, 6);
-  g.fillStyle(0x3a3a44, 1).fillRect(x0, ITQ.cruzY1 + 70, larg, 90);
+  g.fillStyle(0x3a3a44, 1).fillRect(x0, ITQ.radialY, larg, 64);
+  g.fillStyle(0x2c2c34, 1).fillRect(x0, ITQ.radialY + 30, larg, 4);           // o canteiro do meio
   g.fillStyle(0xf2f0ff, 0.5);
-  for (var fx = x0; fx < x0 + larg; fx += 40) g.fillRect(fx, ITQ.cruzY1 + 113, 20, 3);
+  for (var fx = x0; fx < x0 + larg; fx += 40) {
+    g.fillRect(fx, ITQ.radialY + 14, 20, 2);
+    g.fillRect(fx + 20, ITQ.radialY + 48, 20, 2);
+  }
+  pintaFora(g);
+  pintaArena(g);
 
   // um trecho de corredor coberto: piso claro, parede branca, a viga vermelha em cima
   var corredor = function (x, y, w, h, deitado) {
@@ -210,8 +247,6 @@ EstacaoScene.prototype.pintaPassarela = function (g) {
   for (var dg = 0; dg < 6; dg++) {
     g.fillStyle(dg % 2 ? 0x8a857c : 0xa39e94, 1).fillRect(cx + dg * 8, ITQ.cruzY0 + 6, 8, ITQ.cruzY1 - ITQ.cruzY0 - 12);
   }
-  g.fillStyle(0xe6e6ea, 1).fillRect(cx + 50, ITQ.cruzY0 - 120, 50, 90);                 // a Arena, de longe
-  g.fillStyle(0x1a1a1e, 1).fillRect(cx + 54, ITQ.cruzY0 - 112, 42, 6);
   // Saída B: a escada que desce pro terminal, e a cobertura branca dos ônibus
   var by = ITQ.passY1;
   for (var db = 0; db < 5; db++) {
@@ -222,15 +257,110 @@ EstacaoScene.prototype.pintaPassarela = function (g) {
   g.translateCanvas(x0, y0);
 };
 
+/* ---------- a Arena Corinthians, de fora ----------
+   Das fotos aéreas: a cobertura branca de cantos arredondados, com o
+   recorte retangular no meio por onde se vê a arquibancada e o gramado;
+   o prédio oeste, um bloco branco mais alto; a fachada de vidro do leste;
+   a sombra funda debaixo da beira da cobertura; e em volta a esplanada
+   de concreto e o estacionamento. Sem nome nem logo de patrocinador. */
+function pintaFora(g) {
+  var r, i;
+  // a esplanada de concreto, e o estacionamento embaixo com as vagas
+  r = FORA.esplanada;
+  g.fillStyle(0x6f6d66, 1).fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+  pontilhado(g, r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0, 0x000000, 0.08, 8);
+  g.fillStyle(0x3e3e46, 1).fillRect(r.x0, ARENA.y + ARENA.h + 14, r.x1 - r.x0, r.y1 - ARENA.y - ARENA.h - 14);
+  g.fillStyle(0xf2f0ff, 0.4);
+  for (i = r.x0 + 6; i < r.x1; i += 16) g.fillRect(i, ARENA.y + ARENA.h + 20, 1, 22);
+  for (i = r.x0 + 6; i < r.x1; i += 16) g.fillRect(i, ARENA.y + ARENA.h + 44, 1, 22);
+  g.fillStyle(0xf2c14e, 0.8).fillRect(r.x0, r.y1 - 6, r.x1 - r.x0, 2);           // o meio-fio da rua
+  // a calçada que continua o braço e desce até a Radial
+  [FORA.calcada, FORA.descida].forEach(function (c) {
+    g.fillStyle(0x8a857c, 1).fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+    g.fillStyle(0x9d978d, 1);
+    for (var cy = c.y0 + 2; cy < c.y1 - 2; cy += 12) g.fillRect(c.x0 + 2, cy, c.x1 - c.x0 - 4, 10);
+  });
+  // a faixa de pedestre na Radial
+  r = FORA.faixa;
+  g.fillStyle(0xf2f0ff, 0.85);
+  for (i = r.y0 + 4; i < r.y1 - 4; i += 10) g.fillRect(r.x0 + 4, i, r.x1 - r.x0 - 8, 5);
+  // a SUBIDONA: rampa comprida, faixas de piso que ficam mais claras subindo, e o guarda-corpo
+  r = FORA.rampa;
+  for (i = 0; i < r.y1 - r.y0; i += 6) {
+    var k = i / (r.y1 - r.y0);
+    g.fillStyle(Phaser.Display.Color.GetColor(110 + k * 40, 108 + k * 38, 100 + k * 36), 1).fillRect(r.x0, r.y0 + i, r.x1 - r.x0, 6);
+  }
+  g.fillStyle(0x2a2a32, 1).fillRect(r.x0 - 3, r.y0, 3, r.y1 - r.y0).fillRect(r.x1, r.y0, 3, r.y1 - r.y0);
+  g.fillStyle(0xc9ccd2, 1).fillRect(r.x0 - 3, r.y0, 1, r.y1 - r.y0).fillRect(r.x1, r.y0, 1, r.y1 - r.y0);
+}
+
+function pintaArena(g) {
+  var a = ARENA, x = a.x, y = a.y, w = a.w, h = a.h, i;
+  // a sombra da massa inteira, pra baixo e pra direita
+  g.fillStyle(0x000000, 0.4).fillRect(x + 14, y + 18, w, h);
+
+  // PONTA SUL (direita): a esplanada em degraus da arquibancada temporária, pra fora da cobertura
+  for (i = 0; i < 6; i++) {
+    g.fillStyle(i % 2 ? 0x8f8c84 : 0xa9a69d, 1).fillRect(x + w - 6 + i * 7, y + 70 + i * 6, 7, h - 140 - i * 12);
+  }
+  // LADO OESTE (em cima): o prédio branco alto, com a faixa de vidro dos camarotes
+  g.fillStyle(0xcfd2d6, 1).fillRect(x + 20, y - 22, w - 40, 36);
+  g.fillStyle(0xeceef1, 1).fillRect(x + 20, y - 22, w - 40, 26);
+  g.fillStyle(0x6f93b3, 1).fillRect(x + 30, y - 12, w - 60, 7);
+  g.fillStyle(0x9cc3de, 1);
+  for (i = x + 34; i < x + w - 34; i += 12) g.fillRect(i, y - 11, 8, 5);
+  // LADO LESTE (embaixo): a fachada de vidro, com os montantes verticais
+  g.fillStyle(0x5f84a6, 1).fillRect(x + 16, y + h - 14, w - 32, 26);
+  g.fillStyle(0xaccde3, 1);
+  for (i = x + 18; i < x + w - 18; i += 6) g.fillRect(i, y + h - 12, 3, 22);
+
+  // a cobertura: branca, cantos redondos, e as bordas compridas curvando um pouco pra fora
+  var borda = function (cor, m) {
+    g.fillStyle(cor, 1);
+    g.fillRoundedRect(x + m, y + m, w - 2 * m, h - 2 * m, 30 - m);
+    // o arco das bordas longas: a cobertura ondula, e de cima isso vira uma barriga suave
+    g.fillEllipse(x + w / 2, y + m + 4, w - 120, 22 - m);
+    g.fillEllipse(x + w / 2, y + h - m - 4, w - 120, 22 - m);
+  };
+  borda(0xa9adb4, 0);
+  borda(0xf1f2f4, 3);
+  // as emendas dos painéis da cobertura
+  g.fillStyle(0xdcdfe3, 1);
+  for (i = x + 28; i < x + w - 24; i += 22) g.fillRect(i, y + 10, 1, h - 20);
+  g.fillStyle(0xe6e8eb, 1).fillRect(x + 12, y + h / 2, w - 24, 1);
+
+  // o recorte: a cobertura é mais funda no oeste (camarotes), então o vão fica um pouco pra baixo
+  var ox = x + 108, oy = y + 72, ow = w - 216, oh = h - 128;
+  g.fillStyle(0x1e1e24, 1).fillRect(ox, oy, ow, oh);
+  // a arquibancada: anéis de cadeiras, mais escuro no alto
+  for (i = 0; i < 5; i++) {
+    g.fillStyle([0x4a4c54, 0x5c5e66, 0x6e7078, 0x5c5e66, 0x7a7c84][i], 1).fillRect(ox + 4 + i * 5, oy + 4 + i * 4, ow - 8 - i * 10, oh - 8 - i * 8);
+  }
+  // o gramado deitado, com o corte em faixas e as linhas do campo
+  var gx = ox + 32, gy = oy + 26, gw = ow - 64, gh = oh - 52;
+  g.fillStyle(0x2f8a3a, 1).fillRect(gx, gy, gw, gh);
+  g.fillStyle(0x38a045, 1);
+  for (i = 0; i < gw; i += 14) g.fillRect(gx + i, gy, 7, gh);
+  g.lineStyle(1, 0xf2f0ff, 0.85).strokeRect(gx + 3, gy + 3, gw - 6, gh - 6);
+  g.lineBetween(gx + gw / 2, gy + 3, gx + gw / 2, gy + gh - 3);
+  g.strokeCircle(gx + gw / 2, gy + gh / 2, 10);
+  g.strokeRect(gx + 3, gy + gh / 2 - 16, 16, 32).strokeRect(gx + gw - 19, gy + gh / 2 - 16, 16, 32);
+  g.fillStyle(0xf2f0ff, 1).fillRect(gx + 1, gy + gh / 2 - 4, 2, 8).fillRect(gx + gw - 3, gy + gh / 2 - 4, 2, 8);   // as traves
+  // o telão, na ponta sul (direita), virado pro campo
+  g.fillStyle(0x0a0a10, 1).fillRect(ox + ow - 10, oy + oh / 2 - 22, 6, 44);
+  // a sombra que a borda da cobertura joga pra dentro do vão
+  g.fillStyle(0x000000, 0.28).fillRect(ox, oy, ow, 8).fillRect(ox, oy, 8, oh);
+}
+
 /* ---------- monta tudo, no create ---------- */
 EstacaoScene.prototype.montaItaquera = function () {
   var eu = this, l = GameState.linhaAtual(), i;
   // o fundo de fora do mundo de 320px
   var fundo = this.add.graphics().setDepth(-2);
-  fundo.fillStyle(num(PAL.bg), 1).fillRect(ITQ.mundoX0, PLAT_Y - 8, ITQ.mundoX1 - ITQ.mundoX0, ITQ.passY1 + 100 - PLAT_Y);
+  fundo.fillStyle(num(PAL.bg), 1).fillRect(ITQ.mundoX0, PLAT_Y - 8, ITQ.mundoX1 - ITQ.mundoX0, ITQ.fundoY + 10 - PLAT_Y);
 
   var y0 = ITQ.passY0 - 60;
-  texturaDeCena(this, 'est_itq_passarela', ITQ.mundoX1 - ITQ.mundoX0, ITQ.passY1 + 90 - y0,
+  texturaDeCena(this, 'est_itq_passarela', ITQ.mundoX1 - ITQ.mundoX0, ITQ.fundoY - y0,
     function (g) { eu.pintaPassarela(g); });
   this.add.image(ITQ.mundoX0, y0, 'est_itq_passarela').setOrigin(0, 0).setDepth(-1);
 
@@ -253,11 +383,13 @@ EstacaoScene.prototype.montaItaquera = function () {
   placaItq(this, 300, platY(300), placaDe('ITAQUERA'), true);
   placaItq(this, 300, platY(560), placaDe('ITAQUERA'), true);
   placaItq(this, 250, platY(740), 'SAÍDA ▼');
-  placaItq(this, ITQ_MEIO_X, ITQ.passY0 + 40, '▲ CATRACAS');
   // presas na parede de cima do braço, e não soltas no meio do corredor
   placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 - 6, '◄ A  SHOPPING');
   placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 - 6, 'C/D  RADIAL E ARENA ►');
-  placaItq(this, ITQ_MEIO_X, ITQ.passY1 - 90, '▼ B  CPTM E TERMINAL');
+  /* A da saída B mora no fim do corredor, sobre a escada que desce, e por
+     baixo de quem passa: pendurada no meio da passarela ela ficava por
+     cima das cabeças, e lia como alguém passando por cima da placa. */
+  placaItq(this, ITQ_MEIO_X, ITQ.passY1 + 20, '▼ B  CPTM E TERMINAL', false, true);
 
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
@@ -285,14 +417,16 @@ EstacaoScene.prototype.montaItaquera = function () {
    fotos); deitada, ela atravessa o caminho (a de SAÍDA). Pendurada, ela
    mostra os dois ganchos e a sombra cai deslocada no chão: solta no meio
    do piso, sem nada, lia como jogada ali. */
-function placaItq(cena, x, y, texto, emPe) {
-  var t = txtC(cena, x, y, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(46);
+function placaItq(cena, x, y, texto, emPe, fundo) {
+  // `fundo`: presa na parede do fim do corredor, desenhada por baixo de quem passa
+  var prof = fundo ? 3 : 45;
+  var t = txtC(cena, x, y, texto, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(prof + 1);
   var comp = Math.round(t.width) + 12, esp = 13;
   var w = emPe ? esp : comp, h = emPe ? comp : esp;
   var x0 = Math.round(x - w / 2), y0 = Math.round(y - h / 2);
   if (emPe) t.setOrigin(0.5, 0.5).setAngle(90).setPosition(x, y);
   else t.setOrigin(0.5, 0.5).setPosition(x, y + 1);
-  var g = cena.add.graphics().setDepth(45);
+  var g = cena.add.graphics().setDepth(prof);
   g.fillStyle(0x000000, 0.28).fillRect(x0 + 6, y0 + 8, w, h);               // a sombra, longe: está no alto
   // os cabos, dos ganchos até o teto (pra cima na tela)
   g.fillStyle(0x2a2a32, 1);
@@ -313,7 +447,7 @@ EstacaoScene.prototype.posicionaItaquera = function (noAlto) {
   }
   // a câmera presa no personagem, nos dois eixos (o mundo aqui é mais largo que a tela)
   var cam = this.cameras.main;
-  cam.setBounds(ITQ.mundoX0, PLAT_Y - 8, ITQ.mundoX1 - ITQ.mundoX0, ITQ.passY1 + 90 - (PLAT_Y - 8));
+  cam.setBounds(ITQ.mundoX0, PLAT_Y - 8, ITQ.mundoX1 - ITQ.mundoX0, ITQ.fundoY - (PLAT_Y - 8));
   cam.startFollow(this.pl.sp, true, 1, 1);
   cam.setFollowOffset(0, -Math.round(HUD_H / 2));
   cam.centerOn(this.pl.sp.x, this.pl.sp.y - Math.round(HUD_H / 2));
@@ -324,7 +458,9 @@ EstacaoScene.prototype.posicionaItaquera = function (noAlto) {
   if (!noAlto && !GameState.treino && GameState.pernaIdx === 0 && GameState._itqCompensado !== GameState.dia) {
     GameState._itqCompensado = GameState.dia;
     var s2 = SAIDAS_ITQ[saidaDeCasa()];
-    var dist = Math.abs(s2.x - ITQ_MEIO_X) + (s2.y - 244);
+    var dist = (saidaDeCasa() === 'C')
+      ? (s2.y - 862) + (s2.x - ITQ_MEIO_X) + (862 - 244)    // subidona, braço, passarela
+      : Math.abs(s2.x - ITQ_MEIO_X) + (s2.y - 244);
     var extra = Math.max(0, Math.round((dist - 256) / GameState.char.velocidade));
     // o relógio e a saída voltam juntos, e a perna ganha a folga do caminho
     GameState.minutos = (GameState.minutos - extra + 1440) % 1440;
@@ -389,10 +525,9 @@ EstacaoScene.prototype.atualizaItaquera = function (dt) {
 };
 
 EstacaoScene.prototype.saidaSob = function (x, y) {
-  if (y > ITQ.cruzY0 && y < ITQ.cruzY1) {
-    if (x < ITQ.bracoX0 + 18) return 'A';
-    if (x > ITQ.bracoX1 - 18) return 'C';
-  }
+  if (y > ITQ.cruzY0 && y < ITQ.cruzY1 && x < ITQ.bracoX0 + 18) return 'A';
+  // a rua do lado da Arena é o pé do estacionamento
+  if (y > FORA.esplanada.y1 - 16) return 'C';
   if (y > ITQ.passY1 - 18 && x > ITQ.passX0 && x < ITQ.passX1) return 'B';
   return null;
 };
@@ -475,7 +610,7 @@ EstacaoScene.prototype.pintaPSD = function () {
    saguão quando chega nele. */
 var ITQ_PONTOS = {
   A: function () { return { x: ITQ.bracoX0 + 14, y: ITQ_MEIO_Y + (Math.random() - 0.5) * 40 }; },
-  C: function () { return { x: ITQ.bracoX1 - 14, y: ITQ_MEIO_Y + (Math.random() - 0.5) * 40 }; },
+  C: function () { return { x: 780 + Math.random() * 40, y: FORA.esplanada.y1 - 10 }; },
   B: function () { return { x: ITQ_MEIO_X + (Math.random() - 0.5) * 50, y: ITQ.passY1 - 10 }; },
   saguao: function () { return { x: ITQ_MEIO_X + (Math.random() - 0.5) * 50, y: ITQ.passY0 + 6 }; }
 };
@@ -485,7 +620,14 @@ EstacaoScene.prototype.novoPassante = function (de, para, ator) {
   a.sp.setDepth(40);
   a.sp.passante = true; a.sp.dentro = false; a.sp.naEscada = false;
   var meio = { x: ITQ_MEIO_X + (Math.random() - 0.5) * 50, y: ITQ_MEIO_Y + (Math.random() - 0.5) * 40 };
-  a.rota = [meio, p1];
+  // o caminho de fora (estacionamento, subidona, faixa, calçada, fim do braço)
+  var fora = [{ x: 800, y: 1110 }, { x: 800, y: 960 }, { x: 800, y: 866 }, { x: 612, y: ITQ_MEIO_Y }];
+  var rota = [];
+  if (de === 'C') rota = rota.concat(fora.slice(0));
+  rota.push(meio);
+  if (para === 'C') rota = rota.concat(fora.slice(0).reverse());
+  rota.push(p1);
+  a.rota = rota;
   a.destinoItq = para;
   a.vel = 48 + Math.random() * 24;
   // fora da lista de corpos: a passarela é corredor, e o limite do saguão os puxaria de volta
