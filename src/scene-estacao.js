@@ -431,7 +431,12 @@ var EstacaoScene = new Phaser.Class({
       e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
     }
-    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+    /* Quem não é plateia nem fila (os pedintes, o ambulante) mora em
+       `fixos`: a lista de gente é refeita toda vez que alguém embarca ou
+       desce, e refeita só com plateia e fila ela largava esses de fora, e
+       o ambulante sumia ('o ambulante tá desaparecendo'). */
+    this.fixos = [];
+    this.gente = this.juntaGente();
 
     /* quem fica. De madrugada e no vazio eles aparecem mais:
        menos gente passando, mais gente que não vai a lugar nenhum */
@@ -444,14 +449,14 @@ var EstacaoScene = new Phaser.Class({
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(38); pd.anima(0, false);
       pd.fixo = true;                 // quem está agachado não se mexe
-      this.gente.push(pd);
+      this.gente.push(pd); this.fixos.push(pd);
     }
     if (Math.random() < 0.6 - 0.35 * GameState.lotacao()) {
       var pp = new Ator(this, 280, platY(120 + Math.random() * (PLAT_ALT - 200)),
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pp.sp.setDepth(28); pp.anima(0, false);
       pp.fixo = true;
-      this.gente.push(pp);
+      this.gente.push(pp); this.fixos.push(pp);
     }
 
     this.montaAmbulante();
@@ -1349,14 +1354,14 @@ var EstacaoScene = new Phaser.Class({
         a.sp.x = faixaDaEscada(ESC_PISTA[1], fxa === 0);
         a.indo = { fase: 'desce', faixa: fxa };
         this.plateia.push(a);
-        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        this.gente = this.juntaGente();
         continue;
       }
       if (d < 4) {
         // chegou na porta: entrou, e quem entrou não está mais aqui
         a.sp.destroy();
         this.esperando.splice(i, 1);
-        this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+        this.gente = this.juntaGente();
         continue;
       }
       var v = (a.indo.v || 52) * dt / 1000;
@@ -1539,7 +1544,7 @@ var EstacaoScene = new Phaser.Class({
       a.setDir(dx, dy);
       a.anima(dt, true);
     }
-    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+    this.gente = this.juntaGente();
   },
 
   /* quem entra na estação entra pela rua, que é embaixo */
@@ -1691,7 +1696,7 @@ var EstacaoScene = new Phaser.Class({
       this.filaDesce[fx].push(a);
       this.esperando.push(a);
     }
-    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+    this.gente = this.juntaGente();
   },
 
   /* ---------- e chega gente nova ----------
@@ -1711,7 +1716,7 @@ var EstacaoScene = new Phaser.Class({
       a.indo.x = Phaser.Math.Clamp(a.indo.x, PLAT_X0 + 12, PLAT_X1 - 12);
       this.esperando.push(a);
     }
-    this.gente = this.plateia.concat(this.esperando, [this.guarda]);
+    this.gente = this.juntaGente();
   },
 
   /* ---------- áreas caminháveis, nas três faixas ---------- */
@@ -2648,7 +2653,7 @@ var EstacaoScene = new Phaser.Class({
     a.sp.setDepth(39);
     a.vy = (Math.random() < 0.5 ? -1 : 1) * 26;
     this.ambulante = a;
-    this.gente.push(a);
+    this.gente.push(a); this.fixos.push(a);
   },
 
   andaAmbulante: function (dt) {
@@ -2659,6 +2664,11 @@ var EstacaoScene = new Phaser.Class({
     a.sp.y = ny;
     a.dir = a.vy < 0 ? 'up' : 'down';
     a.anima(dt, true);
+  },
+
+  juntaGente: function () {
+    var f = (this.fixos || []).filter(function (a) { return a && a.sp && a.sp.active; });
+    return this.plateia.concat(this.esperando, [this.guarda], f);
   },
 
   ambulantePerto: function () {

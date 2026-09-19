@@ -708,16 +708,23 @@ var ZapScene = new Phaser.Class({
        do outro lado aparecem só as pontas dos quatro dedos, que dão a
        volta por trás. Nada entra na tela. */
     var pele = 0xc98d63, som = 0xa8744e, unha = 0xe8b894, dd, X = ZAP.x0, Y = ZAP.y1;
-    // a palma, atrás do canto de baixo, e a manga saindo pela esquerda
-    g.fillStyle(0x1c1c26, 1).fillEllipse(-14, GH + 4, 70, 46);
-    g.fillStyle(som, 1).fillEllipse(-2, Y - 40, 40, 150);
-    g.fillStyle(pele, 1).fillEllipse(-4, Y - 40, 36, 146);
-    // o polegar: da palma, inclinado, com a ponta deitada na moldura
+    /* Uma peça só ('ta quase'): a palma sai do canto de baixo e sobe
+       colada na lateral esquerda até a base do polegar, e o polegar
+       continua dela, inclinado, com a ponta deitada na moldura. Separados,
+       o polegar lia como um palito solto. */
     var ty = Y - 250;
-    g.fillStyle(som, 1).fillPoints([{ x: X - 18, y: ty + 70 }, { x: X - 2, y: ty + 2 }, { x: X + 14, y: ty + 6 }, { x: X, y: ty + 82 }], true);
-    g.fillStyle(pele, 1).fillPoints([{ x: X - 16, y: ty + 70 }, { x: X - 1, y: ty + 4 }, { x: X + 12, y: ty + 8 }, { x: X - 1, y: ty + 80 }], true);
+    var palma = [{ x: -24, y: ty + 36 }, { x: X - 4, y: ty + 52 }, { x: X + 10, y: Y - 60 }, { x: X + 34, y: GH }, { x: -24, y: GH }];
+    var polegar = [{ x: X - 12, y: ty + 66 }, { x: X - 3, y: ty + 4 }, { x: X + 13, y: ty + 8 }, { x: X + 9, y: ty + 74 }];
+    var borda = function (pts, d) { return pts.map(function (q) { return { x: q.x + d, y: q.y + d }; }); };
+    g.fillStyle(som, 1).fillPoints(borda(palma, 1), true).fillPoints(borda(polegar, 1), true);
+    g.fillStyle(pele, 1).fillPoints(palma, true).fillPoints(polegar, true);
     g.fillStyle(pele, 1).fillCircle(X + 5, ty + 7, 7);
     g.fillStyle(unha, 1).fillRoundedRect(X + 1, ty + 2, 8, 9, 3);
+    // a dobra do polegar e a linha onde ele encontra a palma
+    g.fillStyle(som, 1).fillRect(X - 2, ty + 40, 12, 1);
+    g.lineStyle(1, som, 0.8).beginPath(); g.moveTo(X - 10, ty + 70); g.lineTo(X + 8, ty + 78); g.strokePath();
+    // a manga, saindo pelo canto de baixo
+    g.fillStyle(0x1c1c26, 1).fillEllipse(-10, GH + 6, 80, 40);
     // as pontas dos quatro dedos, do lado direito, o mindinho menor
     for (dd = 0; dd < 4; dd++) {
       var fy = Y - 330 + dd * 26, larg = dd === 3 ? 8 : 11;

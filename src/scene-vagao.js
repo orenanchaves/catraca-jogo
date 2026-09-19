@@ -2476,12 +2476,18 @@ var VagaoScene = new Phaser.Class({
     a.sp.x += dx / d * passo; a.sp.y += dy / d * passo;
     a.setDir(dx, dy); a.anima(dt, true);
   },
-  // vendeu (ou não): segue pelo corredor, pro lado de onde não veio, e some na emenda
+  /* vendeu (ou não): segue pelo corredor, pro lado de onde não veio, até
+     o fole, e só some lá dentro, passando pro carro seguinte. Sumir no
+     meio do corredor era ele evaporando na sua frente. */
   ambulanteVai: function () {
     var v = this.ambVagao;
     if (!v) return;
+    var c = carroDe(v.a.sp.y), topo = HUD_H + c * PASSO_CARRO, pe = topo + CARRO_ALT;
+    var praBaixo = v.saida < this.pl.sp.y;
+    if (praBaixo && c === CARROS - 1) praBaixo = false;
+    if (!praBaixo && c === 0) praBaixo = true;
     v.fase = 'vai';
-    v.longe = v.a.sp.y + (v.saida < this.pl.sp.y ? 260 : -260);
+    v.longe = praBaixo ? pe + SANFONA_ALT / 2 : topo - SANFONA_ALT / 2;
   },
 
   /* ---------- eventos de vagão ---------- */
