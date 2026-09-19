@@ -2764,6 +2764,28 @@ function ambienteGravado() {
 // relógio próprio: a música pode estar desligada e o mundo continua fazendo barulho
 setInterval(ambienteGravado, 250);
 
+/* ---------- o trem chegando, gravado ----------
+   'Varia com esse som de metrô chegando.' A gravação de um trem de
+   verdade encostando na plataforma, a cada chegada com o tom e a
+   velocidade um pouco diferentes (0,9 a 1,1), pra nenhum trem soar igual
+   ao anterior. Alto na plataforma, baixinho de quem ainda está no
+   saguão, e cala quando a cena da estação sai. Sem o arquivo, volta o
+   trem sintetizado de antes. */
+var AUDIO_TREM = 'assets/audio/trem_chegando.mp3';
+function tocaTremChegando(cena) {
+  if (!SOM_LIGADO || document.hidden) return;
+  var naPlat = cena && cena.pl && cena.pl.sp && cena.pl.sp.y < ESC_Y;
+  try {
+    var a = new Audio(AUDIO_TREM);
+    a.volume = naPlat ? 0.6 : 0.18;
+    a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false;
+    a.playbackRate = 0.9 + Math.random() * 0.2;
+    var pr = a.play();
+    if (pr && pr.catch) pr.catch(function () { sfx('trem'); });
+    if (cena && cena.events) cena.events.once('shutdown', function () { try { a.pause(); } catch (e) { } });
+  } catch (e) { sfx('trem'); }
+}
+
 function anuncia(texto) {
   if (!SOM_LIGADO || document.hidden) return;
   if (typeof GameState !== 'undefined' && GameState.treino) return;
