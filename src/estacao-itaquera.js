@@ -232,8 +232,9 @@ EstacaoScene.prototype.montaItaquera = function () {
   placaItq(this, 280, platY(300), placaDe('ITAQUERA'));
   placaItq(this, 280, platY(700), 'SAÍDA ▼');
   placaItq(this, ITQ_MEIO_X, ITQ.passY0 + 40, '▲ CATRACAS');
-  placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 + 14, '◄ A  SHOPPING');
-  placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 + 14, 'C/D  RADIAL E ARENA ►');
+  // presas na parede de cima do braço, e não soltas no meio do corredor
+  placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 - 6, '◄ A  SHOPPING');
+  placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 - 6, 'C/D  RADIAL E ARENA ►');
   placaItq(this, ITQ_MEIO_X, ITQ.passY1 - 90, '▼ B  CPTM E TERMINAL');
 
   // as portas de plataforma: redesenhadas a cada quadro, porque abrem junto com o trem
@@ -258,21 +259,18 @@ function placaItq(cena, x, y, texto) {
   return t;
 }
 
-/* Onde você aparece e como a câmera anda. A câmera segue o y de sempre
-   e o x fica por conta da Itaquera: parado em 0 no mezanino (que tem os
-   320px da tela), e seguindo você na plataforma larga e nos braços. */
+/* Onde você aparece, e a câmera presa em você nos dois eixos. */
 EstacaoScene.prototype.posicionaItaquera = function (noAlto) {
   if (!noAlto) {
     var s = SAIDAS_ITQ[saidaDeCasa()];
     this.pl.sp.x = s.x; this.pl.sp.y = s.y; this.pl.dir = s.dir; this.pl.anima(0, false);
   }
+  // a câmera presa no personagem, nos dois eixos (o mundo aqui é mais largo que a tela)
   var cam = this.cameras.main;
   cam.setBounds(ITQ.mundoX0, PLAT_Y - 8, ITQ.mundoX1 - ITQ.mundoX0, ITQ.passY1 + 90 - (PLAT_Y - 8));
-  cam.startFollow(this.pl.sp, true, 0, 0.16);
+  cam.startFollow(this.pl.sp, true, 1, 1);
   cam.setFollowOffset(0, -Math.round(HUD_H / 2));
-  cam.scrollX = this.alvoCameraX();
-  cam.centerOn(this.pl.sp.x, this.pl.sp.y);
-  cam.scrollX = this.alvoCameraX();
+  cam.centerOn(this.pl.sp.x, this.pl.sp.y - Math.round(HUD_H / 2));
 
   /* O dia começa mais cedo, na medida da caminhada extra: da porta de
      casa até as catracas, contra os 256px do saguão de antes, na
@@ -295,17 +293,8 @@ EstacaoScene.prototype.posicionaItaquera = function (noAlto) {
   }
 };
 
-EstacaoScene.prototype.alvoCameraX = function () {
-  var px = this.pl.sp.x, py = this.pl.sp.y;
-  if (py < ESC_Y) return Phaser.Math.Clamp(px - 200, ITQ.outraX0, ITQ.platX2 - GW);
-  if (py > ITQ.cruzY0 - 60 && py < ITQ.cruzY1 + 60) return Phaser.Math.Clamp(px - GW / 2, ITQ.mundoX0, ITQ.mundoX1 - GW);
-  return 0;
-};
-
 /* ---------- a cada quadro ---------- */
 EstacaoScene.prototype.atualizaItaquera = function (dt) {
-  var cam = this.cameras.main;
-  cam.scrollX += (this.alvoCameraX() - cam.scrollX) * Math.min(1, dt / 180);
   this.pintaPSD();
   this.andaPassantes(dt);
 

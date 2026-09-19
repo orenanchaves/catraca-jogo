@@ -284,6 +284,11 @@ var EstacaoScene = new Phaser.Class({
     HUD_VISIVEL = true; CONTROLES_VISIVEIS = true;
     this.dialog = null;
     this.fim = false;
+    /* A Corinthians-Itaquera tem planta própria (src/estacao-itaquera.js):
+       plataforma mais larga, passarela, saídas pra rua e mais catracas. O
+       treino usa a estação de sempre, porque os minigames medem o saguão
+       antigo. Decidido antes de tudo: até as catracas dependem disso. */
+    this.itq = ehItaquera() && !this.treino;
 
     /* ---------- o saguão ---------- */
     this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
@@ -308,10 +313,6 @@ var EstacaoScene = new Phaser.Class({
     CENTRAL = (GameState.estacaoAtual() === BALDEACAO);
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
-    /* A Corinthians-Itaquera tem planta própria (src/estacao-itaquera.js):
-       plataforma mais larga, passarela e saídas pra rua. O treino usa a
-       estação de sempre, porque os minigames dele medem o saguão antigo. */
-    this.itq = ehItaquera() && !this.treino;
     if (this.itq) PLAT_X1 = ITQ.platX1;
     MAPA_PLAT.x = this.itq ? ITQ.paredeX + 2 : 298;
 
@@ -451,8 +452,10 @@ var EstacaoScene = new Phaser.Class({
        embrulha o estômago. */
     var cam = this.cameras.main;
     cam.setBounds(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 8);
-    cam.setDeadzone(GW, 200);
-    cam.startFollow(this.pl.sp, true, 0.16, 0.16);
+    /* Presa no personagem, sem zona morta e sem atraso: "a câmera tem
+       que acompanhar o personagem, não importa onde ele anda". A zona
+       morta de 200px deixava você andar meia tela sem a câmera mexer. */
+    cam.startFollow(this.pl.sp, true, 1, 1);
     cam.setFollowOffset(0, -Math.round(HUD_H / 2));
     cam.centerOn(GW / 2, this.pl.sp.y);
 
@@ -545,26 +548,54 @@ var EstacaoScene = new Phaser.Class({
     return null;
   },
 
+  /* ---------- barraca que parece barraca ----------
+     Era um retângulo escuro com uma tirinha listrada na borda: de cima,
+     lia como caixa de força. Vista de cima, uma barraca é o TOLDO — ele
+     cobre tudo, listrado da cor dela — e, na frente, o balcão com a
+     mercadoria à mostra, que é o que chama quem passa. O vendedor fica
+     atrás do balcão e a plaquinha com o nome vem por cima (montaVendedores). */
   pintaBarracas: function (g) {
     for (var i = 0; i < this.barracas.length; i++) {
       var b = this.barracas[i];
-      g.fillStyle(0x000000, 0.35).fillRect(b.x + 3, b.y + b.h, b.w, 4);
-      // o corpo
-      g.fillStyle(0x2b2b3a, 1).fillRect(b.x, b.y, b.w, b.h);
-      g.fillStyle(0x3d3d50, 1).fillRect(b.x, b.y, b.w, 3);
-      // o toldo listrado, virado pro corredor
-      var tx = b.lado > 0 ? b.x + b.w - 10 : b.x;
-      for (var f = 0; f < b.h; f += 8) {
-        g.fillStyle(((f / 8) % 2) ? b.cor : 0xf2f0ff, 1).fillRect(tx, b.y + f, 10, Math.min(8, b.h - f));
+      var frente = b.lado > 0 ? b.x + b.w : b.x;           // o lado do balcão
+      g.fillStyle(0x000000, 0.35).fillRect(b.x + 4, b.y + 4, b.w, b.h);
+      // o toldo: listras na direção do corredor, com a borda de babado
+      for (var f = 0; f < b.w; f += 8) {
+        g.fillStyle(((f / 8) % 2) ? b.cor : 0xf2f0ff, 1).fillRect(b.x + f, b.y, Math.min(8, b.w - f), b.h);
       }
-      // o balcão, e a luz por cima dele
-      var cx = b.lado > 0 ? b.x + b.w : b.x - 4;
-      g.fillStyle(0x8a6b3a, 1).fillRect(cx - (b.lado > 0 ? 0 : 0), b.y + 8, 4, b.h - 16);
-      g.fillStyle(0xf2c14e, 0.14).fillRect(b.lado > 0 ? cx : cx - 24, b.y + 4, 28, b.h - 8);
-      // as caixas na bancada
-      g.fillStyle(0xe8a33c, 1).fillRect(b.x + 8, b.y + 12, 10, 8);
-      g.fillStyle(0x6ac06a, 1).fillRect(b.x + 8, b.y + 26, 10, 8);
-      g.fillStyle(0xd05a8a, 1).fillRect(b.x + 8, b.y + 40, 10, 8);
+      g.fillStyle(0x000000, 0.18).fillRect(b.x, b.y + b.h - 4, b.w, 4);
+      for (var bb = 0; bb < b.h; bb += 6) {
+        g.fillStyle(((bb / 6) % 2) ? b.cor : 0xf2f0ff, 1).fillCircle(frente + (b.lado > 0 ? 2 : -2), b.y + bb + 3, 3);
+      }
+      // o balcão de madeira, pra fora do toldo, com a mercadoria em cima
+      var bx = b.lado > 0 ? frente + 4 : frente - 14;
+      g.fillStyle(0x5a3f22, 1).fillRect(bx, b.y + 4, 10, b.h - 8);
+      g.fillStyle(0x8a6b3a, 1).fillRect(bx + 1, b.y + 4, 8, b.h - 10);
+      var cores = b.chave === 'dog' ? [0xc8752a, 0xf2c14e, 0xe8362c, 0x7fd6a0] : [0xf2f0ff, 0xe8a33c, 0x6ac06a, 0xd05a8a];
+      for (var m = 0; m < 5; m++) {
+        g.fillStyle(cores[m % cores.length], 1).fillRect(bx + 2, b.y + 8 + m * 9, 6, 6);
+        g.fillStyle(0xffffff, 0.35).fillRect(bx + 2, b.y + 8 + m * 9, 6, 1);
+      }
+      // a luz amarela que a barraca joga no chão da frente
+      g.fillStyle(0xf2c14e, 0.12).fillRect(b.lado > 0 ? bx + 10 : bx - 24, b.y + 2, 24, b.h - 4);
+    }
+  },
+
+  /* O vendedor atrás do balcão, e a plaquinha com o nome da barraca,
+     pendurada no toldo: é o que faz a barraca ler como barraca de longe. */
+  montaVendedores: function () {
+    for (var i = 0; i < this.barracas.length; i++) {
+      var b = this.barracas[i];
+      var vx = b.lado > 0 ? b.x + b.w - 8 : b.x + 10;
+      var v = new Ator(this, vx, b.y + b.h / 2 + 16,
+        b.chave === 'dog' ? 'np_ambulante_c' : 'np_ambulante_b');
+      v.dir = b.lado > 0 ? 'right' : 'left'; v.anima(0, false);
+      v.sp.setDepth(39);
+      var t = txtC(this, b.x + b.w / 2, b.y - 12, b.nome, PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(41);
+      var w = Math.round(t.width) + 10;
+      var gp = this.add.graphics().setDepth(40);
+      gp.fillStyle(0x14141c, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 15, w, 12);
+      gp.fillStyle(b.cor, 1).fillRect(b.x + b.w / 2 - w / 2, b.y - 5, w, 2);
     }
   },
 
@@ -690,6 +721,7 @@ var EstacaoScene = new Phaser.Class({
 
     this.gCatracas = this.add.graphics().setDepth(2);
     this.pintaCatracas();
+    this.montaVendedores();
 
     veuDaHora(this, 65);
   },
@@ -758,13 +790,15 @@ var EstacaoScene = new Phaser.Class({
        que sobra do bloqueio (o gradil das pontas) é desenhado junto com
        as catracas, que sabem onde elas começam e acabam. */
 
-    g.fillStyle(num(PAL.paredeSom), 1).fillRect(8, 176, 88, 64);
-    g.fillStyle(num(PAL.parede), 1).fillRect(8, 176, 88, 48);
-    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(8, 176, 88, 4);
-    g.fillStyle(0x0a0a12, 1).fillRect(20, 196, 64, 26);
-    g.fillStyle(0x1c2436, 1).fillRect(22, 198, 60, 22);
-    g.fillStyle(num(PAL.amarelo), 1).fillRect(20, 226, 64, 5);
-    g.fillStyle(num(PAL.amareloSom), 1).fillRect(20, 231, 64, 2);
+    // na Itaquera a bilheteria encolhe pra caber a fileira de seis catracas
+    var bw = eu.itq ? 50 : 88;
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(8, 176, bw, 64);
+    g.fillStyle(num(PAL.parede), 1).fillRect(8, 176, bw, 48);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(8, 176, bw, 4);
+    g.fillStyle(0x0a0a12, 1).fillRect(14, 196, bw - 12, 26);
+    g.fillStyle(0x1c2436, 1).fillRect(16, 198, bw - 16, 22);
+    g.fillStyle(num(PAL.amarelo), 1).fillRect(14, 226, bw - 12, 5);
+    g.fillStyle(num(PAL.amareloSom), 1).fillRect(14, 231, bw - 12, 2);
 
     eu.pintaBarracas(g);
   },
@@ -976,6 +1010,11 @@ var EstacaoScene = new Phaser.Class({
     var f = GameState.faixa();
     // o bloqueio começa depois da bilheteria e vai até a parede da direita
     var X0 = 100, X1 = 292, TOTAL = 4, POSTE = 12, VAO = 30, VAO_LARGO = 38;
+    /* Na Itaquera é uma fileira comprida, como na estação de verdade:
+       seis catracas de 22 (a larga, 30), começando logo depois de uma
+       bilheteria mais estreita (x 58). 12 + 5x34 + 42 = 224px, nos 234
+       entre 58 e 292. */
+    if (this.itq) { X0 = 64; TOTAL = 6; VAO = 22; VAO_LARGO = 30; }
     var larga = Math.floor(Math.random() * TOTAL);
 
     var largura = POSTE;
@@ -991,7 +1030,9 @@ var EstacaoScene = new Phaser.Class({
 
     // fora de serviço: a porta larga é a última a fechar
     var abertas = Phaser.Math.Clamp(Math.round(TOTAL * f.catracas), 2, TOTAL);
-    var ordem = Phaser.Utils.Array.Shuffle([0, 1, 2, 3]).sort(function (a, b) {
+    var todas = [];
+    for (var q = 0; q < TOTAL; q++) todas.push(q);
+    var ordem = Phaser.Utils.Array.Shuffle(todas).sort(function (a, b) {
       return (a === larga ? 1 : 0) - (b === larga ? 1 : 0);
     });
     for (var j = 0; j < TOTAL - abertas; j++) this.gates[ordem[j]].fechada = true;
@@ -1016,7 +1057,7 @@ var EstacaoScene = new Phaser.Class({
     var i, t, w, k;
     // o gradil fecha só as pontas: da bilheteria (x 96) ao primeiro gabinete, e do último à parede
     if (this.gates.length) {
-      this.gradil(g, 96, this.gates[0].x0 - 14);
+      this.gradil(g, this.itq ? 58 : 96, this.gates[0].x0 - 14);
       this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, GW);
     }
     for (i = 0; i < this.gates.length; i++) {
@@ -2574,7 +2615,7 @@ var EstacaoScene = new Phaser.Class({
     if (y < 116) { this.dica.setText('▲ PLATAFORMA', PAL.cinza); return; }
 
     var noGuiche = (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
-    var naBilheteria = (x < 96 && y > 244 && y < 288 && !this.liberado);
+    var naBilheteria = (x < (this.itq ? 60 : 96) && y > 244 && y < 288 && !this.liberado);
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
     var naCatraca = (perto && !this.liberado && !gate.fechada);
