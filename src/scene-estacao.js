@@ -62,6 +62,7 @@ var ESC_BOCA = 116;     // onde o degrau some no piso do saguão
 function pistaDaEscada(x) {
   for (var i = 0; i < ESC_PISTA.length; i++) {
     if (x >= ESC_PISTA[i].x0 && x <= ESC_PISTA[i].x1) return ESC_PISTA[i];
+    if (DUPLA && x >= ESC_PISTA[i].x0 + ESC2_DX && x <= ESC_PISTA[i].x1 + ESC2_DX) return pistaEsc(i, 1);
   }
   return null;
 }
@@ -101,6 +102,34 @@ var DIR_PLACAS = [700, 60];
    na plataforma, freando, e a porta abre quando ela termina. */
 var TREM_SOM = 20900, TREM_ENTRA = 5000;
 var CENTRAL = false;                        // esta estação é de plataforma central?
+/* ---------- duas plataformas laterais (DUPLA) ----------
+   'Não tem dois lados pra ir': a estação lateral tinha uma via só. Agora
+   as de meio de linha são como as de verdade: duas plataformas, uma de
+   cada lado das duas vias, e cada uma com a sua escada rolante descendo
+   do mezanino. A da direita é a de sempre (piso 136..288, trem do lado -1,
+   sentido +1). A da esquerda é ela ESPELHADA: a mesma pintura virada,
+   posta em x -296, e o piso dela cai em -264..-112, com o trem dela (lado
+   +1, sentido -1) encostado à direita, de -84 a 4, a 16px do trem de cá.
+   A escada dela é a mesma escada deslocada ESC2_DX, no meio do piso. Nas
+   pontas da linha (Jabaquara, Tucuruvi, Barra Funda, Itaquera) só existe
+   um sentido e continua uma plataforma só; a Sé é central. */
+var DUPLA = false;
+var OUT_X0 = -264, OUT_X1 = -112;           // o piso da plataforma espelhada
+var DUPLA_IMG_X = -296;                     // onde a pintura espelhada começa
+var ESC2_DX = -348;                         // a segunda escada: a de sempre, 348px à esquerda
+var DIVISA_PISOS = 10;                      // entre os dois pisos (fica no meio das vias)
+// de que trem é o piso onde está x: -1 o da direita (e a central à esquerda), +1 o outro
+function ladoDoPiso(x) {
+  if (CENTRAL) return x < (PLAT_X0 + PLAT_X1) / 2 ? -1 : 1;
+  return (DUPLA && x < DIVISA_PISOS) ? 1 : -1;
+}
+// a beirada do piso encostada no trem daquele lado
+function beiradaPiso(lado) { return lado < 0 ? PLAT_X0 : (DUPLA ? OUT_X1 : PLAT_X1); }
+// as faixas de cada escada: e 0 é a de sempre, e 1 a da plataforma espelhada
+function pistaEsc(i, e) {
+  var p = ESC_PISTA[i];
+  return e ? { x0: p.x0 + ESC2_DX, x1: p.x1 + ESC2_DX, sobe: p.sobe, e: 1 } : p;
+}
 
 /* a via, a faixa tátil e a borda de um lado. lado -1 = via à esquerda do
    piso, lado +1 = via à direita. Uma função só porque a central desenha
@@ -205,6 +234,8 @@ function Trem(cena, lado, dir) {
    piso onde se anda e cobria a faixa tátil inteira, que é justamente a
    linha que diz onde não pisar. */
 function beiradaDaVia(lado) {
+  // na dupla o trem do lado +1 encosta à direita do piso espelhado (28px de beirada, como o de cá)
+  if (DUPLA && lado > 0) return OUT_X1 + 28;
   var larg = CENTRAL ? 76 : 100;
   return (lado < 0) ? larg + 8 : GW - larg - 8;
 }
@@ -257,7 +288,9 @@ function quadroDeMapa(g, x, y, w, h) {
 
 /* a plataforma inteira, sem cair no trilho nem entrar na parede */
 function limitaPlataforma(sp) {
-  sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
+  // na dupla, cada um fica no piso em que está: o esbarrão não atravessa ninguém pro outro lado da via
+  if (DUPLA && sp.x < DIVISA_PISOS) sp.x = Phaser.Math.Clamp(sp.x, OUT_X0, OUT_X1);
+  else sp.x = Phaser.Math.Clamp(sp.x, PLAT_X0, PLAT_X1);
   sp.y = Phaser.Math.Clamp(sp.y, platY(80), ESC_Y - 16);
 }
 
@@ -279,8 +312,6 @@ var EstacaoScene = new Phaser.Class({
     this.treino = (dados && dados.treino) || null;
     // desceu na Itaquera na volta: o dia só acaba na saída de casa (estacao-itaquera.js)
     this.praCasa = !!(dados && dados.praCasa);
-    // veio pela passagem do outro sentido (src/scene-estacao.js, passagem)
-    this.daPassagem = !!(dados && dados.daPassagem);
   },
 
   create: function () {
@@ -330,6 +361,10 @@ var EstacaoScene = new Phaser.Class({
        Isso muda o piso caminhável, e por isso é decidido ANTES de
        qualquer coisa ser desenhada ou posicionada. */
     CENTRAL = (GameState.estacaoAtual() === BALDEACAO);
+    var nEst = GameState.linhaAtual().estacoes.length;
+    DUPLA = !CENTRAL && !this.itq && !this.treino && GameState.idx > 0 && GameState.idx < nEst - 1;
+    // o mezanino cresce pra esquerda, pra caber a segunda escada ('mexer no mezanino pro lado')
+    MEZ.x0 = DUPLA ? -300 : -120;
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
     if (this.itq) PLAT_X1 = ITQ.platX1;
@@ -342,7 +377,7 @@ var EstacaoScene = new Phaser.Class({
        plataforma do outro sentido é outra obra, a do corredor. */
     this.trens = CENTRAL
       ? [new Trem(this, -1, -1), new Trem(this, 1, 1)]
-      : [new Trem(this, -1, GameState.dir)];
+      : (DUPLA ? [new Trem(this, -1, 1), new Trem(this, 1, -1)] : [new Trem(this, -1, GameState.dir)]);
     /* As portas são as mesmas nos dois trens (portasDoTrem é pura), e a
        fila da plataforma precisa delas sem perguntar de qual trem. */
     this.portas = portasDoTrem();
@@ -350,7 +385,7 @@ var EstacaoScene = new Phaser.Class({
        tempo fazem a escolha ser "qual está mais perto", que não é
        escolha. Meia espera de defasagem faz um chegar enquanto o outro
        ainda não veio, e aí esperar o de lá custa perder o de cá. */
-    if (CENTRAL) this.trens[1].t = -this.intervalo(this.trens[1]) * 0.5;
+    if (CENTRAL || DUPLA) this.trens[1].t = -this.intervalo(this.trens[1]) * 0.5;
     /* ---------- quem acabou de descer vê o trem ----------
        Descer trocava de cena na hora, e a plataforma nascia vazia: o
        trem de onde você saiu no segundo anterior simplesmente não
@@ -363,7 +398,7 @@ var EstacaoScene = new Phaser.Class({
        Numa central é o trem do SEU sentido que fica parado, e não o da
        esquerda: você desceu dele, e ele é o da via cujo rumo bate com o
        que você vinha seguindo. */
-    if (this.entrada === 'plataforma' && !this.daPassagem) {
+    if (this.entrada === 'plataforma') {
       for (var q = 0; q < this.trens.length; q++) {
         if (this.trens[q].dir !== GameState.dir) continue;
         this.trens[q].estado = 'aberto';
@@ -424,13 +459,15 @@ var EstacaoScene = new Phaser.Class({
       /* Dentro da faixa caminhável, e não a partir dela: na plataforma
          central o piso tem 112px e o "+140" jogava metade da fila em
          cima do trilho do outro lado. */
-      var e = new Ator(this, PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+      var noOutro = DUPLA && Math.random() < 0.5;
+      var ex0 = noOutro ? OUT_X0 : PLAT_X0, ex1 = noOutro ? OUT_X1 : PLAT_X1;
+      var e = new Ator(this, ex0 + 8 + Math.random() * (ex1 - ex0 - 16),
         Phaser.Math.Clamp(ey, platY(90), ESC_Y - 30), sorteiaPax());
       /* Numa central metade da plataforma espera o OUTRO lado: quem
          está na metade da direita fica de costas pra via de cá,
          olhando a de lá. Todo mundo virado pro mesmo lado era a
          plataforma inteira dizendo que só existe um trem. */
-      e.dir = (CENTRAL && e.sp.x > (PLAT_X0 + PLAT_X1) / 2) ? 'right' : 'left';
+      e.dir = ((CENTRAL && e.sp.x > (PLAT_X0 + PLAT_X1) / 2) || noOutro) ? 'right' : 'left';
       e.sp.setDepth(30); e.anima(0, false);
       this.esperando.push(e);
     }
@@ -468,11 +505,10 @@ var EstacaoScene = new Phaser.Class({
     /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
        baldeação ou desceu na estação errada já está lá em cima. */
     var noAlto = (this.entrada === 'plataforma');
-    this.pl = new Ator(this, noAlto ? 200 : 160,
+    this.pl = new Ator(this, noAlto ? ((DUPLA && GameState.dir < 0) ? OUT_X1 - 48 : 200) : 160,
       noAlto ? platY(PLAT_ALT - 140) : 500, spriteJogador());
     this.pl.sp.setDepth(60);
     this.pl.dir = noAlto ? 'left' : 'up';
-    if (this.daPassagem) { this.pl.sp.x = PLAT_X1 - 16; this.pl.sp.y = platY(665); this.naPassagem = true; }
 
     /* ---------- a câmera ----------
        A estação tem 1144 pixels de altura e a tela tem 576. Mesma regra
@@ -660,10 +696,11 @@ var EstacaoScene = new Phaser.Class({
 
     this.add.image(this.mez ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
+    // a plataforma do outro sentido: a mesma pintura, espelhada, do outro lado das vias
+    if (DUPLA) this.add.image(DUPLA_IMG_X, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setFlipX(true).setDepth(0);
     if (this.itq) this.montaItaquera();
     else if (this.mez) this.montaMezanino();
     // o elevador, em toda plataforma lateral (na central não cabe do lado da escada)
-    this.montaPassagem();
     if (!CENTRAL) this.montaElevadores();
     else if (!this.mez) {
       /* as lixeiras das estações de sempre: duas no saguão, rente à parede
@@ -676,6 +713,7 @@ var EstacaoScene = new Phaser.Class({
       this.montaTomadas([{ x: 26, y: 330, lado: 1 }, { x: PLAT_X1 + 12, y: platY(500), lado: -1 }]);
     }
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
+    if (DUPLA) this.add.image(ESC2_DX, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
     this.montaDegraus();
 
     /* Os letreiros são texto, e texto não entra em textura: eles ficam
@@ -703,7 +741,12 @@ var EstacaoScene = new Phaser.Class({
       var cp = this.itq ? null : corDaPlaca();
       placaItq(this, MEZ.x1 - 13, 380, placaDe(GameState.estacaoAtual()), true, true, cp);
       // pendurada, por cima de quem passa ('tem que ficar acima do pessoal')
-      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, false, cp);
+      /* na dupla cada escada leva a um sentido, e a placa diz qual: é aqui
+         que se escolhe o lado (e dá pra pegar o errado) */
+      if (DUPLA) {
+        placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ ' + placaDe(GameState.terminal(1)), false, false, cp);
+        placaItq(this, (ESC_X0 + ESC_X1) / 2 + ESC2_DX, 126, '▲ ' + placaDe(GameState.terminal(-1)), false, false, cp);
+      } else placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, false, cp);
     } else {
       var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
       tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
@@ -917,15 +960,18 @@ var EstacaoScene = new Phaser.Class({
       t.destroy();
     }
     this.degraus = [];
-    var alt = ESC_BOCA - 8 - ESC_Y, i;
-    for (i = 0; i < ESC_PISTA.length; i++) {
-      var p = ESC_PISTA[i];
-      this.degraus.push(this.add.tileSprite(p.x0, ESC_Y, p.x1 - p.x0, alt, 'esc_degrau')
-        .setOrigin(0, 0).setDepth(1));
+    var alt = ESC_BOCA - 8 - ESC_Y, i, escadas = DUPLA ? 2 : 1, ee;
+    for (ee = 0; ee < escadas; ee++) {
+      for (i = 0; i < ESC_PISTA.length; i++) {
+        var p = pistaEsc(i, ee);
+        var ts = this.add.tileSprite(p.x0, ESC_Y, p.x1 - p.x0, alt, 'esc_degrau').setOrigin(0, 0).setDepth(1);
+        ts.sobe = p.sobe;
+        this.degraus.push(ts);
+      }
     }
     var g = this.add.graphics().setDepth(1.5);
-    for (i = 0; i < ESC_PISTA.length; i++) {
-      var q = ESC_PISTA[i], meio = (q.x0 + q.x1) / 2;
+    for (i = 0; i < ESC_PISTA.length * escadas; i++) {
+      var q = pistaEsc(i % ESC_PISTA.length, i >= ESC_PISTA.length ? 1 : 0), meio = (q.x0 + q.x1) / 2;
       var cx = (q.x0 + q.x1) / 2;
       g.fillStyle(q.sobe ? 0x00e676 : 0xe8a33c, 0.32);
       for (var sy = ESC_Y + 22; sy < ESC_BOCA - 30; sy += 44) {
@@ -934,10 +980,13 @@ var EstacaoScene = new Phaser.Class({
       }
     }
     this.gPente = g;
-    g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_X0 - 10, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 8);
-    g.fillStyle(num(PAL.amareloSom), 1).fillRect(ESC_X0 - 10, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 3);
-    g.fillStyle(num(PAL.metal), 1);
-    for (var px = ESC_X0 - 8; px < ESC_X1 + 8; px += 4) g.fillRect(px, ESC_BOCA - 5, 2, 5);
+    for (ee = 0; ee < escadas; ee++) {
+      var ox = ee ? ESC2_DX : 0;
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(ESC_X0 - 10 + ox, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 8);
+      g.fillStyle(num(PAL.amareloSom), 1).fillRect(ESC_X0 - 10 + ox, ESC_BOCA - 8, ESC_X1 - ESC_X0 + 20, 3);
+      g.fillStyle(num(PAL.metal), 1);
+      for (var px = ESC_X0 - 8; px < ESC_X1 + 8; px += 4) g.fillRect(px + ox, ESC_BOCA - 5, 2, 5);
+    }
     this.tEsquerda = 0;
   },
 
@@ -947,7 +996,7 @@ var EstacaoScene = new Phaser.Class({
   rodaEscada: function (dt, andou) {
     var i, passo = ESC_VEL * dt / 1000;
     for (i = 0; i < this.degraus.length; i++) {
-      this.degraus[i].tilePositionY += ESC_PISTA[i].sobe ? passo : -passo;
+      this.degraus[i].tilePositionY += this.degraus[i].sobe ? passo : -passo;
     }
     var sp = this.pl.sp;
     if (this.pulo || sp.y < ESC_Y - 4 || sp.y > ESC_BOCA) { this.tEsquerda = 0; return; }
@@ -961,7 +1010,7 @@ var EstacaoScene = new Phaser.Class({
        contra a parede (medido: parado em y -96, x 124, segurando pra
        cima). No último degrau a escada põe você no piso, de lado, como a
        saída de uma escada de verdade. */
-    if (p.sobe && sp.y < ESC_Y + 24 && sp.x < PLAT_X0 + 10) {
+    if (p.sobe && !p.e && sp.y < ESC_Y + 24 && sp.x < PLAT_X0 + 10) {
       sp.x = Math.min(PLAT_X0 + 10, sp.x + 70 * dt / 1000);
     }
     var naEsquerda = sp.x < (p.x0 + p.x1) / 2;
@@ -1314,9 +1363,9 @@ var EstacaoScene = new Phaser.Class({
           a = this.esperando[i];
           if (!a.sp || !a.sp.active || a.indo) continue;
           // quem está na outra metade não é passageiro deste trem
-          if (CENTRAL && ((t.lado < 0) !== (a.sp.x < meio))) continue;
+          if ((CENTRAL || DUPLA) && ladoDoPiso(a.sp.x) !== t.lado) continue;
           if (Math.random() > 0.55) continue;
-          a.indo = { x: (t.lado < 0) ? PLAT_X0 - 4 : PLAT_X1 + 4,
+          a.indo = { x: (t.lado < 0) ? PLAT_X0 - 4 : beiradaPiso(1) + 4,
             y: this.portaMaisPerto(a.sp.y) };
         }
       }
@@ -1325,7 +1374,7 @@ var EstacaoScene = new Phaser.Class({
 
     // quem saiu da cena (embarcou, sumiu) sai também da fila da escada
     if (this.filaDesce) {
-      for (var fq = 0; fq < 2; fq++) {
+      for (var fq = 0; fq < this.filaDesce.length; fq++) {
         this.filaDesce[fq] = this.filaDesce[fq].filter(function (q) { return q.sp && q.sp.active && q.indo && q.indo.sai; });
       }
     }
@@ -1340,9 +1389,9 @@ var EstacaoScene = new Phaser.Class({
          bolo parado no pé da plataforma. Agora são duas filas indianas,
          uma por faixa, subindo a plataforma 20px por pessoa. */
       if (a.indo.sai && this.filaDesce) {
-        var fk = this.filaDesce[a.indo.faixa].indexOf(a);
+        var fk = this.filaDesce[a.indo.faixa + 2 * (a.indo.e || 0)].indexOf(a);
         if (fk >= 0) {
-          a.indo.x = faixaDaEscada(ESC_PISTA[1], a.indo.faixa === 0);
+          a.indo.x = faixaDaEscada(pistaEsc(1, a.indo.e), a.indo.faixa === 0);
           a.indo.y = ESC_Y - 8 - fk * 20;
         }
       }
@@ -1358,22 +1407,22 @@ var EstacaoScene = new Phaser.Class({
          sobe, e morreria no berço com a regra pelo y sozinha. */
       if (a.indo.sai && a.sp.y >= ESC_Y - 26) {
         // um por vez EM CADA FAIXA: o da frente tem que ter descido um degrau
-        var fxa = a.indo.faixa || 0;
-        if (!this.ultimoDescendo) this.ultimoDescendo = [null, null];
-        var ult = this.ultimoDescendo[fxa];
-        var naFrente = this.filaDesce && this.filaDesce[fxa][0] === a;
+        var fxa = a.indo.faixa || 0, eD = a.indo.e || 0, qD = fxa + 2 * eD;
+        if (!this.ultimoDescendo) this.ultimoDescendo = [null, null, null, null];
+        var ult = this.ultimoDescendo[qD];
+        var naFrente = this.filaDesce && this.filaDesce[qD][0] === a;
         if (!naFrente || (ult && ult.sp && ult.sp.active && ult.indo && ult.indo.fase === 'desce' && ult.sp.y < ESC_Y + 12)) {
           a.anima(dt, false);
           continue;
         }
-        this.filaDesce[fxa].shift();
-        this.ultimoDescendo[fxa] = a;
+        this.filaDesce[qD].shift();
+        this.ultimoDescendo[qD] = a;
         // não some: pega a escada que desce, e o saguão cuida dele dali
         this.esperando.splice(i, 1);
         a.sp.naEscada = true;
         a.sp.setDepth(40);
-        a.sp.x = faixaDaEscada(ESC_PISTA[1], fxa === 0);
-        a.indo = { fase: 'desce', faixa: fxa };
+        a.sp.x = faixaDaEscada(pistaEsc(1, eD), fxa === 0);
+        a.indo = { fase: 'desce', faixa: fxa, e: eD };
         this.plateia.push(a);
         this.gente = this.juntaGente();
         continue;
@@ -1424,9 +1473,9 @@ var EstacaoScene = new Phaser.Class({
       if (gt.espera > 0) gt.espera -= dt;
       for (i = gt.fila.length - 1; i >= 0; i--) if (!gt.fila[i].sp || !gt.fila[i].sp.active) gt.fila.splice(i, 1);
     }
-    if (!this.filaEsc) this.filaEsc = [[], []];
-    if (!this.ultimoNaEscada) this.ultimoNaEscada = [null, null];
-    for (var f = 0; f < 2; f++) {
+    if (!this.filaEsc) this.filaEsc = [[], [], [], []];
+    if (!this.ultimoNaEscada) this.ultimoNaEscada = [null, null, null, null];
+    for (var f = 0; f < this.filaEsc.length; f++) {
       for (i = this.filaEsc[f].length - 1; i >= 0; i--) if (!this.filaEsc[f][i].sp || !this.filaEsc[f][i].sp.active) this.filaEsc[f].splice(i, 1);
     }
     var sobe = ESC_PISTA[0];
@@ -1468,15 +1517,18 @@ var EstacaoScene = new Phaser.Class({
              pessoas num mesmo lugar': com as doze catracas chega mais gente
              do que uma faixa só escoa); empatou, três em cada dez andam
              pela esquerda */
-          var f0 = this.filaEsc[0].length, f1 = this.filaEsc[1].length;
+          // na dupla, metade vai pra escada da plataforma do outro sentido
+          var eS = (DUPLA && Math.random() < 0.5) ? 1 : 0;
+          var f0 = this.filaEsc[2 * eS].length, f1 = this.filaEsc[1 + 2 * eS].length;
           var faixa = f0 < f1 ? 0 : (f1 < f0 ? 1 : (Math.random() < 0.3 ? 0 : 1));
-          this.filaEsc[faixa].push(a);
-          a.indo = ind = { fase: 'escada', faixa: faixa };
+          this.filaEsc[faixa + 2 * eS].push(a);
+          a.indo = ind = { fase: 'escada', faixa: faixa, e: eS };
         }
       }
       if (ind.fase === 'escada') {
-        var kk = this.filaEsc[ind.faixa].indexOf(a);
-        alvoX = faixaDaEscada(sobe, ind.faixa === 0);
+        var qS = ind.faixa + 2 * (ind.e || 0), sobeE = pistaEsc(0, ind.e);
+        var kk = this.filaEsc[qS].indexOf(a);
+        alvoX = faixaDaEscada(sobeE, ind.faixa === 0);
         alvoY = ESC_BOCA + 12 + kk * 22;
         /* Do quarto em diante a fila vira bolo, três de largura, em vez de
            uma linha reta que descia até em cima das catracas; e nunca passa
@@ -1485,12 +1537,12 @@ var EstacaoScene = new Phaser.Class({
           alvoX += ((kk - 3) % 3 - 1) * 20 + (ind.faixa === 0 ? -6 : 6);
           alvoY = Math.min(CATRACA_Y - 26, ESC_BOCA + 12 + (3 + Math.floor((kk - 3) / 3)) * 20);
         }
-        var livre = this.ultimoNaEscada[ind.faixa];
+        var livre = this.ultimoNaEscada[qS];
         var folga = !livre || !livre.sp || !livre.sp.active || livre.sp.y < ESC_BOCA - 12;
         if (kk === 0 && Math.hypot(alvoX - a.sp.x, alvoY - a.sp.y) < 8 && folga) {
-          this.filaEsc[ind.faixa].shift();
-          this.ultimoNaEscada[ind.faixa] = a;
-          a.indo = ind = { fase: 'sobe', faixa: ind.faixa };
+          this.filaEsc[qS].shift();
+          this.ultimoNaEscada[qS] = a;
+          a.indo = ind = { fase: 'sobe', faixa: ind.faixa, e: ind.e };
           a.sp.naEscada = true;
           a.sp.x = alvoX;
         }
@@ -1499,7 +1551,7 @@ var EstacaoScene = new Phaser.Class({
         // o degrau leva; quem está na esquerda ainda anda por cima dele
         var anda = ind.faixa === 0;
         a.sp.y -= (ESC_VEL + (anda ? 40 : 0)) * dt / 1000;
-        a.sp.x = faixaDaEscada(sobe, anda);      // o empurra-empurra não tira ninguém da faixa
+        a.sp.x = faixaDaEscada(pistaEsc(0, ind.e), anda);      // o empurra-empurra não tira ninguém da faixa
         a.dir = 'up';
         a.anima(dt, anda);
         /* No topo ele não some: sai do degrau e vira passageiro da
@@ -1509,8 +1561,9 @@ var EstacaoScene = new Phaser.Class({
           this.plateia.splice(i, 1);
           a.sp.naEscada = false; a.sp.dentro = false;
           a.sp.setDepth(30);
+          var sx0 = ind.e ? OUT_X0 : PLAT_X0, sx1 = ind.e ? OUT_X1 : PLAT_X1;
           a.indo = {
-            x: Phaser.Math.Clamp(PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16), PLAT_X0 + 12, PLAT_X1 - 12),
+            x: Phaser.Math.Clamp(sx0 + 8 + Math.random() * (sx1 - sx0 - 16), sx0 + 12, sx1 - 12),
             y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
           };
           this.esperando.push(a);
@@ -1522,7 +1575,7 @@ var EstacaoScene = new Phaser.Class({
          direita, sai pela catraca (o braço gira pra fora) e vai embora
          pela rua. Some só lá embaixo, na entrada. */
       if (ind.fase === 'desce') {
-        var desce = ESC_PISTA[1], andaD = ind.faixa === 0;
+        var desce = pistaEsc(1, ind.e), andaD = ind.faixa === 0;
         a.sp.y += (ESC_VEL + (andaD ? 40 : 0)) * dt / 1000;
         a.sp.x = faixaDaEscada(desce, andaD);
         a.dir = 'down';
@@ -1706,7 +1759,7 @@ var EstacaoScene = new Phaser.Class({
        recarga limpa, com e sem desembarque dá 49 contra 46 na Sé, dentro
        do ruído. O fps desta máquina não serve pra isso — ver CLAUDE.md.) */
     var quantos = Math.round((2 + 14 * GameState.lotacao()) / (CENTRAL ? 2 : 1));
-    var bx = (t.lado < 0) ? PLAT_X0 + 6 : PLAT_X1 - 6;
+    var bx = (t.lado < 0) ? PLAT_X0 + 6 : beiradaPiso(1) - 6, eT = (DUPLA && t.lado > 0) ? 1 : 0;
     for (var i = 0; i < quantos; i++) {
       var py = t.portas[Math.floor(Math.random() * t.portas.length)] + t.y + 26;
       var a = new Ator(this, bx, py + (Math.random() - 0.5) * 24, sorteiaPax());
@@ -1723,9 +1776,9 @@ var EstacaoScene = new Phaser.Class({
          cabe dentro de um ciclo. */
       // três em dez descem andando pela esquerda; o resto, parado na direita
       var fx = Math.random() < 0.3 ? 0 : 1;
-      a.indo = { x: faixaDaEscada(ESC_PISTA[1], fx === 0), y: ESC_Y - 8, v: 74, sai: true, faixa: fx };
-      if (!this.filaDesce) this.filaDesce = [[], []];
-      this.filaDesce[fx].push(a);
+      a.indo = { x: faixaDaEscada(pistaEsc(1, eT), fx === 0), y: ESC_Y - 8, v: 74, sai: true, faixa: fx, e: eT };
+      if (!this.filaDesce) this.filaDesce = [[], [], [], []];
+      this.filaDesce[fx + 2 * eT].push(a);
       this.esperando.push(a);
     }
     this.gente = this.juntaGente();
@@ -1736,16 +1789,17 @@ var EstacaoScene = new Phaser.Class({
      numa estação chega pela escada, então é de lá que eles nascem. */
   chegaNaPlataforma: function (quantos) {
     for (var i = 0; i < quantos; i++) {
-      var a = new Ator(this, ESC_MEIO + (Math.random() - 0.5) * 60,
+      var ladoC = DUPLA && Math.random() < 0.5, cx0 = ladoC ? OUT_X0 : PLAT_X0, cx1 = ladoC ? OUT_X1 : PLAT_X1;
+      var a = new Ator(this, ESC_MEIO + (ladoC ? ESC2_DX : 0) + (Math.random() - 0.5) * 60,
         ESC_Y - 20 - Math.random() * 30, sorteiaPax());
       a.sp.setDepth(30);
       a.indo = {
-        x: PLAT_X0 + 8 + Math.random() * (PLAT_X1 - PLAT_X0 - 16),
+        x: cx0 + 8 + Math.random() * (cx1 - cx0 - 16),
         y: this.portaMaisPerto(platY(120 + Math.random() * (PLAT_ALT - 240)))
       };
       /* Eles param ANTES da porta: quem acabou de chegar espera o
          próximo trem, não entra no que está indo embora. */
-      a.indo.x = Phaser.Math.Clamp(a.indo.x, PLAT_X0 + 12, PLAT_X1 - 12);
+      a.indo.x = Phaser.Math.Clamp(a.indo.x, cx0 + 12, cx1 - 12);
       this.esperando.push(a);
     }
     this.gente = this.juntaGente();
@@ -1755,9 +1809,16 @@ var EstacaoScene = new Phaser.Class({
   podeIr: function (x, y) {
     if (this.itq) { var itq = this.podeIrItq(x, y); if (itq !== null) return itq; }
     // ---- plataforma ----
-    if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80) && !this.bateNoElevador(x, y);
+    if (y < ESC_Y) {
+      if (y < platY(80)) return false;
+      if (DUPLA && x >= OUT_X0 && x <= OUT_X1) return true;          // o piso do outro sentido
+      return x >= PLAT_X0 && x <= PLAT_X1 && !this.bateNoElevador(x, y);
+    }
     // ---- escada rolante: a passagem entre os dois andares (a cadeira de rodas vai de elevador) ----
-    if (y < 116) return x > ESC_X0 && x < ESC_X1 && !(temPoder('cadeira') && this.elevadores);
+    if (y < 116) {
+      if (DUPLA && x > ESC_X0 + ESC2_DX && x < ESC_X1 + ESC2_DX) return !temPoder('cadeira');
+      return x > ESC_X0 && x < ESC_X1 && !(temPoder('cadeira') && this.elevadores);
+    }
     if (this.bateNaLixeira(x, y)) return false;
     // ---- saguão ----
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
@@ -2441,7 +2502,10 @@ var EstacaoScene = new Phaser.Class({
 
   // o primeiro trem com a porta aberta, pra dica saber pra onde apontar
   tremAberto: function () {
+    // na dupla, só o trem do seu piso: o do outro lado aberto não é porta pra você
+    var soLado = (DUPLA && this.pl && this.pl.sp.y < ESC_Y) ? ladoDoPiso(this.pl.sp.x) : 0;
     for (var i = 0; i < this.trens.length; i++) {
+      if (soLado && this.trens[i].lado !== soLado) continue;
       if (this.trens[i].estado === 'aberto') return this.trens[i];
     }
     return null;
@@ -2454,7 +2518,8 @@ var EstacaoScene = new Phaser.Class({
        só sabia da via da esquerda: na central isso deixava os 48px da
        metade direita do piso sem embarcar em coisa nenhuma — 43% da
        plataforma onde a porta aberta na sua frente não era porta. */
-    var d = (t.lado < 0) ? x - PLAT_X0 : PLAT_X1 - x;
+    if (DUPLA && ladoDoPiso(x) !== t.lado) return null;
+    var d = (t.lado < 0) ? x - PLAT_X0 : beiradaPiso(1) - x;
     if (d > 64) return null;
     for (var i = 0; i < t.portas.length; i++) {
       var py = t.portas[i] + t.y + 26;
@@ -2490,8 +2555,11 @@ var EstacaoScene = new Phaser.Class({
        sempre o escolhido. */
     var ordem = { aberto: 0, fechando: 0, chegando: 1, espera: 2, partindo: 3 };
     var m = null, rm = 9;
+    // na dupla, na plataforma, o painel é o do trem do seu piso
+    var soLado = (DUPLA && this.pl && this.pl.sp.y < ESC_Y) ? ladoDoPiso(this.pl.sp.x) : 0;
     for (var i = 0; i < this.trens.length; i++) {
       var t = this.trens[i];
+      if (soLado && t.lado !== soLado) continue;
       var r = (t.estado === 'partindo' && this.tremEmpurrado === t) ? 0 : ordem[t.estado];
       // o mais adiantado manda; empatou, manda o que chega antes
       if (!m || r < rm || (r === rm && t.falta < m.falta)) { m = t; rm = r; }
@@ -2514,7 +2582,7 @@ var EstacaoScene = new Phaser.Class({
         t.falta = Math.max(0, Math.ceil((esp - t.t) / 1000));
         /* Na central o painel diz o TERMINAL, não "trem": com duas vias,
            'TREM EM 6S' não informa qual das duas está contando. */
-        t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
+        t.aviso = (CENTRAL || DUPLA) ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
           : ('TREM EM ' + t.falta + 'S');
         /* 'Talvez o tempo do áudio pra abrir a porta': a gravação do trem
            começa antes de ele aparecer (ouve-se ele vindo no túnel com o
@@ -2749,58 +2817,6 @@ var EstacaoScene = new Phaser.Class({
     cam.setFollowOffset(-Math.round(this._olhaX), -Math.round(HUD_H / 2) - Math.round(this._olhaY));
   },
 
-  /* ---------- a passagem pro outro sentido ----------
-     'Não tem dois lados pra ir em algumas.' A plataforma lateral tem uma
-     via só, a do sentido em que você vinha, e quem precisava voltar
-     (desceu errado, trocou de destino, está explorando) ficava preso.
-     Nas estações de verdade o outro sentido é a plataforma do outro lado
-     da via, e se chega nela por uma passagem. Aqui é uma porta na parede
-     da direita, no meio da plataforma, entre o nome da estação (560) e o
-     quadro do mapa (760), com a placa pendurada apontando: SENTIDO e o
-     outro terminal. Entrou na porta, pergunta; confirmou, você aparece na
-     plataforma do outro sentido, na mesma porta. Nas pontas da linha e na
-     Itaquera (terminal) não tem: lá só existe um sentido. A Sé é central,
-     e os dois trens já estão nela. */
-  passagemExiste: function () {
-    if (CENTRAL || this.itq || this.treino) return false;
-    var n = GameState.linhaAtual().estacoes.length;
-    return GameState.idx > 0 && GameState.idx < n - 1;
-  },
-  montaPassagem: function () {
-    this.passagem = null;
-    if (!this.passagemExiste()) return;
-    var y0 = platY(640), y1 = platY(690), x0 = PLAT_X1 + 4, w = 24;
-    this.passagem = { y0: y0, y1: y1 };
-    var g = this.add.graphics().setDepth(2);
-    g.fillStyle(0x39415f, 1).fillRect(x0 - 2, y0 - 4, w + 4, y1 - y0 + 8);
-    g.fillStyle(0x0a0a12, 1).fillRect(x0, y0, w, y1 - y0);
-    // os degraus descendo pro corredor, vistos pela porta
-    for (var d = 0; d < 5; d++) g.fillStyle(0x1c1c26 + d * 0x040404, 1).fillRect(x0 + 2, y0 + 4 + d * 9, w - 4, 5);
-    g.fillStyle(GameState.linhaAtual().num, 1).fillRect(x0 - 2, y0 - 4, w + 4, 3);
-    var outro = placaDe(GameState.terminal(-GameState.dir));
-    placaItq(this, PLAT_X1 - 58, platY(622), 'SENTIDO ' + outro + ' ►', false, false, corDaPlaca());
-  },
-  // chamado no contexto: encostou na porta, pergunta
-  contextoPassagem: function () {
-    var p = this.passagem, sp = this.pl.sp;
-    if (!p) return false;
-    var naPorta = sp.x >= PLAT_X1 - 6 && sp.y > p.y0 && sp.y < p.y1;
-    if (!naPorta) { this.naPassagem = false; return false; }
-    if (this.naPassagem || this.dialog) return true;
-    this.naPassagem = true;
-    var eu = this, outro = placaDe(GameState.terminal(-GameState.dir));
-    fala(this, 'Passagem pro outro lado.\nSentido ' + outro + '.', [
-      { label: 'Ir pro sentido ' + outro, cb: function () {
-        GameState.dir = -GameState.dir;
-        GameState.passaTempo(1);
-        sfx('porta');
-        eu.scene.start('Estacao', { onde: 'plataforma', daPassagem: true });
-      } },
-      { label: 'Ficar deste lado', cb: function () { eu.pl.sp.x = PLAT_X1 - 24; } }
-    ]);
-    return true;
-  },
-
   juntaGente: function () {
     var f = (this.fixos || []).filter(function (a) { return a && a.sp && a.sp.active; });
     return this.plateia.concat(this.esperando, [this.guarda], f);
@@ -2858,7 +2874,8 @@ var EstacaoScene = new Phaser.Class({
            ficava cheia de gente parada em y 258. Quem está na escada não
            tem trava (o degrau manda); quem passou fica do lado de dentro. */
         if (sp.naEscada || sp.passante) return;
-        sp.x = self.itq ? Phaser.Math.Clamp(sp.x, MEZ.x0 + 34, MEZ.x1 - 32) : Phaser.Math.Clamp(sp.x, 34, 288);
+        // o mezanino largo (e o da dupla, que vai até a segunda escada) é todo chão
+        sp.x = self.mez ? Phaser.Math.Clamp(sp.x, MEZ.x0 + 34, MEZ.x1 - 32) : Phaser.Math.Clamp(sp.x, 34, 288);
         if (sp.dentro) { sp.y = Phaser.Math.Clamp(sp.y, ESC_BOCA + 4, 262); return; }
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });
@@ -2997,7 +3014,6 @@ var EstacaoScene = new Phaser.Class({
     if (this.contextoLixo()) return;
     if (this.contextoTomada()) return;
     if (this.contextoElevador()) return;
-    if (this.contextoPassagem()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {

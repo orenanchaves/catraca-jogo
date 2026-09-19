@@ -392,6 +392,8 @@ EstacaoScene.prototype.pintaMezanino = function (g, l) {
   g.fillStyle(l.num, 1).fillRect(ESC_X1 + 10, 98, MEZ.x1 - ESC_X1 - 10, 5);
   g.fillStyle(0x000000, 0.3).fillRect(x0, 103, ESC_X0 - 10 - x0, 2).fillRect(ESC_X1 + 10, 103, MEZ.x1 - ESC_X1 - 10, 2);
   this.bocaDaEscada(g, HUD_H, 116);
+  // a boca da segunda escada, a da plataforma do outro sentido
+  if (DUPLA) { g.translateCanvas(ESC2_DX, 0); this.bocaDaEscada(g, HUD_H, 116); g.translateCanvas(-ESC2_DX, 0); }
   this.piso(g, x0, 116, w, 124, 0x4a4a60, 0x565670);
   this.piso(g, x0, 240, w, 280, 0x3f3f52, 0x494960);
   this.azulejo(g, x0, 520, w, 56);
@@ -852,7 +854,7 @@ EstacaoScene.prototype.atualizaMezanino = function (dt) {
   this.tiraDasCabines();
   this.andaCompradores(dt);
   var noSaguao = this.pl.sp.y > ESC_Y + ESCADA_ALT * 0.6;
-  var x0 = noSaguao ? MEZ.x0 : 0, w = noSaguao ? MEZ.x1 - MEZ.x0 : GW, k = Math.min(1, dt / 220);
+  var x0 = noSaguao ? MEZ.x0 : (DUPLA ? DUPLA_IMG_X : 0), w = noSaguao ? MEZ.x1 - MEZ.x0 : (DUPLA ? GW - DUPLA_IMG_X : GW), k = Math.min(1, dt / 220);
   this._camX0 += (x0 - this._camX0) * k; this._camW += (w - this._camW) * k;
   if (Math.abs(this._camX0 - x0) < 0.5) { this._camX0 = x0; this._camW = w; }
   this.cameras.main.setBounds(Math.round(this._camX0), PLAT_Y - 8, Math.round(this._camW), (GH - PLAT_Y) + 8);
