@@ -64,6 +64,7 @@ DEXC.x0 = 0; DEXC.y0 = 0;   // acertados logo abaixo do ZAP
    cruza a Sé, e depois do Pedro II sobe de novo até o Brás, de onde
    corre reta até Itaquera, como no mapa da parede do metrô. */
 var MAPA_CEL = { BX: 150, Y0: 144, PASSO: 14 };
+var MAPA_AREA = { y0: 130, y1: 458 };   // a área do desenho da rede, abaixo das abas e acima do rodapé
 MAPA_CEL.yDe = function (i) { return MAPA_CEL.Y0 + (LINHAS.azul.estacoes.length - 1 - i) * MAPA_CEL.PASSO; };
 (function () {
   var M = MAPA_CEL, yL = M.yDe(LINHAS.azul.estacoes.indexOf('LUZ')), yS = M.yDe(LINHAS.azul.estacoes.indexOf('SÉ'));
@@ -258,14 +259,42 @@ var ZapScene = new Phaser.Class({
     this.rotMapa = [];
     for (var rm = 0; rm < 44; rm++) this.rotMapa.push(txt(this, 0, 0, '', PAL.cinza, 8).setDepth(2403).setVisible(false));
     this.mapaVista = GameState.explorar ? 'rede' : 'caminho';
+    this.mapaZoom = 1; this.mapaPan = { x: 0, y: 0 };
+    this.gMapa = this.add.graphics().setDepth(2401);
+    var mm = this.make.graphics({ add: false });
+    mm.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, MAPA_AREA.y0, ZAP.tx1 - ZAP.tx0, MAPA_AREA.y1 - MAPA_AREA.y0);
+    this.mascMapa = mm.createGeometryMask();
+    this.gMapa.setMask(this.mascMapa);
+    // a roda do mouse aproxima e afasta
+    this.input.on('wheel', function (pt, objs, dx, dy) {
+      if (self.modo === 'app' && self.aba === 1 && self.mapaVista === 'rede') self.zoomMapa(dy < 0 ? 0.5 : -0.5);
+    });
     this.zonaAbasMapa = this.add.zone(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, 24).setOrigin(0, 0);
     this.zonaAbasMapa.on('pointerdown', function (pt) {
       if (self.modo !== 'app' || self.aba !== 1) return;
       var v = (pt.x - ZAP.tx0) < (ZAP.tx1 - ZAP.tx0) / 2 ? 'caminho' : 'rede';
       if (v !== self.mapaVista) { self.mapaVista = v; sfx('catraca'); self.pinta(); }
     });
-    this.zonaMapa = this.add.zone(ZAP.tx0, ZAP.topo + 36, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.topo - 60).setOrigin(0, 0);
-    this.zonaMapa.on('pointerdown', function (pt) { self.tocaMapa(pt.x, pt.y + self.cameras.main.scrollY); });
+    this.zonaMapa = this.add.zone(ZAP.tx0, MAPA_AREA.y0, ZAP.tx1 - ZAP.tx0, MAPA_AREA.y1 - MAPA_AREA.y0).setOrigin(0, 0);
+    this.zonaMapa.on('pointerdown', function (pt) {
+      self._arrasto = { x: pt.x, y: pt.y, px: self.mapaPan.x, py: self.mapaPan.y, andou: false };
+    });
+    this.input.on('pointermove', function (pt) {
+      var a = self._arrasto;
+      if (!a || !pt.isDown || self.aba !== 1 || self.mapaVista !== 'rede') return;
+      if (Math.abs(pt.x - a.x) + Math.abs(pt.y - a.y) > 6) a.andou = true;
+      if (!a.andou || self.mapaZoom <= 1) return;
+      self.mapaPan.x = a.px + (pt.x - a.x); self.mapaPan.y = a.py + (pt.y - a.y);
+      self.limitaPan(); self.pinta();
+    });
+    this.input.on('pointerup', function (pt) {
+      var a = self._arrasto; self._arrasto = null;
+      if (!a || a.andou || self.aba !== 1 || self.mapaVista !== 'rede' || self.modo !== 'app') return;
+      var bx = ZAP.tx1 - 30;
+      if (Math.hypot(pt.x - bx, pt.y - (MAPA_AREA.y1 - 62)) < 14) { self.zoomMapa(0.75); return; }
+      if (Math.hypot(pt.x - bx, pt.y - (MAPA_AREA.y1 - 30)) < 14) { self.zoomMapa(-0.75); return; }
+      self.tocaMapa(pt.x, pt.y);
+    });
     this.zonaFicha = this.add.zone(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.status).setOrigin(0, 0);
     this.zonaFicha.on('pointerdown', function () { self.fechaFicha(); });
     this.figMochila = []; this.zonasMochila = [];
@@ -363,6 +392,9 @@ var ZapScene = new Phaser.Class({
         if (d) { self.selApp = (self.selApp + d + nA * 2) % nA; sfx('catraca'); self.pinta(); return; }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') self.abreApp(self.selApp);
         return;
+      }
+      if (self.aba === 1 && self.mapaVista === 'rede' && (c === 'Equal' || c === 'NumpadAdd' || c === 'Minus' || c === 'NumpadSubtract')) {
+        self.zoomMapa(c === 'Equal' || c === 'NumpadAdd' ? 0.5 : -0.5); return;
       }
       if (self.aba === 5) {
         var dd = 0;
@@ -573,7 +605,8 @@ var ZapScene = new Phaser.Class({
     this.zonaFicha.disableInteractive();
     this.zonaMapa.disableInteractive();
     this.zonaAbasMapa.disableInteractive();
-    for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0);
+    for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0).clearMask();
+    if (this.gMapa) this.gMapa.clear();
     if (this.fichaFig) this.fichaFig.setVisible(false);
     var noInicio = (this.modo !== 'app');
     for (i = 0; i < this.zonas.length; i++) {
@@ -1077,98 +1110,136 @@ var ZapScene = new Phaser.Class({
   pintaMapa: function (g) {
     if (!GameState.char) return;
     if (this.mapaVista !== 'rede') { this.pintaCaminho(g); return; }
+    this.pintaRede(g);
+  },
+
+  /* ---------- a rede, com zoom ----------
+     'Tem que ter como dar zoom out e zoom in e aparecer todas as
+     estações.' O desenho da rede é o mesmo (MAPA_CEL), passado por uma
+     lente: z de 1 a 4 e um deslocamento, que o dedo arrasta. Tudo o que
+     é mapa (linhas, pontos, nomes) é recortado na área dele. Com z até
+     1,7 os nomes da Vermelha são os principais, retos; a partir daí
+     aparecem TODOS, em pé (a 90 graus a letra de pixel fica nítida,
+     inclinada não), subindo no oeste e descendo no leste. O + e o −
+     ficam no canto; a roda do mouse e as teclas + e − também servem. */
+  lenteMapa: function () {
+    var z = this.mapaZoom || 1, cx = (ZAP.tx0 + ZAP.tx1) / 2, cy = (MAPA_AREA.y0 + MAPA_AREA.y1) / 2, pan = this.mapaPan;
+    return function (x, y) { return { x: cx + (x - cx) * z + pan.x, y: cy + (y - cy) * z + pan.y }; };
+  },
+  zoomMapa: function (d) {
+    var z0 = this.mapaZoom, z1 = Phaser.Math.Clamp(z0 + d, 1, 4);
+    if (z1 === z0) return;
+    // o que estava no meio continua no meio
+    this.mapaPan.x *= z1 / z0; this.mapaPan.y *= z1 / z0;
+    this.mapaZoom = z1;
+    this.limitaPan();
+    sfx('catraca');
+    this.pinta();
+  },
+  limitaPan: function () {
+    var z = this.mapaZoom, mx = (ZAP.tx1 - ZAP.tx0) / 2 * (z - 1) + 40, my = (MAPA_AREA.y1 - MAPA_AREA.y0) / 2 * (z - 1) + 40;
+    if (z <= 1) { this.mapaPan.x = 0; this.mapaPan.y = 0; return; }
+    this.mapaPan.x = Phaser.Math.Clamp(this.mapaPan.x, -mx, mx);
+    this.mapaPan.y = Phaser.Math.Clamp(this.mapaPan.y, -my, my);
+  },
+
+  pintaRede: function (g) {
     var M = MAPA_CEL, eu = GameState.estacaoAtual(), alvo = GameState.alvoAtual(), fim = GameState.destinoFinal();
-    var n = 0, self = this;
-    // um rótulo da reserva: rodado (os da Vermelha, como no mapa oficial) ou reto
+    var n = 0, self = this, T = this.lenteMapa(), z = this.mapaZoom, gm = this.gMapa;
+    gm.clear();
     function rot(t, x, y, cor, ox, oy, ang) {
-      if (n >= self.rotMapa.length) return null;
-      return self.rotMapa[n++].setVisible(true).setOrigin(ox, oy).setAngle(ang || 0)
-        .setPosition(Math.round(x), Math.round(y)).setText(t).setColor(cor);
+      if (n >= 42) return null;
+      return self.rotMapa[n++].setVisible(true).setOrigin(ox, oy).setAngle(ang || 0).setMask(self.mascMapa)
+        .setPosition(Math.round(x), Math.round(y)).setText(t).setColor(cor).setScale(ESCALA_TEXTO / 2);
     }
     function corDe(nome, base) {
       return nome === eu ? '#ffffff' : (nome === fim || nome === alvo ? '#15803d' : base);
     }
-    var az = LINHAS.azul.estacoes, vm = LINHAS.vermelha.estacoes, i, p;
+    var az = LINHAS.azul.estacoes, vm = LINHAS.vermelha.estacoes, i, p, q;
 
-    /* 'Ainda dá pra aprimorar': o mapa oficial é branco, de letra preta,
-       com as linhas grossas. Fundo claro, nomes escuros, e só a sua
-       estação e o destino em destaque (em pílula e em verde). */
     g.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.topo + 8);
     g.fillStyle(0xf0f2f5, 1).fillRect(ZAP.tx0, ZAP.topo + 16, ZAP.tx1 - ZAP.tx0, 22);
-    // as duas linhas, grossas, com os pontinhos brancos das estações por dentro
-    g.fillStyle(0x0b5fae, 1).fillRect(M.BX - 3, M.yDe(az.length - 1), 7, M.yDe(0) - M.yDe(az.length - 1));
-    g.lineStyle(7, 0xe8362c, 1);
-    g.beginPath(); g.moveTo(M.rota[0][0], M.rota[0][1]);
-    for (i = 1; i < M.rota.length; i++) g.lineTo(M.rota[i][0], M.rota[i][1]);
-    g.strokePath();
-    for (i = 0; i < az.length; i++) { p = M.pos('azul', az[i]); g.fillStyle(0xf2f0ff, 1).fillRect(p.x - 1, p.y - 1, 2, 2); }
-    for (i = 0; i < vm.length; i++) { p = M.pos('vermelha', vm[i]); g.fillStyle(0xf2f0ff, 1).fillRect(p.x - 1, p.y - 1, 2, 2); }
-    // a Sé, baldeação: a cápsula branca das estações de troca
-    p = M.pos('azul', 'SÉ');
-    g.fillStyle(0x0a0a12, 1).fillCircle(p.x, p.y, 6);
-    g.fillStyle(0xf2f0ff, 1).fillCircle(p.x, p.y, 4.5);
-    g.fillStyle(0x0a0a12, 1).fillCircle(p.x, p.y, 2);
+    var esp = Math.round(6 + z * 1.5);                              // a grossura das linhas cresce um pouco
+    // a Azul
+    var a0 = T(M.BX, M.yDe(az.length - 1)), a1 = T(M.BX, M.yDe(0));
+    gm.fillStyle(0x0b5fae, 1).fillRect(a0.x - esp / 2, a0.y, esp, a1.y - a0.y);
+    // a Vermelha
+    gm.lineStyle(esp, 0xe8362c, 1).beginPath();
+    q = T(M.rota[0][0], M.rota[0][1]); gm.moveTo(q.x, q.y);
+    for (i = 1; i < M.rota.length; i++) { q = T(M.rota[i][0], M.rota[i][1]); gm.lineTo(q.x, q.y); }
+    gm.strokePath();
+    var ponto = Math.max(2, Math.round(z * 1.5));
+    for (i = 0; i < az.length; i++) { q = T(M.BX, M.yDe(i)); gm.fillStyle(0xffffff, 1).fillRect(q.x - ponto / 2, q.y - ponto / 2, ponto, ponto); }
+    for (i = 0; i < vm.length; i++) { p = M.pos('vermelha', vm[i]); q = T(p.x, p.y); gm.fillStyle(0xffffff, 1).fillRect(q.x - ponto / 2, q.y - ponto / 2, ponto, ponto); }
+    // a Sé, baldeação
+    p = M.pos('azul', 'SÉ'); q = T(p.x, p.y);
+    gm.fillStyle(0x111b21, 1).fillCircle(q.x, q.y, 6 + z);
+    gm.fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 4 + z * 0.7);
+    // os números das linhas
+    q = T(M.BX, M.yDe(az.length - 1));
+    gm.fillStyle(0x0b5fae, 1).fillRect(q.x - 20, q.y - 6, 12, 12);
+    rot('1', q.x - 14, q.y - 3, '#ffffff', 0.5, 0);
+    var pi = M.pos('vermelha', 'ITAQUERA'); q = T(pi.x, pi.y);
+    gm.fillStyle(0xe8362c, 1).fillRect(q.x - 6, q.y + 8, 12, 12);
+    rot('3', q.x, q.y + 11, '#ffffff', 0.5, 0);
 
-    // os números das linhas, nos quadradinhos da cor delas
-    g.fillStyle(0x0b5fae, 1).fillRect(M.BX - 20, M.yDe(az.length - 1) - 6, 12, 12);
-    rot('1', M.BX - 14, M.yDe(az.length - 1) - 3, PAL.branco, 0.5, 0).setScale(ESCALA_TEXTO / 2);
-    var pi = M.pos('vermelha', 'ITAQUERA');
-    g.fillStyle(0xe8362c, 1).fillRect(pi.x - 6, pi.y + 8, 12, 12);
-    rot('3', pi.x, pi.y + 11, PAL.branco, 0.5, 0).setScale(ESCALA_TEXTO / 2);
-
-    /* Os nomes da Azul, todos, na vertical: do Tucuruvi até a Luz do lado
-       direito, como no mapa; da Sé pra baixo do lado esquerdo, porque o
-       lado direito de baixo é dos nomes da Vermelha que descem inclinados. */
+    // a Azul: todos os nomes, à direita até São Bento e à esquerda da Sé pra baixo
     for (i = 0; i < az.length; i++) {
-      var nm = az[i]; p = M.pos('azul', nm);
-      if (nm === 'SÉ') { rot('SÉ', p.x + 7, p.y + 5, nm === eu ? '#ffffff' : '#111b21', 0, 0).setScale(ESCALA_TEXTO / 2); continue; }
-      /* São Bento também à direita (à esquerda ela batia no nome da
-         República), abreviada pra acabar antes da subida da Vermelha */
+      var nm = az[i]; p = M.pos('azul', nm); q = T(p.x, p.y);
+      if (nm === 'SÉ') { rot('SÉ', q.x + 8 + z, q.y + 5 + z, nm === eu ? '#ffffff' : '#111b21', 0, 0); continue; }
       var direita = i >= az.indexOf('SÃO BENTO');
-      var t = rot(nm === 'SÃO BENTO' ? 'S. BENTO' : nm, p.x + (direita ? 8 : -8), p.y, corDe(nm, '#2b3440'), direita ? 0 : 1, 0.5);
-      if (t) { t.setScale(ESCALA_TEXTO / 2); if (nm === eu) this.pilula(g, t); }
+      var curto = (nm === 'SÃO BENTO' && z < 1.7) ? 'S. BENTO' : nm;
+      var t = rot(curto, q.x + (direita ? 8 : -8), q.y, corDe(nm, '#2b3440'), direita ? 0 : 1, 0.5);
+      if (t && nm === eu) this.pilula(gm, t);
     }
-    /* Os da Vermelha RETOS ('tá ruim de ler ainda'): inclinada, a letra de
-       pixel virava serrote. Vão só as que todo mundo conhece, cada uma com
-       um risquinho até a estação: Barra Funda em cima da ponta, Brás e
-       Penha logo embaixo da linha, Tatuapé uma fileira abaixo, Itaquera em
-       cima da ponta de lá. A sua e a do destino entram sempre. */
+    // a Vermelha
     var yL = M.verm['BRÁS'][1], yS = M.verm['SÉ'][1];
+    var todos = z >= 1.7;
     var NOMES_VERM = {
       'BARRA FUNDA': [ZAP.tx0 + 4, yL - 16, 0], 'BRÁS': [220, yL + 21, 0.5], 'PENHA': [252, yL + 9, 0.5],
       'TATUAPÉ': [238, yL + 33, 0.5], 'ITAQUERA': [ZAP.tx1 - 4, yL - 16, 1]
     };
+    var iSe = vm.indexOf('SÉ');
     for (i = 0; i < vm.length; i++) {
-      var nv = vm[i], pv = M.pos('vermelha', nv), onde = NOMES_VERM[nv];
+      var nv = vm[i], pv = M.pos('vermelha', nv), qv = T(pv.x, pv.y), tv;
       if (nv === 'SÉ') continue;
-      if (!onde && (nv === eu || nv === fim || nv === alvo)) onde = [pv.x, (pv.y === yS ? yS + 9 : pv.y + 33), 0.5];
-      if (!onde) continue;
-      var tv = rot(nv, onde[0], onde[1], corDe(nv, '#111b21'), onde[2], 0);
-      if (!tv) continue;
-      tv.setScale(ESCALA_TEXTO / 2);
-      // o risquinho da estação até o nome
-      var ly = onde[1] < pv.y ? onde[1] + 8 : onde[1] - 1, lx = onde[2] === 0.5 ? onde[0] : pv.x;
-      g.lineStyle(1, 0x9aa3ab, 1).lineBetween(pv.x, pv.y + (ly > pv.y ? 4 : -4), lx, ly);
-      if (nv === eu) this.pilula(g, tv);
+      if (todos) {
+        // em pé: o oeste sobe da estação, o leste desce
+        var leste = i > iSe;
+        tv = rot(nv, qv.x + 1, qv.y + (leste ? 6 : -6), corDe(nv, '#111b21'), 0, 0.5, leste ? 90 : -90);
+      } else {
+        var onde = NOMES_VERM[nv];
+        if (!onde && (nv === eu || nv === fim || nv === alvo)) onde = [pv.x, (pv.y === yS ? yS + 9 : pv.y + 33), 0.5];
+        if (!onde) continue;
+        tv = rot(nv, onde[0], onde[1], corDe(nv, '#111b21'), onde[2], 0);
+        var ly = onde[1] < pv.y ? onde[1] + 8 : onde[1] - 1, lx = onde[2] === 0.5 ? onde[0] : pv.x;
+        gm.lineStyle(1, 0x9aa3ab, 1).lineBetween(pv.x, pv.y + (ly > pv.y ? 4 : -4), lx, ly);
+      }
+      if (tv && nv === eu) this.pilula(gm, tv);
     }
 
-    // onde você está: o anel branco; pra onde vai: o anel verde
-    var pe = M.pos(GameState.linha, eu);
-    g.fillStyle(0x111b21, 1).fillCircle(pe.x, pe.y, 7);
-    g.fillStyle(0xffffff, 1).fillCircle(pe.x, pe.y, 3.5);
+    // você (o ponto escuro) e o alvo (o anel verde)
+    var pe = M.pos(GameState.linha, eu); q = T(pe.x, pe.y);
+    gm.fillStyle(0x111b21, 1).fillCircle(q.x, q.y, 7);
+    gm.fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 3.5);
     var pa = M.pos(linhaDaEstacao(alvo) === 'azul' || alvo === 'SÉ' ? 'azul' : 'vermelha', alvo);
-    if (pa && alvo !== eu) { g.lineStyle(3, 0x15803d, 1).strokeCircle(pa.x, pa.y, 8); }
+    if (pa && alvo !== eu) { q = T(pa.x, pa.y); gm.lineStyle(3, 0x15803d, 1).strokeCircle(q.x, q.y, 8); }
 
-    // as abas e, embaixo, quantas faltam
+    // o + e o −, no canto de baixo
+    var bx = ZAP.tx1 - 30, b1 = MAPA_AREA.y1 - 62, b2 = MAPA_AREA.y1 - 30;
+    [[b1, '+'], [b2, '-']].forEach(function (b, k) {
+      gm.fillStyle(0xffffff, 1).fillCircle(bx, b[0], 12);
+      gm.lineStyle(2, 0xd1d7db, 1).strokeCircle(bx, b[0], 12);
+      gm.fillStyle(0x111b21, 1).fillRect(bx - 5, b[0] - 1, 11, 3);
+      if (k === 0) gm.fillRect(bx - 1, b[0] - 5, 3, 11);
+    });
+
     this.pintaAbasMapa(g);
     this.linha(1, ZAP.topo + 22, GameState.faltamEstacoes() + ' ESTAÇÕES ATÉ ' + alvo, '#15803d').setOrigin(0, 0)
       .setScale(ESCALA_TEXTO / 2).setPosition(ZAP.tx0 + 10, ZAP.topo + 23);
-    // no EXPLORAR o mapa é um teletransporte: tocar numa estação leva até ela
-    if (GameState.explorar) {
-      this.linhas[1].setText('TOQUE NUMA ESTAÇÃO PRA IR').setColor('#15803d');
-      this.zonaMapa.setInteractive();
-    }
-    this.tRodape.setText('AQUI: ' + eu).setColor('#111b21');
+    if (GameState.explorar) this.linhas[1].setText('TOQUE NUMA ESTAÇÃO PRA IR').setColor('#15803d');
+    this.zonaMapa.setInteractive();
+    this.tRodape.setText(z > 1 ? 'ARRASTE PRA ANDAR' : 'AQUI: ' + eu).setColor('#111b21');
   },
 
   // a pílula escura atrás do nome da sua estação, pra ele saltar do mapa
@@ -1184,10 +1255,10 @@ var ZapScene = new Phaser.Class({
      na plataforma dela. */
   tocaMapa: function (px, py) {
     if (!GameState.explorar || this.modo !== 'app' || this.aba !== 1) return;
-    var M = MAPA_CEL, melhor = null, dm = 10;
+    var M = MAPA_CEL, melhor = null, dm = 10 + this.mapaZoom * 2, lente = this.lenteMapa();
     ['azul', 'vermelha'].forEach(function (l) {
       LINHAS[l].estacoes.forEach(function (nm) {
-        var p = M.pos(l, nm), d = Math.hypot(p.x - px, p.y - py);
+        var p0 = M.pos(l, nm), p = lente(p0.x, p0.y), d = Math.hypot(p.x - px, p.y - py);
         if (d < dm) { dm = d; melhor = nm; }
       });
     });
