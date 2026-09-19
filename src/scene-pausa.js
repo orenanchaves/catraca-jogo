@@ -130,7 +130,7 @@ var PausaScene = new Phaser.Class({
       GameState.reiniciaPerna();
       this.desmonta();
       this.scene.stop('Pausa');
-      this.scene.start('Estacao');
+      this.scene.start('Estacao', { onde: 'saguao' });
       return;
     }
     if (it.chave === 'sair') {

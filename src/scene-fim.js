@@ -116,7 +116,7 @@ var FimScene = new Phaser.Class({
     audioOn(); sfx('ok');
     this.descongela();
     GameState.init(GameState.charKey, GameState.genero);
-    this.scene.start('Estacao');
+    this.scene.start('Estacao', { onde: 'saguao' });
   },
 
   trocar: function () {

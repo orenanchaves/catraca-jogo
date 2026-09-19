@@ -636,6 +636,7 @@ var GameState = {
     this.pontosDaCorrida = 0;
     this.minutos = this.pernaAtual().saida + Math.floor(Math.random() * 21) - 10;
     this.minutoSaida = this.minutos;
+    this.folgaPerna = 0; this._itqCompensado = null;
     this.faixaAnterior = this.faixa().key;
     this.dentroDoSistema = false;
     /* Pular a catraca era uma decisao sem consequencia depois do
@@ -766,8 +767,13 @@ var GameState = {
   /* chegou no destino da perna. De manhã o relógio pula pro fim do
      expediente; de noite vira o dia. */
   // quanto tempo de porta a porta esta perna já levou
+  /* `folgaPerna` são minutos que a perna dá de presente: a caminhada
+     extra da Corinthians-Itaquera (estacao-itaquera.js). Nunca negativo:
+     subtrair do relógio direto dava -6, e o módulo de 24h transformava
+     isso em 1434 minutos de atraso logo na saída de casa. */
   minutosNaPerna: function () {
-    return (this.minutos - this.minutoSaida + 1440) % 1440;
+    var m = (this.minutos - this.minutoSaida + 1440) % 1440;
+    return Math.max(0, m - (this.folgaPerna || 0));
   },
   minutosParaOAtraso: function () { return LIMITE_ATRASO - this.minutosNaPerna(); },
   /* A cobrança é uma hora no relógio do jogo, não um cronômetro de
@@ -826,6 +832,7 @@ var GameState = {
     var coracoesAoChegar = this.coracoes;
     this.pernasFeitas++;
     this.dentroDoSistema = false;
+    this.folgaPerna = 0;
     /* Pular a catraca era uma decisao sem consequencia depois do
        saguao: passou, passou. Agora o trem sabe, porque e no trem que
        existe quem pergunte. */

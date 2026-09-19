@@ -250,7 +250,7 @@ var TitleScene = new Phaser.Class({
       TREINO_QUEM.k = kt;
       TREINO_QUEM.g = eu.gen[kt];
       audioOn(); sfx('ok');
-      eu.scene.start('Treino');
+      eu.scene.start('Treino', {});
     });
     /* O ladrilho do meio é o botão de jogar, e no travado é o de
        comprar: é o mesmo comando que o teclado já dava. */
@@ -453,7 +453,7 @@ var TitleScene = new Phaser.Class({
     audioOn(); sfx('ok');
     GameState.init(this.ordem[this.sel], this.gen[this.ordem[this.sel]]);
     Missoes.novaCorrida();   // partida de verdade: zera o que era "numa corrida"
-    this.scene.start('Estacao');
+    this.scene.start('Estacao', { onde: 'saguao' });
   },
 
   update: function (time, delta) {

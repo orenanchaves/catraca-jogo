@@ -265,10 +265,17 @@ var EstacaoScene = new Phaser.Class({
   /* Dá pra chegar por baixo (da rua, passando pela catraca) ou por cima
      (da baldeação, ou descendo de um trem na estação errada) — e quem
      chega por cima já está dentro do sistema. */
+  /* Toda chamada que abre a estação diz de onde se chega ({ onde: ... }).
+     O Phaser guarda os dados do início anterior quando a chamada não traz
+     nenhum: sem isto, a perna nova depois de uma baldeação nascia na
+     PLATAFORMA (o { onde: 'plataforma' } da Sé ficava valendo), e o dia
+     novo da Itaquera herdava o { praCasa } da volta. */
   init: function (dados) {
     this.entrada = (dados && dados.onde) || 'saguao';
     // aberta pela tela de minigames: 'empurrao' ou 'catraca'
     this.treino = (dados && dados.treino) || null;
+    // desceu na Itaquera na volta: o dia só acaba na saída de casa (estacao-itaquera.js)
+    this.praCasa = !!(dados && dados.praCasa);
   },
 
   create: function () {
@@ -301,6 +308,12 @@ var EstacaoScene = new Phaser.Class({
     CENTRAL = (GameState.estacaoAtual() === BALDEACAO);
     PLAT_X0 = CENTRAL ? PLAT_C_X0 : 136;
     PLAT_X1 = CENTRAL ? PLAT_C_X1 : 288;
+    /* A Corinthians-Itaquera tem planta própria (src/estacao-itaquera.js):
+       plataforma mais larga, passarela e saídas pra rua. O treino usa a
+       estação de sempre, porque os minigames dele medem o saguão antigo. */
+    this.itq = ehItaquera() && !this.treino;
+    if (this.itq) PLAT_X1 = ITQ.platX1;
+    MAPA_PLAT.x = this.itq ? ITQ.paredeX + 2 : 298;
 
     /* Numa central a via da esquerda anda pro começo da lista e a da
        direita pro fim — e como o terminal sai da linha em que você
@@ -462,6 +475,7 @@ var EstacaoScene = new Phaser.Class({
     this.gMini = this.add.graphics().setDepth(500).setScrollFactor(0).setVisible(false);
     this.tMini = txtC(this, GW / 2, GH / 2 - 54, '', PAL.branco, 8).setDepth(501).setScrollFactor(0).setVisible(false);
     this.tMini2 = txtC(this, GW / 2, GH / 2 + 24, '', PAL.amarelo, 8).setDepth(501).setScrollFactor(0).setVisible(false);
+    if (this.itq) this.posicionaItaquera(noAlto);
 
     /* O tutorial é uma camada por cima da primeira partida, e a estação
        é onde toda partida começa. Quem já viu (ou pulou) não vê de
@@ -568,11 +582,16 @@ var EstacaoScene = new Phaser.Class({
     fundo.fillStyle(num(PAL.bg), 1).fillRect(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 16);
 
     texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
-    texturaDeCena(this, 'est_plataforma', GW, PLAT_ALT, function (g) { eu.pintaPlataforma(g, l, CENTRAL); });
+    if (this.itq) {
+      texturaDeCena(this, 'est_plataforma', ITQ.platX2 - ITQ.outraX0, PLAT_ALT, function (g) { eu.pintaPlataformaItq(g, l); });
+    } else {
+      texturaDeCena(this, 'est_plataforma', GW, PLAT_ALT, function (g) { eu.pintaPlataforma(g, l, CENTRAL); });
+    }
     texturaDeCena(this, 'est_escada', GW, ESCADA_ALT, function (g) { eu.pintaEscada(g); });
 
     this.add.image(0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
-    this.add.image(0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
+    this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
+    if (this.itq) this.montaItaquera();
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
     this.montaDegraus();
 
@@ -616,7 +635,7 @@ var EstacaoScene = new Phaser.Class({
          encostavam uma na outra e nos quadros de mapa, que agora moram
          nos vãos (300 e 760). */
       for (var ny = 150; ny < PLAT_ALT - 80; ny += 410) {
-        var tn = txt(this, 309, platY(ny), placaDe(GameState.estacaoAtual()), PAL.branco, 8);
+        var tn = txt(this, this.itq ? ITQ.paredeX + 13 : 309, platY(ny), placaDe(GameState.estacaoAtual()), PAL.branco, 8);
         /* Metade do tamanho (6px por letra, escala 1): a fonte é de pixel
            e só escala inteira fica nítida. Na faixa de 18px o nome do
            tamanho de sempre era um letreiro gritando; na estação de
@@ -1371,6 +1390,12 @@ var EstacaoScene = new Phaser.Class({
       }
       if (ind.fase === 'rua') {
         alvoX = ind.x; alvoY = 560;
+        if (this.itq) alvoX = ITQ_MEIO_X + (Math.random() - 0.5) * 30;
+        if (this.itq && a.sp.y > ITQ.passY0 + 4) {
+          this.plateia.splice(i, 1);
+          this.novoPassante('saguao', ['A', 'B', 'C'][Math.floor(Math.random() * 3)], a);
+          continue;
+        }
         if (a.sp.y > 540) {
           a.sp.destroy();
           this.plateia.splice(i, 1);
@@ -1401,6 +1426,11 @@ var EstacaoScene = new Phaser.Class({
 
   /* quem entra na estação entra pela rua, que é embaixo */
   chegaNoSaguao: function (quantos) {
+    if (this.itq) {
+      // na Itaquera ninguém brota no saguão: vem andando de uma das saídas
+      for (var k = 0; k < quantos; k++) this.novoPassante(['A', 'B', 'C'][Math.floor(Math.random() * 3)], 'saguao');
+      return;
+    }
     for (var i = 0; i < quantos; i++) {
       var a = new Ator(this, 60 + Math.random() * 200, 520 + Math.random() * 30, sorteiaPax());
       a.sp.setDepth(40);
@@ -1568,6 +1598,7 @@ var EstacaoScene = new Phaser.Class({
 
   /* ---------- áreas caminháveis, nas três faixas ---------- */
   podeIr: function (x, y) {
+    if (this.itq) { var itq = this.podeIrItq(x, y); if (itq !== null) return itq; }
     // ---- plataforma ----
     if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80);
     // ---- escada rolante: a única passagem entre os dois andares ----
@@ -2284,7 +2315,7 @@ var EstacaoScene = new Phaser.Class({
     GameState.dir = this.tremEmpurrado.dir;
     Missoes.conta('embarcou', { faixa: GameState.faixa().key, estacao: GameState.estacaoAtual() });
     sfx('ok');
-    this.scene.start('Vagao');
+    this.scene.start('Vagao', {});      // vazio mas explícito: sem dados o Phaser reaproveita os do treino
   },
 
   falhouEmbarque: function () {
@@ -2408,7 +2439,7 @@ var EstacaoScene = new Phaser.Class({
            a pessoa era jogada de volta pra fora, e a fila da escada
            ficava cheia de gente parada em y 258. Quem está na escada não
            tem trava (o degrau manda); quem passou fica do lado de dentro. */
-        if (sp.naEscada) return;
+        if (sp.naEscada || sp.passante) return;
         sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
         if (sp.dentro) { sp.y = Phaser.Math.Clamp(sp.y, ESC_BOCA + 4, 262); return; }
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
@@ -2484,6 +2515,7 @@ var EstacaoScene = new Phaser.Class({
     empurraoNaMarra(this, this.gente, function (sp) { return eu.podeIr(sp.x, sp.y); });
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
+    if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
     /* Passou pela catraca andando, o braço gira pra você: pra dentro na
@@ -2507,6 +2539,7 @@ var EstacaoScene = new Phaser.Class({
      ambulante, embaixo é bilheteria, barraca e catraca. */
   contexto: function (vendo) {
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
+    if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {
       var trem = this.tremNaPorta();
@@ -2564,6 +2597,7 @@ var EstacaoScene = new Phaser.Class({
         ? 'ELE TÁ TE VENDO — ESPERE'
         : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA');
     } else if (vendo) dica = 'sai da frente dele';
+    else if (this.praCasa) dica = 'CASA: ' + SAIDAS_ITQ[saidaDeCasa()].rotulo + ' ▼';
     else if (this.liberado || this.pulou) dica = 'suba pela escada ▲';
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 

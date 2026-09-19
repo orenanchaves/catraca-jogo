@@ -3196,7 +3196,14 @@ var VagaoScene = new Phaser.Class({
       GameState.baldeia();
       sfx('ok');
       // baldear não passa por catraca, mas passa pelo corredor da Sé
-      this.scene.start('Baldeacao');
+      this.scene.start('Baldeacao', {});
+      return;
+    }
+    /* Na volta pra Itaquera o dia não acaba na plataforma: acaba na rua,
+       pela saída de casa (estacao-itaquera.js). */
+    if (GameState.perna === 'volta' && aqui === CASA && !this.treino) {
+      sfx('ok');
+      this.scene.start('Estacao', { onde: 'plataforma', praCasa: true });
       return;
     }
     var atrasado = GameState.minutosNaPerna() > LIMITE_ATRASO && GameState.perna === 'ida';
@@ -3204,7 +3211,7 @@ var VagaoScene = new Phaser.Class({
     var morte = GameState.derrota();
     if (morte) { GameState.motivoFim = morte; this.fimDeJogo(); return; }
     sfx(atrasado ? 'erro' : 'vitoria');
-    this.scene.start('Estacao');            // nova perna: entra no sistema de novo
+    this.scene.start('Estacao', { onde: 'saguao' });            // nova perna: entra no sistema de novo
   },
 
   fimDeJogo: function () {
