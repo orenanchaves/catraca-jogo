@@ -67,14 +67,21 @@ var MAPA_CEL = { BX: 150, Y0: 144, PASSO: 14 };
 var MAPA_AREA = { y0: 130, y1: 458 };   // a área do desenho da rede, abaixo das abas e acima do rodapé
 MAPA_CEL.yDe = function (i) { return MAPA_CEL.Y0 + (LINHAS.azul.estacoes.length - 1 - i) * MAPA_CEL.PASSO; };
 (function () {
-  var M = MAPA_CEL, yL = M.yDe(LINHAS.azul.estacoes.indexOf('LUZ')), yS = M.yDe(LINHAS.azul.estacoes.indexOf('SÉ'));
-  M.rota = [[40, yL], [70, yL], [98, yS], [200, yS], [218, yL], [286, yL]];
+  /* As posições seguem o mapa oficial ('seja mais fiel ao posicionamento'):
+     a Barra Funda na altura da Luz, a Vermelha descendo em diagonal por
+     Deodoro, Santa Cecília e República, reta pelo Anhangabaú até a Sé e o
+     Pedro II; sobe até o Brás e corre reta pro leste na altura de São
+     Bento, até Itaquera. */
+  var M = MAPA_CEL, az = LINHAS.azul.estacoes;
+  var yL = M.yDe(az.indexOf('LUZ')), ySB = M.yDe(az.indexOf('SÃO BENTO')), yS = M.yDe(az.indexOf('SÉ'));
+  M.yL = yL; M.ySB = ySB; M.yS = yS;
+  M.rota = [[98, yL], [126, yS], [168, yS], [186, yL + 10], [196, ySB], [290, ySB]];
   M.verm = {
-    'BARRA FUNDA': [40, yL], 'MAL. DEODORO': [62, yL], 'STA. CECÍLIA': [84, yL + 14],
-    'REPÚBLICA': [106, yS], 'ANHANGABAÚ': [128, yS], 'SÉ': [150, yS], 'PEDRO II': [174, yS]
+    'BARRA FUNDA': [98, yL], 'MAL. DEODORO': [105, yL + 7], 'STA. CECÍLIA': [112, yL + 14],
+    'REPÚBLICA': [119, yL + 21], 'ANHANGABAÚ': [137, yS], 'SÉ': [150, yS], 'PEDRO II': [168, yS], 'BRÁS': [186, yL + 10]
   };
-  var leste = LINHAS.vermelha.estacoes.slice(LINHAS.vermelha.estacoes.indexOf('BRÁS'));
-  for (var i = 0; i < leste.length; i++) M.verm[leste[i]] = [Math.round(218 + i * 6.8), yL];
+  var leste = LINHAS.vermelha.estacoes.slice(LINHAS.vermelha.estacoes.indexOf('BRÁS') + 1);
+  for (var i = 0; i < leste.length; i++) M.verm[leste[i]] = [198 + i * 10, ySB];
 })();
 MAPA_CEL.pos = function (linha, nome) {
   if (linha === 'vermelha' && MAPA_CEL.verm[nome]) return { x: MAPA_CEL.verm[nome][0], y: MAPA_CEL.verm[nome][1] };
@@ -1188,16 +1195,19 @@ var ZapScene = new Phaser.Class({
       var nm = az[i]; p = M.pos('azul', nm); q = T(p.x, p.y);
       if (nm === 'SÉ') { rot('SÉ', q.x + 8 + z, q.y + 5 + z, nm === eu ? '#ffffff' : '#111b21', 0, 0); continue; }
       var direita = i >= az.indexOf('SÃO BENTO');
-      var curto = (nm === 'SÃO BENTO' && z < 1.7) ? 'S. BENTO' : nm;
+      // sem zoom o nome de São Bento bate na subida da Vermelha: só com zoom (ou se for a sua / o destino)
+      if (nm === 'SÃO BENTO' && z < 1.7 && nm !== eu && nm !== fim && nm !== alvo) continue;
+      var curto = nm;
       var t = rot(curto, q.x + (direita ? 8 : -8), q.y, corDe(nm, '#2b3440'), direita ? 0 : 1, 0.5);
       if (t && nm === eu) this.pilula(gm, t);
     }
     // a Vermelha
-    var yL = M.verm['BRÁS'][1], yS = M.verm['SÉ'][1];
+    var yL = M.yL, yS = M.yS;
     var todos = z >= 1.7;
+    // sem zoom, os principais: [x, y, alinhamento] do nome (em pontos do mapa)
     var NOMES_VERM = {
-      'BARRA FUNDA': [ZAP.tx0 + 4, yL - 16, 0], 'BRÁS': [220, yL + 21, 0.5], 'PENHA': [252, yL + 9, 0.5],
-      'TATUAPÉ': [238, yL + 33, 0.5], 'ITAQUERA': [ZAP.tx1 - 4, yL - 16, 1]
+      'BARRA FUNDA': [ZAP.tx0 + 4, yL - 14, 0], 'BRÁS': [182, yL + 4, 1],
+      'TATUAPÉ': [218, M.ySB + 6, 0.5], 'PENHA': [238, M.ySB + 18, 0.5], 'ITAQUERA': [ZAP.tx1 - 4, M.ySB - 14, 1]
     };
     var iSe = vm.indexOf('SÉ');
     for (i = 0; i < vm.length; i++) {
@@ -1211,9 +1221,9 @@ var ZapScene = new Phaser.Class({
         var onde = NOMES_VERM[nv];
         if (!onde && (nv === eu || nv === fim || nv === alvo)) onde = [pv.x, (pv.y === yS ? yS + 9 : pv.y + 33), 0.5];
         if (!onde) continue;
-        tv = rot(nv, onde[0], onde[1], corDe(nv, '#111b21'), onde[2], 0);
-        var ly = onde[1] < pv.y ? onde[1] + 8 : onde[1] - 1, lx = onde[2] === 0.5 ? onde[0] : pv.x;
-        gm.lineStyle(1, 0x9aa3ab, 1).lineBetween(pv.x, pv.y + (ly > pv.y ? 4 : -4), lx, ly);
+        var oq = T(onde[0], onde[1]);
+        tv = rot(nv, oq.x, oq.y, corDe(nv, '#111b21'), onde[2], 0);
+        if (onde[2] === 0.5) gm.lineStyle(1, 0x9aa3ab, 1).lineBetween(qv.x, qv.y + 4, oq.x, oq.y - 1);
       }
       if (tv && nv === eu) this.pilula(gm, tv);
     }
