@@ -1553,9 +1553,9 @@ function quadrosDoCorpo(key) {
   for (var d = 0; d < DIRS.length; d++) {
     var nome = DIRS[d], parado = r[nome];
     if (nome === 'segurando') {
-      // parado, os três quadros iguais: quem segura não anda
-      var seg = r.poseUnica ? r.down : bracoPraCima(r.down);
-      out[nome] = [seg, seg, seg];
+      /* os três quadros do de frente (parado e as duas passadas) com o
+         braço pra cima: dá pra ir andando com a mão correndo na barra */
+      out[nome] = r.poseUnica ? out.down.slice(0) : out.down.map(bracoPraCima);
       continue;
     }
     var passos = (nome === 'side') ? r.pernas.lado : r.pernas.frente;

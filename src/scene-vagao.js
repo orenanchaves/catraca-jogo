@@ -839,7 +839,7 @@ var VagaoScene = new Phaser.Class({
     for (var i = 0; i < BARRAS_X.length; i++) {
       if (i && naPorta(y, 8)) continue;            // na frente da porta não tem barra
       var cx = BARRAS_X[i] + 4, d = Math.abs(x - cx);
-      if (!melhor || d < melhor.d) melhor = { x: cx, d: d };
+      if (!melhor || d < melhor.d) melhor = { x: cx, d: d, col: i };
     }
     return melhor || { x: null, d: 1e9 };
   },
@@ -851,7 +851,7 @@ var VagaoScene = new Phaser.Class({
     // em cima de um poste não dá pra ficar: escorrega pra fora dele
     var p = postePerto(b.x, y);
     if (p && Math.abs(p.y - y) < 14) y = p.y + (y >= p.y ? 14 : -14);
-    this.segurando = { x: b.x, y: y, lado: lado };
+    this.segurando = { x: b.x, y: y, lado: lado, col: b.col, andando: false };
     this.indoPara = null;
     sfx('ok');
   },
@@ -862,13 +862,13 @@ var VagaoScene = new Phaser.Class({
   /* Embaixo da barra, de frente, braço pra cima. A barra (camada 65)
      passa por cima do boneco; a mão é redesenhada por cima dela (66),
      que é o que faz ela parecer fechada NA barra e não atrás dela. */
-  atualizaSegura: function () {
+  atualizaSegura: function (dt) {
     var s = this.segurando;
     if (!s) return;
     this.pl.sp.x = s.x + s.lado * MAO_DA_BARRA;
     this.pl.sp.y = s.y;
     this.pl.dir = s.lado < 0 ? 'segurandoR' : 'segurandoL';
-    this.pl.anima(0, false);
+    this.pl.anima(s.andando ? (dt || 16) : 0, s.andando);
     var pl = PELES[GameState.charKey + (GameState.genero === 'f' ? 'F' : '')] || PELES[GameState.charKey];
     var cor = pl ? num(pl.k) : 0xe0b088;
     var g = this.gMaoFrente; g.clear();
@@ -876,6 +876,21 @@ var VagaoScene = new Phaser.Class({
     g.fillStyle(0x0a0a12, 1).fillRect(hx - 1, hy - 1, 6, 6);
     g.fillStyle(cor, 1).fillRect(hx, hy, 4, 4);
     g.fillStyle(0xffffff, 0.25).fillRect(hx, hy, 4, 1);
+  },
+
+  /* Andar segurando: ▲ e ▼ correm a mão pela barra, a 60% do passo
+     (uma mão ocupada e o trem balançando). A barra acaba na porta, na
+     coluna da direita, e no fole entre dois carros: ali o boneco para,
+     e quem quiser seguir solta a barra andando pro lado. */
+  andaNaBarra: function (dy, vel, dt) {
+    var s = this.segurando;
+    var ny = s.y + dy * vel * 0.6 * dt / 1000;
+    var fim = (s.col === 1 && naPorta(ny, 8)) || apertoSanfona(ny) > 0 ||
+      ny < 84 || ny > fundoDoTrem() - 20;
+    // um poste no caminho é contornado: a mão passa por cima dele, o corpo não bate
+    if (!fim) s.y = ny;
+    s.andando = !fim;
+    this.andandoAgora = !fim;
   },
 
   /* Quem é a barra mais perto, e a que distância. É o que decide se dá
@@ -3465,14 +3480,21 @@ var VagaoScene = new Phaser.Class({
          vai ser jogado. Direção na mão SEMPRE manda: o primeiro
          arrasto cancela o destino, senão o jogo estaria dirigindo
          contra você. */
-      if (dx || dy) { this.indoPara = null; if (this.segurando) this.soltaBarra(); }
+      if (this.segurando) this.segurando.andando = false;
+      if (this.segurando && dy) {
+        /* segurando, ▲ e ▼ andam junto da barra; só pro lado, puro, solta.
+           Com o manche o dedo quase nunca vai reto, e diagonal soltando
+           a barra seria soltar sem querer a cada passo. */
+        this.andaNaBarra(dy, vel, dt);
+        dx = 0; dy = 0;
+      } else if (dx || dy) { this.indoPara = null; if (this.segurando) this.soltaBarra(); }
       else if (this.indoPara) {
         var r = this.rumoAoLugar(dt);
         dx = r.dx; dy = r.dy;
       }
       var mv = (dx !== 0 || dy !== 0);
       // quem anda acorda: o cochilo só conta com o corpo parado
-      this.andandoAgora = mv;
+      this.andandoAgora = mv || !!(this.segurando && this.segurando.andando);
       if (mv) {
         var n = Math.sqrt(dx * dx + dy * dy);
         this.pl.sp.x += (dx / n) * vel * dt / 1000;
@@ -3481,9 +3503,9 @@ var VagaoScene = new Phaser.Class({
         this.pl.setDir(dx, dy);
       }
       this.pl.anima(dt, mv);
-      this.passos(dt, mv);
+      this.passos(dt, this.andandoAgora);
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
-      this.atualizaSegura();            // segurando, o empurrão não te tira do poste
+      this.atualizaSegura(dt);          // segurando, o empurrão não te tira da barra
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
@@ -3606,7 +3628,7 @@ var VagaoScene = new Phaser.Class({
           dica = nomeAgir() + ': VENDER  (FISCAL ' + Math.round(this.fiscal) + '%)';
           if (Ctrl.actJust) this.vende();
         } else if (this.segurando) {
-          dica = 'SEGURANDO. ' + nomeAgir() + ': SOLTAR';
+          dica = 'NA BARRA ▲▼ ' + nomeAgir() + ': SOLTA';
           if (Ctrl.actJust) this.soltaBarra();
         } else if (this.barraDoTetoPerto().d <= 30 && !this.comSono()) {
           dica = nomeAgir() + ': SEGURAR NA BARRA';
