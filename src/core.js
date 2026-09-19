@@ -4164,6 +4164,16 @@ var ACENTUADOS = {
   'Ó': ['O', 'agudo'], 'Õ': ['O', 'til'], 'Ô': ['O', 'circ'],
   'Ú': ['U', 'agudo'], 'Ç': ['C', 'cedilha']
 };
+/* ---------- reduzir tremida ----------
+   Acessibilidade (skill game-feel): a tremida de tela de todo o jogo passa
+   por este fator. 1 = cheia, 0.4 = reduzida. Mexe-se na pausa. */
+var TREMIDA = 1;
+try { TREMIDA = localStorage.getItem('metrosp_tremida') === 'baixa' ? 0.4 : 1; } catch (e) { }
+function ligaTremida(cheia) {
+  TREMIDA = cheia ? 1 : 0.4;
+  try { localStorage.setItem('metrosp_tremida', cheia ? 'cheia' : 'baixa'); } catch (e) { }
+}
+
 var CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?:;\'"-+=/()$%<>#*ÁÀÃÂÉÊÍÓÕÔÚÇ▲▼◄►✓_';
 var CEL_W = 6, CEL_H = 10, POR_LINHA = 16;
 

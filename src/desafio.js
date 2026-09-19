@@ -388,6 +388,19 @@ var DesafioScene = new Phaser.Class({
     this.nervoso = false;
     this.tempo = 0;
 
+    /* ---------- o impacto (skill game-feel) ----------
+       Três intensidades, uma por importância do golpe: PEQUENO (golpe
+       comum), MÉDIO (acertou a fraqueza, NA LATA, ou golpe dele que doeu)
+       e GRANDE (o golpe que zera a paciência). Cada uma junta, no mesmo
+       instante: a tremida por 'trauma' (soma, e vai morrendo, suave e não
+       aos solavancos), a pausa no impacto (o mundo dos efeitos para uns
+       milésimos), o clarão, o número do dano subindo e o alvo achatando e
+       voltando. */
+    this.trauma = 0; this.tTrauma = 0; this.parado = 0; this.clarao = 0;
+    var camM = this.dados.cam;
+    this.camBase = camM ? { x: camM.scrollX, y: camM.scrollY } : null;
+    this.numeros = [];
+    for (var nn = 0; nn < 6; nn++) this.numeros.push(txtC(this, 0, 0, '', PAL.branco, 8).setDepth(6).setVisible(false));
     this.g = this.add.graphics().setDepth(10);
     // os ataques voam por baixo dos painéis, no meio da tela, onde estão os dois
     this.gFx = this.add.graphics().setDepth(5);
@@ -541,6 +554,10 @@ var DesafioScene = new Phaser.Class({
     var eu = this;
     var msgs = [{ msg: r.fala, fx: function () {
       eu.ataque(r.tipo, true, false, mult > 1);
+      var zera = eu.ele.pac - dano <= 0;
+      eu.time.delayedCall(FX_CHEGA + 40, function () {
+        eu.impacto(zera ? 'grande' : (mult > 1 || na ? 'medio' : 'pequeno'), eu.dados.ele, dano, mult > 1 ? PAL.verde : (mult < 1 ? PAL.cinza : PAL.branco));
+      });
       eu.ele.pac = Math.max(0, eu.ele.pac - dano);
       eu.tremeEle = 260;
       sfx(mult > 1 ? 'batida' : 'empurra');
@@ -572,7 +589,9 @@ var DesafioScene = new Phaser.Class({
       if (bloq) { sfx('catraca'); return; }
       eu.vc.pac = Math.max(0, eu.vc.pac - dano);
       eu.tremeVc = 260;
-      eu.cameras.main.shake(160, eu.nervoso ? 0.009 : 0.006);
+      eu.time.delayedCall(FX_CHEGA + 40, function () {
+        eu.impacto(eu.vc.pac <= 0 ? 'grande' : (eu.nervoso || dano >= 15 ? 'medio' : 'pequeno'), eu.dados.pl, dano, PAL.vermelho);
+      });
       sfx('erro');
     } }];
     if (bloq) {
@@ -639,6 +658,8 @@ var DesafioScene = new Phaser.Class({
     var dp = this.dados.pl, de = this.dados.ele;
     if (dp && dp.active) { dp.clearTint(); dp.x = this.xPl; }
     if (de && de.active) { de.clearTint(); de.x = this.xEle; de.angle = 0; }
+    [dp, de].forEach(function (sp) { if (sp && sp.active && sp._escalaBase) { sp.setScale(sp._escalaBase.x, sp._escalaBase.y); delete sp._escalaBase; } });
+    if (this.dados.cam && this.camBase) this.dados.cam.setScroll(this.camBase.x, this.camBase.y);
     devolveCenas(this, this.congeladas);
     var cb = this.dados.aoFechar, r = this.resultado;
     this.scene.stop('Desafio');
@@ -659,8 +680,21 @@ var DesafioScene = new Phaser.Class({
     this.ele.mostra += Phaser.Math.Clamp(this.ele.pac - this.ele.mostra, -v, v);
     if (this.tremeEle > 0) this.tremeEle -= dt;
     if (this.tremeVc > 0) this.tremeVc -= dt;
-    this.pintaFx(dt);
+    // a pausa no impacto: os efeitos param uns milésimos (a mensagem e o relógio seguem)
+    if (this.parado > 0) this.parado -= dt; else this.pintaFx(dt);
+    // a tremida por trauma: soma com os golpes, cai 1,4 por segundo, e o tremor é trauma²
+    var cam = this.dados.cam;
+    if (cam && this.camBase) {
+      this.trauma = Math.max(0, this.trauma - 1.4 * dt / 1000);
+      this.tTrauma += dt / 1000 * 30;
+      var tr = this.trauma * this.trauma * TREMIDA;
+      cam.setScroll(this.camBase.x + 7 * tr * Math.sin(this.tTrauma * 1.7), this.camBase.y + 5 * tr * Math.sin(this.tTrauma * 2.3));
+    }
     this.pinta();
+    if (this.clarao > 0) {
+      this.g.fillStyle(0xffffff, this.clarao * TREMIDA).fillRect(0, 0, GW, GH);
+      this.clarao = Math.max(0, this.clarao - dt / 400);
+    }
   },
 
   /* Onde um sprite do vagão aparece na tela, com o zoom da câmera de lá.
@@ -674,6 +708,13 @@ var DesafioScene = new Phaser.Class({
 
   // um ataque: de quem sai, pra quem vai, e o que acontece quando chega
   ataque: function (tipo, deVc, bloq, forte) {
+    // a preparação (antecipação): quem ataca recua um pouco e volta, antes de soltar
+    var quemAtaca = deVc ? this.dados.pl : this.dados.ele, alvoAt = deVc ? this.dados.ele : this.dados.pl;
+    if (quemAtaca && quemAtaca.active && alvoAt) {
+      var ladoAt = alvoAt.y > quemAtaca.y ? -1 : 1, y0At = quemAtaca.y;
+      this.tweens.add({ targets: quemAtaca, y: y0At + ladoAt * 3, duration: 90, yoyo: true, ease: 'Cubic.easeOut',
+        onComplete: function () { if (quemAtaca.active) quemAtaca.y = y0At; } });
+    }
     var A = this.naTela(deVc ? this.dados.pl : this.dados.ele);
     var B = this.naTela(deVc ? this.dados.ele : this.dados.pl);
     // bloqueado, o golpe morre num escudo a um quarto do caminho
@@ -741,6 +782,34 @@ var DesafioScene = new Phaser.Class({
     var x0 = sp.x, dx = (pt.x - de.x) > 0 ? 1 : -1;
     this.tweens.add({ targets: sp, x: x0 + dx * (forte ? 5 : 3), duration: 70, yoyo: true,
       onComplete: function () { if (sp.active) sp.x = x0; } });
+  },
+
+  impacto: function (nivel, alvo, dano, cor) {
+    var T = { pequeno: { tr: 0.18, para: 0, clarao: 0 }, medio: { tr: 0.42, para: 55, clarao: 0.18 },
+      grande: { tr: 0.85, para: 130, clarao: 0.4 } }[nivel] || { tr: 0.2, para: 0, clarao: 0 };
+    this.trauma = Math.min(1, this.trauma + T.tr);
+    this.parado = Math.max(this.parado, T.para);
+    this.clarao = Math.max(this.clarao, T.clarao);
+    if (alvo && alvo.active) {
+      // achata e volta, passando um pouco do tamanho (o 'pop')
+      var sx = alvo.scaleX, sy = alvo.scaleY, eu = this;
+      if (alvo._escalaBase === undefined) alvo._escalaBase = { x: sx, y: sy };
+      var b = alvo._escalaBase, forca = nivel === 'grande' ? 0.3 : (nivel === 'medio' ? 0.2 : 0.12);
+      alvo.setScale(b.x * (1 + forca), b.y * (1 - forca));
+      this.tweens.add({ targets: alvo, scaleX: b.x, scaleY: b.y, duration: 220, ease: 'Back.easeOut' });
+    }
+    // o número do dano, subindo e sumindo
+    if (dano > 0 && alvo) {
+      var pt = this.naTela(alvo), num = null;
+      for (var i = 0; i < this.numeros.length; i++) if (!this.numeros[i].visible) { num = this.numeros[i]; break; }
+      if (num) {
+        num.setVisible(true).setAlpha(1).setText('-' + dano).setColor(cor || PAL.branco)
+          .setScale(nivel === 'pequeno' ? ESCALA_TEXTO / 2 : ESCALA_TEXTO)
+          .setPosition(pt.x + (Math.random() - 0.5) * 20, pt.y - 20);
+        this.tweens.add({ targets: num, y: num.y - 34, alpha: 0, duration: 700, ease: 'Cubic.easeOut',
+          onComplete: function () { num.setVisible(false); } });
+      }
+    }
   },
 
   /* deita de lado, fica um tempinho rolando de dor e levanta como se

@@ -13,6 +13,7 @@ var ITENS_PAUSA = [
   { chave: 'voltar', rotulo: function () { return 'CONTINUAR'; } },
   { chave: 'efeitos', rotulo: function () { return 'EFEITOS: ' + (SOM_LIGADO ? 'LIGADO' : 'DESLIGADO'); } },
   { chave: 'musica', rotulo: function () { return 'MÚSICA: ' + (MUSICA_LIGADA ? 'LIGADA' : 'DESLIGADA'); } },
+  { chave: 'tremida', rotulo: function () { return 'TREMIDA: ' + (TREMIDA >= 1 ? 'CHEIA' : 'REDUZIDA'); } },
   /* No treino não há trajeto pra reiniciar nem menu pra onde sair: os
      dois botões falam a língua do treino e levam de volta pra lista. */
   { chave: 'reiniciar', rotulo: function () { return GameState.treino ? 'REPETIR' : 'REINICIAR TRAJETO'; } },
@@ -46,7 +47,7 @@ var PausaScene = new Phaser.Class({
     this.itens = [];
     this.zonas = [];
     for (var i = 0; i < ITENS_PAUSA.length; i++) {
-      var y = 228 + i * 40;
+      var y = 222 + i * 36;   // 36 e não 40: com o sexto item (TREMIDA) o último caía na legenda (440)
       this.itens.push(txtC(this, GW / 2, y, '', PAL.cinza, 8).setDepth(2002));
       var z = this.add.zone(40, y - 10, GW - 80, 34).setOrigin(0, 0).setInteractive();
       (function (idx) {
@@ -93,7 +94,7 @@ var PausaScene = new Phaser.Class({
     for (var i = 0; i < ITENS_PAUSA.length; i++) {
       var it = ITENS_PAUSA[i], sel = (i === this.sel);
       var vale = (it.chave !== 'reiniciar') || dentro;
-      var y = 228 + i * 40;
+      var y = 222 + i * 36;   // 36 e não 40: com o sexto item (TREMIDA) o último caía na legenda (440)
       if (sel) {
         g.fillStyle(0x14141f, 1).fillRect(40, y - 10, GW - 80, 34);
         g.lineStyle(2, 0xf2c14e, 1).strokeRect(40, y - 10, GW - 80, 34);
@@ -117,6 +118,7 @@ var PausaScene = new Phaser.Class({
     if (it.chave === 'voltar') { this.fecha(); return; }
     if (it.chave === 'efeitos') { ligaSom(!SOM_LIGADO); sfx('ok'); this.pinta(); return; }
     if (it.chave === 'musica') { ligaMusica(!MUSICA_LIGADA); this.pinta(); return; }
+    if (it.chave === 'tremida') { ligaTremida(TREMIDA < 1); sfx('ok'); this.pinta(); return; }
     if (it.chave === 'reiniciar') {
       if (!GameState.char) return;
       if (GameState.treino) {
