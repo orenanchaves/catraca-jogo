@@ -78,6 +78,14 @@ var ASSETS = {
     { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'palmeiras' },
     { key: 'np_corintiano', file: 'assets/npcs/corintiano.png', pal: PELES.corintiano, corpo: 'touca_corinthians' },
     { key: 'np_atendente', file: 'assets/npcs/atendente.png', pal: PELES.atendente, corpo: 'atendente' },
+    // o estágio do estudante (Ato 1): a Sueli do RH, o Marcão e o Fiscal
+    { key: 'np_sueli', file: 'assets/npcs/sueli.png', pal: PELES.sueli, corpo: 'rh_coque' },
+    { key: 'np_marcao', file: 'assets/npcs/marcao.png', pal: PELES.marcao, corpo: 'gestor' },
+    { key: 'np_fiscal', file: 'assets/npcs/fiscal.png', pal: PELES.fiscal, corpo: 'fiscal' },
+    // a família e a Bia do estudante (as fotos do ZipZap)
+    { key: 'np_mae_est', file: 'assets/npcs/mae_estudante.png', pal: PELES.maeEst, corpo: 'coque' },
+    { key: 'np_pai_est', file: 'assets/npcs/pai_estudante.png', pal: PELES.paiEst, corpo: 'padrao' },
+    { key: 'np_bia', file: 'assets/npcs/bia.png', pal: PELES.bia, corpo: 'rabo' },
     { key: 'np_atendenteF', file: 'assets/npcs/atendente_f.png', pal: PELES.atendenteF, corpo: 'atendente_coque' },
     { key: 'np_saopaulino', file: 'assets/npcs/saopaulino.png', pal: PELES.saopaulino, corpo: 'careca_saopaulo' },
     { key: 'np_santista', file: 'assets/npcs/santista.png', pal: PELES.santista, corpo: 'moicano_santos' },

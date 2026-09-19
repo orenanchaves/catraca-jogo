@@ -22,7 +22,7 @@
 var ROTINAS = {
   estudante: [
     { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 50 },
-    { rotulo: 'A FACULDADE', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
+    { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
     { rotulo: 'CASA', estacao: CASA, saida: 22 * 60 + 40 }
   ],
   clt: [
@@ -101,7 +101,7 @@ function respostaPadrao(k) { return RESPOSTA_PADRAO[k] || RESPOSTA_PADRAO.clt; }
 var CONTATOS = {
   estudante: [
     {
-      nome: 'MÃE', conversas: [
+      nome: 'MÃE', foto: 'np_mae_est', conversas: [
         { msgs: ['Filho, passa na farmácia', 'da Vila Mariana e traz', 'o remédio do seu pai'],
           vai: { rotulo: 'A FARMÁCIA', estacao: 'VILA MARIANA' } },
         { msgs: ['Ta chegando que horas?', 'Deixei comida no fogão'] },
@@ -109,14 +109,14 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'PAI', conversas: [
+      nome: 'PAI', foto: 'np_pai_est', conversas: [
         { msgs: ['Vem no Tatuapé depois', 'que eu te dou carona', 'pra casa'],
           vai: { rotulo: 'A CARONA DO PAI', estacao: 'TATUAPÉ' } },
         { msgs: ['Bom dia', 'Bom dia'] }
       ]
     },
     {
-      nome: 'BIA ❤', conversas: [
+      nome: 'BIA ❤', foto: 'np_bia', conversas: [
         { msgs: ['Amor, me encontra na', 'Santa Cruz? To saindo', 'do cursinho agora'],
           vai: { rotulo: 'ENCONTRAR A BIA', estacao: 'SANTA CRUZ' } },
         { msgs: ['Boa sorte no estágio!'] },
@@ -124,7 +124,8 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'ROLÊ DA FACUL', grupo: true, conversas: [
+      // a faculdade do estudante é a UNIPA (a referência é a Unip)
+      nome: 'ROLÊ DA UNIPA', grupo: true, icone: 'capelo', conversas: [
         { msgs: ['Alguém topa Liberdade', 'depois da aula?', 'Tem pastel de feira'],
           vai: { rotulo: 'O ROLÊ', estacao: 'LIBERDADE' } },
         { msgs: ['Prova adiada!!!', 'GRAÇAS A DEUS'] }
@@ -149,7 +150,7 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'FAMÍLIA ❤', grupo: true, conversas: [
+      nome: 'FAMÍLIA ❤', grupo: true, icone: 'casa', conversas: [
         { msgs: ['BOM DIAAA FAMÍLIA', 'Bom dia', 'Bom dia', '(mais 14 mensagens)'] },
         { msgs: ['Almoço domingo na', 'casa da tia, Carrão'],
           vai: { rotulo: 'O ALMOÇO', estacao: 'CARRÃO' } }
@@ -171,7 +172,7 @@ var CONTATOS = {
 
   senhor: [
     {
-      nome: 'BAILE FLASHBACK', grupo: true, conversas: [
+      nome: 'BAILE FLASHBACK', grupo: true, icone: 'nota', conversas: [
         { msgs: ['Hoje tem baile no', 'salão da Santana!', 'Chega 7h em ponto'],
           vai: { rotulo: 'O BAILE', estacao: 'SANTANA' } },
         { msgs: ['Foto do baile passado', '(imagem)'] }
@@ -185,7 +186,7 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'TURMA DA FACUL 68', grupo: true, conversas: [
+      nome: 'TURMA DA FACUL 68', grupo: true, icone: 'capelo', conversas: [
         { msgs: ['Reunião da turma!', 'Bar de sempre, Liberdade'],
           vai: { rotulo: 'A TURMA', estacao: 'LIBERDADE' } },
         { msgs: ['O Nelson faleceu', 'Que Deus o tenha'] }
@@ -216,7 +217,7 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'RESENHA DA QUEBRADA', grupo: true, conversas: [
+      nome: 'RESENHA DA QUEBRADA', grupo: true, icone: 'copo', conversas: [
         { msgs: ['Resenha hoje no', 'Belém, colou?'],
           vai: { rotulo: 'A RESENHA', estacao: 'BELÉM' } },
         { msgs: ['tá osso hj', 'tá osso todo dia'] }
@@ -252,7 +253,7 @@ var CONTATOS = {
       ]
     },
     {
-      nome: 'CHÁ DE BEBÊ', grupo: true, conversas: [
+      nome: 'CHÁ DE BEBÊ', grupo: true, icone: 'mamadeira', conversas: [
         { msgs: ['Meninas, decidimos:', 'chá no Tatuapé sábado'],
           vai: { rotulo: 'O CHÁ DE BEBÊ', estacao: 'TATUAPÉ' } },
         { msgs: ['que fofoooo', '(imagem)'] }
@@ -262,7 +263,7 @@ var CONTATOS = {
 
   torcedor: [
     {
-      nome: 'A TORCIDA', grupo: true, conversas: [
+      nome: 'A TORCIDA', grupo: true, icone: 'bola', conversas: [
         { msgs: ['Domingo tem jogo!', 'Concentração no bar'],
           vai: { rotulo: 'O BAR', estacao: 'TATUAPÉ' } },
         { msgs: ['Quem vai de camisa?', 'Todo mundo de camisa'] }
@@ -308,6 +309,12 @@ var CONTATOS = {
 
 /* o grupo do torcedor é a organizada do time dele */
 var ORGANIZADA = { corinthians: 'GAVIÕES', palmeiras: 'MANCHA', saopaulo: 'INDEPENDENTE', santos: 'CAMISA 12' };
+// a ficha do contato pelo nome: a conversa da história pega a foto e o ícone daqui
+function perfilDoContato(charKey, nome) {
+  var l = CONTATOS[charKey] || [];
+  for (var i = 0; i < l.length; i++) if (l[i].nome === nome) return l[i];
+  return null;
+}
 function contatosDe(k) {
   var l = CONTATOS[k] || CONTATOS.clt;
   if (k !== 'torcedor') return l;
@@ -403,6 +410,9 @@ function novoFio(item, temVai) {
   return {
     nome: item.contato.nome,
     grupo: !!item.contato.grupo,
+    // quem tem rosto no jogo leva a foto; grupo leva o ícone dele
+    foto: item.contato.foto || null,
+    icone: item.contato.icone || null,
     msgs: c.msgs.slice(0),
     vai: temVai ? c.vai : null,
     /* o que você manda de volta: uma resposta pra cada saída, e a

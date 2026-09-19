@@ -1725,6 +1725,10 @@ var CORPOS = {
   longo_palmeiras: { herda: 'longo', pos: camisaDeTime('palmeiras') },
   longo_saopaulo: { herda: 'longo', pos: camisaDeTime('saopaulo') },
   rabo_santos: { mods: [CABELO_RABO], pos: camisaDeTime('santos') },
+  // o pessoal do estágio: o crachá é o mesmo de quem trabalha no metrô (crachaDoMetro)
+  rh_coque: { herda: 'saia', mods: [CABELO_COQUE], pos: crachaDoMetro },
+  gestor: { mods: [CABELO_CARECA], pos: crachaDoMetro },
+  fiscal: { mods: [CABELO_BONE], pos: crachaDoMetro },
   // os cosplayers da Liberdade (roupaCosplay)
   cos_marinheira: { herda: 'saia', pos: roupaCosplay('marinheira') },
   cos_akatsuki: { mods: [CABELO_RABO], pos: roupaCosplay('akatsuki') },
@@ -2030,6 +2034,22 @@ var PELES = {
   /* os desafiantes: polo bege e jeans; camisa branca e calça social;
      camisa verde de time e boné */
   tiozao: pele('#0a0a12', '#e0b088', '#c8c8d8', '#e3d2a0', '#4a5a7a', '#3a2a22', '#f0eeff'),
+  /* O pessoal do estágio do estudante (CAMPANHA.md, Ato 1). A SUELI do
+     RH: coque castanho, blusa rosa, saia escura e o crachá branco. O
+     MARCÃO, o gestor: careca, camisa social azul-clara, calça escura e o
+     crachá. O FISCAL: boné azul-marinho e colete laranja, que não se
+     confunde com nenhum dos três uniformes de guarda (azul, azul com bege,
+     preto): de longe já se sabe que ele não é da segurança. */
+  sueli: pele('#0a0a12', '#e0b088', '#6b4228', '#d0719f', '#2a2a38', '#14141c', '#f0eeff'),
+  marcao: pele('#0a0a12', '#b07d52', '#1a1a24', '#a9c6e8', '#2a2f40', '#14141c', '#f0eeff'),
+  fiscal: pele('#0a0a12', '#c99a70', '#1c2436', '#ec7000', '#2a2a38', '#14141c', '#f2f0ff'),
+  /* A família e a Bia do estudante: foto no ZipZap e gente de verdade no
+     jogo. A mãe de coque, blusa roxa; o pai grisalho, de polo verde; a Bia
+     de rabo de cavalo, blusa rosa e jeans. A pele da família é a do
+     estudante, pra se ver que é família. */
+  maeEst: pele('#0a0a12', '#c99a70', '#3a2a22', '#8a5a9a', '#2a2a38', '#14141c', '#f0eeff'),
+  paiEst: pele('#0a0a12', '#c99a70', '#8a8a92', '#3a7a5a', '#3a3a4a', '#14141c', '#f0eeff'),
+  bia: pele('#0a0a12', '#e0b088', '#1a1a24', '#f08ab8', '#3a4f7a', '#14141c', '#f0eeff'),
   pregador: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#f0eeff', '#14141c', '#14141c', '#14141c'),
   torcedor: pele('#0a0a12', '#c99a70', '#2a2a30', '#0a7a42', '#e8e8f0', '#14141c', '#f0eeff'),
   // camisa preta com detalhe branco, bermuda branca: o do Corinthians
@@ -3586,12 +3606,17 @@ var DEX = [
   { id: 'cosVingador', nome: 'COSPLAY VINGADOR', sprite: 'np_cos_sasuke', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Quimono branco, cara fechada. Só responde hmph.' },
   { id: 'cosNuvem', nome: 'ACATSUQUI', sprite: 'np_cos_akatsuki', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Capa preta de nuvens vermelhas. O mais forte do evento.' },
   { id: 'cosRosa', nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Cabelo rosa e soco que racha o chão.' },
-  { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' }
+  { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' },
+  // o estágio do estudante (Ato 1): dois pacíficos e o primeiro chefão
+  { id: 'sueli', nome: 'SUELI', sprite: 'np_sueli', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'Do RH. Foi quem te chamou pro estágio.' },
+  { id: 'marcao', nome: 'MARCÃO', sprite: 'np_marcao', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'O gestor. Repara em quem chega atrasado.' },
+  { id: 'fiscal', nome: 'O FISCAL', sprite: 'np_fiscal', desafio: true, chefao: true, tipo: 'CHEFÃO', onde: 'CATRACA', desc: 'Caça bilhete clonado. Chefão do Ato 1.' }
 ];
 // a cor de cada tipo: a da bolinha e a da borda da carta
 var COR_TIPO = {
   CHATO: 0xf2c14e, TORCIDA: 0x00e676, GUARDA: 0x3a7fd0, VENDEDOR: 0xe8a33c,
-  RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0, COSPLAY: 0xf08ab8
+  RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0, COSPLAY: 0xf08ab8,
+  'ESTÁGIO': 0xd0719f, 'CHEFÃO': 0xec7000
 };
 /* Onde cada um costuma aparecer ('coloca em qual estação, pra toda a
    METRODEX'): é o que o jogo faz de verdade, e não enfeite. */
@@ -3603,7 +3628,8 @@ var DEX_APARECE = {
   guardaForte: 'CATRACA DE TODAS', ambulante: 'PLATAFORMA E VAGÃO', rimador: 'VAGÃO',
   pedinte: 'SAGUÃO DE TODAS', atendente: 'BILHETERIA DE TODAS', gestante: 'BANCO DO VAGÃO', idoso: 'BANCO DO VAGÃO',
   cosLaranja: 'DA ANA ROSA ATÉ TIRADENTES', cosVingador: 'DA ANA ROSA ATÉ TIRADENTES', cosNuvem: 'DA ANA ROSA ATÉ TIRADENTES',
-  cosRosa: 'DA ANA ROSA ATÉ TIRADENTES', cosColegial: 'DA ANA ROSA ATÉ TIRADENTES'
+  cosRosa: 'DA ANA ROSA ATÉ TIRADENTES', cosColegial: 'DA ANA ROSA ATÉ TIRADENTES',
+  sueli: 'SAÍDA DO PARAÍSO', marcao: 'SAÍDA DO PARAÍSO', fiscal: 'PARAÍSO, E NA SUA CATRACA'
 };
 for (var dxa = 0; dxa < DEX.length; dxa++) DEX[dxa].aparece = DEX_APARECE[DEX[dxa].id] || DEX[dxa].onde;
 var DEX_POR_SPRITE = {};

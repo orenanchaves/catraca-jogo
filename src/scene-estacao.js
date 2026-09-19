@@ -525,6 +525,9 @@ var EstacaoScene = new Phaser.Class({
 
     this.montaAmbulante();
     this.montaDesafianteDaEstacao();
+    // a campanha (src/chefao-fiscal.js): o vulto do fiscal nos dias 3 e 4, e o chefão no dia 5
+    this.montaVulto();
+    this.montaChefao();
 
     /* Onde você aparece: quem vem da rua entra pelo saguão; quem vem da
        baldeação ou desceu na estação errada já está lá em cima. */
@@ -601,6 +604,10 @@ var EstacaoScene = new Phaser.Class({
       GameState.checkpointAviso = null;
       var selfCk = this;
       this.time.delayedCall(4200, function () { if (selfCk.dialog) selfCk.dialog.fecha(); });
+    } else if (GameState.recepcao && !this.treino) {
+      // a missão fechou aqui: quem mandou te recebe em pessoa (src/chefao-fiscal.js)
+      this.recebeNaSaida(GameState.recepcao);
+      GameState.recepcao = null;
     } else if (!noAlto) {
       var f = GameState.faixa();
       var cabec = GameState.hora() + ', ' + f.nome.toLowerCase() + '.\n';
@@ -636,7 +643,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.mez) {
       this.barracas = cabinesDoMezanino().concat([
         { chave: 'dog', nome: 'DOG DO CÃO', cor: 0xe8362c, x: 236, y: 420, w: 68, h: 58, lado: 0,
-          titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."', cardapio: ['dogao', 'agua', 'chocolate'] },
+          titulo: '"DOG DO CÃO, freguês!\nO monstro da estação."', cardapio: ['dogao', 'cafe', 'agua', 'chocolate'] },
         { chave: 'banca', nome: 'BANCA', cor: 0x3a7fd0, x: 318, y: 424, w: 68, h: 54, lado: 0,
           titulo: '"Jornal, Ralls, pururuca."', cardapio: ['pururuca', 'ralls', 'jornal', 'agua'] }
       ]);
@@ -2911,6 +2918,7 @@ var EstacaoScene = new Phaser.Class({
   },
   entrouDeVez: function (espremido) {
     this.fimEmpurrao(!!this.treino);          // no treino você fica na plataforma
+    if (this.chefao) this.escapouDoFiscal();    // entrou com o fiscal atrás: escapou
     /* No treino, entrar é o fim do minigame e não o começo do vagão:
        sem isto o treino do empurrão te despachava pra uma viagem de
        verdade depois de você só querer ver o empurrão. */
@@ -3153,6 +3161,8 @@ var EstacaoScene = new Phaser.Class({
     if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); vaiPraOFim(this); return; }
 
     this.cicloTrem(dt);
+    // o chefão corre antes do empurrão: o fiscal te alcança até na porta do vagão
+    if (this.chefao && this.atualizaChefao(dt)) { this.pl.anima(dt, false); return; }
     if (this.empurrando) { this.atualizaEmpurrao(dt); return; }
     if (this.noElevador) { this.viajaDeElevador(dt); return; }
 

@@ -32,7 +32,8 @@ var CAT_DO_EV = {
   catraca: 'honesto', cedeu: 'honesto', cedeuCedo: 'honesto', ajudou: 'honesto', achados: 'honesto',
   pulouCatraca: 'malandro', escapouGuarda: 'malandro', moedaDoChao: 'malandro',
   venceuDesafio: 'desafio', rimaGanha: 'desafio', encaradaGanha: 'desafio', disputaGanha: 'desafio',
-  ambulante: 'gente', sentou: 'gente'
+  ambulante: 'gente', sentou: 'gente',
+  chefao: 'desafio', ato: 'rota'
 };
 
 /* O que a meta antiga vira no post: a ordem ('Pule a catraca 3 vezes')
@@ -74,7 +75,12 @@ var CONQUISTAS_NOVAS = [
   { id: 'liberdade', txt: 'Desça na Liberdade', legenda: 'Rolê na Liberdade', ev: 'desceu', meta: 1, xp: 15, cat: 'rota',
     se: function (d) { return d.estacao === 'LIBERDADE'; } },
   { id: 'ambulante10', txt: 'Compre 10 vezes de ambulante', legenda: 'Freguês do ambulante', ev: 'ambulante', meta: 10, xp: 20 },
-  { id: 'dias5', txt: 'Feche 5 dias', legenda: '5 dias de metrô', ev: 'diaCompleto', meta: 5, xp: 30, cat: 'rota' }
+  { id: 'dias5', txt: 'Feche 5 dias', legenda: '5 dias de metrô', ev: 'diaCompleto', meta: 5, xp: 30, cat: 'rota' },
+  // a campanha (src/historia.js): o chefão do Ato 1 e a semana fechada
+  { id: 'fiscal', txt: 'Vença o FISCAL', legenda: 'O fiscal não me segurou', ev: 'chefao', meta: 1, xp: 60,
+    se: function (d) { return d.id === 'fiscal' && d.ok; } },
+  { id: 'ato1', txt: 'Feche a primeira semana de estágio', legenda: 'Primeira semana de estágio: feita', ev: 'ato', meta: 1, xp: 50,
+    se: function (d) { return d.ato === 1; } }
 ];
 
 // a lista inteira, montada uma vez: as antigas primeiro, na ordem dos níveis
@@ -241,6 +247,7 @@ var Catragram = {
       var cs = contatosDe(GameState.charKey || 'estudante');
       for (var i = 0; i < cs.length; i++) if (!cs[i].grupo) l.push(cs[i].nome);
     } catch (x) { }
+    if (GameState.charKey === 'estudante') l.push('SUELI (RH)', 'MARCÃO');
     return l.concat(CAT_FIGURAS);
   },
   reacoes: function (c) {

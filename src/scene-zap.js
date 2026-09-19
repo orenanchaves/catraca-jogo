@@ -111,6 +111,48 @@ function rotuloResposta(t) {
   return '► ' + (t.length > 17 ? t.slice(0, 16) + '.' : t);
 }
 
+/* ---------- a foto do grupo ----------
+   'O grupo tem que ter alguma foto, um ícone de alguma coisa': como a foto
+   de grupo de verdade, que quase sempre é um desenho do assunto. Um fundo
+   de cor e o desenho branco por cima: o capelo da faculdade, a casinha da
+   família, a nota do baile, a bola da torcida, a mamadeira do chá de bebê
+   e o copo da resenha. `r` é o raio da foto (17 na lista, 11 no alto da
+   conversa); o desenho escala junto. */
+var ICONES_GRUPO = {
+  capelo: 0x3a5a8a, casa: 0xe07a1e, nota: 0x8a3ad6, bola: 0x1faa59, mamadeira: 0xf08ab8, copo: 0xd8a02a
+};
+function desenhaIconeGrupo(g, tipo, cx, cy, r) {
+  var u = r / 17;
+  g.fillStyle(ICONES_GRUPO[tipo] || 0x3a5a8a, 1).fillCircle(cx, cy, r);
+  g.fillStyle(0xffffff, 1);
+  if (tipo === 'capelo') {
+    g.fillPoints([{ x: cx, y: cy - 9 * u }, { x: cx + 12 * u, y: cy - 4 * u }, { x: cx, y: cy + 1 * u }, { x: cx - 12 * u, y: cy - 4 * u }], true);
+    g.fillRect(cx - 6 * u, cy - 1 * u, 12 * u, 6 * u);
+    g.fillStyle(0xf2c14e, 1).fillRect(cx + 8 * u, cy - 4 * u, 1.5 * u, 9 * u).fillCircle(cx + 8.7 * u, cy + 6 * u, 1.8 * u);
+  } else if (tipo === 'casa') {
+    g.fillTriangle(cx - 11 * u, cy - 1 * u, cx + 11 * u, cy - 1 * u, cx, cy - 11 * u);
+    g.fillRect(cx - 8 * u, cy - 1 * u, 16 * u, 10 * u);
+    g.fillStyle(ICONES_GRUPO.casa, 1).fillRect(cx - 2 * u, cy + 3 * u, 4 * u, 6 * u);
+  } else if (tipo === 'nota') {
+    g.fillCircle(cx - 4 * u, cy + 6 * u, 3.5 * u).fillRect(cx - 1.5 * u, cy - 9 * u, 2 * u, 15 * u);
+    g.fillPoints([{ x: cx - 0.5 * u, y: cy - 9 * u }, { x: cx + 8 * u, y: cy - 5 * u }, { x: cx + 8 * u, y: cy - 1 * u }, { x: cx - 0.5 * u, y: cy - 5 * u }], true);
+  } else if (tipo === 'bola') {
+    g.fillCircle(cx, cy, 10 * u);
+    g.fillStyle(0x14141c, 1).fillCircle(cx, cy, 3 * u).fillCircle(cx - 7 * u, cy - 4 * u, 2 * u)
+      .fillCircle(cx + 7 * u, cy - 4 * u, 2 * u).fillCircle(cx - 4 * u, cy + 7 * u, 2 * u).fillCircle(cx + 4 * u, cy + 7 * u, 2 * u);
+  } else if (tipo === 'mamadeira') {
+    g.fillRoundedRect(cx - 5 * u, cy - 4 * u, 10 * u, 14 * u, 3 * u);
+    g.fillRect(cx - 6 * u, cy - 6 * u, 12 * u, 3 * u);
+    g.fillCircle(cx, cy - 9 * u, 3 * u);
+    g.fillStyle(ICONES_GRUPO.mamadeira, 1).fillRect(cx - 3 * u, cy + 1 * u, 6 * u, 1.5 * u).fillRect(cx - 3 * u, cy + 5 * u, 6 * u, 1.5 * u);
+  } else {
+    // o copo da resenha, com a espuma
+    g.fillRect(cx - 6 * u, cy - 5 * u, 12 * u, 14 * u);
+    g.fillCircle(cx - 4 * u, cy - 6 * u, 3.5 * u).fillCircle(cx + 1 * u, cy - 7 * u, 4 * u).fillCircle(cx + 5 * u, cy - 5 * u, 3 * u);
+    g.lineStyle(2 * u, 0xffffff, 1).strokeRect(cx + 6 * u, cy - 2 * u, 4 * u, 7 * u);
+  }
+}
+
 var ZapScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function ZapScene() { Phaser.Scene.call(this, { key: 'Zap', active: false }); },
@@ -933,7 +975,12 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xf0f2f5, 1).fillRect(x0, ZAP.topo - 8, W, 34);
       g.fillStyle(0xd1d7db, 1).fillRect(x0, ZAP.topo + 25, W, 1);
       g.fillStyle(f0.grupo ? 0x3a5a8a : 0x4a4a5e, 1).fillCircle(x0 + 30, ZAP.topo + 9, 11);
-      g.fillStyle(0x7a7a90, 1).fillCircle(x0 + 30, ZAP.topo + 5, 4).fillRect(x0 + 24, ZAP.topo + 11, 12, 6);
+      if (f0.grupo && f0.icone) desenhaIconeGrupo(g, f0.icone, x0 + 30, ZAP.topo + 9, 11);
+      else if (f0.foto && this.textures.exists(f0.foto)) {
+        g.fillStyle(0xf6dbe8, 1).fillCircle(x0 + 30, ZAP.topo + 9, 11);
+        this.figMochila[0].setTexture(f0.foto, 0).clearTint().setScale(0.5).setCrop(0, 0, 32, 30)
+          .setPosition(x0 + 30, ZAP.topo + 13).setVisible(true);
+      } else g.fillStyle(0x7a7a90, 1).fillCircle(x0 + 30, ZAP.topo + 5, 4).fillRect(x0 + 24, ZAP.topo + 11, 12, 6);
       this.linha(0, ZAP.topo - 6, '◄', '#3b4a54').setPosition(x0 + 4, ZAP.topo + 1);
       this.linha(1, ZAP.topo - 6, (f0.grupo ? '# ' : '') + f0.nome, '#111b21').setPosition(x0 + 48, ZAP.topo - 5);
       this.linha(2, ZAP.topo, f0.grupo ? 'GRUPO' : 'ONLINE', '#667781').setScale(ESCALA_TEXTO / 2).setPosition(x0 + 48, ZAP.topo + 13);
@@ -1049,7 +1096,16 @@ var ZapScene = new Phaser.Class({
       // a foto: a cor sai do nome, e a inicial vai no meio (grupo leva o desenho de gente)
       var cf = CORES_FOTO[(f.nome.charCodeAt(0) + f.nome.length) % CORES_FOTO.length], fx = X0 + 24, fy = y2 + 26;
       g.fillStyle(f.grupo ? 0xdfe5e7 : cf, 1).fillCircle(fx, fy, 17);
-      if (f.grupo) {
+      /* quem tem rosto no jogo (a Sueli, o Marcão) tem foto de verdade: o
+         boneco, recortado no peito ('foto no ZipZap e na física') */
+      var comFoto = f.foto && this.textures.exists(f.foto);
+      if (comFoto) {
+        g.fillStyle(0xf6dbe8, 1).fillCircle(fx, fy, 17);
+        this.figMochila[i].setTexture(f.foto, 0).clearTint().setScale(0.7).setCrop(0, 0, 32, 30)
+          .setPosition(fx, fy + 6).setVisible(true);
+      }
+      if (f.grupo && f.icone) desenhaIconeGrupo(g, f.icone, fx, fy, 17);
+      else if (f.grupo) {
         g.fillStyle(0xffffff, 1).fillCircle(fx - 5, fy - 4, 4).fillCircle(fx + 6, fy - 3, 3.5)
           .fillRoundedRect(fx - 12, fy + 2, 14, 8, 3).fillRoundedRect(fx + 1, fy + 3, 11, 7, 3);
       }
@@ -1060,8 +1116,11 @@ var ZapScene = new Phaser.Class({
         g.fillStyle(0xffffff, 1).fillCircle(sx0, sy0, 8);
         g.fillStyle(0xf2c14e, 1).fillPoints(pts, true);
       }
-      var ini = this.linhas[12 + (i % 4)];
-      if (!f.grupo && i < 4) ini.setVisible(true).setScale(ESCALA_TEXTO).setOrigin(0.5, 0.5).setPosition(fx, fy + 1)
+      /* a inicial mora na reserva do mapa (livre na lista): nas linhas 12..15
+         ela brigava com o FECHAR da barra de baixo (linha 14), e a terceira
+         conversa e a quinta ficavam sem letra */
+      var ini = this.rotMapa[30 + i];
+      if (!f.grupo && !comFoto) ini.setVisible(true).setScale(ESCALA_TEXTO).setOrigin(0.5, 0.5).setPosition(fx, fy + 1)
         .setText(f.nome.replace(/[^A-ZÀ-Ú]/g, '').charAt(0) || '?').setColor('#ffffff');
       // o nome e a prévia
       this.linhas[i * 2].setVisible(true).setPosition(X0 + 48, y2 + 8)
@@ -1778,6 +1837,15 @@ var ZapScene = new Phaser.Class({
       // a pílula do número e a bolinha do tipo
       g.fillStyle(0x0a0a10, 0.9).fillRoundedRect(x + 5, y + 5, 30, 12, 6);
       g.fillStyle(cor, 1).fillCircle(x + W - 12, y + 11, 5);
+      /* de luta ou da paz, dito com desenho do lado da bolinha do tipo:
+         as espadas cruzadas vermelhas, ou a folhinha verde */
+      if (nivel && e.desafio) {
+        g.lineStyle(2, 0xe8362c, 1);
+        g.lineBetween(x + W - 32, y + 6, x + W - 22, y + 16); g.lineBetween(x + W - 22, y + 6, x + W - 32, y + 16);
+      } else if (nivel) {
+        g.fillStyle(0x7fd6a0, 1).fillEllipse(x + W - 27, y + 11, 10, 6);
+        g.lineStyle(1, 0x2a6a4a, 1).lineBetween(x + W - 31, y + 12, x + W - 23, y + 10);
+      }
       // o círculo escuro com o boneco
       g.fillStyle(0x2a2a34, 1).fillCircle(cx, y + 46, 31);
       g.fillStyle(0x34343f, 1).fillCircle(cx - 4, y + 41, 24);
@@ -1821,7 +1889,9 @@ var ZapScene = new Phaser.Class({
   montaBuscaDex: function () {
     var self = this, W = ZAP.tx1 - ZAP.tx0;
     this.dexTag = 'TODOS'; this.dexBusca = ''; this.dexChipX = 0;
-    var tipos = ['TODOS'];
+    /* 'Tem personagem que você luta e tem os pacíficos': as duas tags
+       vêm logo depois de TODOS, antes das de tipo */
+    var tipos = ['TODOS', 'DE LUTA', 'PACÍFICOS'];
     DEX.forEach(function (e) { if (tipos.indexOf(e.tipo) < 0) tipos.push(e.tipo); });
     this.tagsDex = tipos;
     this.gChipsDex = this.add.graphics().setDepth(2401);
@@ -1884,7 +1954,9 @@ var ZapScene = new Phaser.Class({
     var tag = this.dexTag || 'TODOS', b = semAcentoDex((this.dexBusca || '').trim()), dex = leDex(), out = [];
     for (var i = 0; i < DEX.length; i++) {
       var e = DEX[i];
-      if (tag !== 'TODOS' && e.tipo !== tag) continue;
+      if (tag === 'DE LUTA') { if (!e.desafio) continue; }
+      else if (tag === 'PACÍFICOS') { if (e.desafio) continue; }
+      else if (tag !== 'TODOS' && e.tipo !== tag) continue;
       if (b) {
         var onde = semAcentoDex((dex[e.id] ? e.nome + ' ' : '') + e.tipo + ' ' + e.onde);
         if (onde.indexOf(b) < 0) continue;
@@ -1908,7 +1980,7 @@ var ZapScene = new Phaser.Class({
     var x = x0 + 8 - this.dexChipX, pos = [];
     for (i = 0; i < this.tagsDex.length; i++) {
       var tg = this.tagsDex[i], on = tg === this.dexTag, w = tg.length * 6 + 16;
-      var cor = tg === 'TODOS' ? 0x00e676 : (COR_TIPO[tg] || 0xb8bccc);
+      var cor = tg === 'TODOS' ? 0x00e676 : (tg === 'DE LUTA' ? 0xe8362c : (tg === 'PACÍFICOS' ? 0x7fd6a0 : (COR_TIPO[tg] || 0xb8bccc)));
       gc.fillStyle(on ? cor : 0x1c1c24, 1).fillRoundedRect(x, T + 22, w, 17, 8);
       if (!on) gc.lineStyle(1, cor, 0.8).strokeRoundedRect(x + 0.5, T + 22.5, w - 1, 16, 8);
       this.tChipsDex[i].setVisible(true).setPosition(x + w / 2, T + 27).setText(tg).setColor(on ? '#0a0a12' : PAL.branco);

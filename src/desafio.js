@@ -214,6 +214,33 @@ var DESAFIANTES = {
       { nome: 'RÁDIO NA CENTRAL', dano: 16, bloqueia: 'FONE' }
     ]
   },
+  /* O FISCAL, chefão do Ato 1 do estudante (CAMPANHA.md): o bilhete deu
+     BLOQUEADO e ele acha que é clonado. Só chega no duelo quem ele alcança
+     na fuga (src/chefao-fiscal.js). Lábia não cola nele; a fraqueza é a
+     prova, o EXTRATO do LARANJINHA, que só o honesto tem. O malandro, sem
+     prova, pega o FISCAL DURO: a mesma cara, mais paciência. */
+  fiscal: {
+    nome: 'O FISCAL', sprite: 'np_fiscal', pac: 100, nivel: 6, chefao: true,
+    fraco: 'EXTRATO', resiste: 'LABIA',
+    chega: 'BILHETE CLONADO.\nVAMOS CONVERSAR.',
+    sai: 'TÁ. VOU VERIFICAR\nESSE BILHETE. PODE IR.',
+    golpes: [
+      { nome: 'CADÊ O BILHETE?', dano: 14, bloqueia: 'CALMA' },
+      { nome: 'LISTA DE CLONADOS', dano: 16, bloqueia: 'IRONIA' },
+      { nome: 'MULTA NA HORA', dano: 18, bloqueia: 'FONE' }
+    ]
+  },
+  fiscalDuro: {
+    nome: 'O FISCAL', sprite: 'np_fiscal', pac: 150, nivel: 9, chefao: true,
+    fraco: 'CALMA', resiste: 'LABIA',
+    chega: 'EU CONHEÇO VOCÊ.\nVIVE PULANDO.',
+    sai: 'DESSA VEZ PASSA.\nMAS TÁ ANOTADO.',
+    golpes: [
+      { nome: 'CADÊ O BILHETE?', dano: 16, bloqueia: 'CALMA' },
+      { nome: 'LISTA DE CLONADOS', dano: 18, bloqueia: 'IRONIA' },
+      { nome: 'MULTA NA HORA', dano: 20, bloqueia: 'FONE' }
+    ]
+  },
   guardaForte: {
     nome: 'O GRANDÃO', sprite: 'np_guarda_forte', pac: 110, nivel: 12,
     fraco: 'CALMA', resiste: 'LABIA',
@@ -341,6 +368,12 @@ function nomeResposta(tipo) {
   for (var i = 0; i < RESPOSTAS.length; i++) if (RESPOSTAS[i].tipo === tipo) return RESPOSTAS[i].nome;
   return tipo;
 }
+/* A prova: no duelo com o FISCAL, o honesto troca o FONE pelo EXTRATO (o
+   LARANJINHA mostra a recarga). Dano de resposta boa, e é a fraqueza dele. */
+var RESPOSTA_EXTRATO = { tipo: 'EXTRATO', nome: 'EXTRATO', cor: '#ec7000', dano: 20, fala: 'VOCÊ MOSTROU O EXTRATO!' };
+function respostasComExtrato() {
+  return [RESPOSTAS[0], RESPOSTAS[1], RESPOSTAS[2], RESPOSTA_EXTRATO];
+}
 
 function multiplicador(resp, quem) {
   if (quem.fraco === resp.tipo) return 2;
@@ -367,12 +400,15 @@ var DesafioScene = new Phaser.Class({
     });
 
     this.quem = DESAFIANTES[this.dados.tipo] || DESAFIANTES.tiozao;
-    marcaDex(this.dados.tipo, 1);
+    // as quatro respostas: as de sempre, ou as que a cena mandou (o EXTRATO do honesto contra o fiscal)
+    this.resps = this.dados.respostas || RESPOSTAS;
+    marcaDex(this.dados.dexId || this.dados.tipo, 1);
     /* os níveis: o seu dá paciência (5 por nível) e força (5%); o dele,
        paciência (10%) e força nos golpes (6%) */
     this.nvVc = meuNivel();
     this.nvEle = this.dados.nivel || nivelDoDesafiante(this.dados.tipo);
-    this.podeFugir = Math.abs(this.nvVc - this.nvEle) >= DSF_FUGA;
+    // de chefão não se foge: a fuga dele já foi a fase de ação
+    this.podeFugir = !this.quem.chefao && Math.abs(this.nvVc - this.nvEle) >= DSF_FUGA;
     var maxVc = DSF_VIDA + 5 * (this.nvVc - 1), pacEle = Math.round(this.quem.pac * (1 + 0.1 * (this.nvEle - 1)));
     var fol = Math.max(0.5, GameState.descanso / GameState.char.descansoMax);
     this.vc = { pac: Math.round(maxVc * fol), max: maxVc, mostra: 0 };
@@ -449,7 +485,7 @@ var DesafioScene = new Phaser.Class({
     this.tMenu = [];
     for (i = 0; i < 4; i++) {
       var c = dsfCelula(i);
-      this.tMenu.push(txt(this, c.x + 26, c.y + 10, RESPOSTAS[i].nome, PAL.branco, 8).setDepth(12));
+      this.tMenu.push(txt(this, c.x + 26, c.y + 10, this.resps[i].nome, PAL.branco, 8).setDepth(12));
       var z = this.add.zone(c.x, c.y, c.w, c.h).setOrigin(0, 0).setInteractive().setDepth(13);
       (function (idx) {
         z.on('pointerdown', function () {
@@ -536,7 +572,7 @@ var DesafioScene = new Phaser.Class({
 
   usa: function (i) {
     if (this.fase !== 'menu') return;
-    var r = RESPOSTAS[i], q = this.quem;
+    var r = this.resps[i], q = this.quem;
     var mult = multiplicador(r, q);
     if (mult > 1 && this.nervoso) mult = 3;           // nervoso, a fraqueza dói o triplo
     /* torcedor contra torcedor de outro time: a ironia vem com gosto */
@@ -604,7 +640,7 @@ var DesafioScene = new Phaser.Class({
   },
 
   venceu: function () {
-    marcaDex(this.dados.tipo, 2);      // vencido: a METRODEX passa a mostrar a fraqueza
+    marcaDex(this.dados.dexId || this.dados.tipo, 2);      // vencido: a METRODEX passa a mostrar a fraqueza
     this.resultado = 'ganhou';
     var pts = GameState.ganhaMinigame(6);
     GameState.addCarisma(6);
@@ -956,7 +992,7 @@ var DesafioScene = new Phaser.Class({
     }
     var sabe = vem ? DSF_SABE[this.proximo.nome] : null;
     for (var i = 0; i < 4; i++) {
-      var c = dsfCelula(i), r = RESPOSTAS[i], mira = menu && i === this.sel;
+      var c = dsfCelula(i), r = this.resps[i], mira = menu && i === this.sel;
       g.fillStyle(menu ? (mira ? 0x1b2438 : 0x11141d) : 0x0b0b12, 0.95).fillRect(c.x, c.y, c.w, c.h);
       g.lineStyle(2, mira ? num(r.cor) : 0x2a2a3a, 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
       // o quadradinho do tipo: é por ele que se aprende quem ganha de quem

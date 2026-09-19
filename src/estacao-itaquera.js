@@ -781,6 +781,8 @@ EstacaoScene.prototype.montaDesafianteDaEstacao = function () {
 };
 EstacaoScene.prototype.vigiaDuelos = function () {
   if (this.duelo || this.treino || this.flagra || this.pulo || this.empurrando || this.noElevador) return;
+  // com o chefão no ar ninguém mais puxa briga
+  if (this.chefao && this.chefao.fase !== 'espera' && this.chefao.fase !== 'fim') return;
   if (this.tUltimaLuta !== undefined && this.time.now - this.tUltimaLuta < ESPERA_ENTRE_LUTAS) return;
   var px = this.pl.sp.x, py = this.pl.sp.y, eu = this, i;
   // o ambulante insiste: na primeira vez que você encosta, seis em dez vezes vira duelo
