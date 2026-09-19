@@ -102,70 +102,70 @@ var CONTATOS = {
   estudante: [
     {
       nome: 'MÃE', foto: 'np_mae_est', conversas: [
-        { msgs: ['Filho, passa na farmácia', 'da Vila Mariana e traz', 'o remédio do seu pai'],
-          vai: { rotulo: 'A FARMÁCIA', estacao: 'VILA MARIANA' } },
-        { msgs: ['Ta chegando que horas?', 'Deixei comida no fogão'] },
-        { msgs: ['Vc almoçou??', 'Responde a mãe'] }
+        { msgs: ['Filh{o|a}, passa na farmácia', 'da Vila Mariana e traz', 'o remédio do seu pai'],
+          vai: { rotulo: 'A FARMÁCIA', estacao: 'VILA MARIANA' }, resSim: 'passo lá, mãe', resNao: 'hj não dá, mãe' },
+        { msgs: ['Ta chegando que horas?', 'Deixei comida no fogão'], resOk: 'lá pelas 23h' },
+        { msgs: ['Vc almoçou??', 'Responde a mãe'], resOk: 'almocei sim, mãe' }
       ]
     },
     {
       nome: 'PAI', foto: 'np_pai_est', conversas: [
         { msgs: ['Vem no Tatuapé depois', 'que eu te dou carona', 'pra casa'],
-          vai: { rotulo: 'A CARONA DO PAI', estacao: 'TATUAPÉ' } },
-        { msgs: ['Bom dia', 'Bom dia'] }
+          vai: { rotulo: 'A CARONA DO PAI', estacao: 'TATUAPÉ' }, resSim: 'fechou, pai!', resNao: 'hj não, pai' },
+        { msgs: ['Bom dia', 'Bom dia'], resOk: 'bom dia, pai' }
       ]
     },
     {
       nome: 'BIA ❤', foto: 'np_bia', conversas: [
         { msgs: ['Amor, me encontra na', 'Santa Cruz? To saindo', 'do cursinho agora'],
-          vai: { rotulo: 'ENCONTRAR A BIA', estacao: 'SANTA CRUZ' } },
-        { msgs: ['Boa sorte no estágio!'] },
-        { msgs: ['Vc sumiu hein'] }
+          vai: { rotulo: 'ENCONTRAR A BIA', estacao: 'SANTA CRUZ' }, resSim: 'tô indo, amor', resNao: 'hj não dá, amor' },
+        { msgs: ['Boa sorte no estágio!'], resOk: 'valeu, amor! ❤' },
+        { msgs: ['Vc sumiu hein'], resOk: 'correria, amor' }
       ]
     },
     {
       // a faculdade do estudante é a UNIPA (a referência é a Unip)
       nome: 'ROLÊ DA UNIPA', grupo: true, icone: 'capelo', conversas: [
         { msgs: ['Alguém topa Liberdade', 'depois da aula?', 'Tem pastel de feira'],
-          vai: { rotulo: 'O ROLÊ', estacao: 'LIBERDADE' } },
-        { msgs: ['Prova adiada!!!', 'GRAÇAS A DEUS'] }
+          vai: { rotulo: 'O ROLÊ', estacao: 'LIBERDADE' }, resSim: 'bora! tô dentro', resNao: 'hj não rola' },
+        { msgs: ['Prova adiada!!!', 'GRAÇAS A DEUS'], resOk: 'AMÉM!!!' }
       ]
     }
   ],
 
   clt: [
     {
-      nome: 'ESPOSA', conversas: [
+      nome: { m: 'ESPOSA', f: 'MARIDO' }, conversas: [
         { msgs: ['Amor, passa no mercado', 'do Belém na volta?', 'Acabou o café'],
-          vai: { rotulo: 'O MERCADO', estacao: 'BELÉM' } },
-        { msgs: ['Chega que horas hj?'] },
-        { msgs: ['Te amo', 'Tbm te amo'] }
+          vai: { rotulo: 'O MERCADO', estacao: 'BELÉM' }, resSim: 'Passo lá, amor', resNao: 'Hoje não dá' },
+        { msgs: ['Chega que horas hj?'], resOk: 'Lá pelas 19h' },
+        { msgs: ['Te amo', 'Tbm te amo'], resOk: 'Te amo mais ❤' }
       ]
     },
     {
       nome: 'CHEFE', conversas: [
         { msgs: ['Reunião antecipada.', 'Preciso de vc na São', 'Joaquim às 9h'],
-          vai: { rotulo: 'A REUNIÃO', estacao: 'SÃO JOAQUIM' } },
-        { msgs: ['Manda o relatório hj'] }
+          vai: { rotulo: 'A REUNIÃO', estacao: 'SÃO JOAQUIM' }, resSim: 'Estarei lá', resNao: 'Hoje não consigo' },
+        { msgs: ['Manda o relatório hj'], resOk: 'Mando até as 18h' }
       ]
     },
     {
       nome: 'FAMÍLIA ❤', grupo: true, icone: 'casa', conversas: [
-        { msgs: ['BOM DIAAA FAMÍLIA', 'Bom dia', 'Bom dia', '(mais 14 mensagens)'] },
+        { msgs: ['BOM DIAAA FAMÍLIA', 'Bom dia', 'Bom dia', '(mais 14 mensagens)'], resOk: 'Bom dia, família' },
         { msgs: ['Almoço domingo na', 'casa da tia, Carrão'],
-          vai: { rotulo: 'O ALMOÇO', estacao: 'CARRÃO' } }
+          vai: { rotulo: 'O ALMOÇO', estacao: 'CARRÃO' }, resSim: 'Vou sim!', resNao: 'Domingo não dá' }
       ]
     },
     {
       nome: 'TIO ZEZÉ', conversas: [
-        { msgs: ['sobrinho vc viu aquilo', 'do vídeo que eu mandei'] },
+        { msgs: ['sobrinh{o|a} vc viu aquilo', 'do vídeo que eu mandei'], resOk: 'Vi sim, tio kkkk' },
         { msgs: ['me busca na Penha?', 'meu carro quebrou'],
-          vai: { rotulo: 'BUSCAR O TIO', estacao: 'PENHA' } }
+          vai: { rotulo: 'BUSCAR O TIO', estacao: 'PENHA' }, resSim: 'Te busco, tio', resNao: 'Hoje não dá, tio' }
       ]
     },
     {
       nome: 'PRIMO DISTANTE', conversas: [
-        { msgs: ['fala primo', 'tudo bem?', 'preciso de um favor'] }
+        { msgs: ['fala prim{o|a}', 'tudo bem?', 'preciso de um favor'], resOk: 'Que favor?' }
       ]
     }
   ],
@@ -174,36 +174,36 @@ var CONTATOS = {
     {
       nome: 'BAILE FLASHBACK', grupo: true, icone: 'nota', conversas: [
         { msgs: ['Hoje tem baile no', 'salão da Santana!', 'Chega 7h em ponto'],
-          vai: { rotulo: 'O BAILE', estacao: 'SANTANA' } },
-        { msgs: ['Foto do baile passado', '(imagem)'] }
+          vai: { rotulo: 'O BAILE', estacao: 'SANTANA' }, resSim: 'Estarei lá!', resNao: 'Hoje não vou' },
+        { msgs: ['Foto do baile passado', '(imagem)'], resOk: 'Que saudade!' }
       ]
     },
     {
       nome: 'FILHA', conversas: [
-        { msgs: ['Pai, o senhor tomou', 'o remédio?'] },
+        { msgs: ['{Pai|Mãe}, {o senhor|a senhora} tomou', 'o remédio?'], resOk: 'Tomei, filha' },
         { msgs: ['Vem almoçar aqui na', 'Vila Matilde hoje?'],
-          vai: { rotulo: 'O ALMOÇO NA FILHA', estacao: 'VILA MATILDE' } }
+          vai: { rotulo: 'O ALMOÇO NA FILHA', estacao: 'VILA MATILDE' }, resSim: 'Vou sim, filha', resNao: 'Hoje não, filha' }
       ]
     },
     {
       nome: 'TURMA DA FACUL 68', grupo: true, icone: 'capelo', conversas: [
         { msgs: ['Reunião da turma!', 'Bar de sempre, Liberdade'],
-          vai: { rotulo: 'A TURMA', estacao: 'LIBERDADE' } },
-        { msgs: ['O Nelson faleceu', 'Que Deus o tenha'] }
+          vai: { rotulo: 'A TURMA', estacao: 'LIBERDADE' }, resSim: 'Lá estarei', resNao: 'Dessa vez não' },
+        { msgs: ['O Nelson faleceu', 'Que Deus o tenha'], resOk: 'Descanse em paz' }
       ]
     },
     {
       nome: 'IRMÃO', conversas: [
-        { msgs: ['Tá vivo?', 'Tô'] },
+        { msgs: ['Tá vivo?', 'Tô'], resOk: 'Vivinho da silva' },
         { msgs: ['Me encontra no Brás', 'que eu te mostro uma', 'coisa'],
-          vai: { rotulo: 'O IRMÃO', estacao: 'BRÁS' } }
+          vai: { rotulo: 'O IRMÃO', estacao: 'BRÁS' }, resSim: 'Tô indo, mano', resNao: 'Hoje não, mano' }
       ]
     },
     {
       nome: 'NETO', conversas: [
-        { msgs: ['vô vem me buscar', 'na escola da Penha'],
-          vai: { rotulo: 'BUSCAR O NETO', estacao: 'PENHA' } },
-        { msgs: ['vô o senhor sabe jogar', 'videogame?'] }
+        { msgs: ['{vô|vó} vem me buscar', 'na escola da Penha'],
+          vai: { rotulo: 'BUSCAR O NETO', estacao: 'PENHA' }, resSim: '{O vô|A vó} tá indo!', resNao: 'Hoje não, meu bem' },
+        { msgs: ['{vô|vó}, {o senhor|a senhora} sabe jogar', 'videogame?'], resOk: 'Me ensina?' }
       ]
     }
   ],
@@ -212,28 +212,28 @@ var CONTATOS = {
     {
       nome: 'FORNECEDOR', conversas: [
         { msgs: ['Chegou carregamento', 'novo. Te espero no Brás', 'até meio-dia'],
-          vai: { rotulo: 'A MUAMBA', estacao: 'BRÁS' } },
-        { msgs: ['Acabou o chocolate', 'Só tem bala'] }
+          vai: { rotulo: 'A MUAMBA', estacao: 'BRÁS' }, resSim: 'tô colando', resNao: 'hj não dá' },
+        { msgs: ['Acabou o chocolate', 'Só tem bala'], resOk: 'manda bala então' }
       ]
     },
     {
       nome: 'RESENHA DA QUEBRADA', grupo: true, icone: 'copo', conversas: [
         { msgs: ['Resenha hoje no', 'Belém, colou?'],
-          vai: { rotulo: 'A RESENHA', estacao: 'BELÉM' } },
-        { msgs: ['tá osso hj', 'tá osso todo dia'] }
+          vai: { rotulo: 'A RESENHA', estacao: 'BELÉM' }, resSim: 'colo sim', resNao: 'hj não, mano' },
+        { msgs: ['tá osso hj', 'tá osso todo dia'], resOk: 'nem me fala' }
       ]
     },
     {
       nome: 'PARCEIRO DE VAGÃO', conversas: [
-        { msgs: ['fiscal tá na Sé hj', 'passa longe'] },
-        { msgs: ['me arruma 20 conto?', 'te pago sexta'] }
+        { msgs: ['fiscal tá na Sé hj', 'passa longe'], resOk: 'valeu o toque' },
+        { msgs: ['me arruma 20 conto?', 'te pago sexta'], resOk: 'tô liso também' }
       ]
     },
     {
       nome: 'MÃE', conversas: [
-        { msgs: ['meu filho vc comeu?'] },
+        { msgs: ['meu filh{o|a} vc comeu?'], resOk: 'comi, mãe' },
         { msgs: ['passa aqui na Penha', 'antes de ir pra casa'],
-          vai: { rotulo: 'A CASA DA MÃE', estacao: 'PENHA' } }
+          vai: { rotulo: 'A CASA DA MÃE', estacao: 'PENHA' }, resSim: 'passo aí, mãe', resNao: 'hj não, mãe' }
       ]
     }
   ],
@@ -242,21 +242,21 @@ var CONTATOS = {
     {
       nome: 'MARIDO', conversas: [
         { msgs: ['Amor, te busco na', 'Ana Rosa às 6?'],
-          vai: { rotulo: 'O MARIDO', estacao: 'ANA ROSA' } },
-        { msgs: ['Como vc tá se sentindo?'] }
+          vai: { rotulo: 'O MARIDO', estacao: 'ANA ROSA' }, resSim: 'Me busca sim ❤', resNao: 'Hoje vou sozinha' },
+        { msgs: ['Como vc tá se sentindo?'], resOk: 'Bem, só cansada' }
       ]
     },
     {
       nome: 'DRA. HELENA', conversas: [
         { msgs: ['Consulta remarcada pra', 'hoje, Santa Cruz, 15h'],
-          vai: { rotulo: 'A CONSULTA', estacao: 'SANTA CRUZ' } }
+          vai: { rotulo: 'A CONSULTA', estacao: 'SANTA CRUZ' }, resSim: 'Estarei lá', resNao: 'Não consigo hoje' }
       ]
     },
     {
       nome: 'CHÁ DE BEBÊ', grupo: true, icone: 'mamadeira', conversas: [
         { msgs: ['Meninas, decidimos:', 'chá no Tatuapé sábado'],
-          vai: { rotulo: 'O CHÁ DE BEBÊ', estacao: 'TATUAPÉ' } },
-        { msgs: ['que fofoooo', '(imagem)'] }
+          vai: { rotulo: 'O CHÁ DE BEBÊ', estacao: 'TATUAPÉ' }, resSim: 'Vou sim!', resNao: 'Sábado não dá' },
+        { msgs: ['que fofoooo', '(imagem)'], resOk: 'Que lindo!!' }
       ]
     }
   ],
@@ -265,20 +265,20 @@ var CONTATOS = {
     {
       nome: 'A TORCIDA', grupo: true, icone: 'bola', conversas: [
         { msgs: ['Domingo tem jogo!', 'Concentração no bar'],
-          vai: { rotulo: 'O BAR', estacao: 'TATUAPÉ' } },
-        { msgs: ['Quem vai de camisa?', 'Todo mundo de camisa'] }
+          vai: { rotulo: 'O BAR', estacao: 'TATUAPÉ' }, resSim: 'tô dentro!', resNao: 'hj não, mano' },
+        { msgs: ['Quem vai de camisa?', 'Todo mundo de camisa'], resOk: 'eu, sempre' }
       ]
     },
     {
       nome: 'MÃE', conversas: [
-        { msgs: ['Lava essa camisa', 'antes do jogo, hein'] },
+        { msgs: ['Lava essa camisa', 'antes do jogo, hein'], resOk: 'já lavei, mãe' },
         { msgs: ['Passa na Sé e traz', 'pão de queijo'],
-          vai: { rotulo: 'A SÉ', estacao: 'SÉ' } }
+          vai: { rotulo: 'A SÉ', estacao: 'SÉ' }, resSim: 'levo sim, mãe', resNao: 'hj não dá' }
       ]
     },
     {
       nome: 'CHEFE', conversas: [
-        { msgs: ['Hoje não é dia de', 'camisa de time'] }
+        { msgs: ['Hoje não é dia de', 'camisa de time'], resOk: 'é dia de jogo!' }
       ]
     }
   ],
@@ -286,22 +286,22 @@ var CONTATOS = {
   turista: [
     {
       nome: 'HOSTEL SP', conversas: [
-        { msgs: ['Check-out is at 11!', 'Sua mochila tá aqui'] },
+        { msgs: ['Check-out is at 11!', 'Sua mochila tá aqui'], resOk: 'Ok, thanks!' },
         { msgs: ['Tem festa na', 'República hoje'],
-          vai: { rotulo: 'A FESTA', estacao: 'REPÚBLICA' } }
+          vai: { rotulo: 'A FESTA', estacao: 'REPÚBLICA' }, resSim: 'I go!', resNao: 'Not tonight' }
       ]
     },
     {
       nome: 'GUIA DO ROLÊ', conversas: [
         { msgs: ['Mercadão é PEDRO II,', 'não é Sé! Todo mundo', 'erra isso'],
-          vai: { rotulo: 'O MERCADÃO', estacao: 'PEDRO II' } },
-        { msgs: ['Cuidado com o celular'] }
+          vai: { rotulo: 'O MERCADÃO', estacao: 'PEDRO II' }, resSim: 'Pedro II, ok!', resNao: 'Maybe later' },
+        { msgs: ['Cuidado com o celular'], resOk: '{Obrigado|Obrigada}!' }
       ]
     },
     {
       nome: 'MOM', conversas: [
-        { msgs: ['Are you safe?', 'Call me please'] },
-        { msgs: ['I saw the news', 'Please come home'] }
+        { msgs: ['Are you safe?', 'Call me please'], resOk: 'I\'m fine, mom' },
+        { msgs: ['I saw the news', 'Please come home'], resOk: 'Don\'t worry, mom' }
       ]
     }
   ]
@@ -311,17 +311,22 @@ var CONTATOS = {
 var ORGANIZADA = { corinthians: 'GAVIÕES', palmeiras: 'MANCHA', saopaulo: 'INDEPENDENTE', santos: 'CAMISA 12' };
 // a ficha do contato pelo nome: a conversa da história pega a foto e o ícone daqui
 function perfilDoContato(charKey, nome) {
-  var l = CONTATOS[charKey] || [];
+  var l = contatosDe(charKey);
   for (var i = 0; i < l.length; i++) if (l[i].nome === nome) return l[i];
   return null;
 }
+/* O nome pode depender do gênero de quem joga ({ m: 'ESPOSA', f: 'MARIDO' }:
+   'o gênero muda interações e alguns personagens', CAMPANHA.md), e o grupo
+   da torcida é a organizada do seu time. Daqui pra frente todo mundo lê
+   o nome já resolvido. */
 function contatosDe(k) {
-  var l = CONTATOS[k] || CONTATOS.clt;
-  if (k !== 'torcedor') return l;
+  var l = CONTATOS[k] || CONTATOS.clt, fem = typeof GameState !== 'undefined' && GameState.genero === 'f';
   return l.map(function (c) {
-    if (c.nome !== 'A TORCIDA') return c;
+    var nome = typeof c.nome === 'object' ? (fem ? c.nome.f : c.nome.m) : c.nome;
+    if (k === 'torcedor' && nome === 'A TORCIDA') nome = ORGANIZADA[leTime()] || nome;
+    if (nome === c.nome) return c;
     var copia = {}; for (var q in c) copia[q] = c[q];
-    copia.nome = ORGANIZADA[leTime()] || c.nome;
+    copia.nome = nome;
     return copia;
   });
 }
@@ -405,6 +410,7 @@ function entregaZap() {
    escrita à mão */
 var FIO_VOZ = RESPOSTA_PADRAO.clt;
 
+function generoDoZap(t) { return typeof noGenero === 'function' ? noGenero(t) : t; }
 function novoFio(item, temVai) {
   var c = item.conversa;
   return {
@@ -413,14 +419,15 @@ function novoFio(item, temVai) {
     // quem tem rosto no jogo leva a foto; grupo leva o ícone dele
     foto: item.contato.foto || null,
     icone: item.contato.icone || null,
-    msgs: c.msgs.slice(0),
+    // no gênero de quem joga ('Filh{o|a}'): o noGenero mora no historia.js
+    msgs: c.msgs.map(generoDoZap),
     vai: temVai ? c.vai : null,
     /* o que você manda de volta: uma resposta pra cada saída, e a
        conversa fiada também tem a dela — responder "kkkk" pra piada da
        resenha é metade do que faz o ZipZap parecer um ZipZap */
-    resSim: c.resSim || FIO_VOZ.sim,
-    resNao: c.resNao || FIO_VOZ.nao,
-    resOk: c.resOk || FIO_VOZ.ok,
+    resSim: generoDoZap(c.resSim || FIO_VOZ.sim),
+    resNao: generoDoZap(c.resNao || FIO_VOZ.nao),
+    resOk: generoDoZap(c.resOk || FIO_VOZ.ok),
     enviadas: [],
     lida: false,
     aceito: false,
