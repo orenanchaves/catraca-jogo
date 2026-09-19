@@ -88,7 +88,7 @@ var SAIDAS_ITQ = {
 /* Pra que lado cada um mora. O estudante vem de ônibus (terminal); o
    senhor e a gestante moram do lado do shopping; o CLT e o ambulante,
    pra Radial; o turista veio ver jogo na Arena. */
-var CASA_SAIDA = { estudante: 'B', clt: 'C', senhor: 'A', ambulante: 'C', gestante: 'A', turista: 'C', torcedor: 'C' };
+var CASA_SAIDA = { estudante: 'B', clt: 'C', senhor: 'A', ambulante: 'C', gestante: 'A', turista: 'C', torcedor: 'C', cadeirante: 'A' };
 function saidaDeCasa() { return CASA_SAIDA[GameState.charKey] || 'B'; }
 function ehItaquera() { return GameState.estacaoAtual() === 'ITAQUERA'; }
 
@@ -371,6 +371,7 @@ EstacaoScene.prototype.podeIrItq = function (x, y) {
 };
 
 EstacaoScene.prototype.bateNaPlataforma = function (x, y) {
+  if (this.bateNoElevador(x, y)) return true;
   for (var i = 0; i < ITQ_PILARES.length; i++) {
     var py = PLAT_Y + ITQ_PILARES[i];      // y da textura da plataforma → mundo
     // o pilar, e o banco colado nele (à direita): de pé, contorna-se

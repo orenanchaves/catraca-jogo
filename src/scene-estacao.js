@@ -293,6 +293,7 @@ var EstacaoScene = new Phaser.Class({
        sentado da Itaquera sobravam na seguinte, e sentar ali prendia o
        boneco, porque só a Itaquera sabe levantar dele */
     this.assentos = null; this.sentadoPlat = null;
+    this.elevadores = null; this.noElevador = null;
 
     /* ---------- o saguão ---------- */
     this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
@@ -607,6 +608,8 @@ var EstacaoScene = new Phaser.Class({
     this.add.image(this.itq ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
     if (this.itq) this.montaItaquera();
+    // o elevador, em toda plataforma lateral (na central não cabe do lado da escada)
+    if (!CENTRAL) this.montaElevadores();
     else {
       /* as lixeiras das estações de sempre: duas no saguão, rente à parede
          de baixo, e duas na plataforma, encostadas na parede */
@@ -1047,6 +1050,10 @@ var EstacaoScene = new Phaser.Class({
     if (this.itq) {
       for (var m = 0; m < TOTAL; m++) this.gates[m].sentido = (m < 3 || m >= TOTAL - 3) ? 'sai' : 'entra';
     }
+    /* A larga é a catraca PCD: nunca fecha e passa nos dois sentidos, que
+       quem usa cadeira de rodas não tem outra. */
+    this.gates[larga].fechada = false;
+    this.gates[larga].sentido = null;
   },
 
   /* ---------- catraca de braço, e não muro ----------
@@ -1081,6 +1088,12 @@ var EstacaoScene = new Phaser.Class({
         this.marcaSentido(g, cx, 186, t.sentido === 'sai' ? 'desce' : 'x');
       }
       if (t.larga) {
+        // o símbolo PCD no chão, na frente dela: quadrado azul e a cadeira em branco
+        var pcx = Math.round((t.x0 + t.x1) / 2);
+        g.fillStyle(0x1c5ab4, 1).fillRect(pcx - 6, 256, 13, 13);
+        g.fillStyle(0xf0eeff, 1).fillRect(pcx - 1, 258, 2, 2).fillRect(pcx - 1, 261, 2, 4).fillRect(pcx - 1, 264, 4, 1)
+          .fillRect(pcx + 3, 264, 1, 3);
+        g.lineStyle(1, 0xf0eeff, 1).strokeCircle(pcx - 1, 265, 3);
         // faixa azul no chão marcando a porta larga
         g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
         g.fillStyle(0x3a7fd0, 0.6).fillRect(t.x0 + w / 2 - 5, 241, 10, 3);
@@ -1674,9 +1687,9 @@ var EstacaoScene = new Phaser.Class({
   podeIr: function (x, y) {
     if (this.itq) { var itq = this.podeIrItq(x, y); if (itq !== null) return itq; }
     // ---- plataforma ----
-    if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80);
-    // ---- escada rolante: a única passagem entre os dois andares ----
-    if (y < 116) return x > ESC_X0 && x < ESC_X1;
+    if (y < ESC_Y) return x >= PLAT_X0 && x <= PLAT_X1 && y >= platY(80) && !this.bateNoElevador(x, y);
+    // ---- escada rolante: a passagem entre os dois andares (a cadeira de rodas vai de elevador) ----
+    if (y < 116) return x > ESC_X0 && x < ESC_X1 && !(temPoder('cadeira') && this.elevadores);
     if (this.bateNaLixeira(x, y)) return false;
     // ---- saguão ----
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
@@ -1695,6 +1708,8 @@ var EstacaoScene = new Phaser.Class({
       for (var i = 0; i < this.gates.length; i++) {
         var t = this.gates[i];
         if (t.fechada) continue;
+        // a cadeira de rodas só cabe na larga, a catraca PCD
+        if (temPoder('cadeira') && !t.larga) continue;
         /* a contramão só barra quem está ENTRANDO no vão: quem já está
            no meio da catraca pode voltar, senão ficava preso nela */
         if (t.sentido && this._indo && (this._yDe >= 244 || this._yDe <= 204) &&
@@ -1935,6 +1950,81 @@ var EstacaoScene = new Phaser.Class({
     });
     ops.push({ label: 'Deixa pra lá', cb: function () { } });
     fala(this, 'Bilheteria. Quanto custa hoje\njá não importa.', ops);
+  },
+
+  /* ---------- o elevador ----------
+     De vidro, com a placa azul de acessibilidade: um no mezanino, na
+     parede de cima ao lado da escada, e outro na plataforma, logo acima
+     da boca da escada. A porta dos dois é a face de baixo, que é a que se
+     vê. Qualquer um usa; quem está de cadeira de rodas só sobe por ele. */
+  montaElevadores: function () {
+    var x0 = ESC_X1 + 14, w = 36;
+    this.elevadores = [
+      { lugar: 'saguao', x: x0, y: 76, w: w, h: 40, porta: { x: x0 + w / 2, y: 132 } },
+      { lugar: 'plataforma', x: x0, y: ESC_Y - 64, w: w, h: 40, porta: { x: x0 + w / 2, y: ESC_Y - 12 } }
+    ];
+    this.gElev = this.add.graphics().setDepth(3);
+    this.gElevP = this.add.graphics().setDepth(38);
+    this.pintaElevadores(0);
+  },
+  pintaElevadores: function (fechando) {
+    var lst = this.elevadores || [];
+    for (var i = 0; i < lst.length; i++) {
+      var e = lst[i], g = i ? this.gElevP : this.gElev;
+      g.clear();
+      g.fillStyle(0x000000, 0.3).fillRect(e.x + 3, e.y + 4, e.w, e.h);
+      g.fillStyle(num(PAL.metalSom), 1).fillRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
+      g.fillStyle(0x9ec4dc, 0.55).fillRect(e.x, e.y, e.w, e.h);                // o vidro
+      g.fillStyle(0xffffff, 0.3).fillRect(e.x + 3, e.y + 2, 3, e.h - 4);
+      // a porta, embaixo: duas folhas que se fecham quando alguém está viajando
+      var ab = fechando ? 0 : 8;
+      g.fillStyle(num(PAL.metal), 1).fillRect(e.x + 4, e.y + e.h - 16, e.w / 2 - 4 - ab / 2, 16)
+        .fillRect(e.x + e.w / 2 + ab / 2, e.y + e.h - 16, e.w / 2 - 4 - ab / 2, 16);
+      g.fillStyle(0x14141c, 1).fillRect(e.x + e.w / 2 - ab / 2, e.y + e.h - 16, ab, 16);
+      // a placa azul com a cadeira de rodas, em cima da porta
+      g.fillStyle(0x1c5ab4, 1).fillRect(e.x + e.w / 2 - 6, e.y + 4, 12, 12);
+      g.fillStyle(0xf0eeff, 1).fillRect(e.x + e.w / 2 - 1, e.y + 6, 2, 2).fillRect(e.x + e.w / 2 - 1, e.y + 9, 2, 3);
+      g.lineStyle(1, 0xf0eeff, 1).strokeCircle(e.x + e.w / 2 - 1, e.y + 12, 3);
+    }
+  },
+  bateNoElevador: function (x, y) {
+    var lst = this.elevadores || [];
+    for (var i = 0; i < lst.length; i++) {
+      var e = lst[i];
+      if (x > e.x - 6 && x < e.x + e.w + 6 && y > e.y - 4 && y < e.y + e.h + 4) return true;
+    }
+    return false;
+  },
+  contextoElevador: function () {
+    var lst = this.elevadores || [];
+    for (var i = 0; i < lst.length; i++) {
+      var e = lst[i];
+      if (Math.abs(this.pl.sp.x - e.porta.x) < 20 && Math.abs(this.pl.sp.y - e.porta.y) < 16) {
+        var sobe = (e.lugar === 'saguao');
+        this.dica.setText(nomeAgir() + ': ELEVADOR ' + (sobe ? '▲' : '▼'), PAL.amarelo);
+        if (Ctrl.actJust) {
+          this.noElevador = { t: 0, para: lst[sobe ? 1 : 0] };
+          this.pl.sp.setVisible(false);
+          this.pintaElevadores(1);
+          sfx('porta');
+        }
+        return true;
+      }
+    }
+    return false;
+  },
+  // a viagem: porta fecha, 1,4s de elevador, e a porta abre no outro andar
+  viajaDeElevador: function (dt) {
+    var v = this.noElevador;
+    v.t += dt;
+    this.dica.setText('ELEVADOR...', PAL.cinza);
+    if (v.t < 1400) return;
+    this.pl.sp.x = v.para.porta.x; this.pl.sp.y = v.para.porta.y + 4;
+    this.pl.dir = 'down'; this.pl.anima(0, false);
+    this.pl.sp.setVisible(true);
+    this.noElevador = null;
+    this.pintaElevadores(0);
+    sfx('ok');
   },
 
   /* A recarga do Bilhete Único é a bilheteria fora da catraca: libera
@@ -2611,6 +2701,7 @@ var EstacaoScene = new Phaser.Class({
 
     this.cicloTrem(dt);
     if (this.empurrando) { this.atualizaEmpurrao(dt); return; }
+    if (this.noElevador) { this.viajaDeElevador(dt); return; }
 
     // esperar na estação cansa, esteja você onde estiver dentro dela
     GameState.addDescanso(-0.0004 * GameState.char.dreno * dt);
@@ -2678,6 +2769,7 @@ var EstacaoScene = new Phaser.Class({
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
     if (this.contextoLixo()) return;
     if (this.contextoTomada()) return;
+    if (this.contextoElevador()) return;
     if (this.itq && this.contextoItq()) return;
 
     if (y < ESC_Y) {
@@ -2717,7 +2809,8 @@ var EstacaoScene = new Phaser.Class({
     var naBilheteria = !this.itq && (x < 96 && y > 244 && y < 288 && !this.liberado);
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
-    var naCatraca = (perto && !this.liberado && !gate.fechada && gate.sentido !== 'sai');
+    // na cadeira de rodas não se pula catraca
+    var naCatraca = (perto && !this.liberado && !gate.fechada && gate.sentido !== 'sai' && !temPoder('cadeira'));
     var soSaida = (perto && !gate.fechada && gate.sentido === 'sai');
     /* O cone é a regra inteira: se você está dentro dele, pular é ser
        pego. Fora dele, o risco é ele virar no meio do pulo. */

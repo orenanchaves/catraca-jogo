@@ -33,8 +33,8 @@ function espacosItaquera() {
     // na parede de cima do mezanino, dos dois lados da boca da escada
     { id: 'ITQ-MEZ-1', x: MEZ.x0 + 60, y: 78, tipo: 'estatico', anuncios: ['ceda'] },
     { id: 'ITQ-MEZ-2', x: 54, y: 78, tipo: 'digital', anuncios: ['ond', 'loto', 'ingles'] },
-    { id: 'ITQ-MEZ-3', x: 266, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond'] },
-    { id: 'ITQ-MEZ-4', x: 360, y: 78, tipo: 'estatico', anuncios: ['anuncie'] }
+    // o elevador ocupa de 222 a 258, do lado da escada: à direita dele cabe um cartaz só
+    { id: 'ITQ-MEZ-3', x: 318, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
     /* Na parede da plataforma não: em pé, girado, o cartaz brigava com a
        faixa do nome e o mapa, e ficava feio ('não rola tanto'). */
   ];

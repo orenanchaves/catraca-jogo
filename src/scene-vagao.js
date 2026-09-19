@@ -1257,7 +1257,8 @@ var VagaoScene = new Phaser.Class({
     this.balanca(-1);
     tr.proximo = Math.max(9000, 14000 + Math.random() * 12000 - GameState.dificuldade() * 800);
     this.cameras.main.shake(320, 0.008);
-    if (this.segurando || this.sentadoEm || this.noChao || this.cochilando()) {
+    // de cadeira de rodas, com o freio puxado, o tranco não derruba
+    if (this.segurando || this.sentadoEm || this.noChao || this.cochilando() || temPoder('cadeira')) {
       if (this.segurando) sfx('catraca');
       return;
     }
@@ -1932,6 +1933,7 @@ var VagaoScene = new Phaser.Class({
   },
 
   bancoLivrePerto: function () {
+    if (temPoder('cadeira')) return null;          // a cadeira já é o assento
     var melhor = null, dist = 1e9;
     for (var i = 0; i < this.bancos.length; i++) {
       var b = this.bancos[i];

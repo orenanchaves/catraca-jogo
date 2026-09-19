@@ -398,6 +398,10 @@ var PODERES = {
   torcida: {
     nome: 'TORCIDA JUNTO',
     como: 'O time te dá força.'
+  },
+  cadeira: {
+    nome: 'ELEVADOR E CATRACA PCD',
+    como: 'Sem escada. Passa de graça.'
   }
 };
 
@@ -463,6 +467,17 @@ var CHARS = {
      dá força; torcedor rival apanha mais de ironia. A camisa sai do time
      escolhido (paletaDoTime + camisaDeTime), e cada combinação vira uma
      folha: ch_torcedor_m_santos. */
+  /* O cadeirante: não sobe escada rolante (só o elevador), passa de
+     graça e só pela catraca larga, que é a PCD; no vagão a cadeira tem
+     freio, e o tranco não derruba. */
+  cadeirante: {
+    nome: 'CADEIRANTE', asset: 'cadeirante',
+    desc: 'Sem escada. Passa de graça.',
+    tarifa: 0, dinheiro: 16.00, carisma: 70, descanso: 85, descansoMax: 100,
+    dreno: 0.95, velocidade: 96, empurraoMult: 0.8, gratuidade: true, valeTransporte: 0,
+    poder: 'cadeira',
+    visual: { m: { corpo: 'cadeirante', pal: 'cadeirante' }, f: { corpo: 'cadeirante', pal: 'cadeiranteF' } }
+  },
   torcedor: {
     nome: 'TORCEDOR', nomeF: 'TORCEDORA', asset: 'torcedor',
     desc: 'Vai pro jogo. Faz amizade fácil.',
@@ -595,7 +610,7 @@ function estaCalor() {
    O elenco que já existia continua aberto. Cobrar por ele seria tirar
    de quem já jogava, e comprar tem que abrir coisa nova, não retirar o
    que estava lá. Os pontos abrem os dois que entraram junto com eles. */
-var LIVRES_DE_SAIDA = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor'];
+var LIVRES_DE_SAIDA = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor', 'cadeirante'];
 
 function lePontos() {
   try { return parseInt(localStorage.getItem('metrosp_pontos') || '0', 10) || 0; } catch (e) { return 0; }
@@ -1638,6 +1653,17 @@ var CORPOS = {
   celular_longo: { herda: 'longo', mods: [MOD_CELULAR] },
   saia_bolsa: { herda: 'saia', mods: [MOD_BOLSA] },
   pedinte: { poseUnica: true, down: POSE_PEDINTE, up: POSE_PEDINTE, side: POSE_PEDINTE },
+  /* ---------- o cadeirante ----------
+     Sentado na cadeira de rodas, a cabeça três linhas mais baixa, as
+     rodas dos dois lados (pneu 'z', o raio claro 'w', o quadro 'y'). De
+     lado, uma roda grande cobre o corpo. Andando, o raio muda de lugar e
+     a roda gira. */
+  cadeirante: {
+    down: ['................', '................', '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oakkkkkkao...', '...okkokkokko...', '...okkkkkkkko...', '....okkkkkko....', '......kkkk......', '...ojjjjjjjjo...', '.oooojjjjjjoooo.', 'ozzokjjjjjjkozzo', 'ozwoppppppppowzo', 'ozzoppppppppozzo', 'ozzoyppppppyozzo', 'ozwo.pp..pp.owzo', 'ozzo.pp..pp.ozzo', '.oo..ss..ss..oo.', '....yyyyyyyy....', '................', '................', '................'],
+    up: ['................', '................', '................', '....oooooooo....', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...', '...oaaaaaaaao...', '....oaaaaaao....', '......kkkk......', '..yojjjjjjjjoy..', '.ooyyyyyyyyyyoo.', 'ozzoyyyyyyyyozzo', 'ozwoyyyyyyyyowzo', 'ozzoyyyyyyyyozzo', 'ozzo.yyyyyy.ozzo', 'ozwo........owzo', 'ozzo........ozzo', '.oo..........oo.', '................', '................', '................', '................'],
+    side: ['................', '................', '................', '.....oooooo.....', '....oaaaaaaao...', '....oaaaaaaao...', '....oaaaakkko...', '....oaaakkkko...', '....oakokkkko...', '....okkkkkkko...', '.....okkkkko....', '......kkkk......', '....ojjjjjjo....', '...oozzzzzjo....', '..ozzwwwwzzkk...', '..ozwzzzzwzpppo.', '..ozwzzzzwzpppo.', '..ozzwwwwzz.pso.', '...oozzzzoo.sso.', '.....oooo....yy.', '................', '................', '................', '................'],
+    pernas: { inicio: 14, frente: [['ozzoppppppppozzo', 'ozwoppppppppowzo', 'ozzoyppppppyozzo', 'ozzo.pp..pp.ozzo', 'ozwo.pp..pp.owzo'], ['ozwoppppppppowzo', 'ozzoppppppppozzo', 'ozwoyppppppyowzo', 'ozzo.pp..pp.ozzo', 'ozzo.pp..pp.ozzo']], lado: [['..ozwwzzwwzkk...', '..ozzzwwzzzpppo.', '..ozzzwwzzzpppo.', '..ozwwzzwwz.pso.', '...oozzzzoo.sso.'], ['..ozzzwwzzzkk...', '..ozwwzzwwzpppo.', '..ozwwzzwwzpppo.', '..ozzzwwzzz.pso.', '...oozzzzoo.sso.']] }
+  },
   /* os torcedores, cada um com a camisa do time: o corintiano de touca,
      os outros sem nada na cabeça; e a versão de cabelo comprido de cada um */
   touca_corinthians: { mods: [CABELO_TOUCA], pos: camisaDeTime('corinthians') },
@@ -1867,6 +1893,11 @@ var PELES = {
   corintiano: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#1c1c22', '#e8e8f0', '#14141c', '#f0eeff')
 };
 PELES.corintiano.e = '#d8302a';     // o vermelho do escudo
+// o cadeirante e a cadeirante: a cadeira é pneu preto, raio claro e quadro de metal
+PELES.cadeirante = pele('#0a0a12', '#c99a70', '#2a2a30', '#3a6fb0', '#33334a', '#14141c', '#c8cad4');
+PELES.cadeirante.z = '#1c1c22'; PELES.cadeirante.y = '#8a8c98';
+PELES.cadeiranteF = pele('#0a0a12', '#8a5a3c', '#3a2418', '#c85a9a', '#2e2e40', '#14141c', '#c8cad4');
+PELES.cadeiranteF.z = '#1c1c22'; PELES.cadeiranteF.y = '#8a8c98';
 // quem atende no guichê: uniforme azul-marinho do metrô e o crachá amarelo
 PELES.atendente = pele('#0a0a12', '#c99a70', '#2a2a30', '#1c2c54', '#1c2c54', '#14141c', '#f2c14e');
 PELES.atendenteF = pele('#0a0a12', '#8a5a3c', '#1a1a22', '#1c2c54', '#1c2c54', '#14141c', '#f2c14e');

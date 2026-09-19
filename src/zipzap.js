@@ -44,6 +44,11 @@ var ROTINAS = {
     { rotulo: 'A CONSULTA', estacao: 'SANTA CRUZ', saida: 15 * 60 },
     { rotulo: 'CASA', estacao: CASA, saida: 18 * 60 + 50 }
   ],
+  cadeirante: [
+    { rotulo: 'O TRABALHO', estacao: 'REPÚBLICA', saida: 7 * 60 + 10 },
+    { rotulo: 'O BASQUETE', estacao: 'TATUAPÉ', saida: 17 * 60 },
+    { rotulo: 'CASA', estacao: CASA, saida: 21 * 60 }
+  ],
   torcedor: [
     { rotulo: 'O TRAMPO', estacao: 'BRÁS', saida: 7 * 60 },
     { rotulo: 'O BAR DO JOGO', estacao: 'TATUAPÉ', saida: 17 * 60 + 30 },
@@ -81,7 +86,8 @@ var RESPOSTA_PADRAO = {
   ambulante: { sim: 'tamo junto', nao: 'hj tô na correria', ok: 'salve salve' },
   gestante: { sim: 'Tá bom, eu vou', nao: 'Hoje não dá, amor', ok: 'Obrigada' },
   turista: { sim: 'Ok! I go there', nao: 'Not today, sorry', ok: 'Nice!' },
-  torcedor: { sim: 'bora, tô indo', nao: 'hj não, mano', ok: 'é nóis' }
+  torcedor: { sim: 'bora, tô indo', nao: 'hj não, mano', ok: 'é nóis' },
+  cadeirante: { sim: 'Beleza, tô indo', nao: 'Hoje não rola', ok: 'Valeu!' }
 };
 function respostaPadrao(k) { return RESPOSTA_PADRAO[k] || RESPOSTA_PADRAO.clt; }
 

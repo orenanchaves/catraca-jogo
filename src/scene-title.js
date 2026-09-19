@@ -48,7 +48,7 @@ var TitleScene = new Phaser.Class({
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = true;
     this.sel = 0;
     this.saindo = false;
-    this.ordem = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor', 'gestante', 'turista'];
+    this.ordem = ['estudante', 'clt', 'senhor', 'ambulante', 'torcedor', 'cadeirante', 'gestante', 'turista'];
     // o gênero de cada um, como ficou gravado da última partida
     this.gen = {};
     for (var q = 0; q < this.ordem.length; q++) this.gen[this.ordem[q]] = leGenero(this.ordem[q]);
