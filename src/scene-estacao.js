@@ -842,7 +842,8 @@ var EstacaoScene = new Phaser.Class({
       if (this.tEsquerda > 1200) {
         this.tEsquerda = -1800;       // a próxima bronca vem 3s depois
         GameState.addCarisma(-2);
-        sfx('nao');
+        sfx('bravo');
+        falaGente(['Licença!', 'Ô, a esquerda é pra andar!', 'Dá licença aí!'][Math.floor(Math.random() * 3)], 1.25);
         var al = this.alerta;
         al.setText('"LICENÇA! A ESQUERDA\nÉ PRA QUEM ANDA."');
         this.time.delayedCall(1800, function () { if (al) al.setText(''); });

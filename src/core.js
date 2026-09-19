@@ -1959,7 +1959,7 @@ function agendaMusica() {
    pessoas." Faz sentido: no metrô de verdade ninguém ouve trilha, ouve
    gente, trilho e aviso. Então a música fica nos menus (título, treino,
    fim) e na luta, que é o momento "de jogo" — e no mundo toca o mundo. */
-var _musModo = null;
+var _musModo = null, _gentePerto;
 function modoDoSom() {
   var m = window.jogo && jogo.scene;
   if (!m) return 'musica';
@@ -1973,15 +1973,33 @@ function modoDoSom() {
    Várias dessas se sobrepondo, cada uma de um tom, viram conversa que
    não se entende. Quanto mais lotado, mais vozes. No vagão andando entra
    o ronco do trem e o tá-dum dos trilhos, uma vez por compasso. */
+/* Quanta gente está perto de você, agora: o burburinho vem de quem
+   está em volta, e não de uma média do horário. Sozinho no fim da
+   plataforma é quase silêncio; no meio da fila da catraca é conversa por
+   todo lado. 110px é pouco mais que dois bonecos pra cada lado. */
+function genteEmVolta(modo) {
+  var sc = window.jogo && jogo.scene.getScene(modo === 'vagao' ? 'Vagao' : 'Estacao');
+  if (!sc || !sc.pl || !sc.pl.sp || !sc.gente) return 0;
+  var px = sc.pl.sp.x, py = sc.pl.sp.y, n = 0;
+  for (var i = 0; i < sc.gente.length; i++) {
+    var a = sc.gente[i];
+    if (!a || !a.sp || !a.sp.active) continue;
+    if (Math.abs(a.sp.x - px) < 110 && Math.abs(a.sp.y - py) < 110) n++;
+  }
+  return n;
+}
+
 function tocaPassoAmbiente(i, t, modo) {
-  var lot = (typeof GameState !== 'undefined' && GameState.lotacao) ? GameState.lotacao() : 0.5;
   var atraso = Math.max(0, t - AC.currentTime);
-  var vozes = Math.random() < 0.35 + lot * 0.45 ? (Math.random() < lot ? 2 : 1) : 0;
+  if (i % 4 === 0 || _gentePerto === undefined) _gentePerto = genteEmVolta(modo);
+  var perto = Math.min(_gentePerto, 12);
+  var vozes = Math.random() < 0.12 + perto * 0.07 ? 1 + Math.floor(Math.random() * (1 + perto / 4)) : 0;
   for (var v = 0; v < vozes; v++) {
     var f0 = 350 + Math.random() * 550;
-    ruido(0.22 + Math.random() * 0.35, (0.0025 + Math.random() * 0.003) * (0.7 + lot),
+    ruido(0.22 + Math.random() * 0.35, (0.0022 + Math.random() * 0.003) * (0.6 + perto * 0.09),
       f0, f0 * (0.8 + Math.random() * 0.4), 5, 'bandpass', atraso + Math.random() * 0.1);
   }
+  if (i % 8 === 0) gritaAmbulante(modo);
   // de vez em quando alguém ri ou tosse mais perto
   if (Math.random() < 0.025) ruido(0.12, 0.006, 1400, 900, 3, 'bandpass', atraso);
 
@@ -2012,29 +2030,88 @@ function nomeFalado(n) {
   return String(n).toLowerCase().replace(/(^|\s)(\S)/g, function (m, a, b) { return a + b.toUpperCase(); });
 }
 
+/* A musiquinha antes do aviso. Eram três notas descendo, devagar, que
+   soavam como erro. Agora são quatro subindo, rápidas, e a última
+   segura: sol, dó, mi, sol, com um sino uma oitava acima — o jeito de
+   vinheta de estação, que chama a atenção sem assustar. */
 function plim() {
   if (!AC || !SOM_LIGADO) return;
-  var t = AC.currentTime + 0.02, notas = [79, 76, 72];
+  var t = AC.currentTime + 0.02, notas = [67, 72, 76, 79], passo = 0.13;
   for (var i = 0; i < notas.length; i++) {
-    notaEm(t + i * 0.3, notas[i], 0.7, 'sine', 0.05);
-    notaEm(t + i * 0.3, notas[i] + 12, 0.35, 'triangle', 0.012);
+    var dur = (i === notas.length - 1) ? 0.9 : 0.3;
+    notaEm(t + i * passo, notas[i], dur, 'sine', 0.05);
+    notaEm(t + i * passo, notas[i] + 12, dur * 0.5, 'triangle', 0.014);
   }
 }
 
-var _vozPt = null;
-function vozPt() {
-  if (_vozPt || !window.speechSynthesis) return _vozPt;
-  var vs = speechSynthesis.getVoices(), melhor = null;
-  for (var i = 0; i < vs.length; i++) {
+/* Duas vozes: a do aviso é FEMININA, como a do metrô; a do ambulante
+   e de quem reclama é masculina. O navegador não diz o gênero da voz,
+   então vai pelo nome das que existem: Maria, Francisca, Thalita (as do
+   Windows e do Edge), a do Google (feminina no Android e no Chrome).
+   Daniel e Antonio são as masculinas. Sem uma feminina, o aviso usa a
+   que tiver com o tom mais alto. */
+var VOZ_FEMININA = /maria|francisca|thalita|luciana|vit[oó]ria|raquel|helo[ií]sa|let[ií]cia|manuela|yara|brenda|elza|leila|google/i;
+var VOZ_MASCULINA = /daniel|antonio|ant[oô]nio|fabio|f[aá]bio|donato|humberto|julio|nicolau|valerio/i;
+var _vozes = null;
+function vozesPt() {
+  if (_vozes || !window.speechSynthesis) return _vozes;
+  var vs = speechSynthesis.getVoices(), pt = [], i;
+  for (i = 0; i < vs.length; i++) {
     var l = (vs[i].lang || '').toLowerCase().replace('_', '-');
-    if (l.indexOf('pt') !== 0) continue;
-    if (!melhor || (l === 'pt-br' && (melhor.lang || '').toLowerCase().replace('_', '-') !== 'pt-br')) melhor = vs[i];
+    if (l.indexOf('pt') === 0) pt.push(vs[i]);
   }
-  _vozPt = melhor;
-  return _vozPt;
+  if (!pt.length) return null;
+  // pt-BR na frente: o de Portugal lê "Sé" de outro jeito
+  pt.sort(function (a, b) {
+    var ab = /br/i.test(a.lang) ? 0 : 1, bb = /br/i.test(b.lang) ? 0 : 1;
+    return ab - bb;
+  });
+  var fem = null, mas = null;
+  for (i = 0; i < pt.length; i++) {
+    if (!fem && VOZ_FEMININA.test(pt[i].name)) fem = pt[i];
+    if (!mas && VOZ_MASCULINA.test(pt[i].name)) mas = pt[i];
+  }
+  _vozes = { aviso: fem || pt[0], avisoTom: fem ? 1 : 1.35, gente: mas || pt[0], genteTom: mas ? 1 : 0.75 };
+  return _vozes;
 }
+function vozPt() { var v = vozesPt(); return v ? v.aviso : null; }
 if (window.speechSynthesis && speechSynthesis.addEventListener) {
-  speechSynthesis.addEventListener('voiceschanged', function () { _vozPt = null; vozPt(); });
+  speechSynthesis.addEventListener('voiceschanged', function () { _vozes = null; vozesPt(); });
+}
+
+/* Fala de gente (o ambulante, quem reclama): não passa por cima do
+   aviso, e é mais rápida e mais alta, que é como se grita no vagão. */
+function falaGente(texto, rapido) {
+  if (!SOM_LIGADO || document.hidden || !window.speechSynthesis) return;
+  var v = vozesPt();
+  if (!v || speechSynthesis.speaking) return;
+  try {
+    var u = new SpeechSynthesisUtterance(texto);
+    u.voice = v.gente; u.lang = v.gente.lang;
+    u.rate = rapido || 1.2; u.pitch = v.genteTom; u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch (e) { }
+}
+
+/* O ambulante grita quando está perto: a cada 8 a 14s, se houver um a
+   menos de 170px de você. É o pregão do trem de SP. */
+var PREGOES = ['Metrô, shopping, trem!', 'Olha a água geladinha!', 'Chocolate, é dois é cinco!', 'Metrô, shopping, trem, é só aqui!'];
+var _tPregao = 0;
+function gritaAmbulante(modo) {
+  var agora = Date.now();
+  if (agora < _tPregao) return;
+  var sc = window.jogo && jogo.scene.getScene(modo === 'vagao' ? 'Vagao' : 'Estacao');
+  if (!sc || !sc.pl || !sc.pl.sp) return;
+  var lista = [].concat(sc.gente || [], sc.ambulante ? [sc.ambulante] : []), perto = false;
+  for (var i = 0; i < lista.length; i++) {
+    var a = lista[i];
+    if (!a || !a.sp || !a.sp.active || !a.sp.texture) continue;
+    if (a.sp.texture.key.indexOf('np_ambulante') !== 0) continue;
+    if (Math.abs(a.sp.x - sc.pl.sp.x) < 170 && Math.abs(a.sp.y - sc.pl.sp.y) < 170) { perto = true; break; }
+  }
+  if (!perto) return;
+  _tPregao = agora + 8000 + Math.random() * 6000;
+  falaGente(PREGOES[Math.floor(Math.random() * PREGOES.length)], 1.3);
 }
 
 function anuncia(texto) {
@@ -2048,10 +2125,18 @@ function anuncia(texto) {
     try {
       speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(texto);
-      u.voice = voz; u.lang = voz.lang; u.rate = 1.02; u.pitch = 1; u.volume = 0.9;
+      u.voice = voz; u.lang = voz.lang; u.rate = 1.02; u.pitch = vozesPt().avisoTom; u.volume = 0.9;
       speechSynthesis.speak(u);
     } catch (e) { }
-  }, 950);
+  }, 800);
+}
+/* "Próxima estação: Sé. Desembarque pelo lado esquerdo do trem." A Sé é
+   a única plataforma central do jogo; nas laterais o jogo abre o trem
+   sempre do mesmo lado, e o aviso diz qual. */
+function avisoDaProxima() {
+  var prox = GameState.proximaEstacaoNome();
+  var lado = (prox === BALDEACAO) ? 'esquerdo' : 'direito';
+  return 'Próxima estação: ' + nomeFalado(prox) + '. Desembarque pelo lado ' + lado + ' do trem.';
 }
 function calaAnuncio() {
   try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { }
@@ -2245,6 +2330,11 @@ function sfx(n) {
   switch (n) {
     case 'ok': tom(660, .07); setTimeout(function () { tom(880, .09); }, 70); break;
     case 'nao': tom(150, .16, 'sawtooth'); break;
+    // o "aff" de quem foi atrapalhado: um tsc e um resmungo descendo
+    case 'bravo':
+      ruido(0.05, 0.03, 5200, 4200, 2, 'bandpass');
+      glissando(230, 130, 0.32, 'sawtooth', 0.03, 0.07);
+      break;
     case 'moeda': tom(1046, .05); setTimeout(function () { tom(1568, .1); }, 55); break;
     case 'empurra': tom(110 + Math.random() * 70, .05, 'sawtooth'); break;
     case 'porta': tom(440, .06, 'sine', .06); setTimeout(function () { tom(330, .12, 'sine', .06); }, 70); break;

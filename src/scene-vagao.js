@@ -522,7 +522,7 @@ var VagaoScene = new Phaser.Class({
 
     var self = this;
     fala(this, GameState.hora() + '. Próxima:\n' + GameState.proximaEstacaoNome(), []);
-    anuncia('Próxima estação: ' + nomeFalado(GameState.proximaEstacaoNome()) + '.');
+    anuncia(avisoDaProxima());
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
     if (this.treino) this.montaTreino();
   },
@@ -3241,7 +3241,7 @@ var VagaoScene = new Phaser.Class({
       }
       if (this.t > TEMPO_PARADO) {
         this.estado = 'andando'; this.t = 0;
-        anuncia('Próxima estação: ' + nomeFalado(GameState.proximaEstacaoNome()) + '.');
+        anuncia(avisoDaProxima());
         this.sorteiaRitmo();
         this.sorteouFalha = false;
         this.pintaPortas(false);
