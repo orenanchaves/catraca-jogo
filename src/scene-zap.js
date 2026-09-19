@@ -7,14 +7,14 @@
    resenha muda de bar — e vira o destino da perna.
 
    A tela é o celular na sua mão: abre bloqueado, destrava, e mostra a
-   tela inicial com quatro apps (ZipZap, Mapa, Banco, Missões). Enquanto ele está aberto o jogo congela,
+   tela inicial com os apps (ZipZap, Mapa, Banco, Catragram...). Enquanto ele está aberto o jogo congela,
    igual à pausa: no metrô de verdade também é assim, você para de olhar
    pra onde está indo quando abre o ZipZap.
 
    Como a cena de jogo fica pausada por baixo, aqui o teclado é ouvido
    direto por evento — cena pausada não atualiza tecla nenhuma. */
 
-var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA', 'METRODEX'];
+var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'CATRAGRAM', 'MOCHILA', 'METRODEX'];
 
 /* ---------- a tela inicial ----------
    As abas embaixo viraram aplicativos: o celular abre bloqueado, o
@@ -26,12 +26,13 @@ var APPS_ZAP = [
   { nome: 'ZIPZAP', cor: 0x1faa59, cab: 0x0f3a2c },
   { nome: 'MAPA', cor: 0xf2f0ff, cab: 0x1c2a4a },
   { nome: 'BANCO', cor: 0x14284a, cab: 0xec7000 },
-  { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 },
+  // o MISSÕES virou o CATRAGRAM (src/catragram.js): cabeçalho claro, como o do ZipZap
+  { nome: 'CATRAGRAM', cor: 0xd6307a, cab: 0xffffff },
   { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 },
   { nome: 'METRODEX', cor: 0xe8362c, cab: 0x5a1414 }
 ];
 /* Com a MOCHILA são cinco: três por fileira, ícones de 60 (os de 72 em
-   2x2 não cabiam mais). 'MISSÕES' e 'MOCHILA' têm 84px de nome, e as
+   2x2 não cabiam mais). 'CATRAGRAM' e 'MOCHILA' são os nomes compridos, e as
    colunas ficam a 89 uma da outra. */
 var ICONE_APP = 60;
 function lugarDoApp(i) {
@@ -154,6 +155,7 @@ var ZapScene = new Phaser.Class({
         .setScale(ESCALA_TEXTO / 2).setDepth(2402));
     }
     this.tBadge = txtC(this, 0, 0, '', PAL.branco, 8).setDepth(2403);
+    this.tBadgeCat = txtC(this, 0, 0, '', PAL.branco, 8).setDepth(2403);
     this.modo = 'bloqueio';
     this.selApp = 0;
     this.tStatus = txt(this, ZAP.tx0 + 6, ZAP.status + 4, '', PAL.cinza, 8).setDepth(2402);
@@ -281,6 +283,11 @@ var ZapScene = new Phaser.Class({
     this.gMapa.setMask(this.mascMapa);
     // a roda do mouse aproxima e afasta
     this.input.on('wheel', function (pt, objs, dx, dy) {
+      if (self.modo === 'app' && self.aba === 3) {
+        if (self.catVista === 'feed') self.passaPost(dy > 0 ? 1 : -1);
+        else { self.catRolo = self.limitaRoloCat(self.catRolo + (dy > 0 ? 1 : -1)); self.pinta(); }
+        return;
+      }
       if (self.modo === 'app' && self.aba === 1 && self.mapaVista === 'rede') self.zoomMapa(dy < 0 ? 0.5 : -0.5);
     });
     this.zonaAbasMapa = this.add.zone(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, 24).setOrigin(0, 0);
@@ -308,6 +315,35 @@ var ZapScene = new Phaser.Class({
       if (Math.hypot(pt.x - bx, pt.y - (MAPA_AREA.y1 - 62)) < 14) { self.zoomMapa(0.75); return; }
       if (Math.hypot(pt.x - bx, pt.y - (MAPA_AREA.y1 - 30)) < 14) { self.zoomMapa(-0.75); return; }
       self.tocaMapa(pt.x, pt.y);
+    });
+    /* o CATRAGRAM: as duas abas no alto e a área do conteúdo, que se
+       toca (abre o post, mostra o que falta) e se arrasta (rola o grid,
+       passa o post) */
+    this.catVista = 'perfil'; this.catRolo = 0; this.catSel = 0; this.catPost = 0; this.catInfo = null;
+    this.zonaAbasCat = this.add.zone(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, 24).setOrigin(0, 0);
+    this.zonaAbasCat.on('pointerdown', function (pt) {
+      if (self.modo !== 'app' || self.aba !== 3) return;
+      var v = (pt.x - ZAP.tx0) < (ZAP.tx1 - ZAP.tx0) / 2 ? 'perfil' : 'feed';
+      if (v !== self.catVista) { self.catVista = v; self.catInfo = null; sfx('catraca'); self.pinta(); }
+    });
+    this.zonaCat = this.add.zone(ZAP.tx0, ZAP.topo + 16, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.topo - 16).setOrigin(0, 0);
+    this.zonaCat.on('pointerdown', function (pt) {
+      self._arrCat = { x: pt.x, y: pt.y, rolo: self.catRolo, andou: false };
+    });
+    this.input.on('pointermove', function (pt) {
+      var a = self._arrCat;
+      if (!a || !pt.isDown || self.aba !== 3 || self.modo !== 'app') return;
+      if (Math.abs(pt.y - a.y) > 8) a.andou = true;
+      if (a.andou && self.catVista === 'perfil') {
+        var r = self.limitaRoloCat(a.rolo - Math.round((pt.y - a.y) / 66));
+        if (r !== self.catRolo) { self.catRolo = r; self.pinta(); }
+      }
+    });
+    this.input.on('pointerup', function (pt) {
+      var a = self._arrCat; self._arrCat = null;
+      if (!a || self.aba !== 3 || self.modo !== 'app') return;
+      if (!a.andou) { self.tocaCat(pt.x, pt.y); return; }
+      if (self.catVista === 'feed' && Math.abs(pt.y - a.y) > 40) self.passaPost(pt.y < a.y ? 1 : -1);
     });
     this.zonaFicha = this.add.zone(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.status).setOrigin(0, 0);
     this.zonaFicha.on('pointerdown', function () { self.fechaFicha(); });
@@ -399,6 +435,7 @@ var ZapScene = new Phaser.Class({
         else self.fechaFicha();
         return;
       }
+      if (self.modo === 'app' && self.aba === 3 && self.teclaCat(c)) return;
       if (c === 'Escape' || c === 'KeyX') { if (self.modo === 'app') self.vaiInicio(); else self.fecha(); return; }
       if (self.modo === 'inicio') {
         var d = 0;
@@ -494,6 +531,7 @@ var ZapScene = new Phaser.Class({
     this.selApp = i;
     this.aba = i; this.fio = null; this.sel = 0;
     this.modo = 'app';
+    if (i === 3) { this.catVista = 'perfil'; this.catRolo = 0; this.catSel = 0; this.catPost = 0; this.catInfo = null; Catragram.marcaVistos(); }
     sfx('ok');
     this.pinta();
   },
@@ -622,7 +660,8 @@ var ZapScene = new Phaser.Class({
     for (i = 0; i < this.zonasFiltro.length; i++) this.zonasFiltro[i].disableInteractive();
     for (i = 0; i < this.zonasBotao.length; i++) this.zonasBotao[i].disableInteractive();
     this.zonaVolta.disableInteractive();
-    for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false); }
+    for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false).setCrop(); }
+    this.zonaCat.disableInteractive(); this.zonaAbasCat.disableInteractive();
     for (i = 0; i < this.cartasDex.length; i++) {
       var cc = this.cartasDex[i];
       cc.num.setVisible(false); cc.nome.setVisible(false); cc.r1.setVisible(false); cc.v1.setVisible(false);
@@ -637,7 +676,7 @@ var ZapScene = new Phaser.Class({
     }
     this.zonaMapa.disableInteractive();
     this.zonaAbasMapa.disableInteractive();
-    for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0).clearMask();
+    for (i = 0; i < this.rotMapa.length; i++) this.rotMapa[i].setVisible(false).setAngle(0).clearMask().setMaxWidth(0);
     if (this.gMapa) this.gMapa.clear();
     if (this.fichaFig) this.fichaFig.setVisible(false);
     var noInicio = (this.modo !== 'app');
@@ -673,13 +712,14 @@ var ZapScene = new Phaser.Class({
     if (noInicio) { this.pintaInicio(g); if (this.modo === 'inicio') this.barraFechar(g); }
     else {
       // o cabeçalho do app, na cor dele, com o nome
-      var zapClaro = this.aba === 0 && !this.fio;
+      var zapClaro = this.aba === 0 && !this.fio, catClaro = this.aba === 3;
       g.fillStyle(zapClaro ? 0xffffff : APPS_ZAP[this.aba].cab, 1).fillRect(ZAP.tx0, ZAP.status, ZAP.tx1 - ZAP.tx0, 22);
-      this.tStatus.setText(zapClaro ? 'ZipZap' : APPS_ZAP[this.aba].nome).setColor(zapClaro ? '#1da851' : PAL.branco);
+      this.tStatus.setText(zapClaro ? 'ZipZap' : (catClaro ? 'Catragram' : APPS_ZAP[this.aba].nome))
+        .setColor(zapClaro ? '#1da851' : (catClaro ? '#d6307a' : PAL.branco));
       if (this.aba === 0) this.pintaZap(g);
       else if (this.aba === 1) this.pintaMapa(g);
       else if (this.aba === 2) this.pintaGrana(g);
-      else if (this.aba === 3) this.pintaMissoes(g);
+      else if (this.aba === 3) this.pintaCatragram(g);
       else if (this.aba === 4) this.pintaMochila(g);
       else if (this.dexAberta >= 0) this.pintaFicha(g);
       else this.pintaDex(g);
@@ -718,6 +758,12 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xe8362c, 1).fillCircle(zl.x + ICONE_APP - 4, zl.y + 4, 11);
       this.tBadge.setVisible(true).setPosition(zl.x + ICONE_APP - 4, zl.y - 6).setText(String(n));
     } else this.tBadge.setVisible(false);
+    // e o Catragram, a bolinha dos posts que você ainda não viu
+    var nc = Catragram.naoVistos(), cl = lugarDoApp(3);
+    if (nc && mostra) {
+      g.fillStyle(0xe8362c, 1).fillCircle(cl.x + ICONE_APP - 4, cl.y + 4, 11);
+      this.tBadgeCat.setVisible(true).setPosition(cl.x + ICONE_APP - 4, cl.y - 6).setText(String(Math.min(nc, 9)));
+    } else this.tBadgeCat.setVisible(false);
   },
 
   // o desenho de cada ícone, em volta do centro dele
@@ -760,15 +806,12 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy + 6, 4, 3);
       g.fillStyle(0x3a2814, 1).fillRect(cx - 8, cy - 24, 16, 5);
     } else {
-      // Missões: a prancheta com três itens e os tiques verdes
-      g.fillStyle(0x6b4226, 1).fillRoundedRect(cx - 18, cy - 24, 36, 48, 4);
-      g.fillStyle(0xf2f0ff, 1).fillRect(cx - 14, cy - 18, 28, 38);
-      g.fillStyle(0x9a9ca4, 1).fillRect(cx - 7, cy - 27, 14, 6);
-      for (var k = 0; k < 3; k++) {
-        var ly = cy - 12 + k * 11;
-        g.fillStyle(k < 2 ? 0x1faa59 : 0xc8c8d4, 1).fillRect(cx - 11, ly, 5, 5);
-        g.fillStyle(0x6a6c78, 1).fillRect(cx - 3, ly + 1, 14, 3);
-      }
+      // Catragram: o brilho laranja no canto, e a câmera de contorno branco
+      g.fillStyle(0xf2a03c, 0.85).fillCircle(cx - 14, cy + 14, 14);
+      g.fillStyle(0xf7c04a, 0.7).fillCircle(cx - 18, cy + 18, 8);
+      g.lineStyle(4, 0xffffff, 1).strokeRoundedRect(cx - 17, cy - 17, 34, 34, 10);
+      g.lineStyle(4, 0xffffff, 1).strokeCircle(cx, cy, 8);
+      g.fillStyle(0xffffff, 1).fillCircle(cx + 10, cy - 10, 2.5);
     }
   },
 
@@ -1397,44 +1440,253 @@ var ZapScene = new Phaser.Class({
     this.tRodape.setText('DIA ' + GameState.dia + '  -  ' + lePontos() + ' PONTOS').setColor('#6b7280');
   },
 
-  /* ---------- aba 4: as missões ----------
-     O Alto põe as três metas na tela de pausa; aqui elas moram no
-     celular, que é onde mora a vida de quem anda de metrô. Cada uma é um
-     cartão com a caixinha, o texto em até duas linhas e o quanto falta.
-     "NUMA CORRIDA" marca as que zeram se você perder. O rodapé diz o que
-     subir de nível dá. */
-  pintaMissoes: function (g) {
-    var e = Missoes.le(), n = NIVEIS[e.nivel];
-    var x0 = ZAP.tx0, w = ZAP.tx1 - ZAP.tx0;
+  /* ---------- aba 4: o CATRAGRAM ----------
+     Claro como o ZipZap, porque é rede social e não painel do jogo. Duas
+     abas: PERFIL (você, os números, a etiqueta e a barra do medidor, e o
+     grid das medalhas: as que saíram, as que faltam e as ??? secretas) e
+     FEED (um post por tela, com a medalha grande, as curtidas e o que os
+     seus contatos comentaram). Os textos vêm da reserva do mapa
+     (rotMapa): 0..41 aqui, 42 e 43 as abas. */
+  pintaCatragram: function (g) {
+    var x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0;
+    g.fillStyle(0xffffff, 1).fillRect(x0, ZAP.topo - 8, W, ZAP.abas - ZAP.topo + 8);
+    this._nTx = 0;
+    this.pintaAbasCat(g);
+    if (this.catVista === 'feed') this.pintaFeedCat(g); else this.pintaPerfilCat(g);
+    if (this.catInfo) this.pintaInfoCat(g);
+    this.zonaCat.setInteractive();
+    this.zonaAbasCat.setInteractive();
+  },
+  txCat: function (t, x, y, cor, meia, ox, larg) {
+    if (this._nTx >= 42) return null;
+    return this.rotMapa[this._nTx++].setVisible(true).setAngle(0).setOrigin(ox || 0, 0)
+      .setScale(meia ? ESCALA_TEXTO / 2 : ESCALA_TEXTO).setMaxWidth(larg || 0)
+      .setPosition(Math.round(x), Math.round(y)).setText(t).setColor(cor);
+  },
+  pintaAbasCat: function (g) {
+    var x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0, y = ZAP.topo - 8;
+    var abas = [['perfil', 'PERFIL'], ['feed', 'FEED']];
+    for (var i = 0; i < 2; i++) {
+      var on = this.catVista === abas[i][0], ax = x0 + i * W / 2;
+      this.rotMapa[43 - i].setVisible(true).setAngle(0).setOrigin(0.5, 0).setScale(ESCALA_TEXTO / 2).setMaxWidth(0)
+        .setPosition(Math.round(ax + W / 4), y + 8).setText(abas[i][1]).setColor(on ? '#111b21' : '#8a939b');
+      if (on) g.fillStyle(0xd6307a, 1).fillRect(ax + 10, y + 21, W / 2 - 20, 3);
+    }
+    g.fillStyle(0xe9edef, 1).fillRect(x0, y + 24, W, 1);
+  },
+
+  // o avatar redondo com o anel rosa e laranja; o boneco é recortado na altura do peito
+  avatarCat: function (g, fig, cx, cy, r, esc) {
+    g.fillStyle(0xf2a03c, 1).fillCircle(cx, cy, r + 3);
+    g.fillStyle(0xd6307a, 1).fillCircle(cx + 2, cy - 2, r + 2);
+    g.fillStyle(0xffffff, 1).fillCircle(cx, cy, r + 1);
+    g.fillStyle(0xe9edef, 1).fillCircle(cx, cy, r - 1);
+    if (!GameState.char) return;
+    fig.setTexture(spriteJogador(), 0).clearTint().setScale(esc).setCrop(0, 0, 32, 30)
+      .setPosition(cx, cy + Math.round(13 * esc)).setVisible(true);
+  },
+
+  // o grid do perfil: posts (do mais novo), depois o que falta, e as secretas por último
+  gradeCat: function () {
+    var e = Catragram.le(), out = Catragram.posts().slice(), sec = [];
+    for (var i = 0; i < CONQUISTAS.length; i++) {
+      var c = CONQUISTAS[i];
+      if (!e.feitas[c.id]) (c.secreta ? sec : out).push(c);
+    }
+    return out.concat(sec);
+  },
+  limitaRoloCat: function (r) {
+    var fileiras = Math.ceil(this.gradeCat().length / 4);
+    return Phaser.Math.Clamp(r, 0, Math.max(0, fileiras - 3));
+  },
+
+  pintaPerfilCat: function (g) {
+    var x0 = ZAP.tx0, x1 = ZAP.tx1, W = x1 - x0, e = Catragram.le(), i;
+    var nome = GameState.nome || 'VOCÊ';
+    this.avatarCat(g, this.figMochila[0], x0 + 36, 146, 24, 1);
+    // os três números, cheios, com o rótulo miúdo embaixo
+    var cols = [[134, Catragram.quantas(), 'POSTS'], [200, Catragram.seguidores(), 'SEGUIDORES'], [262, Catragram.seguindo(), 'SEGUINDO']];
+    for (i = 0; i < 3; i++) {
+      this.txCat(numeroCurto(cols[i][1]), cols[i][0], 122, '#111b21', false, 0.5);
+      this.txCat(cols[i][2], cols[i][0], 148, '#667781', true, 0.5);
+    }
+    // o @ e o nível; @ comprido cai pra meia escala (a pílula do nível mora à direita)
+    var arroba = arrobaDe(nome);
+    this.txCat(arroba, x0 + 8, arroba.length > 16 ? 184 : 178, '#111b21', arroba.length > 16);
+    g.fillStyle(0x111b21, 1).fillRoundedRect(x1 - 52, 181, 44, 16, 8);
+    this.txCat('NV ' + meuNivel(), x1 - 30, 184, '#f2c14e', true, 0.5);
+    this.txCat('MORA PERTO DA ' + placaDe(CASA), x0 + 8, 204, '#667781', true);
+    // a etiqueta: o que os outros veem de você
+    var et = etiquetaFama(GameState.fama);
+    g.fillStyle(et.cor, 1).fillRoundedRect(x0 + 8, 218, et.t.length * 12 + 18, 22, 11);
+    this.txCat(et.t, x0 + 17, 218, '#ffffff');
+    // a barra do medidor: honesto à esquerda, malandro à direita
+    this.txCat('HONESTO', x0 + 8, 248, '#15803d', true);
+    this.txCat('MALANDRO', x1 - 8, 248, '#e8362c', true, 1);
+    var bx0 = x0 + 8, bw = W - 16, by = 262, seg = 12;
+    for (i = 0; i < seg; i++) {
+      var k = i / (seg - 1), cor = k < 0.5
+        ? Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0x1faa59), Phaser.Display.Color.ValueToColor(0xf2c14e), 100, k * 200)
+        : Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xf2c14e), Phaser.Display.Color.ValueToColor(0xe8362c), 100, (k - 0.5) * 200);
+      g.fillStyle(Phaser.Display.Color.GetColor(cor.r, cor.g, cor.b), 1).fillRect(bx0 + Math.floor(i * bw / seg), by, Math.ceil(bw / seg), 8);
+    }
+    var mx = bx0 + (20 - Phaser.Math.Clamp(GameState.fama || 0, -20, 20)) / 40 * bw;
+    g.fillStyle(0xffffff, 1).fillCircle(mx, by + 4, 7);
+    g.lineStyle(2, 0x111b21, 1).strokeCircle(mx, by + 4, 7);
+    g.fillStyle(0xe9edef, 1).fillRect(x0, 280, W, 1);
+
+    // o grid: quatro por fileira, três fileiras na tela
+    var lista = this.gradeCat(), n = lista.length;
+    this.catRolo = this.limitaRoloCat(this.catRolo);
+    this.catSel = Phaser.Math.Clamp(this.catSel, 0, n - 1);
+    for (var f = 0; f < 3; f++) {
+      for (var cI = 0; cI < 4; cI++) {
+        var idx = (this.catRolo + f) * 4 + cI;
+        if (idx >= n) continue;
+        var c = lista[idx], feita = !!e.feitas[c.id], tx = x0 + 1 + cI * 67, ty = 284 + f * 66;
+        g.fillStyle(feita ? CAT_CONQ[c.cat].fundo : 0xf0f2f5, 1).fillRect(tx, ty, 65, 64);
+        if (feita) desenhaMedalha(g, tx + 32, ty + 26, 15, c.cat, true);
+        /* texto fica acima de qualquer desenho do celular: com a caixinha do
+           que falta aberta (ela cobre a 3ª fileira), os da 3ª não entram */
+        var tapado = this.catInfo && f === 2;
+        if (!feita && c.secreta) { if (!tapado) this.txCat('???', tx + 33, ty + 22, '#9aa0a8', false, 0.5); }
+        else if (!feita) {
+          desenhaMedalha(g, tx + 32, ty + 22, 12, c.cat, false);
+          if (!tapado) this.txCat(Math.min(e.prog[c.id] || 0, c.meta) + '/' + c.meta, tx + 33, ty + 48, '#667781', true, 0.5);
+        }
+        if (idx === this.catSel && this.teclouCat) g.lineStyle(2, 0xd6307a, 1).strokeRect(tx + 1, ty + 1, 63, 62);
+      }
+    }
+    // a barrinha de rolagem, quando o grid não cabe
+    var fileiras = Math.ceil(n / 4);
+    if (fileiras > 3) {
+      var hb = Math.max(20, 198 * 3 / fileiras), yb = 284 + (198 - hb) * this.catRolo / (fileiras - 3);
+      g.fillStyle(0x111b21, 0.25).fillRoundedRect(x1 - 3, yb, 3, hb, 1.5);
+    }
+  },
+
+  pintaFeedCat: function (g) {
+    var x0 = ZAP.tx0, x1 = ZAP.tx1, W = x1 - x0, posts = Catragram.posts(), n = posts.length;
     if (!n) {
-      this.linha(0, ZAP.topo, 'TODOS OS NÍVEIS', PAL.amarelo);
-      this.linha(1, ZAP.topo + 24, 'FEITOS. VOCÊ JÁ', PAL.cinza);
-      this.linha(2, ZAP.topo + 44, 'É PAULISTANO.', PAL.cinza);
-      this.tRodape.setText('');
+      this.txCat('NENHUM POST AINDA', GW / 2, 220, '#667781', false, 0.5);
+      this.txCat('CADA CONQUISTA VIRA UM POST', GW / 2, 250, '#9aa0a8', true, 0.5);
       return;
     }
-    this.linha(0, ZAP.topo, 'NÍVEL ' + (e.nivel + 1) + ': ' + n.nome, PAL.amarelo);
-    for (var i = 0; i < 3; i++) {
-      var m = n.missoes[i], feita = !!e.feitas[i];
-      var y = ZAP.topo + 30 + i * 104;
-      g.fillStyle(feita ? 0x10241a : 0x121820, 1).fillRect(x0, y, w, 96);
-      var cx = x0 + 10, cy = y + 10;
-      g.lineStyle(2, feita ? 0x00e676 : 0x4f5468, 1).strokeRect(cx, cy, 14, 14);
-      if (feita) {
-        g.lineStyle(3, 0x00e676, 1);
-        g.beginPath(); g.moveTo(cx + 3, cy + 7); g.lineTo(cx + 6, cy + 11); g.lineTo(cx + 12, cy + 3); g.strokePath();
-      }
-      this.linhas[1 + i * 3].setVisible(true).setOrigin(0, 0).setPosition(x0 + 32, y + 4)
-        .setMaxWidth(w - 42).setText(m.txt).setColor(feita ? PAL.verde : PAL.branco);
-      this.linhas[2 + i * 3].setVisible(true).setOrigin(1, 0).setPosition(x0 + w - 10, y + 68)
-        .setText(Math.min(e.prog[i], m.meta) + '/' + m.meta).setColor(feita ? PAL.verde : PAL.amarelo);
-      if (m.corrida && !feita) {
-        this.linhas[3 + i * 3].setVisible(true).setOrigin(0, 0).setPosition(x0 + 32, y + 68)
-          .setText('NUMA CORRIDA').setColor(PAL.cinzaEsc);
-      }
+    this.catPost = Phaser.Math.Clamp(this.catPost, 0, n - 1);
+    var c = posts[this.catPost], info = Catragram.feita(c.id) || {}, cat = CAT_CONQ[c.cat], r = Catragram.reacoes(c);
+    var arroba = arrobaDe(GameState.nome);
+    // o cabeçalho do post
+    var hy = 112;
+    this.avatarCat(g, this.figMochila[1], x0 + 16, hy + 12, 11, 0.55);
+    this.txCat(arroba, x0 + 34, hy + 1, '#111b21', true);
+    this.txCat(info.antes ? 'ANTES DO CATRAGRAM' : 'DIA ' + info.dia + (info.hora ? ', ' + info.hora : ''), x0 + 34, hy + 13, '#667781', true);
+    g.fillStyle(0x111b21, 1).fillCircle(x1 - 18, hy + 12, 1.6).fillCircle(x1 - 12, hy + 12, 1.6).fillCircle(x1 - 6, hy + 12, 1.6);
+    // a foto: a medalha grande no fundo da família dela
+    var iy = hy + 30, ih = 196;
+    g.fillStyle(cat.fundo, 1).fillRect(x0, iy, W, ih);
+    g.fillStyle(0xffffff, 0.4).fillCircle(x0 + W / 2, iy + 78, 72);
+    desenhaMedalha(g, x0 + W / 2, iy + 76, 42, c.cat, true);
+    this.txCat(cat.nome, x0 + W / 2, iy + 158, '#' + ('00000' + cat.cor.toString(16)).slice(-6), false, 0.5);
+    g.fillStyle(0x111b21, 0.8).fillRoundedRect(x1 - 60, iy + 8, 52, 16, 8);
+    this.txCat('+' + (c.xp || 15) + ' XP', x1 - 34, iy + 11, '#f2c14e', true, 0.5);
+    if (c.secreta) {
+      g.fillStyle(0x111b21, 0.8).fillRoundedRect(x0 + 8, iy + 8, 58, 16, 8);
+      this.txCat('SECRETA', x0 + 37, iy + 11, '#ffffff', true, 0.5);
     }
-    var quem = PREMIO_NIVEL[e.nivel + 2];
-    this.tRodape.setText('SUBINDO: +' + (10 * (e.nivel + 2)) + (quem ? ' E ' + nomeDoChar(quem) : ' PONTOS'));
+    // as ações: a curtida (vermelha, alguém sempre curte), o balão e o avião
+    var ay = iy + ih + 12;
+    g.fillStyle(0xe8362c, 1).fillCircle(x0 + 11, ay, 4.2).fillCircle(x0 + 18, ay, 4.2)
+      .fillTriangle(x0 + 6.5, ay + 1.5, x0 + 22.5, ay + 1.5, x0 + 14.5, ay + 10);
+    g.lineStyle(2, 0x111b21, 1).strokeCircle(x0 + 40, ay + 3, 7);
+    g.fillStyle(0x111b21, 1).fillTriangle(x0 + 33, ay + 8, x0 + 36, ay + 12, x0 + 38, ay + 8);
+    g.lineStyle(2, 0x111b21, 1);
+    g.beginPath(); g.moveTo(x0 + 56, ay - 3); g.lineTo(x0 + 72, ay - 5); g.lineTo(x0 + 64, ay + 10); g.lineTo(x0 + 62, ay + 2); g.closePath(); g.strokePath();
+    // quem curtiu, a legenda e os comentários
+    var ty = ay + 16, mw = W - 12;
+    this.txCat('CURTIDO POR ' + r.primeiro + ' E OUTRAS ' + (r.curtidas - 1), x0 + 6, ty, '#111b21', true, 0, mw);
+    this.txCat(arroba + ' ' + c.legenda, x0 + 6, ty + 16, '#111b21', true, 0, mw);
+    for (var k = 0; k < r.comentarios.length; k++) {
+      this.txCat(r.comentarios[k].quem + ': ' + r.comentarios[k].t, x0 + 6, ty + 38 + k * 14, '#4a5560', true, 0, mw);
+    }
+    // o pé: passar de post (o toque na esquerda volta, na direita avança)
+    g.fillStyle(0xe9edef, 1).fillRect(x0, ZAP.abas - 24, W, 1);
+    if (this.catPost > 0) this.txCat('◄ MAIS NOVO', x0 + 8, ZAP.abas - 17, '#d6307a', true);
+    this.txCat((this.catPost + 1) + ' DE ' + n, GW / 2, ZAP.abas - 17, '#8a939b', true, 0.5);
+    if (this.catPost < n - 1) this.txCat('MAIS VELHO ►', x1 - 8, ZAP.abas - 17, '#d6307a', true, 1);
+  },
+
+  // a caixinha do que falta, por cima do grid
+  pintaInfoCat: function (g) {
+    var c = this.catInfo, e = Catragram.le(), x0 = ZAP.tx0 + 8, W = ZAP.tx1 - ZAP.tx0 - 16, y = 408;
+    g.fillStyle(0x000000, 0.25).fillRoundedRect(x0 + 2, y + 3, W, 64, 10);
+    g.fillStyle(0x111b21, 0.96).fillRoundedRect(x0, y, W, 64, 10);
+    if (c.secreta) {
+      this.txCat('CONQUISTA SECRETA', x0 + 12, y + 10, '#f2c14e', true);
+      this.txCat('CONTINUE JOGANDO PRA DESCOBRIR.', x0 + 12, y + 28, '#ffffff', true, 0, W - 24);
+    } else {
+      this.txCat('FALTA ' + Math.min(e.prog[c.id] || 0, c.meta) + ' DE ' + c.meta, x0 + 12, y + 10, '#f2c14e', true);
+      this.txCat(c.txt, x0 + 12, y + 28, '#ffffff', true, 0, W - 24);
+    }
+    this.txCat('+' + (c.xp || 15) + ' XP', x0 + W - 12, y + 10, '#8a939b', true, 1);
+  },
+
+  tocaCat: function (x, y) {
+    if (this.catInfo) { this.catInfo = null; sfx('catraca'); this.pinta(); return; }
+    if (this.catVista === 'feed') {
+      if (y > ZAP.abas - 26) this.passaPost(x < GW / 2 ? -1 : 1);
+      return;
+    }
+    if (y < 284) return;
+    var col = Math.floor((x - ZAP.tx0 - 1) / 67), fil = Math.floor((y - 284) / 66);
+    if (col < 0 || col > 3 || fil > 2) return;
+    this.teclouCat = false;
+    this.abreDoGrid((this.catRolo + fil) * 4 + col);
+  },
+  // do grid: a que saiu abre o post no feed; a que falta mostra o que falta
+  abreDoGrid: function (idx) {
+    var lista = this.gradeCat();
+    if (idx < 0 || idx >= lista.length) return;
+    var c = lista[idx];
+    if (Catragram.feita(c.id)) { this.catVista = 'feed'; this.catPost = idx; }
+    else this.catInfo = c;
+    sfx('ok');
+    this.pinta();
+  },
+  passaPost: function (d) {
+    var n = Catragram.posts().length, p = Phaser.Math.Clamp(this.catPost + d, 0, Math.max(0, n - 1));
+    if (p === this.catPost) return;
+    this.catPost = p; sfx('catraca'); this.pinta();
+  },
+  /* O teclado no Catragram: no perfil as setas andam no grid (e a moldura
+     rosa só aparece pra quem está no teclado); no feed passam o post; Esc
+     e X voltam do feed pro perfil. Devolve true quando a tecla era dele. */
+  teclaCat: function (c) {
+    var esq = c === 'KeyA' || c === 'ArrowLeft', dir = c === 'KeyD' || c === 'ArrowRight';
+    var cima = c === 'KeyW' || c === 'ArrowUp', baixo = c === 'KeyS' || c === 'ArrowDown';
+    var ok = c === 'Space' || c === 'Enter' || c === 'KeyZ';
+    if (this.catInfo) {
+      if (esq || dir || cima || baixo || ok || c === 'Escape' || c === 'KeyX') { this.catInfo = null; this.pinta(); return true; }
+      return false;
+    }
+    if (this.catVista === 'feed') {
+      if (esq || cima) { this.passaPost(-1); return true; }
+      if (dir || baixo) { this.passaPost(1); return true; }
+      if (c === 'Escape' || c === 'KeyX') { this.catVista = 'perfil'; sfx('catraca'); this.pinta(); return true; }
+      return ok;
+    }
+    var d = esq ? -1 : (dir ? 1 : (cima ? -4 : (baixo ? 4 : 0)));
+    if (d) {
+      var n = this.gradeCat().length;
+      this.teclouCat = true;
+      this.catSel = Phaser.Math.Clamp(this.catSel + d, 0, n - 1);
+      var fil = Math.floor(this.catSel / 4);
+      if (fil < this.catRolo) this.catRolo = fil;
+      if (fil > this.catRolo + 2) this.catRolo = fil - 2;
+      sfx('catraca'); this.pinta();
+      return true;
+    }
+    if (ok) { this.abreDoGrid(this.catSel); return true; }
+    return false;
   },
 
   /* ---------- o app da mochila ----------
@@ -1736,7 +1988,7 @@ var ZapScene = new Phaser.Class({
   pintaAbas: function (g) {
     this.tWHora.setVisible(false); this.tWDia.setVisible(false); this.tWDest.setVisible(false);
     for (var i = 0; i < this.tApps.length; i++) this.tApps[i].setVisible(false);
-    this.tBadge.setVisible(false);
+    this.tBadge.setVisible(false); this.tBadgeCat.setVisible(false);
     this.barraFechar(g);
   },
   // a barra de baixo: o ✕ FECHAR (guarda o celular)
@@ -1753,6 +2005,10 @@ var ZapScene = new Phaser.Class({
   voltar: function () {
     if (this.fio) { this.fio = null; sfx('catraca'); this.pinta(); return; }
     if (this.dexAberta >= 0) { this.fechaFicha(); return; }
+    if (this.aba === 3 && this.modo === 'app' && (this.catInfo || this.catVista === 'feed')) {
+      if (this.catInfo) this.catInfo = null; else this.catVista = 'perfil';
+      sfx('catraca'); this.pinta(); return;
+    }
     this.vaiInicio();
   },
 

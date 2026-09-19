@@ -161,6 +161,8 @@ var Historia = {
     var d = this.FAMA[ev];
     if (!d) return;
     GameState.fama = Math.max(-20, Math.min(20, (GameState.fama || 0) + d));
+    // o medidor mora no CATRAGRAM, e dois degraus dele são conquista
+    if (typeof Catragram !== 'undefined') Catragram.confereFama();
   },
 
   /* ---------- a caixa do ZipZap ----------

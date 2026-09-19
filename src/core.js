@@ -4174,7 +4174,12 @@ var GLIFOS = {
   /* o ✓ do zap (visto) e o _ do cursor da pesquisa: fora da fonte eles
      viravam buraco silencioso (CLAUDE.md, 'O CHARSET não tem tudo') */
   '✓': ['.....', '....#', '...#.', '#..#.', '.##..', '.#...', '.....'],
-  '_': ['.....', '.....', '.....', '.....', '.....', '.....', '#####']
+  '_': ['.....', '.....', '.....', '.....', '.....', '.....', '#####'],
+  /* o @ dos perfis do CATRAGRAM e o coração das curtidas; o ❤ dos nomes
+     do ZipZap ('BIA ❤') também era buraco, e vira o mesmo coração */
+  '@': ['.###.', '#...#', '#.###', '#.#.#', '#.###', '#....', '.###.'],
+  '♥': ['.....', '##.##', '#####', '#####', '.###.', '..#..', '.....'],
+  '❤': ['.....', '##.##', '#####', '#####', '.###.', '..#..', '.....']
 };
 var ACENTOS = {
   agudo: ['...#.', '..#..'],
@@ -4199,7 +4204,7 @@ function ligaTremida(cheia) {
   try { localStorage.setItem('metrosp_tremida', cheia ? 'cheia' : 'baixa'); } catch (e) { }
 }
 
-var CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?:;\'"-+=/()$%<>#*ÁÀÃÂÉÊÍÓÕÔÚÇ▲▼◄►✓_';
+var CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?:;\'"-+=/()$%<>#*ÁÀÃÂÉÊÍÓÕÔÚÇ▲▼◄►✓_@♥❤';
 var CEL_W = 6, CEL_H = 10, POR_LINHA = 16;
 
 function geraFonte(scene) {
