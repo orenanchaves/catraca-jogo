@@ -19,8 +19,9 @@ var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA'];
 /* ---------- a tela inicial ----------
    As abas embaixo viraram aplicativos: o celular abre bloqueado, o
    cadeado solta, a tela sobe, e o que aparece é a tela inicial com os
-   quatro apps, como em qualquer aparelho. Cor, desenho e o lugar de
-   cada ícone (2x2, 72px, pra acertar com o dedo). */
+   apps, como em qualquer aparelho. Cor, desenho e o lugar de cada
+   ícone (ver lugarDoApp). O polegar que descia a cada toque saiu:
+   cobria a tela bem na hora de ler ('o dedo atrapalha'). */
 var APPS_ZAP = [
   { nome: 'ZIPZAP', cor: 0x1faa59, cab: 0x0f3a2c },
   { nome: 'MAPA', cor: 0xf2f0ff, cab: 0x1c2a4a },
@@ -96,7 +97,6 @@ var ZapScene = new Phaser.Class({
     this.g = this.add.graphics().setDepth(2400);
     // a barra de status, o ✕ e as mãos ficam por cima de tudo, até da tela de bloqueio
     this.gTopo = this.add.graphics().setDepth(2412);
-    this.gDedo = this.add.graphics().setDepth(2420);
     this.tBat = txt(this, 0, ZAP.y0 + 12, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2)
       .setOrigin(1, 0).setDepth(2413);
     // a tela inicial: o widget e o nome de cada app
@@ -111,7 +111,6 @@ var ZapScene = new Phaser.Class({
     this.tBadge = txtC(this, 0, 0, '', PAL.branco, 8).setDepth(2403);
     this.modo = 'bloqueio';
     this.selApp = 0;
-    this.dedo = null;
     this.tStatus = txt(this, ZAP.tx0 + 6, ZAP.status + 4, '', PAL.cinza, 8).setDepth(2402);
     // a hora mora na barrinha de status do aparelho, pequena, como em celular de verdade
     this.tHora = txt(this, ZAP.tx0 + 8, ZAP.y0 + 12, '', PAL.branco, 8).setDepth(2413)
@@ -245,10 +244,6 @@ var ZapScene = new Phaser.Class({
       .setOrigin(0, 0).setInteractive();
     this.zonaLock.on('pointerdown', function () { self.desbloqueia(); });
 
-    // o polegar desce onde se toca: é a pessoa mexendo no celular
-    this.input.on('pointerdown', function (pt) {
-      if (pt.worldX > ZAP.x0 && pt.worldX < ZAP.x1 && pt.worldY > ZAP.y0 && pt.worldY < ZAP.y1) self.toca(pt.worldX, pt.worldY);
-    });
 
     this.input.keyboard.on('keydown', function (ev) {
       var c = ev.code;
@@ -333,7 +328,6 @@ var ZapScene = new Phaser.Class({
   abreApp: function (i) {
     if (this.modo !== 'inicio') return;
     var lu = lugarDoApp(i);
-    this.toca(lu.x + ICONE_APP / 2, lu.y + ICONE_APP / 2);
     this.selApp = i;
     this.aba = i; this.fio = null; this.sel = 0;
     this.modo = 'app';
@@ -343,39 +337,10 @@ var ZapScene = new Phaser.Class({
 
   vaiInicio: function () {
     if (this.modo !== 'app') return;
-    this.toca(GW / 2, ZAP.abas + 20);
     this.fio = null;
     this.modo = 'inicio';
     sfx('catraca');
     this.pinta();
-  },
-
-  toca: function (x, y) { this.dedo = { x: x, y: y, t: 0 }; },
-
-  /* O polegar: sai da mão que está mais perto do toque, desce, encosta,
-     e volta. Um traço grosso da cor da pele, a ponta redonda e a unha. */
-  pintaDedo: function (dt) {
-    var g = this.gDedo; g.clear();
-    var d = this.dedo;
-    if (!d) return;
-    d.t += dt;
-    var ida = 90, fica = 70, volta = 130, t = d.t, p;
-    if (t < ida) p = t / ida;
-    else if (t < ida + fica) p = 1;
-    else if (t < ida + fica + volta) p = 1 - (t - ida - fica) / volta;
-    else { this.dedo = null; return; }
-    var dir = d.x > GW / 2;
-    var bx = dir ? GW - 24 : 24, by = GH + 18;
-    var rx = dir ? GW - 40 : 40, ry = GH - 40;
-    var tx = rx + (d.x - rx) * p, ty = ry + (d.y + 10 - ry) * p;
-    // grosso como polegar: 24 de largura, e a ponta um pouco mais larga
-    g.lineStyle(28, 0xa8744e, 1).lineBetween(bx, by, tx, ty);
-    g.lineStyle(24, 0xc98d63, 1).lineBetween(bx, by, tx, ty);
-    g.fillStyle(0xa8744e, 1).fillCircle(tx, ty, 14);
-    g.fillStyle(0xc98d63, 1).fillCircle(tx, ty, 12);
-    var ux = tx + (bx - tx) * 0.07, uy = ty + (by - ty) * 0.07;
-    g.fillStyle(0xe8c0a8, 1).fillEllipse(ux, uy + 3, 14, 11);
-    g.fillStyle(0xffffff, 0.35).fillEllipse(ux - 2, uy, 5, 3);
   },
 
   trocaAba: function (d) {
@@ -978,6 +943,5 @@ var ZapScene = new Phaser.Class({
       this.tBloq += dt;
       if (this.tBloq > 620) this.desbloqueia();
     }
-    this.pintaDedo(dt);
   }
 });
