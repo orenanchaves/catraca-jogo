@@ -6,33 +6,35 @@
    lados. */
 var GEN_ABA = { w: 88, h: 24 };
 
-/* ---------- a fileira de botões do rodapé ----------
-   Do Crossy Road: o menu dele não tem linha de texto nenhuma — tem
-   ladrilho, e o ladrilho grande do meio é o que você joga. Aqui as três
-   coisas que a tela de título faz (jogar, rever o tutorial, calar o
-   som) eram três linhas de texto espalhadas em cantos diferentes, e a
-   de jogar era a palavra "toque fora", que é instrução, não botão.
+/* ---------- a tela, de cima pra baixo ----------
+   Era uma pilha: seis cartas, nome, gênero, poder, descrição, uma ficha
+   de cinco linhas e quatro ladrilhos, tudo em cima da plataforma
+   ('muito poluído'). Agora é um carrossel: UM personagem grande no
+   meio, ◄ e ► dos lados e seis pontinhos dizendo quantos são. A ficha
+   virou dois pares lado a lado, e os ladrilhos, um JOGAR largo com as
+   três ferramentas pequenas embaixo. Cada número abaixo é o y de uma
+   faixa; a tinta do tam 8 começa em y+5 e tem 14px, a do tam 16 vai
+   de y+8 a y+44. */
+var TIT = {
+  placaY: 10, placaH: 52,
+  topoY: 70,
+  pes: 214, escala: 2,      // o boneco de 48px vira 96: cabeça em 118
+  setaY: 150,
+  pontosY: 228,
+  nomeY: 236,
+  genY: 284,
+  poderY: 318,
+  descY: 340,
+  fichaY: 392, fichaH: 70
+};
 
-   O ladrilho do meio é o único que muda de assunto: personagem aberto
-   diz JOGAR, personagem travado diz o preço, e o aviso de um instante
-   toma o lugar dos dois. */
-/* ---------- a fileira de baixo ----------
-   Eram três ladrilhos (? | JOGAR | SOM) e entrou um quarto, o TREINO,
-   que abre a tela de minigames. Não coube em linha nova: medido, entre a
-   ficha do personagem e esta fileira sobram 4 pixels. Então a fileira
-   repartiu. O "?" tem uma letra e desceu de 46 pra 30; o SOM tem três,
-   36px de tinta, e ficou com 44; o TREINO tem seis, 72px, e ganhou 80.
-   Quem pagou foi o JOGAR: de 168 pra 128, dez letras em vez de treze.
-   Os textos dele foram medidos pra caber — FALTAM e ABRIR vão até o
-   preço mais caro (150), dez letras cravadas, e os três recados da loja
-   foram encurtados pra no máximo dez.
-
-   TREINO e não JOGOS: "JOGOS" do lado de "► JOGAR" é o mesmo verbo duas
-   vezes, e o polegar erra entre os dois. */
-var BOT = { h: 42, y: GH - 50, gr: 128, tut: 30, tre: 80, som: 44, vao: 6 };
-BOT.x0 = Math.round((GW - (BOT.tut + BOT.gr + BOT.tre + BOT.som + BOT.vao * 3)) / 2);
-BOT.xGr = BOT.x0 + BOT.tut + BOT.vao;
-BOT.xTre = BOT.xGr + BOT.gr + BOT.vao;
+/* O JOGAR é o ladrilho largo, sozinho, porque é o que se aperta; as
+   três ferramentas (tutorial, treino, som) ficam numa fileira menor
+   embaixo dele. TREINO e não JOGOS: "JOGOS" perto de "► JOGAR" é o
+   mesmo verbo duas vezes, e o polegar erra entre os dois. */
+var BOT = { yGr: GH - 106, hGr: 44, xGr: 24, gr: GW - 48, y: GH - 54, h: 38, tut: 44, tre: 120, som: 56, vao: 8 };
+BOT.x0 = Math.round((GW - (BOT.tut + BOT.tre + BOT.som + BOT.vao * 2)) / 2);
+BOT.xTre = BOT.x0 + BOT.tut + BOT.vao;
 BOT.xDir = BOT.xTre + BOT.tre + BOT.vao;
 
 var TitleScene = new Phaser.Class({
@@ -43,21 +45,19 @@ var TitleScene = new Phaser.Class({
     Ctrl.liga(this);
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = true;
     this.sel = 0;
+    this.saindo = false;
     this.ordem = ['estudante', 'clt', 'senhor', 'ambulante', 'gestante', 'turista'];
     // o gênero de cada um, como ficou gravado da última partida
     this.gen = {};
     for (var q = 0; q < this.ordem.length; q++) this.gen[this.ordem[q]] = leGenero(this.ordem[q]);
 
-    var eu = this;
+    var eu = this, i;
 
     /* ---------- o fundo é o jogo ----------
-       Outra do Crossy Road: lá o menu acontece DENTRO do mundo, com o
-       boneco parado na grama. Aqui o fundo é a plataforma de verdade,
-       a mesma arte da estação — trilho, faixa tátil, piso quadriculado —
-       e não uma cor chapada com pontinhos. Ela é desenhada em faixas
-       verticais de ponta a ponta, então duas cópias empilhadas emendam
-       sem costura. O véu por cima é o que deixa o texto legível: fundo
-       bonito que não dá pra ler é fundo ruim. */
+       Do Crossy Road: o menu acontece dentro do mundo. O fundo é a
+       plataforma de verdade, a mesma arte da estação, e o véu por cima
+       ficou mais fechado (0,88): atrás de um carrossel limpo, trilho e
+       piso aparecendo demais eram mais uma coisa pra ler. */
     texturaDeCena(this, 'tit_fundo', GW, PLAT_ALT, function (gp) {
       EstacaoScene.prototype.pintaPlataforma.call(null, gp, null, false);
     });
@@ -65,166 +65,100 @@ var TitleScene = new Phaser.Class({
     this.add.image(0, GH - PLAT_ALT * 2, 'tit_fundo').setOrigin(0, 0).setDepth(-10);
 
     var g = this.add.graphics();
-    g.fillStyle(0x05050a, 0.78).fillRect(0, 0, GW, GH);
+    g.fillStyle(0x05050a, 0.88).fillRect(0, 0, GW, GH);
 
-    /* A tela é uma pilha só, medida de cima pra baixo. Ela encolheu
-       quando o elenco foi de quatro pra seis: a placa perdeu 28px e as
-       cartas viraram duas fileiras de três. Carta espremida a 44px de
-       largura não mostra boneco nenhum. */
-    /* Sem o subtítulo a placa é só o nome: 'CATRACA' em tam 20 tem 60px de
-   tinta a partir de y+2, então 68 dá 6 de folga em cima e em baixo.
-   'METRÔ DE SÃO PAULO' saiu porque o jogo já se chama Catraca e a
-   estação inteira atrás diz de onde é: era legenda de uma coisa que
-   não precisava de legenda, e custava 22px numa tela sem sobra. */
-    var y = 20, altPlaca = 68;
+    // a placa de estação com o nome do jogo: azul em cima, vermelho embaixo
+    var y = TIT.placaY, h = TIT.placaH;
+    g.fillStyle(0x06060c, 1).fillRect(0, y, GW, h);
+    g.fillStyle(0x0b5fae, 1).fillRect(0, y, GW, 5);
+    g.fillStyle(0xe8362c, 1).fillRect(0, y + h - 5, GW, 5);
+    txtC(this, GW / 2, y + 2, 'CATRACA', PAL.branco, 16);
 
-    // placa de estação com o nome do jogo
-    g.fillStyle(0x06060c, 1).fillRect(0, y, GW, altPlaca);
-    g.fillStyle(0x0b5fae, 1).fillRect(0, y, GW, 6);
-    g.fillStyle(num(clarear('#0b5fae', 0.4)), 1).fillRect(0, y, GW, 2);
-    g.fillStyle(0xe8362c, 1).fillRect(0, y + altPlaca - 6, GW, 6);
-    g.fillStyle(num(clarear('#e8362c', 0.4)), 1).fillRect(0, y + altPlaca - 6, GW, 2);
-    /* Texto desta fonte ocupa três vezes o tam em altura: 'CATRACA' em
-       tam 20 come 60px, e o subtítulo a 38px dele estava entrando por
-       baixo das letras. A pilha inteira abaixo é medida assim. */
-    txtC(this, GW / 2, y + 4, 'CATRACA', PAL.branco, 20);
-    y += altPlaca + 10;
-
-    /* ---------- o placar e a bolsa ----------
-       No alto, um de cada lado, como o placar e as moedas do Crossy
-       Road: à esquerda o seu recorde, à direita quanto você tem pra
-       gastar em personagem — com a moeda desenhada do lado, que é a
-       mesma que se cata no chão do vagão. Ponto que não se vê não é
-       moeda; é número. */
-    this.tTopo = txt(this, 8, y, '', PAL.cinza, 8);
+    /* o recorde à esquerda e os pontos à direita, com a moeda do vagão */
+    this.tTopo = txt(this, 12, TIT.topoY, '', PAL.cinzaEsc, 8);
     texturasDoChao(this);
-    this.add.image(GW - 74, y + 11, 'caido_moeda').setDepth(1);
-    this.tPontos = txt(this, GW - 8, y, '', PAL.amarelo, 8).setOrigin(1, 0);
-    y += 28;
+    this.add.image(GW - 70, TIT.topoY + 11, 'caido_moeda').setDepth(1);
+    this.tPontos = txt(this, GW - 12, TIT.topoY, '', PAL.amarelo, 8).setOrigin(1, 0);
 
-    /* 68 e não 76: o boneco tem 48 de altura e a carta lhe dava 60 de
-       folga. Os 8px que sobram de cada fileira são 16 no total, e eles
-       viram respiro lá embaixo, que é onde faltava. */
-    var cardW = 96, cardH = 64, vao = 6, porLinha = 3;
-    var x0 = Math.round((GW - (cardW * porLinha + vao * (porLinha - 1))) / 2);
-    this.gCards = this.add.graphics().setDepth(1);
-    this.cards = [];
-    for (var i = 0; i < this.ordem.length; i++) {
-      var col = i % porLinha, lin = Math.floor(i / porLinha);
-      var cx = x0 + col * (cardW + vao), cy = y + lin * (cardH + vao);
-      var sp = this.add.sprite(cx + cardW / 2, cy + cardH - 8,
-        spriteChar(this.ordem[i], this.gen[this.ordem[i]]), 0)
-        .setOrigin(0.5, 1).setDepth(2);
-      this.cards.push({ x: cx, y: cy, w: cardW, h: cardH, sp: sp, k: this.ordem[i] });
+    /* ---------- o palco ----------
+       Um boneco só, grande. A luz no chão é o que o põe num lugar; o
+       travado vira silhueta com o cadeado e o preço, que é o que ele é
+       até ser comprado. */
+    this.gPalco = this.add.graphics().setDepth(1);
+    this.heroi = this.add.sprite(GW / 2, TIT.pes, spriteChar(this.ordem[0], this.gen[this.ordem[0]]), 0)
+      .setOrigin(0.5, 1).setScale(TIT.escala).setDepth(2);
+    this.gCadeado = this.add.graphics().setDepth(3);
+    this.tPreco = txtC(this, GW / 2, TIT.pes - 44, '', PAL.amarelo, 8).setDepth(4);
+    // tocar no boneco travado é pedir pra comprar
+    this.add.zone(GW / 2 - 50, TIT.pes - 110, 100, 116).setOrigin(0, 0).setInteractive()
+      .on('pointerdown', function () { eu.tentaComprar(); });
 
-      // a zona clicável avisa a cena pra escolher em vez de começar
-      var zona = this.add.zone(cx, cy, cardW, cardH).setOrigin(0, 0).setInteractive();
-      (function (self, idx) {
-        zona.on('pointerdown', function () {
-          if (self.sel === idx) self.tentaComprar();
-          else { self.escolhe(idx); self.ignoraAct = true; }
-        });
-      })(this, i);
-    }
-    y += cardH * 2 + vao + 20;
+    // as setas: zonas largas, porque o polegar não mira em 12 pixels
+    this.tSetas = [
+      txtC(this, 40, TIT.setaY, '◄', PAL.branco, 16).setDepth(3),
+      txtC(this, GW - 40, TIT.setaY, '►', PAL.branco, 16).setDepth(3)
+    ];
+    this.add.zone(0, TIT.setaY - 50, 90, 150).setOrigin(0, 0).setInteractive()
+      .on('pointerdown', function () { eu.passa(-1); eu.ignoraAct = true; });
+    this.add.zone(GW - 90, TIT.setaY - 50, 90, 150).setOrigin(0, 0).setInteractive()
+      .on('pointerdown', function () { eu.passa(1); eu.ignoraAct = true; });
 
-    this.tNome = txtC(this, GW / 2, y, '', PAL.amarelo, 16);
-    /* 44 e não 34: a tinta do nome em tam 16 vai de y+8 a y+44, e as
-       abas de gênero entravam por cima dela. Medido, não estimado. */
-    y += 46;
+    this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.amarelo, 16);
 
     /* ---------- o gênero ----------
-       Fica colado no nome porque é parte do nome: quem escolhe a idosa
-       está escolhendo a IDOSA, não ligando uma opção.
-
-       Era '◄ HOMEM ►' em cinza, e ninguém achava: no meio de uma pilha
-       de texto, uma linha de texto não parece um controle — parece
-       legenda. Agora são as DUAS opções lado a lado, num par de abas,
-       com a escolhida acesa. Ver as duas é o que diz que há escolha, e
-       você toca direto na que quer em vez de adivinhar que aquilo
-       alterna. No teclado a tecla é G.
-
-       A gestante mostra só a dela, apagada e sem toque: o verbo dela é
-       estar grávida. */
-    this.genY = y;
-    /* Depth 3: as abas são desenhadas no gCards (depth 1) e as cartas
-       são sprites em depth 2. Em depth 0 a palavra ficava por baixo da
-       própria aba. */
+       As duas opções lado a lado, com a escolhida acesa: ver as duas é o
+       que diz que há escolha. No teclado a tecla é G. A gestante mostra
+       só a dela, apagada e sem toque: o verbo dela é estar grávida. */
+    this.gCards = this.add.graphics().setDepth(1);
+    this.genY = TIT.genY;
     this.tGen = [
-      txtC(this, GW / 2 - GEN_ABA.w / 2, y + 5, 'HOMEM', PAL.cinza, 8).setDepth(3),
-      txtC(this, GW / 2 + GEN_ABA.w / 2, y + 5, 'MULHER', PAL.cinza, 8).setDepth(3)
+      txtC(this, GW / 2 - GEN_ABA.w / 2, TIT.genY + 5, 'HOMEM', PAL.cinza, 8).setDepth(3),
+      txtC(this, GW / 2 + GEN_ABA.w / 2, TIT.genY + 5, 'MULHER', PAL.cinza, 8).setDepth(3)
     ];
     this.zonaGen = [];
     for (i = 0; i < 2; i++) {
       var zg = this.add.zone(GW / 2 - GEN_ABA.w + i * GEN_ABA.w, this.genY, GEN_ABA.w, GEN_ABA.h)
         .setOrigin(0, 0).setInteractive();
-      (function (g) { zg.on('pointerdown', function () { eu.poeGenero(g); }); })(i ? 'f' : 'm');
+      (function (gg) { zg.on('pointerdown', function () { eu.poeGenero(gg); }); })(i ? 'f' : 'm');
       this.zonaGen.push(zg);
     }
-    y += GEN_ABA.h + 16;
-    /* O verbo que só este personagem tem. Escolher personagem passou a
-       ser escolher como se joga, e isso precisa aparecer na hora da
-       escolha — não no meio da terceira viagem. */
-    this.tPoder = txtC(this, GW / 2, y, '', PAL.verde, 8);
-    y += 26;
-    this.tDesc = txtC(this, GW / 2, y, '', PAL.cinza, 8);
+
+    // o verbo que só este personagem tem, e como ele funciona
+    this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.verde, 8);
+    this.tDesc = txtC(this, GW / 2, TIT.descY, '', PAL.cinza, 8);
     this.tDesc.setWordWrapWidth(GW - 56).setAlign('center');
-    /* 48 e não 46: a descrição quebra em duas linhas e a segunda vai
-       até y+45. Com 46 ela encostava na primeira linha da ficha — dois
-       pixels, que num tipo de 14 de altura é meia letra. */
-    y += 34;
 
-    /* Ficha em uma coluna. Em duas, a coluna tinha 136px pra caber
-       'DESCANSO' mais '90/100' — 192px de texto — e o rótulo entrava
-       no valor: saía 'GRAIR$ 14,00'. */
-    /* PASSO entrou porque a velocidade sempre existiu e nunca aparecia
-       em lugar nenhum: quem trocava de personagem sentia a diferença e
-       não sabia dizer o quê. Agora a faixa vai de 62 (idoso) a 118
-       (ambulante) e tem nome. */
-    /* Eram cinco linhas soltas boiando entre a descrição e os
-       ladrilhos, sem chapa embaixo e sem folga entre uma coisa e
-       outra: a tela toda virava uma pilha de texto centralizado.
-
-       Duas delas — CARISMA e DESCANSO — são medidores de 0 a 100 que
-       o jogo mostra como BARRA no HUD a partida inteira. Número aqui e
-       barra lá é a mesma informação em duas línguas; viraram barra,
-       nas mesmas cores do HUD (laranja carisma, verde descanso), e a
-       pessoa reconhece antes de ler.
-
-       E o resto ganhou a chapa escura do resto do jogo, pra ler como
-       UM objeto e não como três frases perdidas. */
-    /* As cinco linhas continuam cinco — tirar rótulo não deixa mais
-       claro, deixa mais mudo. O que mudou é que as duas últimas têm
-       BARRA na coluna do valor em vez de número, nas mesmas cores que
-       o HUD usa a partida inteira (laranja carisma, verde descanso),
-       e que as cinco moram numa chapa só. Antes eram cinco frases
-       soltas boiando entre a descrição e os ladrilhos, e a tela
-       inteira lia como uma pilha de texto centralizado sem hierarquia. */
-    var passo = 16;
-    this.fichaY = y;
-    this.fichaAlt = 8 + passo * 5 + 8;
+    /* ---------- a ficha ----------
+       Dois pares lado a lado em vez de cinco linhas: em cima o que é
+       palavra (grana e passo), embaixo o que é medidor (carisma e
+       descanso), como barra nas cores do HUD. O rótulo é pequeno e
+       cinza; o valor é o que se lê. A tarifa saiu: ela é a mesma pra
+       quase todo mundo, e quem não paga tem isso escrito no próprio
+       poder. */
     this.gFicha = this.add.graphics().setDepth(1);
+    var colX = [40, GW / 2 + 12];
+    var rot = [['GRANA', 'PASSO'], ['CARISMA', 'DESCANSO']];
     this.fichaVal = [];
-    var rotulos = ['GRANA', 'TARIFA', 'PASSO', 'CARISMA', 'DESCANSO'];
-    for (i = 0; i < rotulos.length; i++) {
-      var fy = y + 8 + i * passo;
-      txt(this, 44, fy, rotulos[i], PAL.cinzaEsc, 8).setDepth(2);
-      // as duas últimas mostram barra; o texto delas fica vazio
-      this.fichaVal.push(txt(this, GW - 44, fy, '', PAL.branco, 8).setOrigin(1, 0).setDepth(2));
+    for (var lin = 0; lin < 2; lin++) {
+      for (var col = 0; col < 2; col++) {
+        txt(this, colX[col], TIT.fichaY + 6 + lin * 34, rot[lin][col], PAL.cinzaEsc, 8)
+          .setScale(ESCALA_TEXTO / 2).setDepth(2);
+      }
     }
-    y += this.fichaAlt + 10;
+    this.fichaVal.push(txt(this, colX[0], TIT.fichaY + 14, '', PAL.branco, 8).setDepth(2));
+    this.fichaVal.push(txt(this, colX[1], TIT.fichaY + 14, '', PAL.branco, 8).setDepth(2));
 
-    /* ---------- os três ladrilhos ---------- */
+    /* ---------- os ladrilhos ---------- */
     this.gBot = this.add.graphics().setDepth(1);
-    this.tTut = txtC(this, BOT.x0 + BOT.tut / 2, BOT.y + 10, '?', PAL.branco, 8).setDepth(3);
-    this.tStart = txtC(this, BOT.xGr + BOT.gr / 2, BOT.y + 10, '', PAL.branco, 8).setDepth(3);
-    this.tTre = txtC(this, BOT.xTre + BOT.tre / 2, BOT.y + 10, 'TREINO', PAL.branco, 8).setDepth(3);
-    this.tSom = txtC(this, BOT.xDir + BOT.som / 2, BOT.y + 10, 'SOM', PAL.branco, 8).setDepth(3);
+    this.tStart = txtC(this, GW / 2, BOT.yGr + 11, '', PAL.branco, 8).setDepth(3);
+    this.tTut = txtC(this, BOT.x0 + BOT.tut / 2, BOT.y + 8, '?', PAL.branco, 8).setDepth(3);
+    this.tTre = txtC(this, BOT.xTre + BOT.tre / 2, BOT.y + 8, 'TREINO', PAL.branco, 8).setDepth(3);
+    this.tSom = txtC(this, BOT.xDir + BOT.som / 2, BOT.y + 8, 'SOM', PAL.branco, 8).setDepth(3);
 
     this.zonaTut = this.add.zone(BOT.x0, BOT.y, BOT.tut, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaTut.on('pointerdown', function () {
       try { localStorage.removeItem('metrosp_tutorial'); } catch (e) { }
-      eu.flashLoja('TUTORIAL');
+      eu.flashLoja('TUTORIAL LIGADO');
       sfx('ok');
       /* Sem isto o mesmo toque religava o tutorial E começava a partida:
          quem só queria saber o que aquilo fazia já estava na catraca. */
@@ -239,9 +173,9 @@ var TitleScene = new Phaser.Class({
       eu.ignoraAct = true;
       eu.atualiza();
     });
-    /* O TREINO leva quem estiver escolhido. Carta travada não entra: o
-       treino viraria o jeito de jogar de graça com quem ainda não foi
-       comprado — aí vai o estudante, que é de todo mundo. */
+    /* O TREINO leva quem estiver escolhido. Travado não entra: o treino
+       viraria o jeito de jogar de graça com quem ainda não foi comprado;
+       aí vai o estudante, que é de todo mundo. */
     this.zonaTre = this.add.zone(BOT.xTre, BOT.y, BOT.tre, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaTre.on('pointerdown', function () {
       eu.ignoraAct = true;
@@ -252,27 +186,25 @@ var TitleScene = new Phaser.Class({
       audioOn(); sfx('ok');
       eu.scene.start('Treino', {});
     });
-    /* O ladrilho do meio é o botão de jogar, e no travado é o de
-       comprar: é o mesmo comando que o teclado já dava. */
-    this.zonaStart = this.add.zone(BOT.xGr, BOT.y, BOT.gr, BOT.h).setOrigin(0, 0).setInteractive();
+    // o ladrilho grande é jogar, e no travado é comprar: o mesmo comando do teclado
+    this.zonaStart = this.add.zone(BOT.xGr, BOT.yGr, BOT.gr, BOT.hGr).setOrigin(0, 0).setInteractive();
     this.zonaStart.on('pointerdown', function () { eu.comeca(); });
 
-    // no teclado, G troca o gênero — a seta já é da escolha de carta
+    // no teclado, G troca o gênero — as setas já são do carrossel
     this.teclaG = this.input.keyboard.addKey('G');
 
     this.atualiza();
     this.tempoAnim = 0;
   },
 
-  /* Escolher troca a folha da carta na hora: a pessoa tem que VER quem
-     vai jogar, não ler o nome de quem vai jogar. */
+  /* Escolher troca a folha na hora: a pessoa tem que VER quem vai
+     jogar, não ler o nome de quem vai jogar. */
   poeGenero: function (g) {
     var k = this.ordem[this.sel];
     if (generosDe(k).indexOf(g) < 0) { sfx('nao'); this.ignoraAct = true; return; }
     if (this.gen[k] === g) { this.ignoraAct = true; return; }
     this.gen[k] = g;
     gravaGenero(k, g);
-    this.cards[this.sel].sp.setTexture(spriteChar(k, g));
     sfx('catraca');
     this.ignoraAct = true;
     this.atualiza();
@@ -285,15 +217,27 @@ var TitleScene = new Phaser.Class({
     this.poeGenero(outroGenero(k, this.gen[k]));
   },
 
-  escolhe: function (i) {
+  /* Passar pro lado: o novo entra deslizando de onde a seta aponta, que
+     é o que faz o carrossel parecer uma fila de gente e não uma troca
+     de figurinha. */
+  passa: function (d) {
+    var n = this.ordem.length;
+    this.escolhe((this.sel + d + n) % n, d);
+  },
+
+  escolhe: function (i, d) {
     if (i === this.sel) return;
     this.sel = i;
     sfx('catraca');
     this.atualiza();
+    var sp = this.heroi;
+    this.tweens.killTweensOf(sp);
+    sp.x = GW / 2 + (d || 1) * 36; sp.setAlpha(0);
+    this.tweens.add({ targets: sp, x: GW / 2, alpha: 1, duration: 160, ease: 'Cubic.easeOut' });
   },
 
-  /* Comprar é o mesmo comando de começar, na carta travada: quem
-     escolhe um cadeado está pedindo pra abrir. */
+  /* Comprar é o mesmo comando de começar, no travado: quem escolhe um
+     cadeado está pedindo pra abrir. */
   tentaComprar: function () {
     var k = this.ordem[this.sel];
     if (destravado(k)) return false;
@@ -311,96 +255,80 @@ var TitleScene = new Phaser.Class({
   },
 
   atualiza: function () {
-    var k = this.ordem[this.sel], c = CHARS[k], aberto = destravado(k);
+    var k = this.ordem[this.sel], c = CHARS[k], aberto = destravado(k), i;
+    var gsel = this.gen[k];
 
-    var g = this.gCards; g.clear();
-    for (var j = 0; j < this.cards.length; j++) {
-      var cd = this.cards[j], sel = (j === this.sel), livre = destravado(cd.k);
-      g.fillStyle(sel ? 0x1b2438 : 0x12121c, 1).fillRect(cd.x, cd.y, cd.w, cd.h);
-      g.fillStyle(sel ? 0x2b3a58 : 0x1a1a26, 1).fillRect(cd.x, cd.y, cd.w, 4);
-      g.lineStyle(2, sel ? 0xf2c14e : 0x282838, 1);
-      g.strokeRect(cd.x + 1, cd.y + 1, cd.w - 2, cd.h - 2);
-      g.fillStyle(0x000000, 0.35).fillEllipse(cd.x + cd.w / 2, cd.y + cd.h - 8, 30, 8);
-      /* O escolhido é maior. Além de dizer qual é o escolhido sem
-         depender só da moldura amarela, é o que dá tamanho pro boneco
-         na hora em que a pessoa está justamente olhando pra ele —
-         inclusive pra decidir entre homem e mulher. */
-      cd.sp.setScale(sel ? 1.4 : 1.0).setAlpha(livre ? (sel ? 1 : 0.5) : 0.18);
-      if (!livre) {
-        // cadeado: corpo e argola, no canto de cima
-        var lx = cd.x + cd.w - 20, ly = cd.y + 8;
-        g.fillStyle(0xf2c14e, 1).fillRect(lx, ly + 5, 12, 9);
-        g.fillStyle(0x12121c, 1).fillRect(lx + 5, ly + 8, 2, 4);
-        g.lineStyle(2, 0xf2c14e, 1).strokeRect(lx + 3, ly, 6, 6);
-      }
+    // o palco: a luz no chão e o boneco, ou a silhueta dele com o cadeado
+    var gp = this.gPalco; gp.clear();
+    gp.fillStyle(0xf2c14e, aberto ? 0.08 : 0.03).fillEllipse(GW / 2, TIT.pes - 40, 150, 130);
+    gp.fillStyle(0x000000, 0.45).fillEllipse(GW / 2, TIT.pes - 2, 70, 14);
+    this.heroi.setTexture(spriteChar(k, gsel), 0);
+    if (aberto) this.heroi.clearTint(); else this.heroi.setTint(0x16161f);
+    var gc = this.gCadeado; gc.clear();
+    this.tPreco.setText(aberto ? '' : String(precoDe(k)));
+    if (!aberto) {
+      var lx = GW / 2, ly = TIT.pes - 70;
+      gc.lineStyle(4, 0xf2c14e, 1).strokeRoundedRect(lx - 8, ly - 14, 16, 18, 7);
+      gc.fillStyle(0xf2c14e, 1).fillRoundedRect(lx - 13, ly - 2, 26, 20, 4);
+      gc.fillStyle(0x16161f, 1).fillRect(lx - 1, ly + 4, 3, 8);
+      this.tPreco.setPosition(GW / 2, ly + 24);
     }
 
-    var gsel = this.gen[k];
+    // os seis pontinhos: o escolhido aceso e maior, o travado mais apagado
+    var n = this.ordem.length, passo = 16, x0 = GW / 2 - (n - 1) * passo / 2;
+    for (i = 0; i < n; i++) {
+      var aqui = (i === this.sel), livre = destravado(this.ordem[i]);
+      gp.fillStyle(aqui ? 0xf2c14e : (livre ? 0x6a6c80 : 0x2e2e3e), 1)
+        .fillCircle(x0 + i * passo, TIT.pontosY, aqui ? 4 : 3);
+    }
+
     this.tNome.setText(nomeDoChar(k, gsel)).setColor(aberto ? PAL.amarelo : PAL.cinzaEsc);
+
     /* As duas abas do gênero, com a escolhida acesa. Quem só tem um
        gênero mostra o dele apagado e sem toque. */
+    var g = this.gCards; g.clear();
     var gs = generosDe(k), dois = gs.length > 1;
     for (var q = 0; q < 2; q++) {
-      var qg = q ? 'f' : 'm', temEsta = gs.indexOf(qg) >= 0, aqui = (gsel === qg);
+      var qg = q ? 'f' : 'm', temEsta = gs.indexOf(qg) >= 0, esta = (gsel === qg);
       this.tGen[q].setVisible(temEsta)
-        .setColor(aqui ? (aberto ? PAL.bg : PAL.cinzaEsc) : PAL.cinza);
-      var zx = GW / 2 - GEN_ABA.w + q * GEN_ABA.w;
+        .setColor(esta ? (aberto ? PAL.bg : PAL.cinzaEsc) : PAL.cinza);
+      // quem só tem um gênero mostra a aba dele sozinha, no meio
+      var zx = dois ? GW / 2 - GEN_ABA.w + q * GEN_ABA.w : GW / 2 - GEN_ABA.w / 2;
+      this.tGen[q].setX(zx + GEN_ABA.w / 2);
       if (temEsta && dois) this.zonaGen[q].setInteractive();
       else this.zonaGen[q].disableInteractive();
       if (!temEsta) continue;
-      g.fillStyle(aqui ? (aberto ? 0xf2c14e : 0x3a3a4a) : 0x14141e, 1)
+      g.fillStyle(esta ? (aberto ? 0xf2c14e : 0x3a3a4a) : 0x14141e, 1)
         .fillRect(zx, this.genY, GEN_ABA.w, GEN_ABA.h);
-      g.lineStyle(2, aqui ? (aberto ? 0xffe9a8 : 0x4a4a5c) : 0x2a2a3a, 1)
+      g.lineStyle(2, esta ? (aberto ? 0xffe9a8 : 0x4a4a5c) : 0x2a2a3a, 1)
         .strokeRect(zx + 1, this.genY + 1, GEN_ABA.w - 2, GEN_ABA.h - 2);
     }
-    /* Dois personagens dividem o mesmo verbo, e não jogam igual: a
-       gestante nunca é recusada e a multidão se abre pra ela. Quando o
-       personagem tem rótulo próprio, é o dele que aparece. */
+
+    /* Dois personagens dividem o mesmo verbo e não jogam igual: quando
+       o personagem tem rótulo próprio, é o dele que aparece. */
     var pd = PODERES[c.poder] || {};
     var rotulo = c.poderRotulo || pd.nome;
     this.tPoder.setText(rotulo ? '► ' + rotulo : '').setColor(aberto ? PAL.verde : PAL.cinzaEsc);
     this.tDesc.setText(c.poderComo || pd.como || c.desc);
-    var tarifa = c.tarifa === 0 ? 'GRÁTIS' : ('R$ ' + c.tarifa.toFixed(2).replace('.', ','));
-    var vals = [
-      'R$ ' + c.dinheiro.toFixed(2).replace('.', ','), tarifa,
-      nomeDoPasso(c.velocidade)
-    ];
-    for (var i = 0; i < vals.length; i++) this.fichaVal[i].setText(vals[i]);
-    /* a chapa e as duas barras da coluna do valor */
-    var gf = this.gFicha; gf.clear();
-    gf.fillStyle(0x0d0d18, 0.92).fillRect(34, this.fichaY, GW - 68, this.fichaAlt);
-    gf.fillStyle(0x272738, 1).fillRect(34, this.fichaY, GW - 68, 2);
-    gf.fillStyle(0x000000, 0.5).fillRect(34, this.fichaY + this.fichaAlt - 2, GW - 68, 2);
-    var bx = GW - 44 - 96, bw = 96;
-    barra(gf, bx, this.fichaY + 8 + 16 * 3 + 2, bw, 11, c.carisma / 100, 0xe8a33c);
-    barra(gf, bx, this.fichaY + 8 + 16 * 4 + 2, bw, 11, c.descanso / c.descansoMax, 0x00e676);
 
-    this.tTopo.setText('RECORDE: ' + GameState.recorde());
+    this.fichaVal[0].setText('R$ ' + c.dinheiro.toFixed(2).replace('.', ','));
+    this.fichaVal[1].setText(nomeDoPasso(c.velocidade));
+    var gf = this.gFicha; gf.clear();
+    gf.fillStyle(0x0d0d18, 0.92).fillRoundedRect(28, TIT.fichaY, GW - 56, TIT.fichaH, 8);
+    var bw = GW / 2 - 52;
+    barra(gf, 40, TIT.fichaY + 50, bw, 10, c.carisma / 100, 0xe8a33c);
+    barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, 0x00e676);
+
+    this.tTopo.setText('RECORDE ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));
     this.pintaBotoes(aberto, k);
   },
 
-  /* ---------- os ladrilhos do rodapé ----------
-     Ladrilho de verdade: fundo, aba clara em cima, sombra embaixo e
-     moldura. É o que faz o olho ver botão sem ninguém escrever "botão".
-     O do meio muda de assunto conforme o personagem escolhido. */
+  /* ---------- os ladrilhos ----------
+     Verde é jogar, amarelo é comprar, vermelho é o preço que você ainda
+     não tem: a cor diz o que o toque vai fazer antes da palavra. */
   pintaBotoes: function (aberto, k) {
     var g = this.gBot; g.clear();
-    function tile(x, w, corpo, aba, borda) {
-      ladrilho(g, x, BOT.y, w, BOT.h, corpo, aba, borda);
-    }
-
-    /* O '?' aparece sempre, mesmo pra quem nunca jogou. Ele já apareceu
-       e sumiu uma vez nesta tela, e some justamente pra quem procura;
-       além disso três ladrilhos com um buraco no meio não parecem uma
-       fileira, parecem um erro. */
-    tile(BOT.x0, BOT.tut, 0x1b2438, 0x2b3a58, 0x3d5180);
-    // azul como o "?" e o SOM: é ferramenta, não é jogar nem comprar
-    tile(BOT.xTre, BOT.tre, 0x1b2438, 0x2b3a58, 0x3d5180);
-
-    /* Verde é jogar, amarelo é comprar, e vermelho é o preço que você
-       ainda não tem. A cor diz o que o toque vai fazer antes de a
-       pessoa ler a palavra. */
     var falta = aberto ? 0 : (precoDe(k) - lePontos());
     var rotulo, corpo, aba, borda, cor;
     if (this.aviso) {
@@ -408,17 +336,13 @@ var TitleScene = new Phaser.Class({
     } else if (aberto) {
       rotulo = '► JOGAR'; corpo = 0x14432c; aba = 0x1d6e42; borda = 0x00e676; cor = PAL.verde;
     } else if (falta > 0) {
-      rotulo = 'FALTAM ' + falta; corpo = 0x3a1418; aba = 0x5c2028; borda = 0xe8362c; cor = PAL.vermelho;
+      rotulo = 'FALTAM ' + falta + ' PONTOS'; corpo = 0x3a1418; aba = 0x5c2028; borda = 0xe8362c; cor = PAL.vermelho;
     } else {
-      rotulo = 'ABRIR: ' + precoDe(k); corpo = 0x3a3410; aba = 0x5c5320; borda = 0xf2c14e; cor = PAL.amarelo;
+      rotulo = 'ABRIR POR ' + precoDe(k); corpo = 0x3a3410; aba = 0x5c5320; borda = 0xf2c14e; cor = PAL.amarelo;
     }
-    tile(BOT.xGr, BOT.gr, corpo, aba, borda);
-    /* O ladrilho grande tem 128 pixels (eram 168 antes do TREINO) e a
-       fonte gasta 12 por letra: dez letras com folga. Recado maior que
-       isso quebra em duas linhas e sai por cima da moldura — e cortado
-       é pior: 'FALTAM 1500' viraria 'FALTAM 150', um preço que não
-       existe. Todo recado foi medido pra caber; o corte é só rede. */
-    this.tStart.setText(rotulo.length > 10 ? rotulo.slice(0, 10) : rotulo).setColor(cor);
+    ladrilho(g, BOT.xGr, BOT.yGr, BOT.gr, BOT.hGr, corpo, aba, borda);
+    // o ladrilho tem 272px, 22 letras de 12: todo recado acima cabe
+    this.tStart.setText(rotulo).setColor(cor);
     // só o de jogar pisca: piscar é o convite, e convite só tem um
     this.tStart.setAlpha(1);
     if (this.piscaStart) { this.piscaStart.stop(); this.piscaStart = null; }
@@ -427,22 +351,24 @@ var TitleScene = new Phaser.Class({
         duration: 700, yoyo: true, repeat: -1 });
     }
 
-    tile(BOT.xDir, BOT.som, SOM_LIGADO ? 0x1b2438 : 0x14141e,
-      SOM_LIGADO ? 0x2b3a58 : 0x1f1f2c, SOM_LIGADO ? 0x3d5180 : 0x2a2a3a);
+    // as ferramentas, em azul apagado: ajudam, não são o jogo
+    ladrilho(g, BOT.x0, BOT.y, BOT.tut, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
+    ladrilho(g, BOT.xTre, BOT.y, BOT.tre, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
+    ladrilho(g, BOT.xDir, BOT.y, BOT.som, BOT.h, SOM_LIGADO ? 0x161c2c : 0x111118,
+      SOM_LIGADO ? 0x222c44 : 0x1a1a24, SOM_LIGADO ? 0x2e3c60 : 0x26263a);
     this.tSom.setColor(SOM_LIGADO ? PAL.branco : PAL.cinzaEsc);
     if (!SOM_LIGADO) {
       // o risco por cima, que é como se desenha "sem" desde sempre
       g.lineStyle(2, 0xe8362c, 1);
       g.beginPath();
-      g.moveTo(BOT.xDir + 9, BOT.y + 9);
-      g.lineTo(BOT.xDir + BOT.som - 9, BOT.y + BOT.h - 9);
+      g.moveTo(BOT.xDir + 10, BOT.y + 8);
+      g.lineTo(BOT.xDir + BOT.som - 10, BOT.y + BOT.h - 8);
       g.strokePath();
     }
   },
 
   /* Começar é o mesmo comando em todo lugar: no ladrilho, na tecla e no
-     toque fora. Na carta travada ele compra, que é o que a pessoa está
-     pedindo ao escolher um cadeado. */
+     toque fora. No travado ele compra. */
   comeca: function () {
     /* O toque no ladrilho chama isto E acende o Ctrl.act do mesmo dedo,
        que chama de novo no update seguinte: sem a trava o jogo começava
@@ -463,17 +389,15 @@ var TitleScene = new Phaser.Class({
       this.avisoT -= delta;
       if (this.avisoT <= 0) { this.aviso = null; this.atualiza(); }
     }
-    // só o escolhido anda no lugar; os outros ficam parados, mais apagados
-    for (var j = 0; j < this.cards.length; j++) {
-      this.cards[j].sp.setFrame(j === this.sel && destravado(this.cards[j].k)
-        ? 1 + (Math.floor(this.tempoAnim / 220) % 2) : 0);
-    }
+    // o escolhido anda no lugar; o travado fica parado
+    var k = this.ordem[this.sel];
+    this.heroi.setFrame(destravado(k) ? 1 + (Math.floor(this.tempoAnim / 220) % 2) : 0);
+    // as setas respiram de leve, pra dizer que dá pra passar
+    var a = 0.55 + 0.35 * Math.sin(this.tempoAnim / 300);
+    this.tSetas[0].setAlpha(a); this.tSetas[1].setAlpha(a);
 
-    var n = this.ordem.length;
-    if (Ctrl.leftJust) this.escolhe((this.sel + n - 1) % n);
-    if (Ctrl.rightJust) this.escolhe((this.sel + 1) % n);
-    if (Ctrl.upJust) this.escolhe((this.sel + n - 3) % n);
-    if (Ctrl.downJust) this.escolhe((this.sel + 3) % n);
+    if (Ctrl.leftJust) this.passa(-1);
+    if (Ctrl.rightJust) this.passa(1);
 
     if (this.teclaG && Phaser.Input.Keyboard.JustDown(this.teclaG)) { this.trocaGenero(); return; }
 
