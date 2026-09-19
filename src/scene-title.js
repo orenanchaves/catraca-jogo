@@ -440,6 +440,8 @@ var TitleScene = new Phaser.Class({
 
   update: function (time, delta) {
     Ctrl.update();
+    // ?teste= no endereço: pula o título e abre a sala de teste (src/teste.js)
+    if (TESTE && !abreSalaDeTeste.feito && this.ordem) { abreSalaDeTeste(this); return; }
     this.tempoAnim += delta;
     if (this.avisoT > 0) {
       this.avisoT -= delta;
