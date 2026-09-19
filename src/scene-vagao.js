@@ -20,6 +20,7 @@
    do lugar. O jogador chegava antes de decidir qualquer coisa.
    Medido andando de ponta a ponta: 14s dão dois carros e uma decisão. */
 var TEMPO_ENTRE_ESTACOES = 18000;
+var ESPERA_ENTRE_LUTAS = 25000;   // ms entre o fim de uma luta e o começo da próxima
 /* ---------- a viagem tem que durar mais que a parada ----------
    Ficou invertido por um tempo: 14s de viagem e 30s de porta aberta. A
    parada era o DOBRO da viagem, e a viagem é onde o jogo acontece — o
@@ -1058,7 +1059,23 @@ var VagaoScene = new Phaser.Class({
      pra ver o desafiante na tela bem antes de entrar na mira dele. Os
      primeiros 2,5s depois do embarque não contam: entrar no vagão e já
      ser parado é armadilha, não desafio. */
+  /* 'Tem que ter um tempo de distância entre as batalhas.' Qualquer luta
+     (desafiante, barra, rima, disputa) marca o relógio enquanto dura, e
+     a próxima só pode começar 25 s depois de a última acabar. */
+  marcaLuta: function () {
+    var m = this.scene.manager;
+    if (this.abordagem || this.encontro || this.batalha || this.duelando ||
+        m.isActive('Desafio') || m.isActive('Disputa') || m.isActive('Briga') || m.isActive('Encarada')) {
+      this.tUltimaLuta = this.time.now;
+    }
+  },
+  podeLutar: function () {
+    return GameState.treino || this.tUltimaLuta === undefined || this.time.now - this.tUltimaLuta > ESPERA_ENTRE_LUTAS;
+  },
+
   vigiaDesafiantes: function (dt) {
+    this.marcaLuta();
+    if (!this.podeLutar()) return;
     this.tDesafio = (this.tDesafio || 0) + dt;
     if (!this.desafiantes || this.abordagem || this.encontro || this.sentadoEm || this.tDesafio < 2500) return;
     if (this.batalha || this.ronda || this.fuga || this.lugar || this.disfarce) return;
@@ -1347,7 +1364,7 @@ var VagaoScene = new Phaser.Class({
      reclamar: sobe o '!', ele chega, e é desafio. Ganhou, a barra é sua;
      perdeu, você solta. */
   cobicaBarra: function (dt) {
-    if (!this.segurando || this.abordagem || this.encontro || this.batalha || GameState.treino) { this.tCobica = 0; return; }
+    if (!this.segurando || this.abordagem || this.encontro || this.batalha || GameState.treino || !this.podeLutar()) { this.tCobica = 0; return; }
     this.tCobica = (this.tCobica || 0) + dt;
     if (this.tCobica < 10000 || Math.random() > dt / 9000) return;
     var melhor = null, dm = 110;
@@ -2789,6 +2806,7 @@ var VagaoScene = new Phaser.Class({
      primeiro — quem chega junto e aperta começa na hora. */
   sorteiaEncontro: function () {
     if (this.encontro || this.batalha || this.duelando || this.disfarce || this.encena) return;
+    if (!this.podeLutar()) return;
     // um rimador de cada vez: dois barracos montados e a caixinha que
     // sai no fim da batalha é a do outro
     if (this.rimador) return;

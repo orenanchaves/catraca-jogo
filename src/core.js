@@ -2776,15 +2776,32 @@ setInterval(ambienteGravado, 250);
    saguão. Ele toca SÓ durante a chegada ('é só durante a chegada do
    trem'): quando o trem para e a porta abre, some num fade curto
    (calaTremChegando). Sem o arquivo, volta o trem sintetizado. */
-var AUDIO_TREM = 'assets/audio/trem_chegando.mp3';
-function tocaTremChegando(cena) {
+var AUDIO_TREM = 'assets/audio/trem_chegando.mp3', AUDIO_TREM_MS = 20900;
+/* Baixado uma vez e tocado da memória: pular pro meio da gravação pede
+   um servidor que aceite pedido parcial, e da memória sempre dá. */
+var _tremUrl = null;
+try {
+  fetch(AUDIO_TREM).then(function (r) { return r.ok ? r.blob() : null; })
+    .then(function (b) { if (b) _tremUrl = URL.createObjectURL(b); }).catch(function () { });
+} catch (e) { }
+/* `resta`: quantos ms faltam até a porta abrir. Com espera curta (no
+   pico, 3 s), a gravação começa do meio, pra terminar junto com a porta
+   em vez de continuar tocando no embarque. */
+function tocaTremChegando(cena, vel, resta) {
   if (!SOM_LIGADO || document.hidden) return;
   var naPlat = cena && cena.pl && cena.pl.sp && cena.pl.sp.y < ESC_Y;
   try {
-    var a = new Audio(AUDIO_TREM);
+    var a = new Audio(_tremUrl || AUDIO_TREM);
     a.volume = naPlat ? 0.6 : 0.18;
     a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false;
-    a.playbackRate = 0.9 + Math.random() * 0.2;
+    a.playbackRate = vel || (0.9 + Math.random() * 0.2);
+    if (resta) {
+      var pula = Math.max(0, (AUDIO_TREM_MS - resta * a.playbackRate) / 1000);
+      if (pula > 0) {
+        var poe = function () { try { a.currentTime = pula; } catch (e) { } };
+        poe(); a.addEventListener('loadedmetadata', poe, { once: true });
+      }
+    }
     var pr = a.play();
     if (pr && pr.catch) pr.catch(function () { sfx('trem'); });
     if (cena && cena.events) cena.events.once('shutdown', function () { try { a.pause(); } catch (e) { } });

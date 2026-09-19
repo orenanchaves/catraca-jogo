@@ -97,6 +97,9 @@ var PLAT_C_X0 = 104, PLAT_C_X1 = 216;      // central: piso 92..228
    acontece; 60 é a outra ponta. Os dois fogem do 220 e do 520, que são
    as chapas com o nome da estação. */
 var DIR_PLACAS = [700, 60];
+/* A gravação do trem chegando tem 20,9 s; os últimos 5 são ele entrando
+   na plataforma, freando, e a porta abre quando ela termina. */
+var TREM_SOM = 20900, TREM_ENTRA = 5000;
 var CENTRAL = false;                        // esta estação é de plataforma central?
 
 /* a via, a faixa tátil e a borda de um lado. lado -1 = via à esquerda do
@@ -2448,8 +2451,20 @@ var EstacaoScene = new Phaser.Class({
            'TREM EM 6S' não informa qual das duas está contando. */
         t.aviso = CENTRAL ? (GameState.terminal(t.dir) + ' ' + t.falta + 'S')
           : ('TREM EM ' + t.falta + 'S');
+        /* 'Talvez o tempo do áudio pra abrir a porta': a gravação do trem
+           começa antes de ele aparecer (ouve-se ele vindo no túnel com o
+           painel ainda contando) e termina com a porta abrindo. Os últimos
+           TREM_ENTRA ms dela são o trem entrando, freando. */
+        if (!t.aud && !t.somFoi) {
+          t.vel = t.vel || (0.95 + Math.random() * 0.1);
+          if (t.t > esp - (TREM_SOM / t.vel - TREM_ENTRA)) {
+            t.aud = tocaTremChegando(this, t.vel, esp - t.t + TREM_ENTRA); t.somFoi = true;
+          }
+        }
         if (t.t > esp) {
-          t.estado = 'chegando'; t.t = 0; t.repos = false; t.aud = tocaTremChegando(this);
+          t.estado = 'chegando'; t.t = 0; t.repos = false;
+          if (!t.somFoi) t.aud = tocaTremChegando(this, t.vel);
+          t.durCheg = TREM_ENTRA;
           /* O relógio anda uma vez por espera, e não uma por trem: com
              dois trens ele andaria em dobro na Sé e a estação sozinha
              comeria o dia. Quem cobra é o da esquerda, que é o único
@@ -2461,11 +2476,12 @@ var EstacaoScene = new Phaser.Class({
         /* 'O trem tem que chegar mais lento': 3,4 s em vez de 1,4, e
            freando (a curva desacelera até parar), como trem de verdade
            entrando na plataforma, e não um bloco que desliza e trava. */
-        var pc = Math.min(1, t.t / 3400);
+        var pc = Math.min(1, t.t / (t.durCheg || TREM_ENTRA));
         t.y = PLAT_Y - t.alt + (1 - Math.pow(1 - pc, 3)) * t.alt;
         if (pc >= 1) {
           t.y = PLAT_Y; t.estado = 'aberto'; t.t = 0; sfx('porta');
-          calaTremChegando(t.aud); t.aud = null;
+          // a gravação acaba com a porta; o fade só apara o que sobrar
+          calaTremChegando(t.aud); t.aud = null; t.somFoi = false; t.vel = 0;
           this.desembarca(t);
         }
         t.aviso = 'CHEGANDO';
@@ -2475,7 +2491,8 @@ var EstacaoScene = new Phaser.Class({
            tendo que achar uma porta, 7,4s viravam corrida. Embarcar é
            decisão, não reflexo — a pressa tem que estar no fim da janela,
            não no começo dela. */
-        var janela = Math.max(6000, 10000 - dif * 300);
+        // 'esperar 10 segundos pra entrar': a porta fica aberta 10 s, sempre
+        var janela = 10000;
         t.falta = Math.max(0, Math.ceil((janela - t.t) / 1000));
         t.aviso = 'EMBARQUE ' + t.falta + 'S';
         if (t.t > janela) {
