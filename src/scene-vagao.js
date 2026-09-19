@@ -399,6 +399,10 @@ var VagaoScene = new Phaser.Class({
        anterior foi destruído junto com ela, e reusar o objeto morto
        congelava o jogo (glTexture nulo) na segunda abordagem. */
     this.gBalao = null; this.tBalao = null; this.uiEscondida = [];
+    this.segurando = null;
+    // o poste em pé fica atrás do boneco (60), a mão na frente dele
+    this.gMao = this.add.graphics().setDepth(59);
+    this.gMaoFrente = this.add.graphics().setDepth(61);
     this.tPasso = 0;
     this.sentadoEm = null;
     this.indoPara = null;      // o lugar que você tocou, e pra onde está indo
@@ -784,15 +788,20 @@ var VagaoScene = new Phaser.Class({
   desenhaBarrasDoCarro: function (g) {
     for (var i = 0; i < 2; i++) {
       var cx = BARRAS_X[i] + 4;
-      /* A barra corrida do teto voltou ('as barras sumiram'): fina, e por
-         trás das pessoas (a imagem das barras mora na camada 20), porque é
-         a de cima — quem passa, passa por baixo dela. Os balaústres ficam
-         em cima dela, e são eles que têm colisão. */
+      /* A barra corrida do teto: no meio do corredor, qualquer camada
+         errava ('tá passando por cima da barra'). Por trás das pessoas,
+         o boneco andava em cima dela; por cima, ela cortava o corpo.
+         Agora ela corre onde ninguém pisa: na beirada dos bancos, 6px
+         pra fora do corredor (esquerda 64, direita 256), como a barra
+         do teto do trem de verdade, que fica em cima de quem está
+         sentado. Na direita ela some na frente das portas, onde o
+         vestíbulo abre até a parede. */
+      var bx = i ? CORREDOR_DIR + 6 : CORREDOR_ESQ - 6;
       for (var by = HUD_H; by < GH; by += 2) {
-        if (i && naPorta(by, 8)) continue;
-        g.fillStyle(0x000000, 0.18).fillRect(cx + 4, by, 2, 2);            // a sombra no chão
-        g.fillStyle(num(PAL.metalSom), 1).fillRect(cx - 2, by, 4, 2);
-        g.fillStyle(num(PAL.metalLuz), 1).fillRect(cx - 1, by, 1, 2);
+        if (i && naPorta(by, RAMPA_VESTIBULO + 4)) continue;
+        g.fillStyle(0x000000, 0.18).fillRect(bx + 3, by, 2, 2);            // a sombra no chão
+        g.fillStyle(num(PAL.metalSom), 1).fillRect(bx - 2, by, 4, 2);
+        g.fillStyle(num(PAL.metalLuz), 1).fillRect(bx - 1, by, 1, 2);
       }
       for (var ay = POSTE_Y0; ay < GH - 40; ay += POSTE_PASSO) {
         if (!temPoste(i, ay)) continue;
@@ -814,6 +823,46 @@ var VagaoScene = new Phaser.Class({
      o aviso e segurar um botão. Saiu inteiro em 18/09. A barra continua
      no cenário, e continua valendo pro CLT, que cochila parado perto
      dela. */
+
+  /* ---------- segurar, de novo, sem minigame ----------
+     'Não consegue segurar': o gesto fazia falta, o jogo em volta dele é
+     que não. Perto de um poste, agir segura: o boneco encosta nele, o
+     poste aparece em pé (de cima ele é só uma bolinha, e bolinha não
+     se segura) e a mão fecha no tubo. Segurando, ninguém te empurra do
+     lugar e ficar em pé cansa pela metade. Andar ou agir de novo solta. */
+  seguraBarra: function () {
+    var p = postePerto(this.pl.sp.x, this.pl.sp.y);
+    if (!p) return;
+    var lado = this.pl.sp.x < p.x ? -1 : 1;
+    this.segurando = { x: p.x, y: p.y, lado: lado };
+    this.indoPara = null;
+    sfx('ok');
+  },
+  soltaBarra: function () {
+    this.segurando = null;
+    this.gMao.clear(); this.gMaoFrente.clear();
+  },
+  // encosta no poste e desenha o poste em pé com a mão nele
+  atualizaSegura: function () {
+    var s = this.segurando, g = this.gMao;
+    if (!s) return;
+    this.pl.sp.x = s.x + s.lado * 11;
+    this.pl.sp.y = s.y + 2;
+    this.pl.dir = s.lado < 0 ? 'right' : 'left';
+    g.clear();
+    // o tubo, do chão até acima da cabeça: 4px de inox com o brilho
+    var ty = s.y - 58;
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(s.x - 2, ty, 4, 58);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(s.x - 1, ty, 1, 58);
+    // a mão: 4x4 da cor da pele, contorno escuro, na altura do ombro
+    var pl = PELES[GameState.charKey + (GameState.genero === 'f' ? 'F' : '')] || PELES[GameState.charKey];
+    var cor = pl ? num(pl.k) : 0xe0b088;
+    var hx = s.x - 3, hy = s.y - 34;
+    this.gMaoFrente.clear();
+    this.gMaoFrente.fillStyle(0x0a0a12, 1).fillRect(hx - 1, hy - 1, 7, 6);
+    this.gMaoFrente.fillStyle(cor, 1).fillRect(hx, hy, 5, 4);
+    this.gMaoFrente.fillStyle(0xffffff, 0.25).fillRect(hx, hy, 5, 1);
+  },
 
   /* Quem é a barra mais perto, e a que distância. É o que decide se dá
      pra segurar e onde a mão vai parar. */
@@ -3255,6 +3304,7 @@ var VagaoScene = new Phaser.Class({
     // o chão descansa menos que o banco, e o cochilo em pé menos ainda
     else if (this.noChao) GameState.addDescanso(0.0011 * dt);
     else if (this.cochilando()) GameState.addDescanso(0.0008 * dt);
+    else if (this.segurando) GameState.addDescanso(-0.00041 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
     // o cansaço é o eixo que nunca satura: a lotação bate no teto no
     // quarto dia, mas ficar em pé cansa cada vez mais
     else GameState.addDescanso(-0.00082 * GameState.char.dreno * dt * (0.8 + GameState.dificuldade() * 0.2));
@@ -3314,6 +3364,7 @@ var VagaoScene = new Phaser.Class({
     /* o toque que escolheu o lugar não pode também agir onde você está */
     if (this.engoleAct) { this.engoleAct = false; Ctrl.actJust = false; }
 
+    if (this.segurando && (this.sentadoEm || this.noChao)) this.soltaBarra();
     if (!this.sentadoEm && !this.noChao) {
       var vel = GameState.char.velocidade * (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
       if (Ctrl.act) vel *= 0.35;
@@ -3326,7 +3377,7 @@ var VagaoScene = new Phaser.Class({
          vai ser jogado. Direção na mão SEMPRE manda: o primeiro
          arrasto cancela o destino, senão o jogo estaria dirigindo
          contra você. */
-      if (dx || dy) this.indoPara = null;
+      if (dx || dy) { this.indoPara = null; if (this.segurando) this.soltaBarra(); }
       else if (this.indoPara) {
         var r = this.rumoAoLugar(dt);
         dx = r.dx; dy = r.dy;
@@ -3344,6 +3395,7 @@ var VagaoScene = new Phaser.Class({
       this.pl.anima(dt, mv);
       this.passos(dt, mv);
       resolveCorpos(this.pl, this.gente, limitaVagao, limitaVagao);
+      this.atualizaSegura();            // segurando, o empurrão não te tira do poste
     }
     // quem está sentado não cata moeda: pegar é passar por cima andando
     if (this.chao && !this.sentadoEm) this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
@@ -3458,6 +3510,12 @@ var VagaoScene = new Phaser.Class({
         } else if (this.podeVender()) {
           dica = nomeAgir() + ': VENDER  (FISCAL ' + Math.round(this.fiscal) + '%)';
           if (Ctrl.actJust) this.vende();
+        } else if (this.segurando) {
+          dica = 'SEGURANDO. ' + nomeAgir() + ': SOLTAR';
+          if (Ctrl.actJust) this.soltaBarra();
+        } else if (this.barraPerto().d <= ALCANCE_BARRA && !this.comSono()) {
+          dica = nomeAgir() + ': SEGURAR NA BARRA';
+          if (Ctrl.actJust) this.seguraBarra();
         } else if (this.comSono() && this.temLugarVago()) {
           /* Com sono, mandar segurar na barra é mandar pro lugar
              errado: barra não descansa ninguém. Enquanto houver lugar

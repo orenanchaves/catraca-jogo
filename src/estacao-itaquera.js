@@ -63,6 +63,12 @@ function dentroDe(r, x, y) { return x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1
    com a câmera presa em você, ela aparece embaixo da tela. */
 var ARENA = { x: 250, y: 1040, w: 500, h: 300 };
 var ITQ_PISA = 6;                   // o boneco não encosta na parede da passarela
+/* ---------- o mezanino largo ----------
+   O saguão das outras estações tem 320px, a tela. O da Itaquera é uma
+   fileira comprida de catracas, como na foto: 560px (x -120 a 440), com
+   doze catracas, a bilheteria e o achados e perdidos na parede da
+   esquerda. A escada e a boca da passarela continuam no mesmo lugar. */
+var MEZ = { x0: -120, x1: 440 };
 /* ---------- a galeria ----------
    Um corredor largo logo embaixo do saguão, atravessando de um lado a
    outro, com as lojas lado a lado na parede de cima (a parede do fim do
@@ -107,22 +113,66 @@ function assentosItq() {
 /* As seis lojas: o que cada uma vende, e onde fica. Vendem só o que o
    jogo já sabe vender (ITENS do core). */
 function lojasDaGaleria() {
+  /* O que existe de verdade nas estações grandes: lanche rápido pra quem
+     tá com pressa, acessório de celular, banca, caixa 24 horas, recarga
+     do Bilhete Único, O Boticário e a lotérica (na transição pro
+     shopping, mas todo mundo conta como "dentro"). Colados um no outro.
+     A esquerda termina em 86: dali até 188 é a boca da passarela. */
   var L = [
-    ['dog', -170, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
-    ['banca', -90, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
-    ['cafe', -10, '"Um cafezinho pra acordar?"', ['cafe', 'doce']],
-    ['doceria', 196, '"Doce pra levar pra casa."', ['chocolate', 'doce']],
-    ['padaria', 276, '"Pão na chapa não tem,\nmas tem café."', ['cafe', 'doce', 'agua']],
-    ['agua', 356, '"Água gelada, suco natural!"', ['agua']]
+    ['dog', -192, 76, '"DOG DO CÃO, freguês!\nO monstro da estação."', ['dogao', 'agua', 'chocolate']],
+    ['salgados', -112, 76, '"Coxinha saindo agora!\nPão de queijo, café."', ['coxinha', 'paoQueijo', 'cafe']],
+    ['celular', -32, 76, '"Capinha, película, fone.\nCarregador tem também."', ['capinha', 'fone']],
+    ['atm', 48, 38, null, null, 'saque'],
+    ['banca', 196, 76, '"Jornal, bala, pururuca."', ['jornal', 'pururuca', 'doce']],
+    ['recarga', 276, 76, null, null, 'recarga'],
+    ['boticario', 356, 76, '"Um perfume pro dia render?"', ['perfume', 'desodorante']],
+    ['loterica', 436, 76, '"Raspadinha, patrão?\nHoje é seu dia."', ['raspadinha']]
   ];
   var out = [];
   for (var i = 0; i < L.length; i++) {
     var e = ESTILO_LOJA[L[i][0]];
-    out.push({ chave: L[i][0], nome: e.nome, cor: e.cor, x: L[i][1], y: GAL.lojaY, w: 76, h: GAL.lojaH,
-      lado: 0, titulo: L[i][2], cardapio: L[i][3] });
+    out.push({ chave: L[i][0], nome: e.nome, cor: e.cor, x: L[i][1], y: GAL.lojaY, w: L[i][2], h: GAL.lojaH,
+      lado: 0, titulo: L[i][3], cardapio: L[i][4], acao: L[i][5] || null });
   }
   return out;
 }
+
+/* ---------- as lixeiras ----------
+   Inox, boca preta e a faixa verde, espalhadas nos cantos: mezanino,
+   galeria e plataforma (do lado dos pilares). Lixeira é coisa em que se
+   esbarra; e quem comeu alguma coisa pode jogar o papel nela. */
+function lixeirasItq() {
+  return [
+    { x: MEZ.x0 + 36, y: 476 }, { x: MEZ.x1 - 36, y: 476 }, { x: 214, y: 506 },
+    { x: -150, y: GAL.piso1 - 10 }, { x: 250, y: GAL.piso1 - 10 }, { x: 470, y: GAL.piso1 - 10 },
+    { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[0] + 4 },
+    { x: ITQ_PILAR_X - 26, y: PLAT_Y + ITQ_PILARES[2] + 4 }
+  ];
+}
+function pintaLixeira(g, x, y) {
+  g.fillStyle(0x000000, 0.3).fillEllipse(x + 2, y + 1, 16, 6);
+  g.fillStyle(0x7a7c86, 1).fillRect(x - 6, y - 14, 12, 14);
+  g.fillStyle(0xb8bac4, 1).fillRect(x - 5, y - 14, 3, 14);
+  g.fillStyle(0x2f7d5e, 1).fillRect(x - 6, y - 7, 12, 3);
+  g.fillStyle(0x9a9ca4, 1).fillEllipse(x, y - 14, 14, 6);
+  g.fillStyle(0x0a0a10, 1).fillEllipse(x, y - 14, 9, 3);
+}
+EstacaoScene.prototype.bateNaLixeira = function (x, y) {
+  if (!this.lixeiras) return false;
+  for (var i = 0; i < this.lixeiras.length; i++) {
+    var l = this.lixeiras[i];
+    if (Math.abs(x - l.x) < 10 && y > l.y - 6 && y < l.y + 4) return true;
+  }
+  return false;
+};
+EstacaoScene.prototype.lixeiraPerto = function () {
+  if (!this.lixeiras) return null;
+  for (var i = 0; i < this.lixeiras.length; i++) {
+    var l = this.lixeiras[i];
+    if (Math.hypot(this.pl.sp.x - l.x, this.pl.sp.y - l.y) < 24) return l;
+  }
+  return null;
+};
 
 /* ---------- o que é chão ---------- */
 EstacaoScene.prototype.naPassarela = function (x, y) {
@@ -142,12 +192,13 @@ EstacaoScene.prototype.naPassarela = function (x, y) {
 
 /* true/false quando a Itaquera decide; null quando vale a regra de sempre */
 EstacaoScene.prototype.podeIrItq = function (x, y) {
+  if (this.bateNaLixeira(x, y)) return false;
   if (y < ESC_Y) {
     if (x < PLAT_X0 || x > PLAT_X1 || y < platY(80)) return false;
     return !this.bateNaPlataforma(x, y);
   }
   if (y < 116) return null;                          // a escada é a de sempre
-  if (y > ITQ.passY0 || x < 0 || x > GW) return this.naPassarela(x, y);
+  if (y > ITQ.passY0 || x < MEZ.x0 || x > MEZ.x1) return this.naPassarela(x, y);
   return null;                                       // o mezanino é o saguão de sempre
 };
 
@@ -160,6 +211,52 @@ EstacaoScene.prototype.bateNaPlataforma = function (x, y) {
         y > py - 12 && y < py + ITQ_BANCO.prof + 4) return true;
   }
   return false;
+};
+
+/* O desenho do mezanino, no lugar do saguão de 320px. Mesmas peças
+   (azulejo, piso, boca da escada, bilheteria, guichê), mais largas. */
+EstacaoScene.prototype.pintaMezanino = function (g, l) {
+  var x0 = MEZ.x0, w = MEZ.x1 - MEZ.x0;
+  g.translateCanvas(-x0, 0);
+  this.azulejo(g, x0, HUD_H, w, 72);
+  g.fillStyle(l.num, 1).fillRect(x0, 98, ESC_X0 - 10 - x0, 5);
+  g.fillStyle(l.num, 1).fillRect(ESC_X1 + 10, 98, MEZ.x1 - ESC_X1 - 10, 5);
+  g.fillStyle(0x000000, 0.3).fillRect(x0, 103, ESC_X0 - 10 - x0, 2).fillRect(ESC_X1 + 10, 103, MEZ.x1 - ESC_X1 - 10, 2);
+  this.bocaDaEscada(g, HUD_H, 116);
+  this.piso(g, x0, 116, w, 124, 0x4a4a60, 0x565670);
+  this.piso(g, x0, 240, w, 280, 0x3f3f52, 0x494960);
+  this.azulejo(g, x0, 520, w, 56);
+  g.fillStyle(0xffffff, 0.05).fillRect(x0, 240, w, 26);
+  g.fillStyle(0xffffff, 0.03).fillRect(x0, 266, w, 26);
+  pontilhado(g, x0, 240, w, 280, 0x000000, 0.07, 8);
+  g.fillStyle(l.num, 1).fillRect(x0, 536, w, 5);
+  g.fillStyle(0x000000, 0.3).fillRect(x0, 541, w, 2);
+  quadroDeMapa(g, MAPA_SAG.x, MAPA_SAG.y, MAPA_SAG.w, MAPA_SAG.h);
+  // as paredes das pontas
+  [x0, MEZ.x1 - 26].forEach(function (px) {
+    g.fillStyle(num(PAL.paredeSom), 1).fillRect(px, 116, 26, 404);
+    g.fillStyle(num(PAL.parede), 1).fillRect(px + (px === x0 ? 0 : 4), 116, 22, 404);
+    g.fillStyle(num(PAL.paredeLuz), 1).fillRect(px + (px === x0 ? 0 : 4), 116, 3, 404);
+  });
+  // o guichê de achados e perdidos, na parede da esquerda
+  g.fillStyle(0x0a0a12, 1).fillRect(x0, ACH.y, 30, ACH.h);
+  g.fillStyle(0x1c2436, 1).fillRect(x0 + 2, ACH.y + 4, 26, ACH.h - 12);
+  var coisas = [0xe8362c, 0xf2c14e, 0x3a7fd0, 0x7fd6a0];
+  for (var ci = 0; ci < coisas.length; ci++) {
+    g.fillStyle(coisas[ci], 0.85).fillRect(x0 + 5 + (ci % 2) * 12, ACH.y + 12 + Math.floor(ci / 2) * 16, 9, 11);
+  }
+  g.fillStyle(num(PAL.metalSom), 1).fillRect(x0, ACH.y + ACH.h - 10, 34, 10);
+  g.fillStyle(num(PAL.metal), 1).fillRect(x0, ACH.y + ACH.h - 10, 34, 7);
+  g.fillStyle(num(PAL.amarelo), 0.5).fillRect(x0, ACH.y + ACH.h, 40, 3);
+  // a bilheteria, encostada na parede da esquerda, na linha das catracas
+  var bx = x0 + 8, bw = 50;
+  g.fillStyle(num(PAL.paredeSom), 1).fillRect(bx, 176, bw, 64);
+  g.fillStyle(num(PAL.parede), 1).fillRect(bx, 176, bw, 48);
+  g.fillStyle(num(PAL.paredeLuz), 1).fillRect(bx, 176, bw, 4);
+  g.fillStyle(0x0a0a12, 1).fillRect(bx + 6, 196, bw - 12, 26);
+  g.fillStyle(0x1c2436, 1).fillRect(bx + 8, 198, bw - 16, 22);
+  g.fillStyle(num(PAL.amarelo), 1).fillRect(bx + 6, 226, bw - 12, 5);
+  g.translateCanvas(x0, 0);
 };
 
 /* ---------- a plataforma larga ---------- */
@@ -422,10 +519,13 @@ EstacaoScene.prototype.montaItaquera = function () {
   }
 
   // as placas: finas, vermelhas, penduradas, como nas fotos
-  // o nome corre ao longo da plataforma, pendurado sobre o piso perto dos pilares
-  placaItq(this, 300, platY(300), placaDe('ITAQUERA'), true);
-  placaItq(this, 300, platY(560), placaDe('ITAQUERA'), true);
-  placaItq(this, 250, platY(740), 'SAÍDA ▼');
+  /* O nome e a SAÍDA moram na parede da direita, na faixa vermelha, como
+     nas fotos. Pendurados sobre o piso eles ficavam por cima de quem
+     passava; na parede ninguém anda, e eles vão por baixo de tudo. */
+  var xp = ITQ.paredeX + 13;
+  placaItq(this, xp, PLAT_Y + 150, placaDe('ITAQUERA'), true, true);
+  placaItq(this, xp, PLAT_Y + 560, placaDe('ITAQUERA'), true, true);
+  placaItq(this, xp, PLAT_Y + 860, 'SAÍDA ▼', true, true);   // abaixo do mapa (760..816), junto da escada
   // presas na parede de cima do braço, e não soltas no meio do corredor
   placaItq(this, ITQ.bracoX0 + 90, ITQ.cruzY0 - 6, '◄ A  SHOPPING');
   placaItq(this, ITQ.bracoX1 - 90, ITQ.cruzY0 - 6, 'C/D  RADIAL E ARENA ►');
@@ -436,6 +536,9 @@ EstacaoScene.prototype.montaItaquera = function () {
 
   // uns assentos já vêm ocupados; no pico, a maioria
   this.assentos = assentosItq();
+  this.lixeiras = lixeirasItq();
+  var gLixo = this.add.graphics().setDepth(2.5);
+  for (var li = 0; li < this.lixeiras.length; li++) pintaLixeira(gLixo, this.lixeiras[li].x, this.lixeiras[li].y);
   for (i = 0; i < this.assentos.length; i++) {
     var as = this.assentos[i];
     if (Math.random() > 0.25 + 0.5 * GameState.lotacao()) continue;
@@ -535,6 +638,7 @@ EstacaoScene.prototype.assentoPerto = function () {
 };
 EstacaoScene.prototype.sentaPlat = function (a) {
   this.sentadoPlat = a;
+  this._sentouAgora = true;                // o mesmo toque que sentou não levanta
   a.npc = 'player';
   this.pl.sp.x = a.x; this.pl.sp.y = a.y + 10;
   this.pl.dir = 'sentadoFrente'; this.pl.anima(0, false);
@@ -555,7 +659,10 @@ EstacaoScene.prototype.levantaPlat = function () {
 EstacaoScene.prototype.atualizaItaquera = function (dt) {
   if (this.sentadoPlat) {
     GameState.addDescanso(0.0018 * dt);
-    if (Ctrl.left || Ctrl.right || Ctrl.up || Ctrl.down) this.levantaPlat();
+    if (!Ctrl.act) this._sentouAgora = false;
+    /* levanta andando OU tocando: no celular o toque é "agir", e quem
+       sentou pelo toque ficava preso no banco sem achar como sair */
+    if (Ctrl.left || Ctrl.right || Ctrl.up || Ctrl.down || (Ctrl.actJust && !this._sentouAgora)) this.levantaPlat();
     else { this.pl.dir = 'sentadoFrente'; this.pl.anima(0, false); }
   }
   this.pintaPSD();
@@ -716,8 +823,20 @@ EstacaoScene.prototype.andaPassantes = function (dt) {
 /* ---------- o rodapé, fora do mezanino ---------- */
 EstacaoScene.prototype.contextoItq = function () {
   var x = this.pl.sp.x, y = this.pl.sp.y;
+  if (GameState.lixo && this.lixeiraPerto()) {
+    this.dica.setText(nomeAgir() + ': JOGAR NO LIXO', PAL.verde);
+    if (Ctrl.actJust) {
+      GameState.lixo = false;
+      GameState.addCarisma(1);
+      sfx('ok');
+      this.alerta.setText('+1 CARISMA. LIXO NO LIXO');
+      var al = this.alerta, eu = this;
+      this.time.delayedCall(1600, function () { if (eu.alerta === al) al.setText(''); });
+    }
+    return true;
+  }
   if (y < ESC_Y) {
-    if (this.sentadoPlat) { this.dica.setText('SENTADO. ANDE PRA LEVANTAR', PAL.cinza); return true; }
+    if (this.sentadoPlat) { this.dica.setText('SENTADO. ' + nomeAgir() + ': LEVANTAR', PAL.cinza); return true; }
     // a porta aberta e o ambulante mandam mais que o banco
     if (this.tremNaPorta() || this.ambulantePerto()) return false;
     var as = this.assentoPerto();
@@ -726,7 +845,7 @@ EstacaoScene.prototype.contextoItq = function () {
     if (Ctrl.actJust) this.sentaPlat(as);
     return true;
   }
-  if (!(y > ITQ.passY0 || x < 0 || x > GW) || y < ESC_Y) return false;
+  if (!(y > ITQ.passY0 || x < MEZ.x0 || x > MEZ.x1) || y < ESC_Y) return false;
   if (this.barracaPerto(x, y)) return false;     // na frente de uma loja, quem fala é a loja
   var dica;
   if (this.praCasa) {

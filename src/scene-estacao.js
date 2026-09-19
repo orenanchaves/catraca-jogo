@@ -289,6 +289,10 @@ var EstacaoScene = new Phaser.Class({
        treino usa a estação de sempre, porque os minigames medem o saguão
        antigo. Decidido antes de tudo: até as catracas dependem disso. */
     this.itq = ehItaquera() && !this.treino;
+    /* a cena é reaproveitada de estação em estação: os bancos e o
+       sentado da Itaquera sobravam na seguinte, e sentar ali prendia o
+       boneco, porque só a Itaquera sabe levantar dele */
+    this.assentos = null; this.sentadoPlat = null;
 
     /* ---------- o saguão ---------- */
     this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
@@ -422,7 +426,7 @@ var EstacaoScene = new Phaser.Class({
     var chance = 0.75 - 0.45 * GameState.lotacao();
     for (var q = 0; q < 2; q++) {
       if (Math.random() > chance) continue;
-      var pd = new Ator(this, q ? 286 : 34, 300 + Math.random() * 130,
+      var pd = new Ator(this, q ? (this.itq ? MEZ.x1 - 34 : 286) : (this.itq ? MEZ.x0 + 34 : 34), 300 + Math.random() * 130,
         PEDINTE_KEYS[Math.floor(Math.random() * PEDINTE_KEYS.length)]);
       pd.sp.setDepth(38); pd.anima(0, false);
       pd.fixo = true;                 // quem está agachado não se mexe
@@ -589,7 +593,8 @@ var EstacaoScene = new Phaser.Class({
     var fundo = this.add.graphics().setDepth(-1);
     fundo.fillStyle(num(PAL.bg), 1).fillRect(0, PLAT_Y - 8, GW, (GH - PLAT_Y) + 16);
 
-    texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
+    if (this.itq) texturaDeCena(this, 'est_saguao', MEZ.x1 - MEZ.x0, GH, function (g) { eu.pintaMezanino(g, l); });
+    else texturaDeCena(this, 'est_saguao', GW, GH, function (g) { eu.pintaSaguao(g, l); });
     if (this.itq) {
       texturaDeCena(this, 'est_plataforma', ITQ.platX2 - ITQ.outraX0, PLAT_ALT, function (g) { eu.pintaPlataformaItq(g, l); });
     } else {
@@ -597,7 +602,7 @@ var EstacaoScene = new Phaser.Class({
     }
     texturaDeCena(this, 'est_escada', GW, ESCADA_ALT, function (g) { eu.pintaEscada(g); });
 
-    this.add.image(0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
+    this.add.image(this.itq ? MEZ.x0 : 0, 0, 'est_saguao').setOrigin(0, 0).setDepth(0);
     this.add.image(this.itq ? ITQ.outraX0 : 0, PLAT_Y, 'est_plataforma').setOrigin(0, 0).setDepth(0);
     if (this.itq) this.montaItaquera();
     this.add.image(0, ESC_Y, 'est_escada').setOrigin(0, 0).setDepth(0);
@@ -621,11 +626,19 @@ var EstacaoScene = new Phaser.Class({
        informação do saguão que você precisa ter antes de chegar perto. */
 
     // o nome da estação desceu: o guichê ocupou a altura em que ele morava
-    var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
-    tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
-    /* A placa da escada fica NO PISO, rente à boca: pendurada no vão
-       ela virava parede na frente de quem sobe. */
-    placaSaida(this, GW / 2, 126, '▲ PLATAFORMA', 3);
+    /* Na Itaquera as placas do mezanino são as mesmas finas e vermelhas
+       da passarela e da plataforma ('deixa as placas bem semelhantes'):
+       uma família só. O nome vai na parede da direita, que é a vazia. */
+    if (this.itq) {
+      placaItq(this, MEZ.x1 - 13, 380, placaDe(GameState.estacaoAtual()), true, true);
+      placaItq(this, (ESC_X0 + ESC_X1) / 2, 126, '▲ PLATAFORMA', false, true);
+    } else {
+      var tSag = txt(this, 12, 470, GameState.estacaoAtual(), PAL.branco, 8);
+      tSag.setOrigin(0.5, 0.5).setAngle(90).setDepth(1);
+      /* A placa da escada fica NO PISO, rente à boca: pendurada no vão
+         ela virava parede na frente de quem sobe. */
+      placaSaida(this, GW / 2, 126, '▲ PLATAFORMA', 3);
+    }
     /* o nome repetido na faixa, de 260 em 260: é assim que a estação se
        identifica de qualquer ponto da plataforma, e é o marco que diz
        quanto você já andou */
@@ -642,7 +655,8 @@ var EstacaoScene = new Phaser.Class({
          oficial (CORINTHIANS-ITAQUERA, 240px em pé) três repetições
          encostavam uma na outra e nos quadros de mapa, que agora moram
          nos vãos (300 e 760). */
-      for (var ny = 150; ny < PLAT_ALT - 80; ny += 410) {
+      // na Itaquera o nome da parede é a placa vermelha (estacao-itaquera.js)
+      for (var ny = 150; ny < PLAT_ALT - 80 && !this.itq; ny += 410) {
         var tn = txt(this, this.itq ? ITQ.paredeX + 13 : 309, platY(ny), placaDe(GameState.estacaoAtual()), PAL.branco, 8);
         /* Metade do tamanho (6px por letra, escala 1): a fonte é de pixel
            e só escala inteira fica nítida. Na faixa de 18px o nome do
@@ -988,10 +1002,9 @@ var EstacaoScene = new Phaser.Class({
     // o bloqueio começa depois da bilheteria e vai até a parede da direita
     var X0 = 100, X1 = 292, TOTAL = 4, POSTE = 12, VAO = 30, VAO_LARGO = 38;
     /* Na Itaquera é uma fileira comprida, como na estação de verdade:
-       seis catracas de 22 (a larga, 30), começando logo depois de uma
-       bilheteria mais estreita (x 58). 12 + 5x34 + 42 = 224px, nos 234
-       entre 58 e 292. */
-    if (this.itq) { X0 = 64; TOTAL = 6; VAO = 22; VAO_LARGO = 30; }
+       doze catracas de 22 (a larga, 30) no mezanino largo, de x -56 a
+       432. 12 + 11x34 + 42 = 428px, centrados: vão de -14 a 390. */
+    if (this.itq) { X0 = MEZ.x0 + 64; X1 = MEZ.x1 - 8; TOTAL = 12; VAO = 22; VAO_LARGO = 30; }
     var larga = Math.floor(Math.random() * TOTAL);
 
     var largura = POSTE;
@@ -1015,6 +1028,13 @@ var EstacaoScene = new Phaser.Class({
     });
     for (var j = 0; j < TOTAL - abertas; j++) this.gates[ordem[j]].fechada = true;
     this.abertas = abertas;
+    /* Mão e contramão: na Itaquera as três de cada ponta são só de
+       SAÍDA e as seis do meio só de ENTRADA, como o fluxo da estação,
+       que entra reto da passarela pra escada e sai pelos lados. A seta
+       verde e o X vermelho no chão dizem qual é qual. */
+    if (this.itq) {
+      for (var m = 0; m < TOTAL; m++) this.gates[m].sentido = (m < 3 || m >= TOTAL - 3) ? 'sai' : 'entra';
+    }
   },
 
   /* ---------- catraca de braço, e não muro ----------
@@ -1035,12 +1055,18 @@ var EstacaoScene = new Phaser.Class({
     var i, t, w, k;
     // o gradil fecha só as pontas: da bilheteria (x 96) ao primeiro gabinete, e do último à parede
     if (this.gates.length) {
-      this.gradil(g, this.itq ? 58 : 96, this.gates[0].x0 - 14);
-      this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, GW);
+      this.gradil(g, this.itq ? MEZ.x0 + 58 : 96, this.gates[0].x0 - 14);
+      this.gradil(g, this.gates[this.gates.length - 1].x1 + 14, this.itq ? MEZ.x1 : GW);
     }
     for (i = 0; i < this.gates.length; i++) {
       t = this.gates[i]; w = t.x1 - t.x0;
       if (t.fechada) continue;
+      if (t.sentido) {
+        // fora (embaixo) e dentro (em cima): seta verde de onde se passa, X vermelho de onde não
+        var cx = Math.round((t.x0 + t.x1) / 2);
+        this.marcaSentido(g, cx, 250, t.sentido === 'entra' ? 'sobe' : 'x');
+        this.marcaSentido(g, cx, 186, t.sentido === 'sai' ? 'desce' : 'x');
+      }
       if (t.larga) {
         // faixa azul no chão marcando a porta larga
         g.fillStyle(0x1c4a8a, 0.5).fillRect(t.x0, 240, w, 5);
@@ -1088,6 +1114,22 @@ var EstacaoScene = new Phaser.Class({
       g.fillStyle(num(PAL.metalLuz), 1).fillCircle(t.x0 - 2, CATRACA_Y, 3);
       g.fillStyle(num(PAL.metalSom), 1).fillCircle(t.x0 - 2, CATRACA_Y, 1.5);
     }
+  },
+
+  /* A marca no chão da catraca: seta de 7px, ou X de 7px */
+  marcaSentido: function (g, cx, y, qual) {
+    var r, k;
+    if (qual === 'x') {
+      g.fillStyle(0xe8362c, 0.9);
+      for (k = 0; k < 7; k++) { g.fillRect(cx - 3 + k, y + k, 2, 1); g.fillRect(cx + 3 - k, y + k, 2, 1); }
+      return;
+    }
+    g.fillStyle(0x00e676, 0.9);
+    for (r = 0; r < 4; r++) {
+      var yy = qual === 'sobe' ? y + r : y + 6 - r;
+      g.fillRect(cx - r, yy, 2 * r + 1, 1);
+    }
+    g.fillRect(cx - 1, qual === 'sobe' ? y + 4 : y, 3, 3);
   },
 
   /* Gradil de metrô: corrimão em cima, travessa embaixo e balaústre a
@@ -1316,7 +1358,7 @@ var EstacaoScene = new Phaser.Class({
         var melhor = null;
         for (g = 0; g < this.gates.length; g++) {
           var cand = this.gates[g];
-          if (cand.fechada) continue;
+          if (cand.fechada || cand.sentido === 'sai') continue;
           if (!melhor || cand.fila.length < melhor.fila.length) melhor = cand;
         }
         if (!melhor) { a.anima(dt, false); continue; }
@@ -1394,7 +1436,7 @@ var EstacaoScene = new Phaser.Class({
         a.anima(dt, andaD);
         if (a.sp.y > ESC_BOCA + 6) {
           a.sp.naEscada = false; a.sp.dentro = true;
-          var abertas = this.gates.filter(function (q) { return !q.fechada; });
+          var abertas = this.gates.filter(function (q) { return !q.fechada && q.sentido !== 'entra'; });
           var porta = abertas[Math.floor(Math.random() * abertas.length)] || this.gates[0];
           a.indo = ind = { fase: 'saindo', x: (porta.x0 + porta.x1) / 2 };
         }
@@ -1626,7 +1668,7 @@ var EstacaoScene = new Phaser.Class({
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
        saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
        são o único jeito de contornar — cada pixel de beirada é caminho. */
-    if (x < 22 || x > 298) return false;
+    if (this.itq ? (x < MEZ.x0 + 22 || x > MEZ.x1 - 22) : (x < 22 || x > 298)) return false;
     // o corpo da barraca é parede; o balcão é onde se atende
     for (var b = 0; b < this.barracas.length; b++) {
       var q = this.barracas[b];
@@ -1639,6 +1681,10 @@ var EstacaoScene = new Phaser.Class({
       for (var i = 0; i < this.gates.length; i++) {
         var t = this.gates[i];
         if (t.fechada) continue;
+        /* a contramão só barra quem está ENTRANDO no vão: quem já está
+           no meio da catraca pode voltar, senão ficava preso nela */
+        if (t.sentido && this._indo && (this._yDe >= 244 || this._yDe <= 204) &&
+            (this._indo < 0 ? t.sentido === 'sai' : t.sentido === 'entra')) continue;
         if (x > t.x0 + 2 && x < t.x1 - 2) return true;
       }
       return false;
@@ -1822,8 +1868,9 @@ var EstacaoScene = new Phaser.Class({
     if (this.gEstado === 'anda') {
       var v = (52 + dif * 16) * this.patente.vel * this.gVx * (dt / 1000);
       var nx = g.sp.x + v;
-      if (nx < 60) { nx = 60; this.gVx = 1; }
-      if (nx > 286) { nx = 286; this.gVx = -1; }
+      var gx0 = this.itq ? MEZ.x0 + 60 : 60, gx1 = this.itq ? MEZ.x1 - 34 : 286;
+      if (nx < gx0) { nx = gx0; this.gVx = 1; }
+      if (nx > gx1) { nx = gx1; this.gVx = -1; }
       g.sp.x = nx;
       g.dir = this.gVx < 0 ? 'left' : 'right';
       g.anima(dt, true);
@@ -1874,6 +1921,33 @@ var EstacaoScene = new Phaser.Class({
     });
     ops.push({ label: 'Deixa pra lá', cb: function () { } });
     fala(this, 'Bilheteria. Quanto custa hoje\njá não importa.', ops);
+  },
+
+  /* A recarga do Bilhete Único é a bilheteria fora da catraca: libera
+     a passagem do mesmo jeito. */
+  recargaBU: function () {
+    if (this.liberado) {
+      fala(this, '"Já tá carregado, pode passar."', []);
+      var eu = this;
+      this.time.delayedCall(1300, function () { if (eu.dialog) eu.dialog.fecha(); });
+      return;
+    }
+    this.abreMenuBilheteria();
+  },
+  /* O caixa 24 horas: um saque por dia, R$ 20 menos a taxa. Salva quem
+     ficou sem grana pra passagem, e custa três minutos na fila. */
+  saca24h: function () {
+    var eu = this, msg;
+    if (GameState.sacouNoDia === GameState.dia) msg = 'LIMITE DE SAQUE DIÁRIO.\nVolte amanhã.';
+    else {
+      GameState.sacouNoDia = GameState.dia;
+      GameState.dinheiro += 14;
+      GameState.passaTempo(3);
+      sfx('moeda');
+      msg = 'Sacou R$ 20,00.\nA taxa comeu R$ 6,00.';
+    }
+    fala(this, msg, []);
+    this.time.delayedCall(1500, function () { if (eu.dialog) eu.dialog.fecha(); });
   },
 
   libera: function (msg) {
@@ -2459,7 +2533,7 @@ var EstacaoScene = new Phaser.Class({
            ficava cheia de gente parada em y 258. Quem está na escada não
            tem trava (o degrau manda); quem passou fica do lado de dentro. */
         if (sp.naEscada || sp.passante) return;
-        sp.x = Phaser.Math.Clamp(sp.x, 34, 288);
+        sp.x = self.itq ? Phaser.Math.Clamp(sp.x, MEZ.x0 + 34, MEZ.x1 - 32) : Phaser.Math.Clamp(sp.x, 34, 288);
         if (sp.dentro) { sp.y = Phaser.Math.Clamp(sp.y, ESC_BOCA + 4, 262); return; }
         sp.y = Phaser.Math.Clamp(sp.y, 258, 514);
       });
@@ -2523,9 +2597,12 @@ var EstacaoScene = new Phaser.Class({
       var n = Math.sqrt(dx * dx + dy * dy);
       var px = this.pl.sp.x + (dx / n) * vel * dt / 1000;
       var py = this.pl.sp.y + (dy / n) * vel * dt / 1000;
+      // pra onde o boneco vai decide a mão da catraca (e o funil acha a certa)
+      this._indo = dy; this._yDe = this.pl.sp.y;
       if (this.podeIr(px, this.pl.sp.y)) this.pl.sp.x = px;
       if (this.podeIr(this.pl.sp.x, py)) this.pl.sp.y = py;
       else if (dy !== 0) this.afunila(py, dx, vel * dt / 1000);
+      this._indo = 0;
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
@@ -2592,11 +2669,12 @@ var EstacaoScene = new Phaser.Class({
 
     if (y < 116) { this.dica.setText('▲ PLATAFORMA', PAL.cinza); return; }
 
-    var noGuiche = (x < ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
-    var naBilheteria = (x < (this.itq ? 60 : 96) && y > 244 && y < 288 && !this.liberado);
+    var noGuiche = (x < (this.itq ? MEZ.x0 : 0) + ACH.alcance && y > ACH.y - 8 && y < ACH.y + ACH.h + 8);
+    var naBilheteria = (x < (this.itq ? MEZ.x0 + 60 : 96) && y > 244 && y < 288 && !this.liberado);
     var gate = this.gateSob(x);
     var perto = (gate && y > 244 && y < 284);
-    var naCatraca = (perto && !this.liberado && !gate.fechada);
+    var naCatraca = (perto && !this.liberado && !gate.fechada && gate.sentido !== 'sai');
+    var soSaida = (perto && !gate.fechada && gate.sentido === 'sai');
     /* O cone é a regra inteira: se você está dentro dele, pular é ser
        pego. Fora dele, o risco é ele virar no meio do pulo. */
     var seguro = naCatraca && !vendo;
@@ -2611,6 +2689,8 @@ var EstacaoScene = new Phaser.Class({
     else if (noGuiche) dica = nomeAgir() + ': ACHADOS (' + ACHADOS_PRECO + ')';
     else if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
     else if (perto && gate.fechada) dica = 'catraca fora de serviço';
+    else if (soSaida && !this.praCasa) dica = 'SÓ SAÍDA. ENTRADA NO MEIO';
+    else if (gate && y > 172 && y < 206 && gate.sentido === 'entra') dica = 'ENTRADA. SAIA PELOS LADOS';
     else if (naCatraca) {
       dica = vendo
         ? 'ELE TÁ TE VENDO — ESPERE'
@@ -2621,7 +2701,9 @@ var EstacaoScene = new Phaser.Class({
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 
     if (Ctrl.actJust) {
-      if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
+      if (barraca && barraca.acao === 'recarga') this.recargaBU();
+      else if (barraca && barraca.acao === 'saque') this.saca24h();
+      else if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
       else if (noMapa) abreMapaParede(this);
       else if (noGuiche) this.abreAchados();
       else if (naBilheteria) this.abreMenuBilheteria();

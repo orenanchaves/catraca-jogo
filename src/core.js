@@ -543,7 +543,17 @@ var ITENS = {
   agua: { nome: 'ÁGUA', preco: 3.00, descanso: 12, min: 1, noCalor: 1.6 },
   cafe: { nome: 'CAFÉ', preco: 4.00, descanso: 16, min: 2 },
   dogao: { nome: 'DOGÃO', preco: 12.00, descanso: 26, min: 4, coracao: true },
-  jornal: { nome: 'JORNAL', preco: 4.00, descanso: 4, min: 1, carisma: 5 }
+  jornal: { nome: 'JORNAL', preco: 4.00, descanso: 4, min: 1, carisma: 5 },
+  /* o que a galeria da Itaquera vende: a lista do que existe de verdade
+     nas estações (salgado, capinha e fone, perfume, raspadinha) */
+  coxinha: { nome: 'COXINHA', preco: 7.00, descanso: 18, min: 2 },
+  paoQueijo: { nome: 'PÃO DE QUEIJO', preco: 5.00, descanso: 14, min: 1 },
+  fone: { nome: 'FONE DE OUVIDO', preco: 20.00, descanso: 14, min: 2, carisma: 2 },
+  capinha: { nome: 'CAPINHA', preco: 12.00, descanso: 0, min: 2, carisma: 5 },
+  perfume: { nome: 'PERFUME', preco: 30.00, descanso: 0, min: 3, carisma: 12 },
+  desodorante: { nome: 'DESODORANTE', preco: 12.00, descanso: 2, min: 1, carisma: 5 },
+  // raspadinha: uma em seis paga R$ 30; o resto é papel
+  raspadinha: { nome: 'RASPADINHA', preco: 5.00, descanso: 0, min: 1, sorte: 1 / 6, premio: 30 }
 };
 
 /* Calor é o que faz a água valer o preço: as faixas de mais movimento
@@ -629,6 +639,7 @@ var GameState = {
     this.poeNoTrajeto(CASA);
     this.estacoes = 0;
     this.dia = 1;
+    this.lixo = false; this.sacouNoDia = 0;      // o papel do lanche e o saque do 24 horas
     this.pernasFeitas = 0;
     this.atrasos = 0;
     this.ultimoAtraso = 0;
@@ -908,6 +919,11 @@ var GameState = {
     var ganho = it.descanso * ((it.noCalor && estaCalor()) ? it.noCalor : 1);
     this.addDescanso(ganho);
     if (it.carisma) this.addCarisma(it.carisma);
+    if (it.sorte) {
+      this.stats.comprou = (this.stats.comprou || 0) + 1;
+      if (Math.random() < it.sorte) { this.dinheiro += it.premio; return 'premio'; }
+      return 'nada';
+    }
     /* Coração só volta se estiver faltando: comprar dogão com a vida
        cheia é só um dogão. */
     var deuCoracao = false;
@@ -2778,7 +2794,14 @@ var ESTILO_LOJA = {
   cafe: { nome: 'CAFÉ', cor: 0xc8752a, fundo: 0x2a1e16, parede: 'maquina', balcao: 0x6b4226, produto: 'xicara', letra: '#f2c14e', ven: 'np_pax5' },
   doceria: { nome: 'DOCERIA', cor: 0xe28cc0, fundo: 0x2a1c26, parede: 'vitrine', balcao: 0xc85a9a, produto: 'bolo', letra: '#f2f0ff', ven: 'np_pax3' },
   padaria: { nome: 'PADARIA', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'paes', balcao: 0xb07a3a, produto: 'pao', letra: '#f2c14e', ven: 'np_pax4' },
-  agua: { nome: 'ÁGUA E SUCO', cor: 0x3a7fd0, fundo: 0x16223a, parede: 'geladeira', balcao: 0x2f6fb8, produto: 'garrafa', letra: '#f2f0ff', ven: 'np_pax0' }
+  agua: { nome: 'ÁGUA E SUCO', cor: 0x3a7fd0, fundo: 0x16223a, parede: 'geladeira', balcao: 0x2f6fb8, produto: 'garrafa', letra: '#f2f0ff', ven: 'np_pax0' },
+  salgados: { nome: 'SALGADOS', cor: 0xe8a33c, fundo: 0x2a2418, parede: 'estufa', balcao: 0xc0392b, produto: 'coxinha', letra: '#f2c14e', ven: 'np_pax2' },
+  celular: { nome: 'ACESSÓRIOS', cor: 0x7c3fff, fundo: 0x1a1a2a, parede: 'capinhas', balcao: 0x2a2a3a, produto: 'fone', letra: '#f2f0ff', ven: 'np_pax11' },
+  recarga: { nome: 'RECARGA BU', cor: 0x1c6fd0, fundo: 0x16223a, parede: 'cartoes', balcao: 0x1c4a8a, produto: 'cartao', letra: '#f2f0ff', ven: 'np_pax1' },
+  boticario: { nome: 'O BOTICÁRIO', cor: 0x2f7d5e, fundo: 0x14281e, parede: 'frascos', balcao: 0x1f5a40, produto: 'frasco', letra: '#f2f0ff', ven: 'np_pax10' },
+  loterica: { nome: 'LOTÉRICA', cor: 0xf2c14e, fundo: 0x14284a, parede: 'bilhetes', balcao: 0x1c4a8a, produto: 'bilhete', letra: '#f2c14e', ven: 'np_pax9' },
+  // o caixa eletrônico: máquina, sem balcão e sem ninguém atrás
+  atm: { nome: 'CAIXA 24H', letreiro: '24H', cor: 0xe8362c, fundo: 0x3a3a44, parede: 'atm', maquina: true, letra: '#f2f0ff' }
 };
 
 function pintaFundoDaLoja(g, b) {
@@ -2787,7 +2810,57 @@ function pintaFundoDaLoja(g, b) {
   g.fillStyle(e.fundo, 1).fillRect(x, y, w, h);
   g.fillStyle(0x14141a, 1).fillRect(x + 3, y + 12, w - 6, h - 30);
   var py = y + 14, ph = h - 34;
-  if (e.parede === 'geladeira') {
+  if (e.maquina) {
+    // o caixa eletrônico: gabinete cinza, tela azul, teclado e a boca do dinheiro
+    g.fillStyle(0x6a6c78, 1).fillRect(x + 3, y + 12, w - 6, h - 14);
+    g.fillStyle(0x1c3a6a, 1).fillRect(x + 7, y + 16, w - 14, 14);
+    g.fillStyle(0x6aa0e0, 1).fillRect(x + 9, y + 18, w - 18, 2);
+    g.fillStyle(0x2a2a32, 1).fillRect(x + 8, y + 34, w - 16, 10);
+    g.fillStyle(0xd8d8e8, 1);
+    for (k = 0; k < 3; k++) for (r = 0; r < 2; r++) g.fillRect(x + 10 + k * 6, y + 35 + r * 4, 4, 3);
+    g.fillStyle(0x0a0a10, 1).fillRect(x + 8, y + 48, w - 16, 3);
+    g.fillStyle(0xf2c14e, 0.1).fillRect(x - 2, y + h, w + 4, 14);
+    return;
+  }
+  if (e.parede === 'estufa') {
+    // a estufa de vidro com as coxinhas e os pães de queijo
+    g.fillStyle(0x9ec4dc, 0.6).fillRect(x + 6, py, w - 12, ph);
+    for (r = 0; r < 2; r++) for (k = 0; k < 6; k++) {
+      g.fillStyle(r ? 0xe8b85a : 0xd8943a, 1).fillRect(x + 10 + k * 10, py + 3 + r * 9, 6, 6);
+    }
+    g.fillStyle(0xffffff, 0.35).fillRect(x + 7, py, 2, ph);
+  } else if (e.parede === 'capinhas') {
+    // a parede de capinhas penduradas, e os fones em cima
+    var cc = [0x7c3fff, 0xe8362c, 0x00e676, 0xf2c14e, 0x3a7fd0, 0xe28cc0, 0xf2f0ff];
+    for (r = 0; r < 2; r++) for (k = 0; k < 9; k++) {
+      g.fillStyle(cc[(k + r * 3) % cc.length], 1).fillRect(x + 6 + k * 7, py + 8 + r * 10, 5, 8);
+    }
+    g.fillStyle(0xf2f0ff, 1);
+    for (k = 0; k < 4; k++) g.fillRect(x + 8 + k * 16, py + 1, 8, 2).fillRect(x + 8 + k * 16, py + 3, 2, 3).fillRect(x + 14 + k * 16, py + 3, 2, 3);
+  } else if (e.parede === 'cartoes') {
+    // o cartaz do Bilhete Único e a maquininha
+    g.fillStyle(0x1c6fd0, 1).fillRect(x + 8, py, 30, ph);
+    g.fillStyle(0xf2f0ff, 1).fillRect(x + 12, py + 4, 22, 3).fillRect(x + 12, py + 10, 16, 2);
+    g.fillStyle(0xe8762c, 1).fillRect(x + 12, py + 16, 10, 5);
+    g.fillStyle(0x9a9ca4, 1).fillRect(x + 46, py + 4, 20, 18);
+    g.fillStyle(0x00e676, 1).fillRect(x + 50, py + 7, 12, 5);
+  } else if (e.parede === 'frascos') {
+    // prateleiras verdes com os frascos
+    for (r = 0; r < 2; r++) {
+      g.fillStyle(0x1f5a40, 1).fillRect(x + 5, py + 9 + r * 11, w - 10, 2);
+      for (k = 0; k < 8; k++) {
+        g.fillStyle(k % 3 ? 0x9ec4dc : 0xe8c96a, 1).fillRect(x + 8 + k * 8, py + 2 + r * 11, 5, 7);
+        g.fillStyle(0x2f7d5e, 1).fillRect(x + 9 + k * 8, py + 1 + r * 11, 3, 2);
+      }
+    }
+  } else if (e.parede === 'bilhetes') {
+    // o painel azul e amarelo da lotérica, com o número do prêmio
+    g.fillStyle(0x1c4a8a, 1).fillRect(x + 6, py, w - 12, ph);
+    g.fillStyle(0xf2c14e, 1).fillRect(x + 6, py, w - 12, 5);
+    g.fillStyle(0x0a0a10, 1).fillRect(x + 14, py + 9, w - 28, 10);
+    g.fillStyle(0x00e676, 1);
+    for (k = 0; k < 6; k++) g.fillRect(x + 17 + k * 7, py + 11, 4, 6);
+  } else if (e.parede === 'geladeira') {
     for (k = 0; k < 2; k++) {
       var fx = k ? x + w - 21 : x + 5;
       g.fillStyle(0x9ec4dc, 1).fillRect(fx, py, 16, ph);
@@ -2831,6 +2904,14 @@ function pintaFundoDaLoja(g, b) {
 
 function montaFrenteDaLoja(cena, b) {
   var e = ESTILO_LOJA[b.chave] || ESTILO_LOJA.banca, x = b.x, y = b.y, w = b.w, h = b.h, k;
+  if (e.maquina) {
+    // máquina não tem atendente nem balcão: só o letreiro vermelho em cima
+    var gm = cena.add.graphics().setDepth(41);
+    gm.fillStyle(e.cor, 1).fillRect(x - 2, y - 8, w + 4, 18);
+    gm.fillStyle(0xf2c14e, 1).fillRect(x - 2, y + 8, w + 4, 2);
+    txtC(cena, x + w / 2, y - 4, e.letreiro || e.nome, e.letra, 8).setScale(ESCALA_TEXTO / 2).setDepth(42);
+    return;
+  }
   // o atendente, de frente, com as pernas atrás do balcão
   var ven = new Ator(cena, x + w / 2, y + h - 4, e.ven);
   ven.dir = 'down'; ven.anima(0, false); ven.sp.setDepth(39);
@@ -2854,6 +2935,21 @@ function montaFrenteDaLoja(cena, b) {
     } else if (e.produto === 'bolo') {
       gb.fillStyle(0xf2f0ff, 1).fillRect(hx + 2, hy - 2, 12, 6);
       gb.fillStyle(0xe28cc0, 1).fillRect(hx + 2, hy - 4, 12, 2);
+    } else if (e.produto === 'coxinha') {
+      gb.fillStyle(0xd8943a, 1).fillRect(hx + 4, hy - 4, 6, 3).fillRect(hx + 2, hy - 1, 10, 5);
+      gb.fillStyle(0xe8b85a, 1).fillRect(hx + 12, hy - 1, 5, 5);
+    } else if (e.produto === 'fone') {
+      gb.fillStyle(0xf2f0ff, 1).fillRect(hx + 3, hy - 4, 10, 2).fillRect(hx + 2, hy - 2, 3, 5).fillRect(hx + 11, hy - 2, 3, 5);
+    } else if (e.produto === 'cartao') {
+      gb.fillStyle(0x1c6fd0, 1).fillRect(hx + 2, hy - 3, 13, 8);
+      gb.fillStyle(0xe8762c, 1).fillRect(hx + 4, hy - 1, 4, 3);
+    } else if (e.produto === 'frasco') {
+      gb.fillStyle(0x9ec4dc, 1).fillRect(hx + 4, hy - 4, 6, 8);
+      gb.fillStyle(0x2f7d5e, 1).fillRect(hx + 5, hy - 6, 4, 2);
+      gb.fillStyle(0xe8c96a, 1).fillRect(hx + 12, hy - 2, 4, 6);
+    } else if (e.produto === 'bilhete') {
+      gb.fillStyle(0xf2c14e, 1).fillRect(hx + 2, hy - 3, 12, 7);
+      gb.fillStyle(0xe8362c, 1).fillRect(hx + 9, hy - 1, 4, 3);
     } else if (e.produto === 'pao') {
       gb.fillStyle(0xd99a4e, 1).fillEllipse(hx + 8, hy, 16, 7);
       gb.fillStyle(0xf2c14e, 0.6).fillRect(hx + 3, hy - 1, 10, 1);
@@ -3900,6 +3996,53 @@ var ICONES_ITEM = {
     pinta(c, '#f2c14e', 11, 13, 3, 1);
     pinta(c, '#f2c14e', 15, 12, 3, 1);
   },
+  coxinha: function (c) {
+    pinta(c, '#b8742a', 8, 4, 8, 3);
+    pinta(c, '#d8943a', 6, 7, 12, 5);
+    pinta(c, '#d8943a', 4, 12, 16, 7);
+    pinta(c, '#f0b85a', 6, 8, 3, 9);
+    pinta(c, '#9a5a1e', 4, 18, 16, 2);
+  },
+  paoQueijo: function (c) {
+    for (var i = 0; i < 3; i++) {
+      pinta(c, '#e8b85a', 3 + i * 6, 9 + (i % 2) * 3, 7, 7);
+      pinta(c, '#f5d88a', 4 + i * 6, 10 + (i % 2) * 3, 3, 2);
+      pinta(c, '#b8862a', 3 + i * 6, 15 + (i % 2) * 3, 7, 1);
+    }
+  },
+  fone: function (c) {
+    pinta(c, '#f2f0ff', 5, 4, 2, 10);
+    pinta(c, '#f2f0ff', 17, 4, 2, 10);
+    pinta(c, '#f2f0ff', 7, 3, 10, 2);
+    pinta(c, '#d8d8e8', 3, 12, 5, 7);
+    pinta(c, '#d8d8e8', 16, 12, 5, 7);
+    pinta(c, '#8b90a6', 11, 14, 2, 8);
+  },
+  capinha: function (c) {
+    pinta(c, '#7c3fff', 7, 3, 11, 19);
+    pinta(c, '#a070ff', 8, 4, 3, 17);
+    pinta(c, '#1a1a24', 9, 5, 4, 4);
+    pinta(c, '#f2f0ff', 10, 6, 2, 2);
+  },
+  perfume: function (c) {
+    pinta(c, '#2f7d5e', 10, 3, 4, 4);
+    pinta(c, '#9ec4dc', 6, 7, 12, 14);
+    pinta(c, '#cdeeff', 7, 8, 3, 12);
+    pinta(c, '#3f9a70', 8, 12, 8, 5);
+  },
+  desodorante: function (c) {
+    pinta(c, '#8b90a6', 9, 2, 6, 4);
+    pinta(c, '#3a7fd0', 8, 6, 8, 16);
+    pinta(c, '#6aa0e0', 9, 7, 2, 14);
+    pinta(c, '#f2f0ff', 8, 11, 8, 3);
+  },
+  raspadinha: function (c) {
+    pinta(c, '#f2c14e', 3, 5, 18, 14);
+    pinta(c, '#1c4a8a', 3, 5, 18, 3);
+    pinta(c, '#a0a4b4', 5, 10, 14, 6);
+    pinta(c, '#e8362c', 12, 10, 7, 6);
+    pinta(c, '#f2f0ff', 14, 12, 3, 2);
+  },
   jornal: function (c) {
     pinta(c, '#c8c8d4', 4, 5, 16, 15);
     pinta(c, '#e0e0ea', 4, 5, 16, 2);
@@ -4054,9 +4197,14 @@ MenuComida.prototype.compra = function () {
   if (this.scene._deAmbulante) Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
   var sc = this.scene, ao = this.aoFechar;
   this.fecha();
-  fala(sc, r === 'coracao'
-    ? it.nome + ' na veia.\nVocê recuperou um coração.'
-    : it.nome + '. Deu uma segurada.', []);
+  var msg = it.nome + '. Deu uma segurada.';
+  if (r === 'coracao') msg = it.nome + ' na veia.\nVocê recuperou um coração.';
+  else if (r === 'premio') msg = 'RASPOU E GANHOU!\n+R$ ' + it.premio + ',00';
+  else if (r === 'nada') msg = 'Raspou... e nada.\nFica pra próxima.';
+  else if (!it.descanso && it.carisma) msg = it.nome + '.\nTá se sentindo outra pessoa.';
+  // quem comeu fica com o papel na mão: é o que a lixeira da Itaquera recebe
+  if (it.descanso && !it.carisma && !it.sorte) GameState.lixo = true;
+  fala(sc, msg, []);
   sc.time.delayedCall(1300, function () { if (sc.dialog) sc.dialog.fecha(); });
   if (ao) ao();
 };

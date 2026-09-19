@@ -270,7 +270,14 @@ var DesafioScene = new Phaser.Class({
     GameState.addDescanso(-8);
     GameState.stats.causos++;
     sfx('nao');
-    this.poe([{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: 'O VAGÃO INTEIRO VIU.' }], 'sai');
+    var msgs = [{ msg: 'VOCÊ PERDEU\nA PACIÊNCIA.', cor: PAL.vermelho }, { msg: 'O VAGÃO INTEIRO VIU.' }];
+    /* perder o desafio custa um coração, como perder qualquer outro
+       minigame; no treino não, que treino não vale nada */
+    if (!GameState.treino) {
+      GameState.perdeCoracao(1);
+      msgs.push({ msg: '-1 CORAÇÃO', cor: PAL.vermelho });
+    }
+    this.poe(msgs, 'sai');
   },
 
   fecha: function () {
