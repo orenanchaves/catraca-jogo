@@ -395,6 +395,7 @@ var VagaoScene = new Phaser.Class({
     this.sorteouFalha = false;
     this.duelando = false;
     this.encontro = null;
+    this.ambVagao = null;        // o ambulante vindo pelo corredor
     this.abordagem = null;       // o desafiante que te viu (src/desafio.js)
     /* A cena é reaproveitada de estação em estação: o balão da viagem
        anterior foi destruído junto com ela, e reusar o objeto morto
@@ -2418,23 +2419,77 @@ var VagaoScene = new Phaser.Class({
     });
   },
 
-  /* ---------- eventos de vagão ---------- */
-  sorteiaEvento: function () {
-    var self = this;
-    var baralho = [
-      function () {
-        fala(self, '"Olha o chocolate, dois real,\ndois real o chocolate."', [
-          {
-            label: 'Comprar (R$ 2,00)', cb: function () {
-              if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); return; }
+  /* ---------- o ambulante do vagão ----------
+     'Só tem como o ambulante vender quando ele chegar perto de mim.' Era
+     um diálogo que abria do nada, sem ninguém ali. Agora ele entra pela
+     porta do carro mais longe de você, gritando (o pregão gravado, com
+     as ondas saindo dele), e vem pelo corredor; a oferta só abre quando
+     ele encosta. Se você se afastar, ele desiste e segue pro próximo
+     carro; depois de vender, também. */
+  chegaAmbulante: function () {
+    if (this.ambVagao || this.dialog) return;
+    var c = carroDe(this.pl.sp.y), portas = this.portasDoCarro(c), porta = portas[0], melhor = -1;
+    for (var i = 0; i < portas.length; i++) {
+      var d = Math.abs(portas[i] + PORTA_ALT / 2 - this.pl.sp.y);
+      if (d > melhor) { melhor = d; porta = portas[i]; }
+    }
+    var a = new Ator(this, 160, porta + PORTA_ALT / 2, 'np_ambulante_a');
+    a.sp.setDepth(56); a.fixo = false; a.ehAmbulante = true;
+    this.gente.push(a);
+    this.ambVagao = { a: a, fase: 'vem', t: 0, saida: porta + PORTA_ALT / 2 };
+  },
+  andaAmbulante: function (dt) {
+    var v = this.ambVagao;
+    if (!v) return;
+    var a = v.a, self = this;
+    if (!a.sp || !a.sp.active) { this.ambVagao = null; return; }
+    v.t += dt;
+    var alvo = v.fase === 'vem' ? { x: this.pl.sp.x + (this.pl.sp.x < 160 ? 18 : -18), y: this.pl.sp.y }
+                                : { x: 160, y: v.fase === 'vai' ? v.longe : v.saida };
+    var dx = alvo.x - a.sp.x, dy = alvo.y - a.sp.y, d = Math.hypot(dx, dy);
+    if (v.fase === 'vem') {
+      // encostou: a oferta abre; ficou longe demais por muito tempo: desiste
+      if (d < 26) {
+        v.fase = 'vende'; a.dir = dy < 0 ? 'up' : 'down'; a.anima(0, false);
+        fala(this, '"Olha o chocolate, dois real,\ndois real o chocolate."', [
+          { label: 'Comprar (R$ 2,00)', cb: function () {
+            if (GameState.dinheiro < 2) { sfx('nao'); self.flash('Sem troco.'); }
+            else {
               GameState.gastar(2); GameState.addCarisma(4); GameState.addDescanso(2);
               GameState.stats.causos++; sfx('moeda'); self.flash('O chocolate salva.');
               Missoes.conta('ambulante', { estacao: GameState.estacaoAtual() });
             }
-          },
-          { label: 'Fazer que não ouviu', cb: function () { GameState.addCarisma(-2); GameState.stats.causos++; } }
+            self.ambulanteVai();
+          } },
+          { label: 'Fazer que não ouviu', cb: function () { GameState.addCarisma(-2); GameState.stats.causos++; self.ambulanteVai(); } }
         ]);
-      },
+        return;
+      }
+      if (v.t > 16000 || d > 420) { this.ambulanteVai(); return; }
+    }
+    if (v.fase === 'vende') return;
+    if (d < 4) {
+      if (v.fase === 'vai') { a.sp.destroy(); this.gente.splice(this.gente.indexOf(a), 1); this.ambVagao = null; }
+      return;
+    }
+    var passo = Math.min(d, (v.fase === 'vem' ? 46 : 58) * dt / 1000);
+    a.sp.x += dx / d * passo; a.sp.y += dy / d * passo;
+    a.setDir(dx, dy); a.anima(dt, true);
+  },
+  // vendeu (ou não): segue pelo corredor, pro lado de onde não veio, e some na emenda
+  ambulanteVai: function () {
+    var v = this.ambVagao;
+    if (!v) return;
+    v.fase = 'vai';
+    v.longe = v.a.sp.y + (v.saida < this.pl.sp.y ? 260 : -260);
+  },
+
+  /* ---------- eventos de vagão ---------- */
+  sorteiaEvento: function () {
+    var self = this;
+    var baralho = [
+      // o ambulante: entra pela porta e só vende quando chega perto (chegaAmbulante)
+      function () { self.chegaAmbulante(); },
       function () { self.comecaRimador(); },
       function () {
         fala(self, 'Alguém pede ajuda no corredor.', [
@@ -3542,6 +3597,7 @@ var VagaoScene = new Phaser.Class({
     if (this.estado === 'andando') {
       this.atualizaTranco(dt);
       this.cobicaBarra(dt);
+      this.andaAmbulante(dt);
       this.caiDoBolso(dt);
       this.atualizaFalha(dt);
       if (this.falha) { this.animaGente(dt); this.pintaUI(); this.contexto(); return; }

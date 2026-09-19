@@ -1875,20 +1875,25 @@ function roupaCosplay(tipo) {
         if (costas) { linha(12, 4, 11, 'z'); linha(13, 4, 11, 'e'); }
       }
       if (tipo === 'akatsuki') {
-        linha(10, 5, 10, 'j', 'k');                              // a gola alta tampa o pescoço
-        if (frente) {
-          poe(11, 7, 'e'); poe(11, 8, 'e');                      // o forro vermelho na gola
-          poe(12, 4, 'w'); poe(13, 3, 'e'); poe(13, 4, 'e'); poe(13, 5, 'e'); poe(14, 4, 'e');
-          poe(15, 10, 'w'); poe(16, 9, 'e'); poe(16, 10, 'e'); poe(16, 11, 'e');
-        }
-        if (costas) {
-          poe(12, 9, 'w'); poe(13, 8, 'e'); poe(13, 9, 'e'); poe(13, 10, 'e'); poe(14, 9, 'e');
-          poe(16, 4, 'e'); poe(16, 5, 'e');
-        }
-        if (VISTA_LADO.indexOf(nome) >= 0) { poe(13, 6, 'e'); poe(13, 7, 'e'); poe(14, 7, 'e'); }
-        // a capa desce até a canela
-        for (y = 18; y <= 21; y++) for (x = 3; x <= 12; x++) poe(y, x, 'j', 'p');
+        /* 'Ainda tá meio fake': a capa de verdade tem a gola alta que
+           tampa o queixo, cai inteira até a canela (sem perna aparecendo
+           no meio) e as nuvens são grandes, vermelhas, de contorno branco. */
+        var lado = VISTA_LADO.indexOf(nome) >= 0;
+        // a capa até a canela, fechada entre as pernas
+        for (y = 18; y <= 21; y++) for (x = (lado ? 4 : 2); x <= (lado ? 11 : 13); x++) poe(y, x, 'j', 'p.');
+        poe(22, lado ? 5 : 4, 'j', 'p'); poe(22, lado ? 6 : 11, 'j', 'p');
+        // a gola alta: pescoço e queixo somem dentro dela, com o forro vermelho na borda
+        linha(10, 3, 12, 'j', 'k.');
+        if (frente) { linha(9, 4, 11, 'j', 'k'); poe(9, 4, 'e', 'j'); poe(9, 11, 'e', 'j'); poe(10, 4, 'e', 'j'); poe(10, 11, 'e', 'j'); }
+        var nuvem = function (x0, y0) {   // 4x3 de vermelho com o contorno branco
+          linha(y0, x0 + 1, x0 + 2, 'w'); poe(y0 + 1, x0, 'w'); poe(y0 + 1, x0 + 1, 'e'); poe(y0 + 1, x0 + 2, 'e'); poe(y0 + 1, x0 + 3, 'w');
+          poe(y0 + 2, x0, 'w'); linha(y0 + 2, x0 + 1, x0 + 3, 'e'); poe(y0 + 2, x0 + 4, 'w'); linha(y0 + 3, x0 + 1, x0 + 3, 'w');
+        };
+        if (frente) { nuvem(2, 12); nuvem(8, 17); }
+        if (costas) { nuvem(5, 12); nuvem(2, 17); nuvem(9, 18); }
+        if (lado) nuvem(5, 13);
         linha(frente ? 4 : 3, 3, 12, 'y', 'a');                  // a bandana de metal
+        if (frente) poe(4, 7, 'o', 'y');                         // o risco na placa
       }
       if (tipo === 'naruto') {
         linha(11, 0, 15, 'z'); linha(12, 0, 15, 'z');            // os ombros pretos
