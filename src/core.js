@@ -1641,6 +1641,13 @@ var POSE_PEDINTE = [
   '...osssssso.....', '................', '................', '................'
 ];
 
+/* o cabelo espetado do Naruto e do Sasuke: as pontas saindo do topo */
+var CABELO_ESPETADO = {
+  down: { 0: '...oa.oaao.ao...', 1: '..oaaaaaaaaaao..', 2: '..oaaaaaaaaaao..', 3: '..oaaaaaaaaaao..', 4: '..oaaaaaaaaaao..', 5: '..oaakkkkkkaao..' },
+  up: { 0: '...oa.oaao.ao...', 1: '..oaaaaaaaaaao..', 2: '..oaaaaaaaaaao..', 3: '..oaaaaaaaaaao..', 4: '..oaaaaaaaaaao..', 5: '..oaaaaaaaaaao..', 6: '..oaaaaaaaaaao..', 7: '..oaaaaaaaaaao..', 8: '...oaaaaaaaao...' },
+  side: { 0: '....oa.oa.ao....', 1: '...oaaaaaaaoa...', 2: '..oaaaaaaaaao...', 3: '..oaaaaaaaaao...', 4: '..oaaaaaaakkko..', 5: '...oaaaakkkko...' }
+};
+
 /* cada tipo de gente é uma pilha de camadas sobre o corpo base */
 var CORPOS = {
   padrao: {},
@@ -1695,7 +1702,13 @@ var CORPOS = {
   longo_corinthians: { herda: 'longo', pos: camisaDeTime('corinthians') },
   longo_palmeiras: { herda: 'longo', pos: camisaDeTime('palmeiras') },
   longo_saopaulo: { herda: 'longo', pos: camisaDeTime('saopaulo') },
-  rabo_santos: { mods: [CABELO_RABO], pos: camisaDeTime('santos') }
+  rabo_santos: { mods: [CABELO_RABO], pos: camisaDeTime('santos') },
+  // os cosplayers da Liberdade (roupaCosplay)
+  cos_marinheira: { herda: 'saia', pos: roupaCosplay('marinheira') },
+  cos_akatsuki: { mods: [CABELO_RABO], pos: roupaCosplay('akatsuki') },
+  cos_naruto: { mods: [CABELO_ESPETADO], pos: roupaCosplay('naruto') },
+  cos_sasuke: { mods: [CABELO_ESPETADO], pos: roupaCosplay('sasuke') },
+  cos_sakura: { herda: 'longo', pos: roupaCosplay('sakura') }
 };
 
 var DIRS = ['down', 'up', 'side', 'diagDown', 'diagUp', 'sentado', 'sentadoFrente', 'sentadoCostas', 'segurando', 'segurandoCostas'];
@@ -1819,6 +1832,89 @@ function camisaDeTime(time) {
   };
 }
 
+/* ---------- os cosplayers da Liberdade ----------
+   'Na Liberdade tem que aparecer uns cosplayers.' Cinco roupas, das
+   fotos que vieram, pintadas pixel a pixel por cima do corpo de sempre,
+   como a camisa de time:
+   - a estudante de marinheira: blusa branca, gola azul-marinho com o
+     lenço azul-claro na frente e o quadrado da gola nas costas, saia
+     plissada azul-marinho, cabelo preto comprido de franja;
+   - o da Akatsuki: capa preta até a canela, gola alta com o forro
+     vermelho, nuvens vermelhas de contorno branco, rabo de cavalo e a
+     bandana de metal na testa;
+   - o Naruto: macacão laranja com os ombros pretos e o zíper branco,
+     cabelo loiro espetado e a bandana azul com a placa de metal;
+   - o Sasuke: quimono branco aberto em V, a corda roxa na cintura, o
+     avental azul-marinho, os protetores pretos no braço e cabelo preto
+     espetado;
+   - a Sakura: vestido vermelho com a gola e os punhos brancos, o
+     círculo branco nas costas, o short verde, cabelo rosa comprido e a
+     faixa azul na cabeça. */
+var VISTA_LADO = ['side', 'sentado'];
+function roupaCosplay(tipo) {
+  return function (alvo) {
+    for (var d = 0; d < DIRS.length; d++) {
+      var nome = DIRS[d];
+      if (!alvo[nome]) continue;
+      var a = alvo[nome].slice(0), x, y;
+      var frente = VISTA_FRENTE.indexOf(nome) >= 0, costas = VISTA_COSTAS.indexOf(nome) >= 0;
+      // troca o pixel (yy, xx) por ch só se ele for um dos de `de`
+      var poe = function (yy, xx, ch, de) {
+        if (a[yy] && (de || 'j').indexOf(a[yy][xx]) >= 0) a[yy] = a[yy].substr(0, xx) + ch + a[yy].substr(xx + 1);
+      };
+      var linha = function (yy, x0, x1, ch, de) { for (var xx = x0; xx <= x1; xx++) poe(yy, xx, ch, de); };
+      if (tipo === 'marinheira') {
+        linha(11, 0, 15, 'z');                                   // a gola nos ombros
+        poe(12, 1, 'z'); poe(12, 2, 'z'); poe(12, 13, 'z'); poe(12, 14, 'z');
+        poe(14, 1, 'z'); poe(14, 14, 'z');                       // os punhos
+        if (frente) {
+          // a gola desce em V até o lenço
+          poe(12, 3, 'z'); poe(12, 4, 'z'); poe(12, 11, 'z'); poe(12, 12, 'z'); poe(13, 5, 'z'); poe(13, 10, 'z'); poe(14, 6, 'z'); poe(14, 9, 'z');
+          poe(12, 7, 'e'); poe(12, 8, 'e'); poe(13, 7, 'e'); poe(13, 8, 'e'); poe(14, 8, 'e');
+        }
+        if (costas) { linha(12, 4, 11, 'z'); linha(13, 4, 11, 'e'); }
+      }
+      if (tipo === 'akatsuki') {
+        linha(10, 5, 10, 'j', 'k');                              // a gola alta tampa o pescoço
+        if (frente) {
+          poe(11, 7, 'e'); poe(11, 8, 'e');                      // o forro vermelho na gola
+          poe(12, 4, 'w'); poe(13, 3, 'e'); poe(13, 4, 'e'); poe(13, 5, 'e'); poe(14, 4, 'e');
+          poe(15, 10, 'w'); poe(16, 9, 'e'); poe(16, 10, 'e'); poe(16, 11, 'e');
+        }
+        if (costas) {
+          poe(12, 9, 'w'); poe(13, 8, 'e'); poe(13, 9, 'e'); poe(13, 10, 'e'); poe(14, 9, 'e');
+          poe(16, 4, 'e'); poe(16, 5, 'e');
+        }
+        if (VISTA_LADO.indexOf(nome) >= 0) { poe(13, 6, 'e'); poe(13, 7, 'e'); poe(14, 7, 'e'); }
+        // a capa desce até a canela
+        for (y = 18; y <= 21; y++) for (x = 3; x <= 12; x++) poe(y, x, 'j', 'p');
+        linha(frente ? 4 : 3, 3, 12, 'y', 'a');                  // a bandana de metal
+      }
+      if (tipo === 'naruto') {
+        linha(11, 0, 15, 'z'); linha(12, 0, 15, 'z');            // os ombros pretos
+        if (frente) { poe(11, 7, 'w', 'z'); poe(11, 8, 'w', 'z'); for (y = 13; y <= 16; y++) poe(y, 7, 'w'); }
+        linha(4, 3, 12, 'y', 'a');                               // a bandana azul
+        if (frente) { poe(4, 7, 'e', 'y'); poe(4, 8, 'e', 'y'); }   // e a placa de metal
+      }
+      if (tipo === 'sasuke') {
+        if (frente) { linha(11, 5, 10, 'k'); linha(12, 6, 9, 'k'); linha(13, 7, 8, 'k'); }   // o quimono aberto
+        linha(16, 0, 15, 'e');                                   // a corda roxa
+        if (frente) poe(17, 6, 'e');                             // o nó
+        linha(17, 0, 15, 'p');                                   // o avental começa
+        for (y = 14; y <= 16; y++) { poe(y, 1, 'z', 'kje'); poe(y, 14, 'z', 'kje'); }   // os protetores do braço
+      }
+      if (tipo === 'sakura') {
+        linha(2, 2, 13, 'y', 'a');                               // a faixa azul na cabeça
+        if (frente) linha(11, 6, 9, 'w');                        // a gola
+        poe(14, 1, 'w'); poe(14, 14, 'w');                       // os punhos
+        if (costas) { poe(13, 7, 'w'); poe(13, 8, 'w'); poe(14, 6, 'w'); poe(14, 9, 'w'); poe(15, 7, 'w'); poe(15, 8, 'w'); }
+        linha(18, 0, 15, 'j', 'p');                              // o vestido até a coxa
+        for (y = 20; y <= 22; y++) linha(y, 0, 15, 'k', 'p');     // as pernas, do short pra baixo
+      }
+      alvo[nome] = a;
+    }
+  };
+}
 var CACHE_CORPOS = {};
 function quadrosDoCorpo(key) {
   key = key || 'padrao';
@@ -1928,6 +2024,17 @@ PELES.saopaulino.e = '#d8302a'; PELES.saopaulino.z = '#1c1c22';
 PELES.santista = pele('#0a0a12', '#8a5a3c', '#4a2c18', '#f0eeff', '#f0eeff', '#14141c', '#f0eeff');
 PELES.santista.z = '#1c1c22'; PELES.santista.e = '#e8b83c';   // a base escura e a ponta dourada da crista
 PELES.santista.y = '#5a3a24';                                 // o cabelo curtinho das laterais raspadas
+// os cosplayers: o, pele, cabelo, roupa, calça/saia, sapato, branco; e/z/y são os detalhes de cada um
+PELES.cosMarinheira = pele('#0a0a12', '#f0c8a8', '#16161e', '#f4f2f8', '#1c2448', '#2a1c18', '#f4f2f8');
+PELES.cosMarinheira.z = '#1c2448'; PELES.cosMarinheira.e = '#8fd8f0';
+PELES.cosAkatsuki = pele('#0a0a12', '#e8c8a8', '#101016', '#16161c', '#16161c', '#2a2a30', '#f0eeff');
+PELES.cosAkatsuki.e = '#d0282c'; PELES.cosAkatsuki.y = '#9aa0b0';
+PELES.cosNaruto = pele('#0a0a12', '#f0c49c', '#f6d04a', '#f08a24', '#f08a24', '#1c2a50', '#f0eeff');
+PELES.cosNaruto.z = '#16161e'; PELES.cosNaruto.y = '#2c4a8a'; PELES.cosNaruto.e = '#c8ccd8';
+PELES.cosSasuke = pele('#0a0a12', '#f0d0b0', '#14141c', '#f0f0f6', '#2a3470', '#1c1c24', '#f0eeff');
+PELES.cosSasuke.e = '#7a4ab0'; PELES.cosSasuke.z = '#16161e';
+PELES.cosSakura = pele('#0a0a12', '#f4d0b8', '#f0a2bc', '#c8283c', '#2a5a3a', '#3a2a28', '#f0eeff');
+PELES.cosSakura.y = '#3a6fc0';
 // o torcedor jogável: pele, cabelo e jeans; a camisa vem do time escolhido
 PELES.torcedorJog = pele('#0a0a12', '#6b4228', '#1a1a22', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
 PELES.torcedoraJog = pele('#0a0a12', '#c99a70', '#3a2418', '#1c1c22', '#3a5a8a', '#14141c', '#f0eeff');
@@ -3365,6 +3472,7 @@ function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
    você é uma silhueta com ???; quem já passou mostra o nome e o que faz;
    e o desafiante que você venceu mostra também a fraqueza. Fica gravado
    entre as partidas (metrosp_dex): 1 é visto, 2 é vencido. */
+var COSPLAYERS = ['np_cos_marinheira', 'np_cos_akatsuki', 'np_cos_naruto', 'np_cos_sasuke', 'np_cos_sakura'];
 var DEX = [
   { id: 'tiozao', nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Manda áudio de 5 minutos. Quer conversar.' },
   { id: 'pregador', nome: 'PREGADOR', sprite: 'np_pregador', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Tem um minutinho? Nunca é um minutinho.' },
@@ -3381,17 +3489,19 @@ var DEX = [
   { id: 'pedinte', nome: 'PEDINTE', sprite: 'np_pedinte', tipo: 'GENTE', onde: 'SAGUÃO', desc: 'Fica no saguão. Uma moeda muda o dia dele.' },
   { id: 'atendente', nome: 'ATENDENTE', sprite: 'np_atendente', tipo: 'METRÔ', onde: 'GUICHÊ', desc: 'Na bilheteria. Vende a passagem.' },
   { id: 'gestante', nome: 'GESTANTE', sprite: 'np_gestante', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
-  { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' }
+  { id: 'idoso', nome: 'IDOSO', sprite: 'np_idoso', tipo: 'PRIORIDADE', onde: 'BANCO', desc: 'Tem prioridade no banco. Ceda o lugar.' },
+  { id: 'cosplayer', nome: 'COSPLAYER', sprite: 'np_cos_naruto', tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Vai pro evento de anime. Marinheira, Akatsuki, Naruto, Sasuke, Sakura.' }
 ];
 // a cor de cada tipo: a da bolinha e a da borda da carta
 var COR_TIPO = {
   CHATO: 0xf2c14e, TORCIDA: 0x00e676, GUARDA: 0x3a7fd0, VENDEDOR: 0xe8a33c,
-  RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0
+  RIMADOR: 0xa47cff, GENTE: 0xb8bccc, 'METRÔ': 0x4fb8ff, PRIORIDADE: 0x7fd6a0, COSPLAY: 0xf08ab8
 };
 var DEX_POR_SPRITE = {};
 for (var dxi = 0; dxi < DEX.length; dxi++) DEX_POR_SPRITE[DEX[dxi].sprite] = DEX[dxi].id;
 DEX_POR_SPRITE.np_pedinte_b = 'pedinte';
 DEX_POR_SPRITE.np_atendenteF = 'atendente';
+COSPLAYERS.forEach(function (k) { DEX_POR_SPRITE[k] = 'cosplayer'; });
 function leDex() {
   try { return JSON.parse(localStorage.getItem('metrosp_dex') || '{}') || {}; } catch (e) { return {}; }
 }

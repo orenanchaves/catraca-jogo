@@ -80,7 +80,13 @@ var ASSETS = {
     { key: 'np_atendente', file: 'assets/npcs/atendente.png', pal: PELES.atendente, corpo: 'atendente' },
     { key: 'np_atendenteF', file: 'assets/npcs/atendente_f.png', pal: PELES.atendenteF, corpo: 'atendente_coque' },
     { key: 'np_saopaulino', file: 'assets/npcs/saopaulino.png', pal: PELES.saopaulino, corpo: 'careca_saopaulo' },
-    { key: 'np_santista', file: 'assets/npcs/santista.png', pal: PELES.santista, corpo: 'moicano_santos' }
+    { key: 'np_santista', file: 'assets/npcs/santista.png', pal: PELES.santista, corpo: 'moicano_santos' },
+    // os cosplayers da Liberdade
+    { key: 'np_cos_marinheira', file: 'assets/npcs/cos_marinheira.png', pal: PELES.cosMarinheira, corpo: 'cos_marinheira' },
+    { key: 'np_cos_akatsuki', file: 'assets/npcs/cos_akatsuki.png', pal: PELES.cosAkatsuki, corpo: 'cos_akatsuki' },
+    { key: 'np_cos_naruto', file: 'assets/npcs/cos_naruto.png', pal: PELES.cosNaruto, corpo: 'cos_naruto' },
+    { key: 'np_cos_sasuke', file: 'assets/npcs/cos_sasuke.png', pal: PELES.cosSasuke, corpo: 'cos_sasuke' },
+    { key: 'np_cos_sakura', file: 'assets/npcs/cos_sakura.png', pal: PELES.cosSakura, corpo: 'cos_sakura' }
   ]
 };
 
@@ -104,6 +110,11 @@ var PESO_TOTAL = 0;
 
 /* sorteia um passageiro respeitando os pesos */
 function sorteiaPax() {
+  /* Na Liberdade, um em cada quatro é cosplayer indo pro evento: na
+     estação e no vagão parado nela */
+  if (typeof GameState !== 'undefined' && GameState.char && GameState.estacaoAtual() === 'LIBERDADE' && Math.random() < 0.25) {
+    return COSPLAYERS[Math.floor(Math.random() * COSPLAYERS.length)];
+  }
   var r = Math.random() * PESO_TOTAL;
   for (var i = 0; i < MULTIDAO.length; i++) {
     r -= MULTIDAO[i].peso;
