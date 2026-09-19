@@ -13,7 +13,9 @@
    entra como imagem pelo mesmo id, sem mexer em espaço nenhum. */
 
 var ANUNCIOS = {
-  ond: { linhas: ['OND VIAJAR', 'VIAJE MAIS.', 'PLANEJE MENOS.'], fundo: 0x0d0d14, borda: 0x7c3fff, titulo: '#00e676', letra: '#f0eeff' },
+  // url: tocar no cartaz (quando é ele que está na tela) abre o site numa aba nova
+  ond: { linhas: ['OND VIAJAR', 'VIAJE MAIS.', 'PLANEJE MENOS.'], fundo: 0x0d0d14, borda: 0x7c3fff, titulo: '#00e676', letra: '#f0eeff',
+    url: 'https://ondviajar.com.br/' },
   anuncie: { linhas: ['ANUNCIE AQUI', 'ESTE ESPAÇO', 'ESTÁ LIVRE'], fundo: 0xf2c14e, borda: 0x14141c, titulo: '#14141c', letra: '#3a2a10' },
   dog: { linhas: ['DOG DO CÃO', 'O MONSTRO', 'DA ESTAÇÃO'], fundo: 0x2a2320, borda: 0xe8362c, titulo: '#f2c14e', letra: '#f0eeff' },
   loto: { linhas: ['LOTODIFÍCIL', 'ACUMULOU:', 'R$ 3 MILHÕES'], fundo: 0x1c4a8a, borda: 0xf2c14e, titulo: '#f2c14e', letra: '#f0eeff' },
@@ -55,6 +57,13 @@ function montaAnuncios(cena, espacos, prof) {
     var c = cena.add.container(e.x, e.y, [g].concat(ts)).setDepth(prof);
     if (e.vertical) c.setRotation(-Math.PI / 2);
     var cz = { e: e, g: g, ts: ts, c: c, idx: 0, t: Math.random() * 4000 };
+    c.setSize(CARTAZ.w, CARTAZ.h).setInteractive();
+    (function (cz) {
+      cz.c.on('pointerdown', function () {
+        var a = ANUNCIOS[cz.e.anuncios[cz.idx % cz.e.anuncios.length]];
+        if (a && a.url) { try { window.open(a.url, '_blank', 'noopener'); } catch (err) { } }
+      });
+    })(cz);
     pintaCartaz(cz, 1);
     cena.cartazes.push(cz);
   }

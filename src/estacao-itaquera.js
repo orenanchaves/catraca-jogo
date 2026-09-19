@@ -260,8 +260,9 @@ EstacaoScene.prototype.lixeiraPerto = function () {
 function cabinesDoMezanino() {
   var y = 300, h = 58;
   return [
-    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 34, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendente' },
-    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 100, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendenteF' },
+    // 24px de vão entre as duas: coladas, os letreiros viravam uma palavra só
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 32, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendente' },
+    { chave: 'bilheteria', nome: 'BILHETERIA', x: MEZ.x0 + 114, y: y, w: 58, h: h, lado: 0, acao: 'bilheteria', ven: 'np_atendenteF' },
     { chave: 'achados', nome: 'ACHADOS', x: MEZ.x1 - 110, y: y, w: 76, h: h, lado: 0, acao: 'achados' }
   ];
 }
@@ -318,6 +319,26 @@ EstacaoScene.prototype.andaCompradores = function (dt) {
   for (i = 0; i < this.barracas.length; i++) {
     var b = this.barracas[i];
     if (b.acao === 'bilheteria' && (porCab[b.x] || 0) < 2) { this.novoComprador(b, porCab[b.x] || 0, false); return; }
+  }
+};
+
+/* Quem anda pelo saguão não passa por dentro de cabine nem de loja: o
+   passeio deles anda livre, e só esbarrão chamava o limite, então dava
+   gente parada atrás do atendente. A cada quadro, quem está dentro de
+   uma é empurrado pro lado mais curto. */
+EstacaoScene.prototype.tiraDasCabines = function () {
+  var gs = this.plateia || [], i, b;
+  for (i = 0; i < gs.length; i++) {
+    var sp = gs[i].sp;
+    if (!sp || !sp.active || sp.naEscada) continue;
+    for (b = 0; b < this.barracas.length; b++) {
+      var q = this.barracas[b];
+      var x0 = q.x - 8, x1 = q.x + q.w + 8, y0 = q.y - 6, y1 = q.y + q.h + 6;
+      if (sp.x <= x0 || sp.x >= x1 || sp.y <= y0 || sp.y >= y1) continue;
+      var dE = sp.x - x0, dD = x1 - sp.x, dB = y1 - sp.y, dC = sp.y - y0;
+      var m = Math.min(dE, dD, dB, dC);
+      if (m === dE) sp.x = x0; else if (m === dD) sp.x = x1; else if (m === dB) sp.y = y1; else sp.y = y0;
+    }
   }
 };
 
@@ -809,6 +830,7 @@ EstacaoScene.prototype.atualizaItaquera = function (dt) {
   }
   this.pintaPSD();
   atualizaAnuncios(this, dt);
+  this.tiraDasCabines();
   this.andaPassantes(dt);
   this.andaCompradores(dt);
 
