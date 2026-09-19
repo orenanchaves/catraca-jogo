@@ -2865,12 +2865,27 @@ function gritaAmbulante(modo) {
    rima, com o som desligado e com a aba escondida. */
 var AUDIO_AMBIENTE = 'assets/audio/ambiente_transporte.mp3';
 var _audAmbiente = null;
+/* 'Tem que ser barulho de pessoas falando no mezanino; só na plataforma
+   tem que ter barulho de metrô.' A gravação de metrô toca no vagão e na
+   plataforma; no saguão ela some aos poucos e fica só o burburinho de
+   gente (o sintetizado, que já vem de quem está em volta). O volume
+   desliza, pra subir a escada não ser um corte seco. */
+var _volAmbiente = 0;
 function ambienteGravado() {
-  var modo = modoDoSom(), quer = SOM_LIGADO && !document.hidden && (modo === 'estacao' || modo === 'vagao');
-  if (!quer) { if (_audAmbiente && !_audAmbiente.paused) _audAmbiente.pause(); return; }
+  var modo = modoDoSom(), alvo = 0;
+  if (SOM_LIGADO && !document.hidden) {
+    if (modo === 'vagao') alvo = 0.42;
+    else if (modo === 'estacao') {
+      var est = window.jogo && jogo.scene.getScene('Estacao');
+      var naPlat = est && est.pl && est.pl.sp && typeof ESC_Y !== 'undefined' && est.pl.sp.y < ESC_Y + 40;
+      alvo = naPlat ? 0.34 : 0;
+    }
+  }
+  _volAmbiente += Phaser.Math.Clamp(alvo - _volAmbiente, -0.06, 0.06);
+  if (_volAmbiente <= 0.01) { _volAmbiente = 0; if (_audAmbiente && !_audAmbiente.paused) _audAmbiente.pause(); return; }
   try {
     if (!_audAmbiente) { _audAmbiente = new Audio(AUDIO_AMBIENTE); _audAmbiente.loop = true; }
-    _audAmbiente.volume = modo === 'vagao' ? 0.42 : 0.3;
+    _audAmbiente.volume = _volAmbiente;
     if (_audAmbiente.paused) {
       var pr = _audAmbiente.play();
       if (pr && pr.catch) pr.catch(function () { });
