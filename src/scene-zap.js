@@ -25,7 +25,7 @@ var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'MISSÕES', 'MOCHILA', 'METRODEX'];
 var APPS_ZAP = [
   { nome: 'ZIPZAP', cor: 0x1faa59, cab: 0x0f3a2c },
   { nome: 'MAPA', cor: 0xf2f0ff, cab: 0x1c2a4a },
-  { nome: 'BANCO', cor: 0x14284a, cab: 0x14284a },
+  { nome: 'BANCO', cor: 0x14284a, cab: 0xec7000 },
   { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 },
   { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 },
   { nome: 'METRODEX', cor: 0xe8362c, cab: 0x5a1414 }
@@ -1308,29 +1308,69 @@ var ZapScene = new Phaser.Class({
      Saiu do topo da tela e veio parar aqui: o HUD tinha quatro coisas
      disputando a segunda linha, e grana e dia são justamente as duas
      que não mudam nenhuma decisão no meio de um vagão. */
+  /* ---------- o banco ----------
+     'Pro banco' (as fotos do app laranja): o BANCO LARANJINHA, de nome
+     inventado. A faixa laranja com o olá, a agência e a conta; três
+     atalhos em cartão branco (PIX, BILHETE, EXTRATO); o cartão do saldo,
+     com o vale-transporte e a tarifa; e os últimos lançamentos, que são
+     os gastos e ganhos de verdade da partida (GameState.extrato). */
   pintaGrana: function (g) {
     if (!GameState.char) return;
-    var c = GameState.char;
-    var itens = [
-      ['SALDO', 'R$ ' + GameState.dinheiro.toFixed(2).replace('.', ',')],
-      ['TARIFA', c.tarifa === 0 ? 'GRÁTIS' : 'R$ ' + c.tarifa.toFixed(2).replace('.', ',')],
-      ['VALE', GameState.valeRestante > 0 ? GameState.valeRestante + ' PASSAGENS' : 'ACABOU'],
-      ['', ''],
-      ['DIA', String(GameState.dia)],
-      ['HOJE', GameState.rotuloDaPerna()],
-      ['PONTOS', String(lePontos())]
-    ];
-    for (var i = 0; i < itens.length; i++) {
-      var y = ZAP.topo + 10 + i * 34;
-      if (!itens[i][0]) continue;
-      g.fillStyle(0x121820, 1).fillRect(ZAP.tx0, y - 6, ZAP.tx1 - ZAP.tx0, 30);
-      this.linhas[i].setVisible(true).setOrigin(0, 0).setPosition(ZAP.tx0 + 10, y)
-        .setText(itens[i][0]).setColor(PAL.cinzaEsc);
-      // 0..6 são os rótulos, 7..13 os valores, 14..17 as abas e o badge
-      this.linhas[i + 7].setVisible(true).setOrigin(1, 0).setPosition(ZAP.tx1 - 10, y)
-        .setText(itens[i][1]).setColor(PAL.branco);
+    var c = GameState.char, x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0, T = ZAP.topo, n = 0, eu = this, i;
+    var LAR = 0xec7000, ESC = '#1f2328', CIN = '#6b7280';
+    function tx(t, x, y, cor, esc, ox) {
+      if (n >= 44) return null;
+      return eu.rotMapa[n++].setVisible(true).setAngle(0).setOrigin(ox || 0, 0).setScale(esc || ESCALA_TEXTO / 2)
+        .setPosition(Math.round(x), Math.round(y)).setText(t).setColor(cor);
     }
-    this.tRodape.setText('');
+    function reais(v) { return 'R$ ' + Math.abs(v).toFixed(2).replace('.', ','); }
+    this.tStatus.setText('LARANJINHA');
+    g.fillStyle(0xf2f2f4, 1).fillRect(x0, T - 8, W, ZAP.abas - T + 8);
+    // a faixa laranja: o olá, a agência e a conta
+    g.fillStyle(LAR, 1).fillRect(x0, T - 8, W, 44);
+    g.fillStyle(0xffffff, 1).fillCircle(x0 + 20, T + 12, 11);
+    var nome = nomeDoChar(GameState.charKey, GameState.genero);
+    tx(nome.charAt(0), x0 + 20, T + 5, '#ec7000', ESCALA_TEXTO, 0.5);
+    tx('OLÁ, ' + nome, x0 + 38, T - 2, '#ffffff', ESCALA_TEXTO);
+    tx('AG 0277  CC 40028-2', x0 + 38, T + 17, '#ffe2c2');
+    // os três atalhos
+    var at = [['PIX', 'pix'], ['BILHETE', 'bilhete'], ['EXTRATO', 'extrato']], tw = (W - 32) / 3;
+    for (i = 0; i < 3; i++) {
+      var ax = x0 + 8 + i * (tw + 8), ay = T + 44;
+      g.fillStyle(0xffffff, 1).fillRoundedRect(ax, ay, tw, 44, 8);
+      g.fillStyle(LAR, 1);
+      if (at[i][1] === 'pix') g.fillPoints([{ x: ax + 16, y: ay + 8 }, { x: ax + 23, y: ay + 15 }, { x: ax + 16, y: ay + 22 }, { x: ax + 9, y: ay + 15 }], true);
+      else if (at[i][1] === 'bilhete') { g.fillRoundedRect(ax + 8, ay + 9, 18, 12, 2); g.fillStyle(0xffffff, 1).fillRect(ax + 10, ay + 12, 6, 2); }
+      else { g.fillRect(ax + 9, ay + 9, 14, 2).fillRect(ax + 9, ay + 14, 14, 2).fillRect(ax + 9, ay + 19, 10, 2); }
+      tx(at[i][0], ax + 8, ay + 29, ESC);
+    }
+    // o saldo
+    var sy = T + 96;
+    g.fillStyle(0xffffff, 1).fillRoundedRect(x0 + 8, sy, W - 16, 62, 8);
+    tx('SALDO DISPONÍVEL', x0 + 18, sy + 8, CIN);
+    tx(reais(GameState.dinheiro), x0 + W - 18, sy + 4, ESC, ESCALA_TEXTO, 1);
+    g.fillStyle(0xe5e7eb, 1).fillRect(x0 + 18, sy + 26, W - 36, 1);
+    tx('VALE-TRANSPORTE', x0 + 18, sy + 32, CIN);
+    tx(GameState.valeRestante > 0 ? GameState.valeRestante + ' PASSAGENS' : 'ACABOU', x0 + W - 18, sy + 32, ESC, 0, 1);
+    tx('TARIFA', x0 + 18, sy + 46, CIN);
+    tx(c.tarifa === 0 ? 'GRÁTIS' : reais(c.tarifa), x0 + W - 18, sy + 46, ESC, 0, 1);
+    // os últimos lançamentos
+    var ly = sy + 70, ext = GameState.extrato || [];
+    g.fillStyle(0xffffff, 1).fillRoundedRect(x0 + 8, ly, W - 16, ZAP.abas - ly - 30, 8);
+    tx('ÚLTIMOS LANÇAMENTOS', x0 + 18, ly + 8, ESC);
+    if (!ext.length) tx('NENHUM AINDA HOJE', x0 + 18, ly + 28, CIN);
+    for (i = 0; i < ext.length && i < 5; i++) {
+      var e = ext[i], ry = ly + 26 + i * 30;
+      // o ícone: seta pra baixo (entrou) ou pra cima (saiu)
+      g.fillStyle(e.v < 0 ? 0xfde8d7 : 0xdcfce7, 1).fillCircle(x0 + 26, ry + 8, 8);
+      g.fillStyle(e.v < 0 ? LAR : 0x15803d, 1)
+        .fillTriangle(x0 + 22, ry + (e.v < 0 ? 10 : 6), x0 + 30, ry + (e.v < 0 ? 10 : 6), x0 + 26, ry + (e.v < 0 ? 4 : 12));
+      tx(e.d.length > 22 ? e.d.slice(0, 21) + '.' : e.d, x0 + 40, ry + 1, ESC);
+      tx(e.h, x0 + 40, ry + 11, CIN);
+      tx((e.v < 0 ? '- ' : '+ ') + reais(e.v), x0 + W - 18, ry + 5, e.v < 0 ? ESC : '#15803d', 0, 1);
+      if (i < 4) g.fillStyle(0xf1f1f3, 1).fillRect(x0 + 40, ry + 24, W - 58, 1);
+    }
+    this.tRodape.setText('DIA ' + GameState.dia + '  -  ' + lePontos() + ' PONTOS').setColor('#6b7280');
   },
 
   /* ---------- aba 4: as missões ----------

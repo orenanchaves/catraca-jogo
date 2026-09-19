@@ -1992,7 +1992,7 @@ var EstacaoScene = new Phaser.Class({
           fala(self, 'Não dá. Você não tem o valor\nda passagem. Ou pula, ou fica.', []);
           return;
         }
-        GameState.gastar(c.tarifa);
+        GameState.gastar(c.tarifa, 'PASSAGEM');
         GameState.stats.catracasPagas++;
         GameState.passaTempo(3 + Math.round(4 * GameState.lotacao()));
         self.libera('Bilhete na mão.\nCaro, mas legal.');

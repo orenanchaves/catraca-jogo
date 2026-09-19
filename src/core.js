@@ -999,7 +999,7 @@ var GameState = {
     var it = ITENS[chave];
     if (!it) return null;
     if (this.dinheiro < it.preco) return 'falta';
-    this.gastar(it.preco);
+    this.gastar(it.preco, it.nome);
     if (!this.mochila) this.mochila = {};
     this.mochila[chave] = (this.mochila[chave] || 0) + 1;
     this.stats.comprou = (this.stats.comprou || 0) + 1;
@@ -1076,11 +1076,21 @@ var GameState = {
   dificuldade: function () { return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1; },
   addCarisma: function (n) { this.carisma = Phaser.Math.Clamp(this.carisma + n, 0, 100); },
   addDescanso: function (n) { this.descanso = Phaser.Math.Clamp(this.descanso + n, 0, this.char.descansoMax); },
-  gastar: function (n) {
+  gastar: function (n, desc) {
     this.dinheiro = Math.max(0, Math.round((this.dinheiro - n) * 100) / 100);
     if (n > 0) this.gastoNoDia = (this.gastoNoDia || 0) + n;     // a missão do fim do mês
+    if (n > 0) this.lanca(desc || 'COMPRA', -n);
   },
-  ganhar: function (n) { this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100; },
+  ganhar: function (n, desc) {
+    this.dinheiro = Math.round((this.dinheiro + n) * 100) / 100;
+    if (n > 0) this.lanca(desc || 'RECEBIDO', n);
+  },
+  // o extrato do banco do celular: os últimos vinte, o mais novo em cima
+  lanca: function (desc, valor) {
+    if (!this.extrato) this.extrato = [];
+    this.extrato.unshift({ d: desc, v: valor, h: this.hora ? this.hora() : '' });
+    if (this.extrato.length > 20) this.extrato.length = 20;
+  },
   /* A tela de fim reserva TRÊS linhas pro motivo, e a caixa quebra a 22
      caracteres. Estes textos tinham linha de 24 e de 29: viravam cinco
      linhas e entravam por cima do placar. Cada linha aqui cabe medida —
@@ -4788,7 +4798,7 @@ Chao.prototype.pega = function (i) {
   var grana = c.grana[1] > 0
     ? Math.round(Phaser.Math.FloatBetween(c.grana[0], c.grana[1]) * 4) / 4
     : 0;
-  if (grana > 0) { GameState.ganhar(grana); Missoes.conta('moedaDoChao'); }
+  if (grana > 0) { GameState.ganhar(grana, 'ACHOU NO CHÃO'); Missoes.conta('moedaDoChao'); }
   if (c.pontos > 0) gravaPontos(lePontos() + c.pontos);
   GameState.stats.caidos = (GameState.stats.caidos || 0) + 1;
 

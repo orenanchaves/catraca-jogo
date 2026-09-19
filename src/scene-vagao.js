@@ -1493,7 +1493,7 @@ var VagaoScene = new Phaser.Class({
       sfx('nao');
       this.flash('NINGUÉM QUIS ' + m.nome + '.');
     } else {
-      GameState.ganhar(m.preco);
+      GameState.ganhar(m.preco, 'VENDA: ' + m.nome);
       GameState.addCarisma(2);
       sfx('moeda');
       this.flash('VENDEU ' + m.nome + '\n+R$ ' + m.preco.toFixed(2).replace('.', ','));
@@ -1717,7 +1717,7 @@ var VagaoScene = new Phaser.Class({
             GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
             eu.flash('VOCÊ NÃO TEM.\nDESCEU ESCOLTADO.');
           } else {
-            GameState.gastar(multa);
+            GameState.gastar(multa, 'MULTA');
             GameState.multasNoDia = (GameState.multasNoDia || 0) + 1;
             sfx('moeda');
             eu.flash('PAGOU E FICOU.');
@@ -1897,7 +1897,7 @@ var VagaoScene = new Phaser.Class({
     f.a.destroy();
     this.vendas = 0;
     var multa = Math.min(GameState.dinheiro, 6 + f.patente.custo * 6);
-    GameState.gastar(multa);
+    GameState.gastar(multa, 'MULTA');
     GameState.addCarisma(-5);
     perdeVida(this, this.pl.sp, f.patente.custo);
     sfx('erro');
