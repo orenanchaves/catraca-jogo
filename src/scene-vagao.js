@@ -3197,6 +3197,8 @@ var VagaoScene = new Phaser.Class({
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
     if (this.abordagem) { if (this.abordagem.fase !== 'luta' && this.abordagem.fase !== 'volta') this.atualizaAbordagem(dt); return; }
     this.vigiaDesafiantes(dt);
+    // três toques rápidos abrem caminho no braço (ver empurraoNaMarra)
+    if (!this.sentadoEm) empurraoNaMarra(this, this.gente, function (sp) { limitaVagao(sp); });
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
     if (this.disfarce) { this.atualizaDisfarce(dt); this.pintaUI(); return; }
 

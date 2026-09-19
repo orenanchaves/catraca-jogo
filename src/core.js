@@ -2724,6 +2724,41 @@ function devolveCenas(cena, lista) {
   hud.time.delayedCall(120, espera);
 }
 
+/* ---------- abrir caminho no braço ----------
+   Tocar várias vezes seguidas (três toques em 0,9s) empurra quem está
+   colado em você: todo mundo num raio de 44px é afastado 16px, na
+   direção contrária à sua. É o que se faz no vagão lotado — e custa:
+   carisma, e de vez em quando alguém reclama em voz alta. `limita(sp)`
+   é a regra de chão de cada cena (ninguém atravessa parede no empurrão).
+   Devolve true quando empurrou. */
+var EMPURRA_TOQUES = 3, EMPURRA_JANELA = 900, EMPURRA_RAIO = 44, EMPURRA_PASSO = 16;
+function empurraoNaMarra(cena, gente, limita) {
+  if (!Ctrl.actJust) return false;
+  var agora = cena.time.now;
+  cena._toques = (cena._toques || []).filter(function (t) { return agora - t < EMPURRA_JANELA; });
+  cena._toques.push(agora);
+  if (cena._toques.length < EMPURRA_TOQUES) return false;
+  cena._toques = [];
+  var px = cena.pl.sp.x, py = cena.pl.sp.y, n = 0;
+  for (var i = 0; i < gente.length; i++) {
+    var a = gente[i];
+    if (!a || !a.sp || !a.sp.active || a.fixo || a.sp.naEscada) continue;
+    var dx = a.sp.x - px, dy = a.sp.y - py, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > EMPURRA_RAIO) continue;
+    if (d < 1) { dx = 1; dy = 0; d = 1; }
+    var ax = a.sp.x, ay = a.sp.y;
+    a.sp.x += dx / d * EMPURRA_PASSO; a.sp.y += dy / d * EMPURRA_PASSO;
+    if (limita && limita(a.sp) === false) { a.sp.x = ax; a.sp.y = ay; }
+    n++;
+  }
+  if (!n) return false;
+  sfx('empurra');
+  cena.cameras.main.shake(90, 0.004);
+  GameState.addCarisma(-1);
+  if (Math.random() < 0.35) falaGente(['Ei!', 'Calma aí!', 'Tá empurrando por quê?', 'Ô, devagar!'][Math.floor(Math.random() * 4)], 1.2);
+  return true;
+}
+
 function perdeVida(scene, sp, quanto) {
   var n = GameState.perdeCoracao(quanto);
   if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40, quanto);

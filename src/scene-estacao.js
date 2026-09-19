@@ -2480,6 +2480,8 @@ var EstacaoScene = new Phaser.Class({
     }
     this.pl.anima(dt, mv);
     this.rodaEscada(dt, mv);
+    var eu = this;
+    empurraoNaMarra(this, this.gente, function (sp) { return eu.podeIr(sp.x, sp.y); });
     this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
 
