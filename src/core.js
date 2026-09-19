@@ -4475,9 +4475,9 @@ Plaqueta.prototype.setFilete = function (c) {
 
 /* a faixa de dica: mesma altura, mesma cor, em todas as cenas.
    É ela que dá o chão pro texto e tira a sensação de letra jogada. */
-function FaixaDica(scene, depth) {
+function FaixaDica(scene, depth, y) {
   var d = (depth === undefined) ? 860 : depth;
-  this.y = GH - 32;
+  this.y = (y === undefined) ? GH - 32 : y;
   this.g = scene.add.graphics().setDepth(d).setScrollFactor(0);
   this.t = txtC(scene, GW / 2, this.y + 6, '', PAL.amarelo, 8).setDepth(d + 1).setScrollFactor(0);
   this.setText('');
@@ -4971,6 +4971,16 @@ var ICONES_ITEM = {
     pinta(c, '#3d2614', 14, 8, 1, 10);
     pinta(c, '#3d2614', 5, 13, 14, 1);
   },
+  // o RALLS: o rolinho de bala embrulhado, verde com a faixa branca e as pontas torcidas
+  ralls: function (c) {
+    pinta(c, '#0f5a3a', 4, 8, 16, 9);
+    pinta(c, '#1f8a5a', 4, 8, 16, 3);
+    pinta(c, '#f2f0ff', 9, 8, 6, 9);
+    pinta(c, '#0f5a3a', 11, 11, 2, 3);
+    pinta(c, '#1f8a5a', 1, 10, 3, 5);
+    pinta(c, '#1f8a5a', 20, 10, 3, 5);
+    pinta(c, '#0a3a26', 4, 16, 16, 1);
+  },
   doce: function (c) {
     pinta(c, '#d84a8c', 8, 8, 8, 8);
     pinta(c, '#f07ab0', 9, 9, 4, 3);
@@ -5138,6 +5148,12 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
   this.tTitulo = txtC(scene, GW / 2, this.y + 10, titulo, PAL.amarelo, 8)
     .setDepth(901).setScrollFactor(0);
   this.tTitulo.setWordWrapWidth(GW - 40);
+  /* Título que não cabe numa linha cheia (23 letras de 12px na faixa) vai
+     em letra meia, que cabe em duas linhas dentro dos 44 da faixa. Cheio,
+     a segunda linha saía por baixo ('"Jornal, Ralls, pururuca."'). */
+  if (titulo.length > 23 || titulo.indexOf('\n') >= 0) {
+    this.tTitulo.setScale(ESCALA_TEXTO / 2).setWordWrapWidth((GW - 40) / (ESCALA_TEXTO / 2)).setPosition(GW / 2, this.y + 12);
+  }
 
   this.sprites = [];
   /* ---------- tocar o ícone é escolher o ícone ----------
@@ -5179,7 +5195,7 @@ function MenuComida(scene, titulo, cardapio, aoFechar) {
     .setDepth(901).setScrollFactor(0);
   this.tEfeito.setWordWrapWidth(GW - 24).setAlign('center');
   this.tRodape = txtC(scene, GW / 2, this.y + alt - 34,
-    nomeAgir() + ': COMPRAR    X: SAIR', PAL.cinzaEsc, 8)
+    nomeAgir() + ': COMPRAR  X: SAIR', PAL.cinzaEsc, 8)     // 24 letras, 288px: com quatro espaços o SAIR passava da caixa
     .setDepth(901).setScrollFactor(0);
   this.redesenha();
 }

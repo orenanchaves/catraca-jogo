@@ -496,8 +496,16 @@ var EstacaoScene = new Phaser.Class({
     this.chao.semeia(quantoCaiNoChao(4), function () { return eu2.pontoDoChao(); });
 
     /* ---------- o que fica preso na tela ---------- */
-    this.gAviso = this.add.graphics().setDepth(70);   // o cone é do mundo
-    this.dica = new FaixaDica(this);
+    /* O cone é luz no CHÃO: fica por baixo de quem passa (2,5, acima das
+       catracas em 2 e abaixo da gente em 30+). A 70 ele era pintado por
+       cima das pessoas e esverdeava quem estava dentro ('às vezes dá uma
+       bugada aqui'). */
+    this.gAviso = this.add.graphics().setDepth(2.5);
+    /* A dica mora em cima, logo embaixo do painel do trem (EMBARQUE, em
+       HUD_H + 22): 'o SUBA PELA ESCADA embaixo do embarque, pra ficar mais
+       próximo do HUD sem atrapalhar'. No pé da tela ela ficava embaixo do
+       dedo, e longe de onde o olho já está. */
+    this.dica = new FaixaDica(this, undefined, HUD_H + 52);   // 52: o painel do trem vai até ~y 98 (medido)
     this.alerta = new Plaqueta(this, GW / 2, 320, { cor: PAL.vermelho, filete: 0xe8362c, depth: 82 });
     /* O letreiro do embarque acompanha você pela estação inteira: é ele
        que faz valer a pena subir correndo. Fica rente ao rodapé porque
@@ -1456,8 +1464,12 @@ var EstacaoScene = new Phaser.Class({
       if (ind.fase === 'passou') {
         alvoX = ind.x; alvoY = CATRACA_Y - 14;
         if (a.sp.y <= CATRACA_Y - 10) {
-          // na escada, três em cada dez vão andando pela esquerda
-          var faixa = Math.random() < 0.3 ? 0 : 1;
+          /* na escada, a faixa com a fila mais curta ('às vezes acumula as
+             pessoas num mesmo lugar': com as doze catracas chega mais gente
+             do que uma faixa só escoa); empatou, três em cada dez andam
+             pela esquerda */
+          var f0 = this.filaEsc[0].length, f1 = this.filaEsc[1].length;
+          var faixa = f0 < f1 ? 0 : (f1 < f0 ? 1 : (Math.random() < 0.3 ? 0 : 1));
           this.filaEsc[faixa].push(a);
           a.indo = ind = { fase: 'escada', faixa: faixa };
         }
@@ -1466,8 +1478,15 @@ var EstacaoScene = new Phaser.Class({
         var kk = this.filaEsc[ind.faixa].indexOf(a);
         alvoX = faixaDaEscada(sobe, ind.faixa === 0);
         alvoY = ESC_BOCA + 12 + kk * 22;
+        /* Do quarto em diante a fila vira bolo, três de largura, em vez de
+           uma linha reta que descia até em cima das catracas; e nunca passa
+           da linha delas. */
+        if (kk >= 3) {
+          alvoX += ((kk - 3) % 3 - 1) * 20 + (ind.faixa === 0 ? -6 : 6);
+          alvoY = Math.min(CATRACA_Y - 26, ESC_BOCA + 12 + (3 + Math.floor((kk - 3) / 3)) * 20);
+        }
         var livre = this.ultimoNaEscada[ind.faixa];
-        var folga = !livre || !livre.sp || !livre.sp.active || livre.sp.y < ESC_BOCA - 16;
+        var folga = !livre || !livre.sp || !livre.sp.active || livre.sp.y < ESC_BOCA - 12;
         if (kk === 0 && Math.hypot(alvoX - a.sp.x, alvoY - a.sp.y) < 8 && folga) {
           this.filaEsc[ind.faixa].shift();
           this.ultimoNaEscada[ind.faixa] = a;
