@@ -574,8 +574,11 @@ var EstacaoScene = new Phaser.Class({
     // o painel do trem mora logo embaixo do HUD: no pé da tela ele ficava no meio do caminho
     this.painel = new Plaqueta(this, GW / 2, HUD_H + 22, { cor: PAL.branco, filete: num(GameState.faixa().cor), depth: 80 });
     this.gMini = this.add.graphics().setDepth(500).setScrollFactor(0).setVisible(false);
-    this.tMini = txtC(this, GW / 2, GH / 2 - 54, '', PAL.branco, 8).setDepth(501).setScrollFactor(0).setVisible(false);
-    this.tMini2 = txtC(this, GW / 2, GH / 2 + 24, '', PAL.amarelo, 8).setDepth(501).setScrollFactor(0).setVisible(false);
+    /* a caixa do empurrão mora no alto (140..206), embaixo do painel e da
+       faixa de dica (que acaba em ~130): o meio da tela é onde a câmera
+       põe você, e é lá que agora se vê a briga com a porta */
+    this.tMini = txtC(this, GW / 2, 146, '', PAL.branco, 8).setDepth(501).setScrollFactor(0).setVisible(false);
+    this.tMini2 = txtC(this, GW / 2, 186, '', PAL.amarelo, 8).setDepth(501).setScrollFactor(0).setVisible(false);
     if (this.itq) this.posicionaItaquera(noAlto);
 
     /* O tutorial é uma camada por cima da primeira partida, e a estação
@@ -2738,7 +2741,7 @@ var EstacaoScene = new Phaser.Class({
              estranho" da chegada e da saída. */
           t.estado = 'fechando'; t.t = 0; sfx('bipePorta');
           // só falha o empurrão de quem estava empurrando ESTE trem
-          if (this.empurrando && this.tremEmpurrado === t) this.falhouEmbarque();
+          if (this.empurrando && this.tremEmpurrado === t && !this.entrandoAnim) this.falhouEmbarque();
         }
         break;
       case 'fechando':
@@ -2791,18 +2794,123 @@ var EstacaoScene = new Phaser.Class({
       lot > 0.8 ? 'VAGÃO LOTADO' : (lot > 0.45 ? 'VAGÃO CHEIO' : 'DÁ PRA ENTRAR'));
     this.tMini2.setVisible(true).setText(nomeAgir() + ' SEM PARAR');
     sfx('empurra');
+    this.dica.setText('', PAL.branco);            // quem fala agora é a caixa
+    this.montaPortaCheia(t);
   },
 
-  fimEmpurrao: function () {
+  /* ---------- a porta cheia ----------
+     'Tem que ter uma animação do personagem tentando entrar no trem, hoje
+     só aparece aquela tela clicável.' Agora a tela é a porta: você cola
+     nela de frente pro vagão, e lá dentro tem uma parede de gente de
+     frente pra você (duas no vazio, até cinco no pico). A barra vira
+     distância: cheia, você está 4px pra dentro da porta; vazia, 30px pra
+     fora, no piso. Cada toque é um tranco (ombro pra frente, o corpo
+     amassa, a parede cede), e quando a multidão empurra de volta você
+     escorrega pra trás. De vez em quando alguém reclama lá de dentro. */
+  montaPortaCheia: function (t) {
+    var y = this.pl.sp.y, py = null, melhor = 1e9;
+    for (var i = 0; i < t.portas.length; i++) {
+      var c = t.portas[i] + t.y + 26;
+      if (Math.abs(c - y) < melhor) { melhor = Math.abs(c - y); py = c; }
+    }
+    var s = t.lado < 0 ? -1 : 1, E = beiradaDaVia(t.lado);
+    var emp = this.emp = { t: t, py: py, s: s, E: E, tranco: 0, fala: 900 + Math.random() * 600, gente: [],
+      volta: { x: this.pl.sp.x, y: this.pl.sp.y }, esc: { x: this.pl.sp.scaleX, y: this.pl.sp.scaleY } };
+    var n = 2 + Math.round(3 * GameState.lotacao());
+    for (var k = 0; k < n; k++) {
+      // pés de py+4 a py+32, em volta dos seus (py+20): é a mesma porta
+      var a = new Ator(this, E + s * (12 + (k % 2) * 14), py + 4 + k * 7, sorteiaPax());
+      a.dir = s < 0 ? 'right' : 'left';
+      a.anima(0, false);
+      a.sp.setDepth(25 + k * 0.01);
+      a.base = { x: a.sp.x, y: a.sp.y };
+      emp.gente.push(a);
+    }
+    this.pl.sp.y = py + 20;
+    this.pl.dir = s < 0 ? 'left' : 'right';
+  },
+  animaPortaCheia: function (dt, trancou) {
+    var emp = this.emp;
+    if (!emp) return;
+    var pl = this.pl.sp, fill = Phaser.Math.Clamp(this.pressao / this.metaEmpurrao(), 0, 1);
+    if (trancou) {
+      emp.tranco = 1;
+      if (Math.random() < 0.22) this.popEmpurrao(pl.x, pl.y - 58, ['LICENÇA!', 'CABE SIM!', 'UM PASSINHO!', 'CHEGA PRA LÁ!'][Math.floor(Math.random() * 4)], PAL.amarelo);
+    }
+    emp.tranco = Math.max(0, emp.tranco - dt / 180);
+    // o ombro vai 7px pra frente no tranco e volta; o corpo amassa junto
+    var alvo = emp.E - emp.s * (30 - 34 * fill) + emp.s * 7 * emp.tranco;
+    pl.x += (alvo - pl.x) * Math.min(1, dt / 70);
+    pl.y = emp.py + 20;
+    pl.setScale(emp.esc.x * (1 + 0.12 * emp.tranco), emp.esc.y * (1 - 0.08 * emp.tranco));
+    this.pl.dir = emp.s < 0 ? 'left' : 'right';
+    this.pl.anima(dt, emp.tranco > 0.2);
+    // a parede de gente cede pra dentro conforme você entra, e treme no tranco
+    for (var k = 0; k < emp.gente.length; k++) {
+      var a = emp.gente[k];
+      if (!a.sp || !a.sp.active) continue;
+      a.sp.x = a.base.x + emp.s * (10 * fill + 4 * emp.tranco) + (emp.tranco > 0.5 ? (Math.random() - 0.5) * 2 : 0);
+      a.sp.y = a.base.y;
+    }
+    emp.fala -= dt;
+    if (emp.fala <= 0 && emp.gente.length) {
+      emp.fala = 1400 + Math.random() * 1200;
+      var q = emp.gente[Math.floor(Math.random() * emp.gente.length)];
+      this.popEmpurrao(q.sp.x, q.sp.y - 58, ['NÃO CABE!', 'VAI NO PRÓXIMO!', 'TÁ CHEIO!', 'ENCOLHE!', 'AI, MEU PÉ!'][Math.floor(Math.random() * 5)], PAL.branco);
+    }
+  },
+  popEmpurrao: function (x, y, texto, cor) {
+    var t = txtC(this, x, y, texto, cor, 8).setScale(ESCALA_TEXTO / 2).setDepth(70);
+    this.tweens.add({ targets: t, y: y - 16, alpha: 0, duration: 1000, onComplete: function () { t.destroy(); } });
+  },
+  // desmonta a porta; `ficaNaPorta` é pra quem não entrou: volta pro piso
+  desmontaPortaCheia: function (ficaNaPorta) {
+    var emp = this.emp;
+    if (!emp) return;
+    for (var k = 0; k < emp.gente.length; k++) if (emp.gente[k].sp) emp.gente[k].sp.destroy();
+    this.pl.sp.setScale(emp.esc.x, emp.esc.y);
+    if (ficaNaPorta) {
+      // a multidão te devolve pra plataforma, a um passo da beirada
+      var pisoX = emp.s < 0 ? PLAT_X0 + 10 : beiradaPiso(1) - 10;
+      if (DUPLA && emp.s > 0) pisoX = OUT_X1 - 10;
+      this.pl.sp.x = pisoX;
+    }
+    this.emp = null;
+  },
+
+  fimEmpurrao: function (ficaNaPorta) {
     this.empurrando = false;
     this.gMini.setVisible(false).clear();
     this.tMini.setVisible(false);
     this.tMini2.setVisible(false);
+    this.desmontaPortaCheia(ficaNaPorta !== false);
   },
 
-  /* entrou: no talo ou espremido na porta fechando */
+  /* entrou: no talo ou espremido na porta fechando. Antes de trocar de
+     cena, 0,4s de você entrando de vez: a parede de gente engole o boneco
+     pra dentro da porta. */
   entrou: function (espremido) {
-    this.fimEmpurrao();
+    if (this.entrandoAnim) return;
+    var emp = this.emp, eu = this;
+    if (emp) {
+      this.entrandoAnim = true;
+      this.pl.sp.setDepth(24);
+      this.tweens.add({ targets: this.pl.sp, x: emp.E + emp.s * 20, duration: 380, ease: 'Quad.easeIn' });
+      for (var k = 0; k < emp.gente.length; k++) {
+        this.tweens.add({ targets: emp.gente[k].sp, x: emp.gente[k].sp.x + emp.s * 8, duration: 380 });
+      }
+      if (espremido) this.popEmpurrao(this.pl.sp.x, this.pl.sp.y - 58, 'UFA!', PAL.verde);
+      this.time.delayedCall(420, function () {
+        eu.entrandoAnim = false;
+        eu.pl.sp.setDepth(60);
+        eu.entrouDeVez(espremido);
+      });
+      return;
+    }
+    this.entrouDeVez(espremido);
+  },
+  entrouDeVez: function (espremido) {
+    this.fimEmpurrao(!!this.treino);          // no treino você fica na plataforma
     /* No treino, entrar é o fim do minigame e não o começo do vagão:
        sem isto o treino do empurrão te despachava pra uma viagem de
        verdade depois de você só querer ver o empurrão. */
@@ -2832,6 +2940,7 @@ var EstacaoScene = new Phaser.Class({
     if (this.pressao >= this.metaEmpurrao() * 0.62) { this.entrou(true); return; }
     var t = this.tremEmpurrado;
     this.fimEmpurrao();
+    this.cameras.main.shake(160, 0.006);
     if (t) t.perdido = true;
     GameState.addDescanso(-4);
     GameState.addCarisma(-2);
@@ -2847,6 +2956,7 @@ var EstacaoScene = new Phaser.Class({
     var c = GameState.char;
     var lot = GameState.lotacao();
     var meta = this.metaEmpurrao();
+    if (this.entrandoAnim) return;                 // já está entrando: só a animação anda
 
     var forca = 13 * c.empurraoMult
       * (0.7 + 0.3 * (GameState.descanso / c.descansoMax))
@@ -2857,10 +2967,11 @@ var EstacaoScene = new Phaser.Class({
     // segurar rende pouco; quem martela entra
     if (Ctrl.act) this.pressao += quedaS * 0.5 * (dt / 1000);
     if (Ctrl.actJust) { this.pressao += forca; sfx('empurra'); this.cameras.main.shake(60, 0.003); }
+    this.animaPortaCheia(dt, Ctrl.actJust);
 
     var g = this.gMini; g.clear();
-    caixa(g, 32, GH / 2 - 68, GW - 64, 124, 0xe8362c);
-    barra(g, 48, GH / 2 - 12, GW - 96, 24, this.pressao / meta, 0x00e676, 0x1e1e2a);
+    caixa(g, 32, 140, GW - 64, 70, 0xe8362c);
+    barra(g, 48, 168, GW - 96, 14, this.pressao / meta, 0x00e676, 0x1e1e2a);
 
     if (this.pressao >= meta) this.entrou(false);
   },
