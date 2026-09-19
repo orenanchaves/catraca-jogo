@@ -29,7 +29,7 @@ var NIVEIS = [
   ] },
   { nome: 'O CAMINHO', missoes: [
     // era segurar a barra no solavanco, que saiu do jogo em 18/09
-    { txt: 'Sente 3 vezes no vagão', ev: 'sentou', meta: 3 },
+    { txt: 'Vença um desafio no vagão', ev: 'venceuDesafio', meta: 1 },
     { txt: 'Olhe o mapa na parede', ev: 'mapaParede', meta: 1 },
     { txt: 'Faça a baldeação na Sé', ev: 'baldeacao', meta: 1 }
   ] },
@@ -55,7 +55,7 @@ var NIVEIS = [
   { nome: 'VERMELHA', missoes: [
     { txt: 'Compre do ambulante no Brás', ev: 'ambulante', meta: 1,
       se: function (d) { return d.estacao === 'BRÁS'; } },
-    { txt: 'Ganhe a disputa da barra', ev: 'disputaGanha', meta: 1 },
+    { txt: 'Vença 3 desafios', ev: 'venceuDesafio', meta: 3 },
     { txt: 'Chegue na Sé sem sentar', ev: 'seSemSentar', meta: 1, corrida: true }
   ] },
   { nome: 'AZUL', missoes: [
@@ -63,7 +63,8 @@ var NIVEIS = [
     // fora do caminho de quem vai pro sul: sentido Tucuruvi, custa minutos
     { txt: 'Desça em São Bento', ev: 'desceu', meta: 1,
       se: function (d) { return d.estacao === 'SÃO BENTO'; } },
-    { txt: 'Ganhe uma encarada', ev: 'encaradaGanha', meta: 1 }
+    { txt: 'Vença um pregador', ev: 'venceuDesafio', meta: 1,
+      se: function (d) { return d.tipo === 'pregador'; } }
   ] },
   { nome: 'FIM DO MÊS', missoes: [
     { txt: 'Gaste até R$ 5 num dia inteiro', ev: 'diaCompleto', meta: 1, corrida: true,

@@ -26,9 +26,8 @@ var TREINO_QUEM = { k: 'estudante', g: null };
    devolve no fim); `cena` + `modo` monta a estação ou o vagão já
    armados pro minigame e volta sozinho quando ele termina. */
 var TREINO = [
-  { nome: 'A BRIGA', desc: 'rápido, forte e guarda', duelo: 'Briga' },
-  { nome: 'A ENCARADA', desc: 'quem desvia, perde', duelo: 'Encarada' },
-  { nome: 'A DISPUTA DA BARRA', desc: 'leia o corpo dele', duelo: 'Disputa' },
+  // a briga, a encarada e a disputa saíram: o desafio é o lugar delas
+  { nome: 'O DESAFIO', desc: 'ache o ponto fraco dele', cena: 'Vagao', modo: 'desafio' },
   { nome: 'BATALHA DE RIMA', desc: 'toque no ritmo', cena: 'Vagao', modo: 'rima' },
   { nome: 'O GUARDA NA RONDA', desc: 'ele procura quem pulou', cena: 'Vagao', modo: 'ronda' },
   { nome: 'DAR O LUGAR', desc: 'carisma ou descanso', cena: 'Vagao', modo: 'lugar' },

@@ -306,10 +306,10 @@ function limitaVagao(sp) {
    não sobrar carro sossegado pra onde fugir. */
 var SITUACOES = [
   { nome: 'TEM RIMADOR AQUI', roda: function (v) { v.comecaRimador(); } },
-  { nome: 'ALGUÉM QUER SUA BARRA', roda: function (v) { v.desafioDeBarra(); } },
+  /* A disputa da barra, a encarada e a briga saíram do sorteio: quem
+     puxa conversa agora são os desafiantes, que moram parados em cada
+     carro (ver o desafio, em src/desafio.js). */
   { nome: 'DESAFIO DE RIMA', roda: function (v) { v.desafioDeRima(); } },
-  { nome: 'TEM GENTE TE ENCARANDO', roda: function (v) { v.comecaEncarada(); } },
-  { nome: 'VAI DAR TRETA', roda: function (v) { v.comecaBriga(); } },
   { nome: 'GUARDA NA RONDA', roda: function (v) { v.comecaRonda(); } },
   { nome: 'ALGUMA COISA ROLANDO', roda: function (v) { v.sorteiaEvento(); } },
   { nome: 'ALGUMA COISA ROLANDO', roda: function (v) { v.sorteiaEvento(); } }
@@ -356,6 +356,11 @@ var VagaoScene = new Phaser.Class({
     this.sorteouFalha = false;
     this.duelando = false;
     this.encontro = null;
+    this.abordagem = null;       // o desafiante que te viu (src/desafio.js)
+    /* A cena é reaproveitada de estação em estação: o balão da viagem
+       anterior foi destruído junto com ela, e reusar o objeto morto
+       congelava o jogo (glTexture nulo) na segunda abordagem. */
+    this.gBalao = null; this.tBalao = null; this.uiEscondida = [];
     this.tPasso = 0;
     this.sentadoEm = null;
     this.indoPara = null;      // o lugar que você tocou, e pra onde está indo
@@ -894,6 +899,159 @@ var VagaoScene = new Phaser.Class({
         this.gente.push(p);
       }
     }
+    /* Um desafiante por carro. No treino não: lá quem arma o desafio é o
+       montaTreino, na frente de quem joga. */
+    this.desafiantes = [];
+    this.tDesafio = 0;
+    if (!GameState.treino) {
+      for (var c3 = 0; c3 < CARROS; c3++) {
+        this.poeDesafiante(c3, 124 + Math.random() * 72, yDoCarro(c3, 150 + Math.random() * 300),
+          Math.random() < 0.5 ? 'up' : 'down');
+      }
+    }
+  },
+
+  /* ---------- os desafiantes ----------
+     Parados, olhando pra um lado do corredor. Não entram no npcExtra
+     porque lá todo mundo olha em volta, e quem olha em volta não tem
+     linha de visão: a regra do jogo é justamente você saber pra onde ele
+     está olhando e escolher passar ou não. */
+  poeDesafiante: function (carro, x, y, olha, tipo) {
+    tipo = tipo || TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
+    var a = new Ator(this, x, y, DESAFIANTES[tipo].sprite);
+    a.dir = olha; a.anima(0, false);
+    a.sp.setDepth(36);
+    a.fixo = true;
+    a.desafio = { tipo: tipo, olha: olha, feito: false };
+    this.desafiantes.push(a);
+    this.gente.push(a);
+    return a;
+  },
+
+  /* A linha de visão: o corredor na frente dele, 120px, 22 pra cada
+     lado do eixo. 120 é um pouco mais que dois bonecos de altura — dá
+     pra ver o desafiante na tela bem antes de entrar na mira dele. Os
+     primeiros 2,5s depois do embarque não contam: entrar no vagão e já
+     ser parado é armadilha, não desafio. */
+  vigiaDesafiantes: function (dt) {
+    this.tDesafio = (this.tDesafio || 0) + dt;
+    if (!this.desafiantes || this.abordagem || this.encontro || this.sentadoEm || this.tDesafio < 2500) return;
+    if (this.batalha || this.ronda || this.fuga || this.lugar || this.disfarce) return;
+    var px = this.pl.sp.x, py = this.pl.sp.y, meu = carroDe(py);
+    for (var i = 0; i < this.desafiantes.length; i++) {
+      var d = this.desafiantes[i];
+      if (d.desafio.feito || !d.sp.active || carroDe(d.sp.y) !== meu) continue;
+      if (Math.abs(px - d.sp.x) > 22) continue;
+      var dy = py - d.sp.y;
+      var viu = d.desafio.olha === 'down' ? (dy > 0 && dy < 120) : (dy < 0 && dy > -120);
+      if (viu) { this.comecaAbordagem(d); return; }
+    }
+  },
+
+  /* ---------- a abordagem ----------
+     susto (o "!"), vem (ele anda até você), fala (a frase dele), zoom
+     (a câmera fecha nos dois) e luta (a cena Desafio por cima). Durante
+     tudo isso o vagão para, como o mundo para no Pokémon quando o
+     treinador te vê. */
+  comecaAbordagem: function (d) {
+    this.abordagem = { d: d, fase: 'susto', t: 0 };
+    d.desafio.feito = true;
+    this.pl.dir = (d.sp.y < this.pl.sp.y) ? 'up' : 'down';
+    this.pl.anima(0, false);
+    this.gBalao = this.gBalao || this.add.graphics().setDepth(95);
+    this.tBalao = this.tBalao || txtC(this, 0, 0, '', '#0a0a12', 8).setDepth(96).setAlign('center');
+    sfx('apito');
+  },
+
+  atualizaAbordagem: function (dt) {
+    var e = this.abordagem, d = e.d, eu = this;
+    e.t += dt;
+    var gb = this.gBalao; gb.clear();
+    this.tBalao.setVisible(false);
+    if (e.fase === 'susto') {
+      // o "!" pula em cima da cabeça dele
+      var sobe = Math.min(1, e.t / 120);
+      var bx = Math.round(d.sp.x), by = Math.round(d.sp.y - 56 - 6 * sobe);
+      gb.fillStyle(0x0a0a12, 1).fillRect(bx - 9, by - 22, 18, 24);
+      gb.fillStyle(0xf2f0ff, 1).fillRect(bx - 7, by - 20, 14, 20);
+      gb.fillTriangle(bx - 4, by, bx + 4, by, bx, by + 5);
+      gb.fillStyle(0xe8362c, 1).fillRect(bx - 2, by - 17, 4, 10);
+      gb.fillRect(bx - 2, by - 5, 4, 3);
+      if (e.t > 700) { e.fase = 'vem'; e.t = 0; }
+    } else if (e.fase === 'vem') {
+      /* até ficar de frente. 44 e não 34: o boneco tem 48 de altura, e a
+         34 os pés dele entravam na cabeça de quem joga no zoom da luta */
+      var alvoY = this.pl.sp.y + (d.sp.y < this.pl.sp.y ? -44 : 44);
+      var dx = this.pl.sp.x - d.sp.x, dy = alvoY - d.sp.y;
+      var dist = Math.sqrt(dx * dx + dy * dy), v = 110 * dt / 1000;
+      if (dist <= v + 0.5) {
+        d.sp.x = this.pl.sp.x; d.sp.y = alvoY;
+        d.dir = (d.sp.y < this.pl.sp.y) ? 'down' : 'up';
+        d.anima(0, false);
+        e.fase = 'fala'; e.t = 0;
+      } else {
+        d.sp.x += dx / dist * v; d.sp.y += dy / dist * v;
+        d.dir = Math.abs(dy) >= Math.abs(dx) ? (dy > 0 ? 'down' : 'up') : (dx > 0 ? 'right' : 'left');
+        d.anima(dt, true);
+      }
+    } else if (e.fase === 'fala') {
+      var q = DESAFIANTES[d.desafio.tipo];
+      var fx = GW / 2, fy = Math.round(Math.min(d.sp.y, this.pl.sp.y) - 96);
+      this.tBalao.setVisible(true).setText(q.chega).setPosition(fx, fy + 8).setColor('#0a0a12');
+      var w = Math.round(this.tBalao.width) + 20, h = Math.round(this.tBalao.height) + 14;
+      gb.fillStyle(0x0a0a12, 1).fillRect(fx - w / 2 - 2, fy - 2, w + 4, h + 4);
+      gb.fillStyle(0xf2f0ff, 1).fillRect(fx - w / 2, fy, w, h);
+      if (e.t > 1600) { e.fase = 'zoom'; e.t = 0; this.zoomNaAbordagem(); }
+    }
+  },
+
+  /* O zoom: 2,2x, com o par um pouco acima do meio da tela, porque o
+     painel da luta ocupa o topo (o outro) e o pé (você, a mensagem e o
+     menu). O vão livre entre os dois vai de ~112 a ~334, centro em 220:
+     68px acima do meio, 31 no mundo com o zoom. A UI de tela do vagão
+     some enquanto isso: ela também levaria o zoom e sairia enorme. */
+  zoomNaAbordagem: function () {
+    var e = this.abordagem, d = e.d, eu = this, cam = this.cameras.main;
+    cam.stopFollow();
+    this.uiEscondida = [];
+    var lista = this.children.list;
+    for (var i = 0; i < lista.length; i++) {
+      var o = lista[i];
+      if (o.scrollFactorX === 0 && o.visible) { o.setVisible(false); this.uiEscondida.push(o); }
+    }
+    var mx = (d.sp.x + this.pl.sp.x) / 2;
+    var my = (d.sp.y + this.pl.sp.y) / 2 - 24 + 31;
+    this.tweens.add({
+      targets: cam, zoom: 2.2, scrollX: mx - GW / 2, scrollY: my - GH / 2,
+      duration: 450, ease: 'Cubic.easeInOut',
+      onComplete: function () {
+        e.fase = 'luta';
+        eu.scene.launch('Desafio', {
+          tipo: d.desafio.tipo,
+          aoFechar: function (r) { eu.fimDaAbordagem(r); }
+        });
+      }
+    });
+  },
+
+  /* A volta: o zoom abre, a câmera volta a seguir, a UI reaparece. Quem
+     ganhou vira as costas e fica quieto; quem perdeu fica olhando. */
+  fimDaAbordagem: function (r) {
+    var e = this.abordagem, eu = this, cam = this.cameras.main;
+    if (!e) return;
+    if (r === 'ganhou') { e.d.dir = (e.d.sp.y < this.pl.sp.y) ? 'up' : 'down'; e.d.anima(0, false); }
+    e.fase = 'volta';
+    this.tweens.add({
+      targets: cam, zoom: 1, scrollY: this.pl.sp.y - GH / 2 - Math.round(HUD_H / 2), scrollX: 0,
+      duration: 350, ease: 'Cubic.easeInOut',
+      onComplete: function () {
+        cam.startFollow(eu.pl.sp, true, 0.16, 0.16);
+        cam.setFollowOffset(0, -Math.round(HUD_H / 2));
+        for (var i = 0; i < (eu.uiEscondida || []).length; i++) eu.uiEscondida[i].setVisible(true);
+        eu.uiEscondida = [];
+        eu.abordagem = null;
+      }
+    });
   },
 
   /* ---------- os poderes ----------
@@ -1082,6 +1240,12 @@ var VagaoScene = new Phaser.Class({
       if (eu.dialog) eu.dialog.fecha();
       if (eu.treino === 'rima') {
         eu.comecaBatalha();
+      } else if (eu.treino === 'desafio') {
+        // um desafiante 100px à frente, olhando pra você: vê na hora
+        var tipo = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
+        var dd = eu.poeDesafiante(carroDe(eu.pl.sp.y), eu.pl.sp.x, eu.pl.sp.y - 100, 'down', tipo);
+        eu.tDesafio = 99999;
+        eu.comecaAbordagem(dd);
       } else if (eu.treino === 'ronda') {
         GameState.pulouCatraca = true;     // senão ele passa reto e não há minigame
         eu.comecaRonda();
@@ -1112,6 +1276,7 @@ var VagaoScene = new Phaser.Class({
   treinoEmCurso: function () {
     var ativo = false;
     if (this.treino === 'rima') ativo = !!this.batalha;
+    else if (this.treino === 'desafio') ativo = !!this.abordagem;
     else if (this.treino === 'ronda') ativo = !!(this.ronda || this.fuga);
     else if (this.treino === 'lugar') ativo = !!(this.lugar || this.disfarce);
     if (!ativo && this.treinoFase !== 'esperando' && this.dialog && this.dialog.ativo) ativo = true;
@@ -1927,7 +2092,7 @@ var VagaoScene = new Phaser.Class({
     this.time.delayedCall(800, function () {
       if (!eu.scene.isActive()) return;
       // nada por cima de coisa já acontecendo
-      if (eu.dialog || eu.encontro || eu.rimador || eu.batalha || eu.duelando ||
+      if (eu.dialog || eu.encontro || eu.abordagem || eu.rimador || eu.batalha || eu.duelando ||
         eu.disfarce || eu.brigando || eu.ronda || eu.fuga || eu.lugar) return;
       if (carroDe(eu.pl.sp.y) !== c) return;  // já foi embora, deixa quieto
       s.roda(eu);
@@ -3011,6 +3176,8 @@ var VagaoScene = new Phaser.Class({
     if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
 
     if (this.dialog && this.dialog.ativo) { this.dialog.update(dt); return; }
+    if (this.abordagem) { if (this.abordagem.fase !== 'luta' && this.abordagem.fase !== 'volta') this.atualizaAbordagem(dt); return; }
+    this.vigiaDesafiantes(dt);
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
     if (this.disfarce) { this.atualizaDisfarce(dt); this.pintaUI(); return; }
 

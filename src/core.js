@@ -1559,7 +1559,12 @@ var PELES = {
   colo0: pele('#0a0a12', '#c99a70', '#3a2a22', '#c85a9a', '#2a2a38', '#14141c', '#ffe08a'),
   colo1: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#3a6fb0', '#25304d', '#14141c', '#e8e4f4'),
   colo2: pele('#0a0a12', '#f0c8a0', '#8a5a2a', '#2f7d5e', '#2e2e40', '#14141c', '#8bd0ff'),
-  pedinte2: pele('#0a0a12', '#c99a70', '#5a4a3a', '#4a4438', '#3a3a30', '#2a2a2a', '#8a8272')
+  pedinte2: pele('#0a0a12', '#c99a70', '#5a4a3a', '#4a4438', '#3a3a30', '#2a2a2a', '#8a8272'),
+  /* os desafiantes: polo bege e jeans; camisa branca e calça social;
+     camisa verde de time e boné */
+  tiozao: pele('#0a0a12', '#e0b088', '#c8c8d8', '#e3d2a0', '#4a5a7a', '#3a2a22', '#f0eeff'),
+  pregador: pele('#0a0a12', '#8a5a3c', '#1a1a22', '#f0eeff', '#14141c', '#14141c', '#14141c'),
+  torcedor: pele('#0a0a12', '#c99a70', '#2a2a30', '#0a7a42', '#e8e8f0', '#14141c', '#f0eeff')
 };
 
 /* desenha um quadro 32x48 a partir da silhueta 16x24, com sombreamento */

@@ -59,7 +59,13 @@ var ASSETS = {
     { key: 'np_senhora', file: 'assets/npcs/senhora.png', pal: PELES.senhora, corpo: 'senhora_coque' },
     { key: 'np_senhor_b', file: 'assets/npcs/senhor_b.png', pal: PELES.senhorB, corpo: 'senhor_grisalho' },
     { key: 'np_colo_a', file: 'assets/npcs/colo_a.png', pal: PELES.colo1, corpo: 'colo' },
-    { key: 'np_colo_b', file: 'assets/npcs/colo_b.png', pal: PELES.colo2, corpo: 'colo_longo' }
+    { key: 'np_colo_b', file: 'assets/npcs/colo_b.png', pal: PELES.colo2, corpo: 'colo_longo' },
+
+    /* Os desafiantes: a roupa diz o tipo antes de ele abrir a boca, que é
+       como se aprende a ler treinador no Pokémon. Provisórios até a arte. */
+    { key: 'np_tiozao', file: 'assets/npcs/tiozao.png', pal: PELES.tiozao, corpo: 'careca_celular' },
+    { key: 'np_pregador', file: 'assets/npcs/pregador.png', pal: PELES.pregador, corpo: 'padrao' },
+    { key: 'np_torcedor', file: 'assets/npcs/torcedor.png', pal: PELES.torcedor, corpo: 'bone' }
   ]
 };
 
@@ -141,7 +147,9 @@ var config = {
      desenhada: o treino fica logo depois do título, senão a lista dele
      aparece por cima da briga que ela mesma abriu. */
   scene: [BootScene, TitleScene, TreinoScene, EstacaoScene, VagaoScene, BaldeacaoScene, FimScene,
-    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene, BrigaScene]
+    HudScene, TutorialScene, PausaScene, ZapScene, EncaradaScene, DisputaScene, BrigaScene,
+    // o desafio desenha só o painel, por cima do vagão com zoom: tem que vir por último
+    DesafioScene]
 };
 
 window.addEventListener('load', function () {
