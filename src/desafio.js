@@ -219,7 +219,7 @@ var DESAFIANTES = {
      a fraqueza que a cena pede: a dancinha não aguenta ironia, o vendedor
      não aguenta fone, e o mochilão só entende conversa calma. */
   tiktoker: {
-    nome: 'DANCINHA', sprite: 'np_tiktoker', pac: 70, nivel: 3,
+    nome: 'INFLUENCER', sprite: 'np_tiktoker', pac: 70, nivel: 3,
     fraco: 'IRONIA', resiste: 'LABIA',
     chega: 'AMIGO, VOCÊ TÁ\nNO MEU QUADRO.',
     sai: 'DEIXA, EU GRAVO\nDE NOVO.',

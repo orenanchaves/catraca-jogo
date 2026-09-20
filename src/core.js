@@ -3780,7 +3780,7 @@ var DEX = [
   { id: 'cosRosa', nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Cabelo rosa e soco que racha o chão.' },
   { id: 'cosColegial', nome: 'COLEGIAL', sprite: 'np_cos_marinheira', desafio: true, tipo: 'COSPLAY', onde: 'LIBERDADE', desc: 'Uniforme de marinheira. Kawaii, mas brava.' },
   // o estágio do estudante (Ato 1): dois pacíficos e o primeiro chefão
-  { id: 'tiktoker', nome: 'DANCINHA', sprite: 'np_tiktoker', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Grava dancinha no corredor. Você entrou no quadro.' },
+  { id: 'tiktoker', nome: 'INFLUENCER', sprite: 'np_tiktoker', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Grava dancinha no corredor. Você entrou no quadro.' },
   { id: 'vendedorCurso', nome: 'VENDE CURSO', sprite: 'np_curso', desafio: true, tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Curso de inglês em três meses. Só hoje, diz ele.' },
   { id: 'mochilao', nome: 'MOCHILÃO', sprite: 'np_mochilao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Entrou de mochila nas costas e não tirou. Você levou.' },
   { id: 'sueli', nome: 'SUELI', sprite: 'np_sueli', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'Do RH. Foi quem te chamou pro estágio.' },
