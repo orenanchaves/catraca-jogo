@@ -3167,6 +3167,24 @@ var EstacaoScene = new Phaser.Class({
       var g = this.gente[q];
       if (g && g.sp && g.sp.y > topo && g.sp.y < base) perto.push(g);
     }
+    /* ---------- quem está mais embaixo desenha na frente ----------
+       'Às vezes dá uma bugada': a multidão parecia grudada. A física
+       estava certa — medido no pico da Itaquera, a pior sobreposição real
+       era de 3 pixels num corpo de 22. O que estava errado era o
+       DESENHO: 39 dos 64 passageiros dividiam a camada 40, e entre iguais
+       quem aparece na frente é a ordem de criação. Dava gente de baixo
+       desenhada ATRÁS de gente de cima, que é o que o olho lê como boneco
+       preso no outro.
+
+       O corpo tem 22 de separação e o sprite tem 32 de largura: encostar
+       e se sobrepor na tela é normal e é o que faz parecer multidão. O
+       que não pode é a ordem ser aleatória. Um deslocamento minúsculo por
+       Y dentro da própria camada resolve, sem mexer em quem mora nas
+       outras (a escada é 30, o balcão é 38, o jogador é 60). */
+    for (var d = 0; d < perto.length; d++) {
+      var spD = perto[d].sp;
+      if (Math.floor(spD.depth) === 40) spD.setDepth(40 + (spD.y + 1000) * 0.00001);
+    }
     resolveCorpos(this.pl, perto,
       function (sp) {
         if (!self.podeIr(sp.x, sp.y)) { sp.x = antes.x; sp.y = antes.y; }
@@ -3315,7 +3333,6 @@ var EstacaoScene = new Phaser.Class({
     this.rodaEscada(dt, mv);
     var eu = this;
     empurraoNaMarra(this, this.gente, function (sp) { return eu.podeIr(sp.x, sp.y); });
-    this.resolveCorpos();
     this.chao.atualiza(dt, this.pl.sp.x, this.pl.sp.y);
     mostraLixoNaMao(this, this.pl);
     ondasDoPregao(this, time);
@@ -3323,6 +3340,20 @@ var EstacaoScene = new Phaser.Class({
     this.atualizaCarga(dt, mv);
     if (this.itq) { this.atualizaItaquera(dt); if (this.fim) return; }
     else if (this.mez) this.atualizaMezanino(dt);
+
+    /* ---------- separar é a ÚLTIMA coisa do quadro ----------
+       'Às vezes dá uma bugada': a multidão amontoada. A separação existia
+       e funcionava, só que rodava ANTES de a multidão andar — o
+       `atualizaItaquera` e o `atualizaMezanino` são quem move cada
+       passageiro, e vinham depois. Ou seja: separava, todo mundo andava
+       por cima de todo mundo de novo, e o quadro desenhado era sempre o
+       de antes de separar. Medido no pico da Itaquera: quatro pares
+       sobrepostos ao chegar viravam sete depois de nove segundos, com 21
+       pixels de sobreposição num corpo de 22.
+
+       Agora é a última conta antes de desenhar, e por isso vale também
+       pro jogador, que se moveu lá em cima. */
+    this.resolveCorpos();
 
     // passar do bloqueio é entrar no sistema, e isso não se desfaz
     /* Passou pela catraca andando, o braço gira pra você: pra dentro na
