@@ -2476,7 +2476,8 @@ var EstacaoScene = new Phaser.Class({
     GameState.stats.catracasPuladas++;
     Missoes.conta('pulouCatraca'); Missoes.conta('catraca');
     GameState.addCarisma(-2);
-    sfx('ok');
+    // caiu do outro lado do braço: o peso é o da aterrissagem
+    baque(this, 'medio', this.pl.sp, 'ok');
     var self = this;
     fala(this, 'Passou.\nO coração bateu, mas passou.', []);
     this.time.delayedCall(1300, function () { if (self.dialog) self.dialog.fecha(); });
@@ -3027,7 +3028,9 @@ var EstacaoScene = new Phaser.Class({
       return;
     }
     GameState.addDescanso(-4 - 5 * GameState.lotacao() - (espremido ? 4 : 0));
-    if (espremido) { GameState.addCarisma(-2); this.cameras.main.shake(200, 0.005); }
+    // entrar é um baque: espremido dói mais do que entrar folgado
+    baque(this, espremido ? 'medio' : 'leve', this.pl.sp);
+    if (espremido) GameState.addCarisma(-2);
     /* ---------- o lado vira o rumo ----------
        É aqui que a plataforma central deixa de ser desenho. Até agora
        `dir` só era escrito pelo apontaPraAlvo(), que aponta pro alvo

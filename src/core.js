@@ -4262,6 +4262,59 @@ function montaFrenteDaLoja(cena, b) {
   txtC(cena, x + w / 2, y - 4, e.nome, e.letra, 8).setScale(ESCALA_TEXTO / 2).setDepth(42);
 }
 
+/* ---------- o baque ----------
+   Da skill game-feel (.claude/skills/game-feel): um acontecimento que
+   precisa ter peso não é UMA resposta grande, são várias pequenas na
+   mesma fração de segundo — som, tremida, o corpo esmagando e voltando.
+   Duas regras separam juice de bagunça: exagera e VOLTA (o exagero é
+   passageiro, nunca o novo repouso), e o tamanho da resposta é o tamanho
+   do acontecimento (um passo não é uma queda).
+
+   Três níveis, e o jogo inteiro usa só estes três: sem isso cada tela
+   acaba com a sua própria régua de tremida.
+
+   Sem hit-stop, e isto foi medido antes de decidir: o Phaser 3.80 não
+   tem `timeScale` no laço (só no relógio e nos tweens de cada cena), e o
+   jogo lê o `delta` direto do laço — congelar de verdade pediria uma
+   bandeira no `update` de quatro cenas. E, no assunto deste jogo, o
+   mundo parar é justamente o que não acontece: o trem não espera você
+   cair.
+
+   A tremida respeita o TREMIDA da pausa (CHEIA/REDUZIDA), que é a opção
+   de acessibilidade que a skill pede e que o jogo já tinha. */
+var BAQUES = {
+  leve: { tremida: [90, 0.0025], esmaga: 0.10, volta: 140 },
+  medio: { tremida: [200, 0.006], esmaga: 0.18, volta: 190 },
+  forte: { tremida: [340, 0.011], esmaga: 0.26, volta: 260 }
+};
+function baque(cena, nivel, sp, som) {
+  var b = BAQUES[nivel] || BAQUES.leve;
+  if (som) sfx(som);
+  if (cena && cena.cameras && cena.cameras.main && TREMIDA > 0) {
+    cena.cameras.main.shake(b.tremida[0], b.tremida[1] * TREMIDA);
+  }
+  if (sp) esmagaEEstica(cena, sp, b.esmaga, b.volta);
+}
+
+/* Esmaga e estica conservando volume: achata na vertical e alarga na
+   horizontal no instante do baque, e volta com Back.easeOut, que passa
+   um tico do repouso antes de assentar. Linear aqui fica de robô.
+
+   A escala de repouso é lida na primeira vez e guardada no próprio
+   sprite: o boneco da estação e o do vagão não têm a mesma, e chutar um
+   valor deixaria um deles torto pra sempre. */
+function esmagaEEstica(cena, sp, quanto, ms) {
+  if (!cena || !cena.tweens || !sp || !quanto) return;
+  if (sp._repousoX === undefined) { sp._repousoX = sp.scaleX; sp._repousoY = sp.scaleY; }
+  if (sp._twBaque) sp._twBaque.stop();
+  sp.setScale(sp._repousoX * (1 + quanto), sp._repousoY * (1 - quanto));
+  sp._twBaque = cena.tweens.add({
+    targets: sp, scaleX: sp._repousoX, scaleY: sp._repousoY,
+    duration: ms, ease: 'Back.easeOut',
+    onComplete: function () { sp._twBaque = null; sp.setScale(sp._repousoX, sp._repousoY); }
+  });
+}
+
 function perdeVida(scene, sp, quanto) {
   var n = GameState.perdeCoracao(quanto);
   if (scene && sp) coracaoQuebrado(scene, sp.x, sp.y - 40, quanto);

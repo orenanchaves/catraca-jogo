@@ -1350,7 +1350,8 @@ var VagaoScene = new Phaser.Class({
     // segurou o pêndulo no verde: fica de pé, mesmo solto
     var equilibrou = this.equil && this.equil.ok;
     this.fechaEquilibrio();
-    if (equilibrou) { this.cameras.main.shake(200, 0.005); return; }
+    // aguentou em pé: o corpo absorve o tranco, em vez de só a tela tremer
+    if (equilibrou) { baque(this, 'medio', this.pl.sp); return; }
     tr.proximo = Math.max(9000, 14000 + Math.random() * 12000 - GameState.dificuldade() * 800);
     this.cameras.main.shake(320, 0.008);
     // de cadeira de rodas, com o freio puxado, o tranco não derruba
@@ -1551,7 +1552,8 @@ var VagaoScene = new Phaser.Class({
     this.pl.dir = this.pl.sp.x < 160 ? 'sentadoR' : 'sentadoL';
     this.pl.anima(0, false);
     sentaAnimado(this.pl);
-    sfx('nao');
+    // cair é o acontecimento mais pesado do vagão: baque forte (core.js)
+    baque(this, 'forte', this.pl.sp, 'nao');
     if (Math.random() < 0.5) falaGente(['Eita!', 'Segura aí!', 'Opa, cuidado!'][Math.floor(Math.random() * 3)], 1.2);
     this.flash('CAIU COM O TRANCO!\nSEGURE NA BARRA.');
   },
