@@ -440,6 +440,7 @@ var VagaoScene = new Phaser.Class({
     this.estado = 'andando';
     this.t = 0;
     this.duracao = TEMPO_ENTRE_ESTACOES;
+    this.perguntouAdiantar = false;     // uma pergunta de adiantar por perna
     this.eventoPendente = false;
     this.dilemaPendente = false;
     this.ronda = null;
@@ -2597,6 +2598,79 @@ var VagaoScene = new Phaser.Class({
     this.tCarroAtual = 5000 + Math.random() * 3000;
   },
 
+  /* ---------- adiantar ----------
+     'Tô pensando em conseguir pular o trajeto, meio que um adiantar caso
+     tenha explorado tudo no vagão.'
+
+     A armadilha que decide o desenho: se adiantar for mais BARATO que
+     viajar, adiantar vira a jogada ótima e a viagem vira punição — o
+     relógio é o antagonista deste jogo. Então adiantar custa exatamente o
+     que custaria viajar: os mesmos minutos por estação (quem cobra é o
+     `avancaTrem`) e o mesmo desgaste de quem fica em pé o trajeto todo
+     (0,00082 por ms, a conta do `update`, vezes os 18 segundos de uma
+     estação). O que você ganha não é vantagem, é não segurar a barra por
+     trinta segundos de nada.
+
+     'Você explorou todos os vagões': a conta é do trem INTEIRO, não só do
+     carro em que você está. Nenhuma situação por entregar, nenhum achado
+     escondido de pé, e nada acontecendo agora. O chão fica de fora:
+     moeda cai o tempo todo, e com ela na conta a pergunta nunca
+     apareceria.
+
+     Pergunta uma vez por perna, e só quando ainda faltam duas estações
+     ou mais: adiantar uma parada não é adiantar, é pular a chegada. */
+  nadaPendente: function () {
+    if (this.achado) return false;
+    for (var i = 0; i < (this.situacoes || []).length; i++) if (this.situacoes[i]) return false;
+    /* `this.dialog` é o OBJETO da caixa de fala, e ele existe desde a
+       primeira fala da viagem — perguntar por ele é perguntar se alguém
+       já falou alguma vez, não se tem conversa aberta agora. Quem
+       responde isso é o `ativo`. */
+    return !((this.dialog && this.dialog.ativo) || this.encontro || this.abordagem ||
+      this.batalha || this.duelando || this.rimador || this.fuga || this.lugar ||
+      this.disfarce || this.ambulante || this.tCarroAtual);
+  },
+
+  vigiaAdiantar: function () {
+    if (this.perguntouAdiantar || this.treino || GameState.explorar) return;
+    if (GameState.faltamEstacoes() < 2 || !this.nadaPendente()) return;
+    this.perguntouAdiantar = true;
+    var eu = this;
+    fala(this, 'Você explorou todos os vagões, gostaria de adiantar?', [
+      { label: 'Adiantar', cb: function () { eu.adianta(); } },
+      { label: 'Seguir viajando', cb: function () { } }
+    ]);
+  },
+
+  adianta: function () {
+    var faltam = GameState.faltamEstacoes(), i;
+    /* ---------- o preço, medido ----------
+       Ficar em pé custa 0,00082 por milissegundo, e uma estação leva 18
+       segundos: quase 15 de descanso por parada. Cobrei isso de cada
+       estação pulada e o resultado, medido, foi a barra inteira embora
+       em doze estações — adiantar virava sentença de morte, e ninguém
+       usaria. E cobrar zero seria o oposto: adiantar vira a jogada ótima.
+
+       Então a conta assume o que uma pessoa faz de verdade num trecho
+       vazio: parte sentada, parte em pé. Metade do desgaste de quem vai
+       o caminho todo em pé, e nunca abaixo de 10 — adiantar pode te
+       deixar acabado, não morto. O RELÓGIO, esse sim, cobra inteiro:
+       é ele o antagonista, e é dele que ninguém escapa. */
+    var dreno = 0.00082 * GameState.char.dreno * TEMPO_ENTRE_ESTACOES *
+      (0.8 + GameState.dificuldade() * 0.2) * 0.5;
+    var piso = 10;
+    // as do meio passam em silêncio; a última é a chegada de sempre
+    for (i = 0; i < faltam - 1; i++) {
+      GameState.avancaTrem();
+      if (GameState.descanso - dreno > piso) GameState.addDescanso(-dreno);
+      this.marcaEstacao();
+    }
+    if (GameState.descanso - dreno > piso) GameState.addDescanso(-dreno);
+    sfx('empurra');
+    this.flash('ADIANTOU ' + faltam + ' ESTAÇÕES');
+    this.chega();
+  },
+
   /* Passou a emenda: o carro novo se apresenta. O número do vagão é o
      que dá tamanho ao trem — sem ele, andar oito telas parece andar em
      círculo no mesmo lugar. */
@@ -3838,6 +3912,7 @@ var VagaoScene = new Phaser.Class({
       }
       if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
       if (this.dilemaPendente && !this.encena && !this.lugar && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
+      this.vigiaAdiantar();
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
       /* Trinta segundos de porta aberta sem aviso viram trinta segundos

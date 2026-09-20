@@ -276,14 +276,19 @@ var FimScene = new Phaser.Class({
       if (lista.length > out.length) out.push('+' + (lista.length - out.length));
       return out.join(', ');
     };
-    var linha = function (rot, texto, cor) {
+    /* O contador é ' 3/??' de propósito: o jogo NÃO diz quantos existem.
+       Saber que faltou algo sem saber quanto é o que faz voltar; um
+       denominador fechado transforma a fase numa lista de compras. */
+    var linha = function (rot, n, texto, cor) {
       txt(eu, 24, y, rot, PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
-      txt(eu, 92, y, texto || 'NADA', texto ? cor : PAL.cinzaEsc, 8)
-        .setScale(ESCALA_TEXTO / 2).setMaxWidth(GW - 116);
+      txt(eu, 102, y, n + '/??', PAL.amarelo, 8).setScale(ESCALA_TEXTO / 2);
+      txt(eu, 140, y, texto || 'NADA', texto ? cor : PAL.cinzaEsc, 8)
+        .setScale(ESCALA_TEXTO / 2).setMaxWidth(GW - 164);
       y += 16;
     };
-    linha('ENCONTROU', nomes(b.inimigos || [], typeof DESAFIANTES !== 'undefined' ? DESAFIANTES : null, 'nome'), PAL.branco);
-    linha('ACHOU', nomes(b.itens || [], typeof GUARDADOS !== 'undefined' ? GUARDADOS : null, 'nome'), PAL.branco);
+    var ini = b.inimigos || [], ite = b.itens || [];
+    linha('ENCONTROU', ini.length, nomes(ini, typeof DESAFIANTES !== 'undefined' ? DESAFIANTES : null, 'nome'), PAL.branco);
+    linha('ACHOU', ite.length, nomes(ite, typeof GUARDADOS !== 'undefined' ? GUARDADOS : null, 'nome'), PAL.branco);
   },
 
   marca: function (n, trancada) {
