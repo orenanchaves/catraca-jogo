@@ -71,7 +71,12 @@ var TitleScene = new Phaser.Class({
     this.add.image(0, GH - PLAT_ALT * 2, 'tit_fundo').setOrigin(0, 0).setDepth(-10);
 
     var g = this.add.graphics();
-    g.fillStyle(0x05050a, 0.88).fillRect(0, 0, GW, GH);
+    /* O véu sobre o papel de parede era 0,88, e a plataforma atravessava
+       forte demais: a faixa tátil amarela subia pelo meio da tela e o
+       quadro redondo da parede aparecia atrás do texto do poder, lido
+       como se fosse um botão do jogo. Cenário de fundo é para dar lugar,
+       não para competir com o que se clica. */
+    g.fillStyle(0x05050a, 0.94).fillRect(0, 0, GW, GH);
 
     // a placa de estação com o nome do jogo: azul em cima, vermelho embaixo
     var y = TIT.placaY, h = TIT.placaH;
@@ -112,10 +117,15 @@ var TitleScene = new Phaser.Class({
     /* ---------- onde ele mora ----------
        'Importante mostrar em que estação começa o jogo do personagem.'
        Uma placa de metrô em cima do boneco, na cor da linha da casa
-       dele: é a primeira coisa que se lê antes de escolher. */
+       dele: é a primeira coisa que se lê antes de escolher.
+
+       'Poluído ainda': a placa vinha com um rótulo COMEÇA EM em cima
+       dela, e o rótulo caía na mesma linha do RECORDE. Placa de metrô
+       não precisa de legenda dizendo que é uma estação: quem lê a chapa
+       preta com a tarja colorida já sabe. Ficou a chapa, e ela desceu
+       pra ter ar entre ela e a linha do recorde. */
     this.gCasa = this.add.graphics().setDepth(1);
-    this.tCasaRot = txtC(this, GW / 2, 78, 'COMEÇA EM', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
-    this.tCasa = txtC(this, GW / 2, 92, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
+    this.tCasa = txtC(this, GW / 2, 96, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
     this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.amarelo, 16);
 
     /* ---------- o gênero ----------
@@ -153,8 +163,13 @@ var TitleScene = new Phaser.Class({
 
     // o verbo que só este personagem tem, e como ele funciona
     this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.verde, 8);
-    this.tDesc = txtC(this, GW / 2, TIT.descY, '', PAL.cinza, 8);
-    this.tDesc.setWordWrapWidth(GW - 56).setAlign('center');
+    /* A explicação do verbo tinha o mesmo corpo do verbo, e duas linhas
+       do mesmo tamanho brigam em vez de se completarem: o verde é a
+       coisa, o cinza é a nota de rodapé dela. Em meia escala a nota cabe
+       numa linha só, e a largura de quebra dobra pra ocupar a mesma
+       faixa de tela. */
+    this.tDesc = txtC(this, GW / 2, TIT.descY, '', PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
+    this.tDesc.setWordWrapWidth((GW - 56) * 2).setAlign('center');
 
     /* ---------- a ficha ----------
        Dois pares lado a lado em vez de cinco linhas: em cima o que é
@@ -385,13 +400,12 @@ var TitleScene = new Phaser.Class({
     // a placa da estação de casa, na cor da linha dela
     var casaK = casaDe(k), lk = LINHAS[linhaDaEstacao(casaK)], nomeCasa = placaDe(casaK);
     this.tCasa.setText(nomeCasa).setColor(aberto ? PAL.branco : PAL.cinzaEsc);
-    this.tCasaRot.setColor(aberto ? PAL.cinzaEsc : '#33333f');
     var lw = nomeCasa.length * 6 + 22, lx = GW / 2 - lw / 2;
     var gc = this.gCasa; gc.clear();
-    gc.fillStyle(0x000000, 0.5).fillRect(lx + 2, 90, lw, 18);
-    gc.fillStyle(aberto ? 0x14141c : 0x101018, 1).fillRect(lx, 88, lw, 18);
-    gc.fillStyle(aberto ? lk.num : 0x2a2a3a, 1).fillRect(lx, 104, lw, 3);
-    gc.lineStyle(1, aberto ? 0x3a3a4a : 0x24242e, 1).strokeRect(lx + 0.5, 88.5, lw - 1, 17);
+    gc.fillStyle(0x000000, 0.5).fillRect(lx + 2, 94, lw, 18);
+    gc.fillStyle(aberto ? 0x14141c : 0x101018, 1).fillRect(lx, 92, lw, 18);
+    gc.fillStyle(aberto ? lk.num : 0x2a2a3a, 1).fillRect(lx, 108, lw, 3);
+    gc.lineStyle(1, aberto ? 0x3a3a4a : 0x24242e, 1).strokeRect(lx + 0.5, 92.5, lw - 1, 17);
 
     this.tTopo.setText('RECORDE ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));
