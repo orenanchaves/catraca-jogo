@@ -734,6 +734,12 @@ var GameState = {
     this.minutos = this.pernaAtual().saida + Math.floor(Math.random() * 21) - 10;
     this.minutoSaida = this.minutos;
     this.folgaPerna = 0; this._itqCompensado = null;
+    /* Casa das flags e dos números da história. Era cada uma um campo
+       solto no GameState, e o save é uma lista branca escrita à mão
+       (campanha.js): flag nova que alguém esquecesse de pôr na lista
+       sumia em silêncio no checkpoint. Daqui pra frente nasce aqui. */
+    this.flags = {}; this.vars = {};
+    this.diaBase = null; this.diaConta = { duelos: 0, entregas: 0 };
     this.faixaAnterior = this.faixa().key;
     this.dentroDoSistema = false;
     /* Pular a catraca era uma decisao sem consequencia depois do
@@ -749,6 +755,9 @@ var GameState = {
       minigamesGanhos: 0, minigamesPerdidos: 0,
       caidos: 0, achados: 0, terciarias: 0
     };
+    // a primeira fase também tem que ter foto, senão ela é a única que
+    // não dá pra repetir (src/diario.js)
+    if (typeof Diario !== 'undefined') Diario.abre();
   },
   linhaAtual: function () { return LINHAS[this.linha]; },
   estacaoAtual: function () { return this.linhaAtual().estacoes[this.idx]; },
@@ -947,6 +956,7 @@ var GameState = {
     this.poeNoTrajeto(this.origem);
     this.minutoSaida = this.minutos;
     this.faixaAnterior = this.faixa().key;
+    if (typeof Diario !== 'undefined') Diario.abre();
   },
 
   chegouNoDestino: function () {
@@ -1023,6 +1033,8 @@ var GameState = {
        que derrubou (o atraso zera os corações) não grava, senão voltar pra
        ela seria cair de novo. */
     if (typeof Campanha !== 'undefined' && !this.derrota()) Campanha.salva('chegou');
+    // fase nova: o diário tira a foto do começo dela (src/diario.js)
+    if (eraUltima && typeof Diario !== 'undefined') Diario.abre();
   },
 
   /* Comer devolve fôlego e custa minutos. O dogão é o único que devolve
@@ -4882,7 +4894,11 @@ function vaiPraOFim(scene) {
     scene.scene.pause(k);
   });
   HUD_VISIVEL = false; CONTROLES_VISIVEIS = false;
-  scene.scene.launch('Fim', { congeladas: congeladas });
+  /* a fase acabou mal, e o balanço dela vai junto: é a mesma tela, no
+     humor vermelho (src/diario.js, src/scene-fim.js) */
+  var bal = null;
+  if (typeof Diario !== 'undefined' && !GameState.treino && !GameState.explorar) bal = Diario.fecha(false);
+  scene.scene.launch('Fim', { congeladas: congeladas, balanco: bal });
 }
 
 /* ---------- ladrilho ----------

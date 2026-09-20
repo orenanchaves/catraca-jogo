@@ -1076,14 +1076,24 @@ EstacaoScene.prototype.chegaPelaRua = function () {
   this.time.delayedCall(2200, function () { eu.scene.start('Estacao', { onde: 'saguao' }); });
 };
 
+/* ---------- a porta de casa fecha a fase ----------
+   'O balanço aparece só quando o dia acaba.' É aqui: entrou em casa na
+   última perna, a fase fechou. O balanço é tirado ANTES do
+   `chegouNoDestino`, que é quem vira o dia e zera os contadores — depois
+   dele não há mais o que contar. */
 EstacaoScene.prototype.chegouEmCasa = function () {
   if (this.fim) return;
   this.fim = true;
+  var bal = (typeof Diario !== 'undefined' && !GameState.treino && !GameState.explorar)
+    ? Diario.fecha(true) : null;
   GameState.chegouNoDestino();
   var morte = GameState.derrota();
   if (morte) { GameState.motivoFim = morte; this.fim = true; GameState.salvarRecorde(); vaiPraOFim(this); return; }
   sfx('vitoria');
-  this.scene.start('Estacao', { onde: 'saguao' });           // dia novo: sai de casa pela mesma porta
+  if (!bal) { this.scene.start('Estacao', { onde: 'saguao' }); return; }
+  HUD_VISIVEL = false; CONTROLES_VISIVEIS = false;
+  this.scene.launch('Fim', { congeladas: ['Estacao'], balanco: bal });
+  this.scene.pause();
 };
 
 /* ---------- as portas de plataforma ----------

@@ -64,7 +64,16 @@ var ROTINAS = {
 /* A perna 'CASA' vai pra casa de quem joga (CASA muda com o personagem:
    o palmeirense mora na Barra Funda), e não pra que era casa quando a
    lista foi escrita. */
+/* A campanha manda: se a fase da vez tem pernas escritas (src/fases.js),
+   o dia é o que a OCASIÃO pede, e não a rotina de sempre. Sem fase
+   escrita — outro personagem, ou a temporada já acabou — vale a rotina,
+   que é o lado sem fim do jogo. */
 function rotinaDe(k) {
+  if (typeof pernasDaFase === 'function' && typeof GameState !== 'undefined' &&
+    !GameState.treino && GameState.charKey === k) {
+    var p = pernasDaFase(k, GameState.dia);
+    if (p) return p;
+  }
   return (ROTINAS[k] || ROTINAS.clt).map(function (p) {
     return p.rotulo === 'CASA' ? { rotulo: 'CASA', estacao: CASA, saida: p.saida } : p;
   });

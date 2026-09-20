@@ -23,7 +23,10 @@ var Campanha = {
   CHAVE: 'metrosp_campanha',
   // vN -> vN+1, em ordem; nenhuma ainda (a v1 é a primeira)
   MIGRACOES: {},
+  /* 'flags' e 'vars' entram uma vez e valem pra sempre: é o que impede
+     a próxima flag de história de nascer fora do save. */
   CAMPOS: ['charKey', 'genero', 'dia', 'pernaIdx', 'perna', 'origem', 'destino', 'minutos',
+    'flags', 'vars', 'diaBase', 'diaConta',
     'dinheiro', 'carisma', 'descanso', 'coracoes', 'valeRestante', 'mochila', 'extrato', 'bateria',
     'atrasos', 'ultimoAtraso', 'pernasFeitas', 'estacoes', 'pontosDaCorrida', 'stats', 'lixo',
     'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso', 'duelosNoDia'],

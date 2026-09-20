@@ -838,6 +838,8 @@ var DesafioScene = new Phaser.Class({
       if (subiu) fim.push({ msg: 'SUBIU PRO NÍVEL ' + subiu + '!', cor: PAL.verde, fx: function () { tocaJingle('vitoria'); } });
     }
     sfx('vitoria');
+    // o balanço da fase conta as discussões ganhas (src/diario.js)
+    if (typeof Diario !== 'undefined' && !GameState.treino) Diario.conta('duelos');
     this.poe(fim, 'sai');
   },
 
