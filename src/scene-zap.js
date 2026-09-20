@@ -14,7 +14,7 @@
    Como a cena de jogo fica pausada por baixo, aqui o teclado é ouvido
    direto por evento — cena pausada não atualiza tecla nenhuma. */
 
-var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'CATRAGRAM', 'MOCHILA', 'METRODEX'];
+var ABAS_ZAP = ['ZIPZAP', 'MAPA', 'BANCO', 'CATRAGRAM', 'MOCHILA', 'METRODEX', 'MISSÕES', 'POMBO'];
 
 /* ---------- a tela inicial ----------
    As abas embaixo viraram aplicativos: o celular abre bloqueado, o
@@ -29,14 +29,32 @@ var APPS_ZAP = [
   // o MISSÕES virou o CATRAGRAM (src/catragram.js): cabeçalho claro, como o do ZipZap
   { nome: 'CATRAGRAM', cor: 0xd6307a, cab: 0xffffff },
   { nome: 'MOCHILA', cor: 0xb07a3a, cab: 0x3a2814 },
-  { nome: 'METRODEX', cor: 0xe8362c, cab: 0x5a1414 }
+  { nome: 'METRODEX', cor: 0xe8362c, cab: 0x5a1414 },
+  /* O MISSÕES voltou ('acho que não tá claro; talvez ter um app chamado
+     missões deixe mais claro mesmo'). Ele não dá missão — quem dá é o
+     ZipZap — ele LISTA o que está aberto agora: a principal do dia, as
+     secundárias e o que ficou pendente no mundo. O Catragram continua
+     sendo o que já foi feito. */
+  { nome: 'MISSÕES', cor: 0xf2c14e, cab: 0x3a3014 },
+  // o joguinho do celular: um jogo dentro do jogo (src/minijogo-pombo.js)
+  { nome: 'POMBO', cor: 0x3fa07d, cab: 0x14281e }
 ];
 /* Com a MOCHILA são cinco: três por fileira, ícones de 60 (os de 72 em
    2x2 não cabiam mais). 'CATRAGRAM' e 'MOCHILA' são os nomes compridos, e as
    colunas ficam a 89 uma da outra. */
-var ICONE_APP = 60;
+/* Com oito apps são TRÊS fileiras, e a terceira encostava no ✕ FECHAR:
+   o ícone caiu de 60 pra 52 e o passo de 112 pra 82, que é o que cabe
+   entre o widget da hora (acaba em 190) e a barra de baixo (486). */
+var ICONE_APP = 46;
+/* ---------- a ordem na tela ----------
+   'Tem que ficar na ordem ZipZap, Missões, Mapa.' O número de cada app é
+   o que o resto do código usa (this.aba === 3 é o Catragram), então a
+   ordem de exibição mora aqui, à parte: ORDEM_APPS[posição] = app. */
+var ORDEM_APPS = [0, 6, 1, 2, 3, 4, 5, 7];
+function posDoApp(i) { var p = ORDEM_APPS.indexOf(i); return p < 0 ? i : p; }
 function lugarDoApp(i) {
-  return { x: [71, 160, 249][i % 3] - ICONE_APP / 2, y: 206 + Math.floor(i / 3) * 112 };
+  var p = posDoApp(i);
+  return { x: [76, 160, 244][p % 3] - ICONE_APP / 2, y: 198 + Math.floor(p / 3) * 74 };
 }
 var DIAS_SEMANA = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO'];
 
@@ -318,6 +336,11 @@ var ZapScene = new Phaser.Class({
     for (var rm = 0; rm < 44; rm++) this.rotMapa.push(txt(this, 0, 0, '', PAL.cinza, 8).setDepth(2403).setVisible(false));
     this.mapaVista = GameState.explorar ? 'rede' : 'caminho';
     this.mapaZoom = 1; this.mapaPan = { x: 0, y: 0 };
+    /* o joguinho: desenho próprio e uma zona de toque que cobre a tela
+       inteira do aparelho (bater asa é tocar em qualquer lugar) */
+    this.gPombo = this.add.graphics().setDepth(2401);
+    this.zPombo = this.add.zone(ZAP.tx0, ZAP.topo - 8, ZAP.tx1 - ZAP.tx0, ZAP.abas - ZAP.topo + 8).setOrigin(0, 0);
+    this.zPombo.on('pointerdown', function () { if (self.modo === 'app' && self.aba === 7) self._tocouPombo = true; });
     this.gMapa = this.add.graphics().setDepth(2401);
     var mm = this.make.graphics({ add: false });
     mm.fillStyle(0xffffff, 1).fillRect(ZAP.tx0, MAPA_AREA.y0, ZAP.tx1 - ZAP.tx0, MAPA_AREA.y1 - MAPA_AREA.y0);
@@ -494,7 +517,11 @@ var ZapScene = new Phaser.Class({
         else if (c === 'KeyW' || c === 'ArrowUp') d = -3;
         else if (c === 'KeyS' || c === 'ArrowDown') d = 3;
         var nA = APPS_ZAP.length;
-        if (d) { self.selApp = (self.selApp + d + nA * 2) % nA; sfx('catraca'); self.pinta(); return; }
+        if (d) {
+          var pos = (posDoApp(self.selApp) + d + nA * 2) % nA;
+          self.selApp = ORDEM_APPS[pos];
+          sfx('catraca'); self.pinta(); return;
+        }
         if (c === 'Space' || c === 'Enter' || c === 'KeyZ') self.abreApp(self.selApp);
         return;
       }
@@ -521,6 +548,7 @@ var ZapScene = new Phaser.Class({
       if (c === 'KeyW' || c === 'ArrowUp') { self.move(-1); return; }
       if (c === 'KeyS' || c === 'ArrowDown') { self.move(1); return; }
       if (c === 'Space' || c === 'Enter' || c === 'KeyZ') {
+        if (self.aba === 7) { self._tocouPombo = true; return; }
         if (self.fio) self.confirma(); else if (self.aba === 0) self.abre(); else if (self.aba === 4) self.usaItem(self.sel);
       }
     });
@@ -588,6 +616,7 @@ var ZapScene = new Phaser.Class({
     this.aba = i; this.fio = null; this.sel = 0;
     this.modo = 'app';
     if (i === 3) { this.catVista = 'perfil'; this.catRolo = 0; this.catSel = 0; this.catPost = 0; this.catInfo = null; Catragram.marcaVistos(); }
+    if (i === 7) this.comecaPombo(false);
     sfx('ok');
     this.pinta();
   },
@@ -718,6 +747,7 @@ var ZapScene = new Phaser.Class({
     this.zonaVolta.disableInteractive();
     for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false).setCrop(); }
     this.zonaCat.disableInteractive(); this.zonaAbasCat.disableInteractive();
+    if (this.zPombo) { this.zPombo.disableInteractive(); if (this.aba !== 7 && this.gPombo) this.gPombo.clear(); }
     if (this.zonasBolso) for (var zb in this.zonasBolso) this.zonasBolso[zb].disableInteractive();
     for (i = 0; i < this.cartasDex.length; i++) {
       var cc = this.cartasDex[i];
@@ -778,6 +808,8 @@ var ZapScene = new Phaser.Class({
       else if (this.aba === 2) this.pintaGrana(g);
       else if (this.aba === 3) this.pintaCatragram(g);
       else if (this.aba === 4) this.pintaMochila(g);
+      else if (this.aba === 6) this.pintaMissoesApp(g);
+      else if (this.aba === 7) { this.pintaPombo(); this.textosDoPombo(); this.zPombo.setInteractive(); }
       else if (this.dexAberta >= 0) this.pintaFicha(g);
       else this.pintaDex(g);
       this.pintaAbas(g);
@@ -862,6 +894,25 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0x5a3a1e, 1).fillRoundedRect(cx - 10, cy + 2, 20, 14, 4);
       g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy + 6, 4, 3);
       g.fillStyle(0x3a2814, 1).fillRect(cx - 8, cy - 24, 16, 5);
+    } else if (i === 7) {
+      // Pombo: o bicho de perfil, com o bico laranja e o verdinho do pescoço
+      g.fillStyle(0x6a7a8c, 1).fillEllipse(cx - 2, cy + 4, 30, 20);
+      g.fillStyle(0x8a99aa, 1).fillEllipse(cx - 4, cy + 1, 20, 12);
+      g.fillStyle(0x2e3a48, 1).fillCircle(cx + 9, cy - 6, 8);
+      g.fillStyle(0xf2f0ff, 1).fillCircle(cx + 12, cy - 8, 2.5);
+      g.fillStyle(0xe8a33c, 1).fillTriangle(cx + 16, cy - 8, cx + 27, cy - 5, cx + 16, cy - 2);
+      g.fillStyle(0x3fa07d, 0.8).fillCircle(cx + 4, cy - 2, 5);
+      g.fillStyle(0xe8a33c, 1).fillRect(cx - 4, cy + 13, 3, 6).fillRect(cx + 3, cy + 13, 3, 6);
+    } else if (i === 6) {
+      // Missões: a prancheta com três itens e os tiques verdes
+      g.fillStyle(0x6b4226, 1).fillRoundedRect(cx - 18, cy - 24, 36, 48, 4);
+      g.fillStyle(0xf2f0ff, 1).fillRect(cx - 14, cy - 18, 28, 38);
+      g.fillStyle(0x9a9ca4, 1).fillRect(cx - 7, cy - 27, 14, 6);
+      for (var km = 0; km < 3; km++) {
+        var lym = cy - 12 + km * 11;
+        g.fillStyle(km < 2 ? 0x1faa59 : 0xc8c8d4, 1).fillRect(cx - 11, lym, 5, 5);
+        g.fillStyle(0x6a6c78, 1).fillRect(cx - 3, lym + 1, 14, 3);
+      }
     } else {
       /* Catragram: era a câmera de contorno, igualzinha à do Instagram
          ('tem que ser outro, tá igual do insta'). Agora é o que o nome
@@ -1808,7 +1859,7 @@ var ZapScene = new Phaser.Class({
     if (!lista.length) {
       this.linhas[2].setVisible(true).setScale(ESCALA_TEXTO / 2).setPosition(x0 + 10, 336)
         .setText(b === 'notebook' ? 'VAZIO. UM DIA ALGUÉM TE PEDE PRA LEVAR UM.' : 'VAZIO.').setColor(PAL.cinzaEsc);
-      this.tRodape.setText('TOQUE NA MOCHILA PRA ABRIR OUTRO BOLSO');
+      this.tRodape.setText('TOQUE PRA VER O BOLSO');
       return;
     }
     if (this.sel >= lista.length) this.sel = 0;
@@ -1898,6 +1949,76 @@ var ZapScene = new Phaser.Class({
     sfx(r === 'nada' ? 'nao' : 'moeda');
     this.pinta();
     this.tRodape.setText(msg);
+  },
+
+  /* ---------- o app MISSÕES ----------
+     O diário do dia, em três blocos: a PRINCIPAL (com estrela, de quem
+     mandou e o que fazer), as SECUNDÁRIAS e o QUE FALTA NO MUNDO (o que
+     você achou e é de alguém). Embaixo, o que já fechou hoje. Nada aqui
+     dá missão: é só onde olhar quando bater a dúvida de 'e agora?'. */
+  linhasDaMissao: function () {
+    var out = [], st = (typeof Historia !== 'undefined') ? Historia.estado() : null;
+    if (!st) return out;
+    var id;
+    for (id in st.ativas) {
+      var h = HISTORIA[id];
+      if (!h) continue;
+      var m = Historia.missaoDe(id), passos = (m && (m.passos || [m.objetivo])) || [];
+      var passo = (st.ativas[id].passo || 0);
+      out.push({
+        tipo: h.tipo, quem: Historia.contatoDe(h), txt: Historia.ordemDe(m),
+        etapa: passos.length > 1 ? (passo + 1) + ' DE ' + passos.length : ''
+      });
+    }
+    // o que está guardado e é de alguém: terciária em aberto
+    var gu = GameState.guardados || {};
+    for (id in gu) {
+      if (!gu[id] || !GUARDADOS[id] || !GUARDADOS[id].entrega) continue;
+      out.push({ tipo: 'terciaria', quem: 'NO MUNDO', txt: 'DEVOLVER ' + GUARDADOS[id].nome + ' NO ACHADOS E PERDIDOS' });
+    }
+    return out;
+  },
+  pintaMissoesApp: function (g) {
+    var x0 = ZAP.tx0, W = ZAP.tx1 - ZAP.tx0, y = ZAP.topo + 4, i;
+    g.fillStyle(0x14141c, 1).fillRect(x0, ZAP.topo - 8, W, ZAP.abas - ZAP.topo + 8);
+    var lista = this.linhasDaMissao(), n = 0;
+    var tx = function (eu, t, xx, yy, cor, meia, larg) {
+      if (n >= 40) return null;
+      return eu.rotMapa[n++].setVisible(true).setAngle(0).setOrigin(0, 0).setScale(meia ? ESCALA_TEXTO / 2 : ESCALA_TEXTO)
+        .setMaxWidth(larg || 0).setPosition(Math.round(xx), Math.round(yy)).setText(t).setColor(cor);
+    };
+    tx(this, 'DIA ' + (GameState.dia || 1) + ' - ' + (GameState.pernaAtual() ? GameState.pernaAtual().rotulo : ''), x0 + 8, y, PAL.amarelo, true);
+    y += 18;
+    if (!lista.length) {
+      tx(this, 'NADA EM ABERTO AGORA.', x0 + 8, y + 10, PAL.cinza, true);
+      tx(this, 'AS MISSÕES CHEGAM PELO ZIPZAP,', x0 + 8, y + 30, PAL.cinzaEsc, true);
+      tx(this, 'E O QUE VOCÊ ENCONTRA NO CAMINHO', x0 + 8, y + 44, PAL.cinzaEsc, true);
+      tx(this, 'VIRA TAREFA AQUI.', x0 + 8, y + 58, PAL.cinzaEsc, true);
+    }
+    for (i = 0; i < lista.length && i < 6; i++) {
+      var m = lista[i], principal = m.tipo === 'principal';
+      var alt = 52;
+      g.fillStyle(principal ? 0x2a2418 : 0x16161f, 1).fillRect(x0 + 6, y, W - 12, alt);
+      g.fillStyle(principal ? 0xf2c14e : (m.tipo === 'terciaria' ? 0x4fb8ff : 0x7fd6a0), 1).fillRect(x0 + 6, y, 3, alt);
+      tx(this, (principal ? '★ ' : '') + m.quem + (m.etapa ? '   ' + m.etapa : ''), x0 + 16, y + 6, principal ? PAL.amarelo : PAL.cinza, true);
+      tx(this, m.txt, x0 + 16, y + 22, PAL.branco, true, (W - 34) / (ESCALA_TEXTO / 2));
+      y += alt + 6;
+    }
+    // o que fechou hoje
+    var st = (typeof Historia !== 'undefined') ? Historia.estado() : null, feitasHoje = [];
+    if (st) for (var id2 in st.feitas) {
+      if (st.feitas[id2].dia !== (GameState.dia || 1) || !HISTORIA[id2]) continue;
+      feitasHoje.push({ ok: st.feitas[id2].ok, quem: Historia.contatoDe(HISTORIA[id2]) });
+    }
+    if (feitasHoje.length) {
+      y = Math.max(y, ZAP.abas - 24 - feitasHoje.length * 14);
+      tx(this, 'HOJE:', x0 + 8, y, PAL.cinzaEsc, true);
+      for (i = 0; i < feitasHoje.length && i < 4; i++) {
+        tx(this, (feitasHoje[i].ok ? '✓ ' : 'X ') + feitasHoje[i].quem, x0 + 44, y + i * 14,
+          feitasHoje[i].ok ? PAL.verde : PAL.vermelho, true);
+      }
+    }
+    this.tRodape.setText('MISSÃO VEM NO ZIPZAP');
   },
 
   /* ---------- o app da METRODEX ----------
@@ -2213,6 +2334,8 @@ var ZapScene = new Phaser.Class({
       GameState.bateria = Math.max(0, GameState.bateria - dt / 3000);
       if (GameState.bateria <= 0) { sfx('nao'); this.fecha(); return; }
     }
+    // o joguinho anda sozinho, quadro a quadro, sem repintar a tela toda
+    if (this.modo === 'app' && this.aba === 7) { this.rodaPombo(dt); this.textosDoPombo(); }
     if (this.buscaAtiva && this.aba === 5 && time - (this._tCursor || 0) > 500) { this._tCursor = time; this.pinta(); }
     // o nome comprido das cartas da METRODEX roda da direita pra esquerda
     if (this.modo === 'app' && this.aba === 5 && this.cartasDex) {

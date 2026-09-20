@@ -1332,6 +1332,8 @@ var VagaoScene = new Phaser.Class({
       sfx('empurra');
       // solto em pé: o pêndulo do equilíbrio (abaixo) abre junto com o aviso
       if (!this.segurando && !this.sentadoEm && !this.noChao && !this.cochilando() && !temPoder('cadeira')) {
+        // 'tem que durar mais o equilíbrio': o aviso estica pra dar tempo de mirar
+        tr.dur = Math.max(tr.dur, 3200);
         this.abreEquilibrio(tr.dur);
       }
       return;
