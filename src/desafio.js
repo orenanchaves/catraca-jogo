@@ -500,6 +500,10 @@ var DesafioScene = new Phaser.Class({
     contaDuelo(this.dados.tipo);
     var tm = TEMA_DSF[this.dados.tipo] || ['temaChato', 0];
     tocaJingle(tm[0], tm[1]);
+    /* e a TRILHA do duelo inteiro muda junto: a família dá tom, andamento
+       e timbre; o rival dá a transposição (core.js, defineTrilhaDaLuta) */
+    defineTrilhaDaLuta(tm[0].replace('tema', '').toLowerCase(), tm[1]);
+    this.events.once('shutdown', function () { zeraTrilhaDaLuta(); });
     // as quatro respostas: as de sempre, ou as que a cena mandou (o EXTRATO do honesto contra o fiscal)
     this.resps = this.dados.respostas || RESPOSTAS;
     marcaDex(this.dados.dexId || this.dados.tipo, 1);

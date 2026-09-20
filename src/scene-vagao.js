@@ -2488,7 +2488,11 @@ var VagaoScene = new Phaser.Class({
         eu.levanta();
       });
     }
-    var mostra = !!this.sentadoEm && !this.dialog;
+    /* Ele some no meio de qualquer outra coisa: na batalha de rima ele
+       ficava em cima das pistas ('o levantar atrapalha o jogo com
+       rimador'), e o mesmo valeria pra abordagem, a fuga e a ronda. */
+    var mostra = !!this.sentadoEm && !this.dialog && !this.batalha && !this.abordagem &&
+      !this.encontro && !this.fuga && !this.lugar && !this.disfarce && !this.duelando;
     this.gLevanta.setVisible(mostra).clear();
     this.tLevanta.setVisible(mostra);
     if (mostra) this.zLevanta.setInteractive(); else this.zLevanta.disableInteractive();

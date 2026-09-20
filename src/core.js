@@ -2569,21 +2569,50 @@ var LUTA_ACORDES = [
   [45, [57, 60, 64]], [45, [57, 60, 64]], [41, [57, 60, 65]], [40, [56, 59, 64]]
 ];
 var LUTA_BAIXO = [0, 12, 0, 12, 0, 12, 0, 12];
+
+/* ---------- a trilha muda com quem está na sua frente ----------
+   'Precisa de músicas diferentes pra cada tipo de oponente.' A melodia é
+   a mesma, mas ela é tocada em outro TOM, noutro ANDAMENTO e com outro
+   TIMBRE conforme a família do adversário — e cada rival ainda leva a
+   transposição dele por cima (desafio.js, TEMA_DSF). O chato é arrastado
+   e mole; a torcida é rápida e quadrada; o guarda é grave e áspero; o
+   cosplay é agudo e corrido; o chefão é grave, lento e pesado.
+   `defineTrilhaDaLuta` é chamada quando o duelo abre, e zerada quando
+   ele fecha. */
+var LUTA_TOM = 0, LUTA_RITMO = 1, LUTA_ONDA = 'square', LUTA_PESO = false;
+var TRILHAS_LUTA = {
+  chato: { tom: 0, ritmo: 1.14, onda: 'triangle' },
+  torcida: { tom: 2, ritmo: 0.88, onda: 'square' },
+  guarda: { tom: -5, ritmo: 1.0, onda: 'sawtooth' },
+  cosplay: { tom: 7, ritmo: 0.8, onda: 'square' },
+  chefao: { tom: -7, ritmo: 0.96, onda: 'sawtooth', peso: true }
+};
+function defineTrilhaDaLuta(familia, semi) {
+  var t = TRILHAS_LUTA[familia] || TRILHAS_LUTA.chato;
+  LUTA_TOM = t.tom + (semi || 0);
+  LUTA_RITMO = t.ritmo;
+  LUTA_ONDA = t.onda;
+  LUTA_PESO = !!t.peso;
+  _musPasso = 0;               // a trilha nova começa do começo da frase
+}
+function zeraTrilhaDaLuta() { LUTA_TOM = 0; LUTA_RITMO = 1; LUTA_ONDA = 'square'; LUTA_PESO = false; }
+function lutaColcheia() { return LUTA_COLCHEIA * LUTA_RITMO; }
+
 function tocaPassoLuta(i, t) {
-  var c = LUTA_COLCHEIA, n = LUTA_MELODIA.length;
+  var c = lutaColcheia(), n = LUTA_MELODIA.length;
   var pc = i % 8, acorde = LUTA_ACORDES[Math.floor(i / 8) % LUTA_ACORDES.length];
   var m = LUTA_MELODIA[i % n];
   if (m > 0) {
     var seg = 1;
     while (LUTA_MELODIA[(i + seg) % n] === -1) seg++;
-    notaEm(t, m, c * seg * 0.92, 'square', 0.012);
+    notaEm(t, m + LUTA_TOM, c * seg * 0.92, LUTA_ONDA, LUTA_ONDA === 'sawtooth' ? 0.009 : 0.012);
   }
-  var b = acorde[0] + LUTA_BAIXO[pc];
-  notaEm(t, b, c * 0.7, 'triangle', 0.032);
+  var b = acorde[0] + LUTA_BAIXO[pc] + LUTA_TOM;
+  notaEm(t, b, c * 0.7, 'triangle', LUTA_PESO ? 0.046 : 0.032);
   notaEm(t, b + 12, c * 0.5, 'square', 0.004);
   var tri = acorde[1], ordem = [0, 1, 2, 1], k = (i * 2) % 4;
-  notaEm(t, tri[ordem[k]] + 12, c * 0.4, 'square', 0.003);
-  notaEm(t + c / 2, tri[ordem[k + 1]] + 12, c * 0.4, 'square', 0.003);
+  notaEm(t, tri[ordem[k]] + 12 + LUTA_TOM, c * 0.4, 'square', 0.003);
+  notaEm(t + c / 2, tri[ordem[k + 1]] + 12 + LUTA_TOM, c * 0.4, 'square', 0.003);
   var atraso = Math.max(0, t - AC.currentTime);
   if (pc === 0 || pc === 3 || pc === 4) bumboEm(t);
   if (pc === 2 || pc === 6) ruido(0.10, 0.014, 2000, 1500, 0.8, 'bandpass', atraso);
@@ -2747,6 +2776,7 @@ function agendaMusica() {
      desliga. Um `setInterval` continua rodando em aba de fundo — so
      mais devagar — entao ele e o ultimo lugar em que da pra checar. */
   if (document.hidden) { paraMusica(); suspendeAudio(); return; }
+  if (jogoPausado()) return;
   if (AC.state !== 'running') return;
   // ficou pra trás (contexto suspenso, aba voltando): retoma do agora, sem rajada
   if (_musProx < AC.currentTime) _musProx = AC.currentTime + 0.05;
@@ -2756,7 +2786,7 @@ function agendaMusica() {
   if ((modo === 'musica' || modo === 'luta' || modo === 'boombap') && _musModo !== modo) _musPasso = 0;
   _musModo = modo;
   var luta = (modo === 'luta'), rap = (modo === 'boombap');
-  var passo = rap ? BOOMBAP_PASSO : (luta ? LUTA_COLCHEIA : MUS_COLCHEIA);
+  var passo = rap ? BOOMBAP_PASSO : (luta ? lutaColcheia() : MUS_COLCHEIA);
   var volta = rap ? 32 : (luta ? LUTA_MELODIA.length : MUS_MELODIA.length);
   while (_musProx < AC.currentTime + 0.15) {
     // durante a vinheta a trilha anda calada, e volta do começo da frase depois
@@ -3005,6 +3035,48 @@ function gritaAmbulante(modo) {
    rima, com o som desligado e com a aba escondida. */
 var AUDIO_AMBIENTE = 'assets/audio/ambiente_transporte.mp3';
 var _audAmbiente = null;
+/* As gravações que estão tocando agora (o ambiente e o trem chegando).
+   Sem uma lista não dá pra calar tudo de uma vez quando o jogo pausa. */
+var _gravacoes = [];
+function guardaGravacao(a) {
+  if (!a) return a;
+  _gravacoes.push(a);
+  a.addEventListener('ended', function () {
+    var i = _gravacoes.indexOf(a);
+    if (i >= 0) _gravacoes.splice(i, 1);
+  }, { once: true });
+  return a;
+}
+
+/* ---------- pausou, calou ----------
+   'Quando pausa, tem que pausar o som também.' O relógio da música e o
+   das gravações são próprios (setInterval), e continuavam rodando com o
+   jogo congelado: a pausa ficava com o trem passando por trás. */
+function jogoPausado() {
+  var m = window.jogo && jogo.scene;
+  return !!(m && m.isActive('Pausa'));
+}
+function calaTudoNaPausa() {
+  paraMusica();
+  calaAnuncio();
+  for (var i = 0; i < _gravacoes.length; i++) {
+    try { if (!_gravacoes[i].paused) { _gravacoes[i]._pausadoPelaPausa = true; _gravacoes[i].pause(); } } catch (e) { }
+  }
+  if (_audAmbiente && !_audAmbiente.paused) { try { _audAmbiente._pausadoPelaPausa = true; _audAmbiente.pause(); } catch (e) { } }
+}
+function voltaSomDaPausa() {
+  for (var i = 0; i < _gravacoes.length; i++) {
+    var a = _gravacoes[i];
+    if (!a._pausadoPelaPausa) continue;
+    a._pausadoPelaPausa = false;
+    try { var pr = a.play(); if (pr && pr.catch) pr.catch(function () { }); } catch (e) { }
+  }
+  if (_audAmbiente && _audAmbiente._pausadoPelaPausa) {
+    _audAmbiente._pausadoPelaPausa = false;
+    try { var pa = _audAmbiente.play(); if (pa && pa.catch) pa.catch(function () { }); } catch (e) { }
+  }
+  if (MUSICA_LIGADA && SOM_LIGADO) comecaMusica();
+}
 /* 'Tem que ser barulho de pessoas falando no mezanino; só na plataforma
    tem que ter barulho de metrô.' A gravação de metrô toca no vagão e na
    plataforma; no saguão ela some aos poucos e fica só o burburinho de
@@ -3013,6 +3085,7 @@ var _audAmbiente = null;
 var _volAmbiente = 0;
 function ambienteGravado() {
   var modo = modoDoSom(), alvo = 0;
+  if (jogoPausado()) return;          // pausado, o mundo cala (calaTudoNaPausa)
   if (SOM_LIGADO && !document.hidden) {
     if (modo === 'vagao') alvo = 0.42;
     else if (modo === 'estacao') {
@@ -3072,7 +3145,7 @@ function tocaTremChegando(cena, vel, resta) {
     var pr = a.play();
     if (pr && pr.catch) pr.catch(function () { sfx('trem'); });
     if (cena && cena.events) cena.events.once('shutdown', function () { try { a.pause(); } catch (e) { } });
-    return a;
+    return guardaGravacao(a);
   } catch (e) { sfx('trem'); }
   return null;
 }

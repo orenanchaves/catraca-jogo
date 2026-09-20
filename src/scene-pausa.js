@@ -28,6 +28,9 @@ var PausaScene = new Phaser.Class({
     var self = this;
     this.sel = 0;
     this.congeladas = [];
+    // pausou, calou: a música, o ambiente, o trem e a voz do anúncio
+    calaTudoNaPausa();
+    this.events.once('shutdown', function () { voltaSomDaPausa(); });
 
     // congela tudo que estava rodando, menos o HUD e esta cena
     this.scene.manager.getScenes(true).forEach(function (sc) {

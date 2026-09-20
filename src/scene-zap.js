@@ -863,12 +863,21 @@ var ZapScene = new Phaser.Class({
       g.fillStyle(0xf2c14e, 1).fillRect(cx - 2, cy + 6, 4, 3);
       g.fillStyle(0x3a2814, 1).fillRect(cx - 8, cy - 24, 16, 5);
     } else {
-      // Catragram: o brilho laranja no canto, e a câmera de contorno branco
-      g.fillStyle(0xf2a03c, 0.85).fillCircle(cx - 14, cy + 14, 14);
-      g.fillStyle(0xf7c04a, 0.7).fillCircle(cx - 18, cy + 18, 8);
-      g.lineStyle(4, 0xffffff, 1).strokeRoundedRect(cx - 17, cy - 17, 34, 34, 10);
-      g.lineStyle(4, 0xffffff, 1).strokeCircle(cx, cy, 8);
-      g.fillStyle(0xffffff, 1).fillCircle(cx + 10, cy - 10, 2.5);
+      /* Catragram: era a câmera de contorno, igualzinha à do Instagram
+         ('tem que ser outro, tá igual do insta'). Agora é o que o nome
+         diz: a CATRACA dentro da lente. O aro branco, os três braços do
+         torniquete no meio, e o pontinho de luz em cima. */
+      g.fillStyle(0x8a1f4e, 1).fillCircle(cx, cy, 22);
+      g.fillStyle(0xf2a03c, 0.9).fillCircle(cx - 13, cy + 13, 9);
+      g.lineStyle(4, 0xffffff, 1).strokeCircle(cx, cy, 16);
+      g.fillStyle(0xffffff, 1).fillCircle(cx, cy, 4);
+      for (var br = 0; br < 3; br++) {
+        var an = -Math.PI / 2 + br * (Math.PI * 2 / 3);
+        g.lineStyle(4, 0xffffff, 1);
+        g.lineBetween(cx + Math.cos(an) * 3, cy + Math.sin(an) * 3,
+          cx + Math.cos(an) * 14, cy + Math.sin(an) * 14);
+      }
+      g.fillStyle(0xffe9a8, 1).fillCircle(cx + 12, cy - 12, 2.5);
     }
   },
 
