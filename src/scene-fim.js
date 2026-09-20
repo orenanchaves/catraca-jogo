@@ -44,6 +44,10 @@ var FimScene = new Phaser.Class({
     this.congeladas = (dados && dados.congeladas) || [];
     this.saindo = false;
     this.bal = (dados && dados.balanco) || null;
+    /* 'temporada' abre a MESMA tela em modo de leitura, sem balanço: é o
+       atalho do título, pra olhar a campanha e repetir uma fase sem
+       precisar terminar um dia primeiro. */
+    this.vista = (dados && dados.vista) || null;
     this.escolhida = 0;      // a fase marcada na linha do tempo (0 = nenhuma)
   },
 
@@ -51,9 +55,10 @@ var FimScene = new Phaser.Class({
     Ctrl.liga(this);
     // no resultado o direcional não leva a lugar nenhum: toque em qualquer lugar age
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = false;
-    var b = this.bal, bom = !!(b && b.bom);
-    sfx(bom ? 'vitoria' : 'fim');
-    var corN = bom ? 0x1faa59 : 0xe8362c, corT = bom ? PAL.verde : PAL.vermelho;
+    var b = this.bal, so = this.vista === 'temporada', bom = so || !!(b && b.bom);
+    sfx(so ? 'ok' : (bom ? 'vitoria' : 'fim'));
+    var corN = so ? 0xf2c14e : (bom ? 0x1faa59 : 0xe8362c);
+    var corT = so ? PAL.amarelo : (bom ? PAL.verde : PAL.vermelho);
     var g = this.add.graphics();
     /* Escuro, não opaco: o lugar onde a fase acabou continua atrás,
        parado. Sem isso a tela é um número sem endereço. */
@@ -66,15 +71,17 @@ var FimScene = new Phaser.Class({
     g.fillStyle(0x06060c, 1).fillRect(0, 52, GW, 72);
     g.fillStyle(corN, 1).fillRect(0, 52, GW, 5);
     g.fillStyle(corN, 1).fillRect(0, 119, GW, 5);
-    txtC(this, GW / 2, 68, bom ? 'FASE CUMPRIDA' : 'FIM DE LINHA', corT, 16);
+    txtC(this, GW / 2, 68, so ? 'A TEMPORADA' : (bom ? 'FASE CUMPRIDA' : 'FIM DE LINHA'), corT, 16);
 
     var n = (b && b.dia) || GameState.dia || 1;
     var nome = (typeof nomeDaFase === 'function') ? nomeDaFase(GameState.charKey, n) : ('DIA ' + n);
-    txtC(this, GW / 2, 104, nome, PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
+    txtC(this, GW / 2, 104, so ? (GameState.nome || '') : nome, PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
 
-    var recado = bom
-      ? ((typeof faseDe === 'function' && faseDe(GameState.charKey, n)) ? faseDe(GameState.charKey, n).premissa : 'Você chegou em casa.')
-      : (GameState.motivoFim || 'A cidade venceu hoje.');
+    var recado = so
+      ? 'Toque numa fase pra repetir. O que veio depois dela se desfaz.'
+      : (bom
+        ? ((typeof faseDe === 'function' && faseDe(GameState.charKey, n)) ? faseDe(GameState.charKey, n).premissa : 'Você chegou em casa.')
+        : (GameState.motivoFim || 'A cidade venceu hoje.'));
     /* BitmapText quebra linha por `setMaxWidth`, nunca por
        `setWordWrapWidth` — com o segundo a frase saía numa linha só,
        cortada nas duas pontas. E a medida é em unidade de fonte, antes
@@ -84,7 +91,9 @@ var FimScene = new Phaser.Class({
     txtC(this, GW / 2, 134, recado, PAL.cinza, 8)
       .setScale(ESCALA_TEXTO / 2).setMaxWidth(GW - 48).setAlign('center');
 
-    if (b) this.pintaBalanco(g, b, corN); else this.pintaPlacarAntigo(g);
+    if (so) this.pintaListaDeFases();
+    else if (b) this.pintaBalanco(g, b, corN);
+    else this.pintaPlacarAntigo(g);
     this.pintaLinhaDoTempo();
     this.montaBotoes(bom);
   },
@@ -117,6 +126,58 @@ var FimScene = new Phaser.Class({
       .setScale(ESCALA_TEXTO / 2);
   },
 
+  /* ---------- a temporada por extenso ----------
+     As pastilhas dizem a nota; esta lista diz o NOME, que é o que faz a
+     fileira virar a história do personagem em vez de um calendário. */
+  pintaListaDeFases: function () {
+    /* A temporada inteira, uma fase por linha, e cada linha se toca. É a
+       tela de ESCOLHER fase: 'não tô conseguindo jogar as missões de
+       forma separada'. Mostra também a que você ainda não alcançou, que é
+       o que faz a lista ser um caminho e não um extrato.
+
+       Quatro estados, e cada um diz o que dá pra fazer:
+         ▶ atual     — a fase de agora; o botão joga ela
+         ✓ feita     — já fechada, com nota; tocar repete
+           pulada    — passou sem nota (caiu, ou save antigo sem foto)
+           trancada  — a história ainda não chegou; não abre */
+    var temporada = (typeof temporadaDe === 'function') ? temporadaDe(GameState.charKey) : [];
+    var feitas = {}, i;
+    if (typeof Diario !== 'undefined') {
+      var l = Diario.lista();
+      for (i = 0; i < l.length; i++) feitas[l[i].n] = l[i];
+    }
+    var atual = GameState.dia || 1;
+    var quantas = Math.max(temporada.length, atual);
+    var y0 = 170, alt = 26, eu = this, g = this.add.graphics().setDepth(1);
+    this.zonasFase = [];
+    for (i = 1; i <= quantas && i <= 10; i++) {
+      var y = y0 + (i - 1) * alt, d = feitas[i];
+      var estado = (i === atual) ? 'atual'
+        : (d && d.nota ? 'feita' : (i < atual ? 'pulada' : 'trancada'));
+      var podeIr = estado !== 'trancada';
+      var nomeF = (typeof nomeDaFase === 'function') ? nomeDaFase(GameState.charKey, i) : ('FASE ' + i);
+      if (estado === 'trancada') nomeF = '- - -';
+      g.fillStyle(estado === 'atual' ? 0x2a2418 : 0x11111c, 1).fillRect(20, y, GW - 40, alt - 4);
+      g.fillStyle(estado === 'atual' ? 0xf2c14e : (estado === 'feita' ? 0x1faa59 : 0x2a2a3a), 1)
+        .fillRect(20, y, 3, alt - 4);
+      txt(this, 30, y + 5, String(i), estado === 'atual' ? PAL.amarelo : PAL.cinzaEsc, 8)
+        .setScale(ESCALA_TEXTO / 2).setDepth(2);
+      txt(this, 46, y + 5, nomeF,
+        estado === 'atual' ? PAL.branco : (podeIr ? PAL.cinza : PAL.cinzaEsc), 8)
+        .setScale(ESCALA_TEXTO / 2).setDepth(2).setMaxWidth(GW - 100);
+      txt(this, GW - 30, y + 3, (d && d.nota) || (estado === 'atual' ? '►' : '-'),
+        (d && d.nota) ? PAL.verde : PAL.cinzaEsc, 8).setOrigin(1, 0).setDepth(2);
+      var z = this.add.zone(20, y, GW - 40, alt - 4).setOrigin(0, 0).setInteractive();
+      (function (num, pode) {
+        z.on('pointerdown', function () { eu.marca(pode ? num : 0, !pode); });
+      })(i, podeIr);
+      this.zonasFase.push(z);
+    }
+    this.gFases = g;
+    this.tPreco = txtC(this, GW / 2, y0 + Math.min(quantas, 10) * alt + 6, '', PAL.cinzaEsc, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(2);
+  },
+
   /* sem balanço (partida de treino, save antigo): o placar de sempre */
   pintaPlacarAntigo: function (g) {
     var dias = GameState.diasInteiros();
@@ -133,7 +194,7 @@ var FimScene = new Phaser.Class({
      REPETIR — marcar não faz nada sozinho, justamente porque repetir
      desfaz o que veio depois. */
   pintaLinhaDoTempo: function () {
-    if (typeof Diario === 'undefined') return;
+    if (typeof Diario === 'undefined' || this.vista === 'temporada') return;
     var lista = Diario.lista();
     if (!lista.length) return;
     // só as últimas oito: a fase da vez é sempre a que tem que aparecer
@@ -164,18 +225,25 @@ var FimScene = new Phaser.Class({
       .setScale(ESCALA_TEXTO / 2).setDepth(2);
   },
 
-  marca: function (n) {
+  marca: function (n, trancada) {
     if (this.saindo || typeof Diario === 'undefined') return;
-    if (!Diario.podeRepetir(n)) {
+    if (trancada) {
+      this.tPreco.setText('A HISTÓRIA AINDA NÃO CHEGOU AQUI').setColor(PAL.cinzaEsc);
+      return;
+    }
+    var atual = (GameState.dia || 1);
+    // a fase de agora não precisa de foto: ela já é o estado do jogo
+    if (n !== atual && !Diario.podeRepetir(n)) {
       this.tPreco.setText('FASE SEM REGISTRO: NÃO DÁ PRA VOLTAR').setColor(PAL.cinzaEsc);
       return;
     }
     this.escolhida = (this.escolhida === n) ? 0 : n;
     sfx('catraca');
-    var q = this.escolhida ? Diario.quantosDesfaz(this.escolhida) : 0;
+    var q = (this.escolhida && this.escolhida !== atual) ? Diario.quantosDesfaz(this.escolhida) : 0;
     this.tPreco.setText(!this.escolhida ? ''
-      : (q ? 'REPETIR A ' + this.escolhida + ' DESFAZ ' + q + (q > 1 ? ' FASES' : ' FASE')
-        : 'REPETIR A FASE ' + this.escolhida)).setColor(q ? PAL.vermelho : PAL.cinza);
+      : (q ? 'VOLTAR PRA ' + this.escolhida + ' DESFAZ ' + q + (q > 1 ? ' FASES' : ' FASE')
+        : (this.escolhida === atual ? 'A FASE DE AGORA' : 'REPETIR A FASE ' + this.escolhida)))
+      .setColor(q ? PAL.vermelho : PAL.cinza);
     this.pintaBotaoGrande();
   },
 
@@ -203,12 +271,17 @@ var FimScene = new Phaser.Class({
     ladrilho(g, FIM_BOT.xDir, FIM_BOT.y, FIM_BOT.pq, FIM_BOT.h, 0x1b2438, 0x2b3a58, 0x3d5180);
     /* 'REPETIR A 2' tem 13 caracteres e o ladrilho tem 146 pixels: a 12
        por letra são 156, e o texto encostava no TROCAR do lado. */
-    this.tGr.setText(repetir ? '► REPETIR ' + this.escolhida : (this.bom ? '► CONTINUAR' : '► DE NOVO'))
-      .setColor(repetir ? PAL.amarelo : PAL.verde);
+    var atual = this.escolhida === (GameState.dia || 1);
+    this.tGr.setText(repetir
+      ? (atual ? '► JOGAR A ' + this.escolhida : '► VOLTAR PRA ' + this.escolhida)
+      : (this.bom ? '► CONTINUAR' : '► DE NOVO'))
+      .setColor(repetir && !atual ? PAL.amarelo : PAL.verde);
   },
 
   grande: function () {
-    if (this.escolhida) this.repete(this.escolhida);
+    // a fase de agora se joga direto; qualquer outra passa pelo diário
+    if (this.escolhida && this.escolhida === (GameState.dia || 1)) this.continua();
+    else if (this.escolhida) this.repete(this.escolhida);
     else if (this.bom) this.continua();
     else this.deNovo();
   },

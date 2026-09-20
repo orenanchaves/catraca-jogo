@@ -472,14 +472,25 @@ var TitleScene = new Phaser.Class({
        ou se começa a campanha de novo, do dia 1 (src/campanha.js). */
     var salvo = !explorar && Campanha.tem(k);
     if (salvo) {
-      fala(this, 'Você parou no DIA ' + salvo.dia + ',\nem ' + placaDe(salvo.origem) + '.', [
-        { label: 'Continuar do dia ' + salvo.dia, cb: function () {
-          GameState.init(k, salvo.genero);
-          GameState.explorar = false;
-          Campanha.aplica(salvo);
+      /* Três saídas, e a do meio é a linha do tempo ('a timeline na
+         entrada'): olhar a temporada e repetir uma fase sem precisar
+         terminar um dia antes. Ela precisa do save APLICADO antes de
+         abrir, senão o diário não sabe de quem é a temporada. */
+      var retoma = function () {
+        GameState.init(k, salvo.genero);
+        GameState.explorar = false;
+        Campanha.aplica(salvo);
+      };
+      fala(this, 'Você parou na FASE ' + salvo.dia + ',\nem ' + placaDe(salvo.origem) + '.', [
+        { label: 'Continuar a fase ' + salvo.dia, cb: function () {
+          retoma();
           eu.scene.start('Estacao', { onde: 'saguao' });
         } },
-        { label: 'Começar do dia 1', cb: function () { Campanha.apaga(); eu.saindo = false; eu.comeca(false); } }
+        { label: 'Ver a temporada', cb: function () {
+          retoma();
+          eu.scene.start('Fim', { vista: 'temporada' });
+        } },
+        { label: 'Começar do começo', cb: function () { Campanha.apaga(); eu.saindo = false; eu.comeca(false); } }
       ]);
       return;
     }
