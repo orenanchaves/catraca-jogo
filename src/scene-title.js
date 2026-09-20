@@ -4,7 +4,40 @@
 /* As duas abas de gênero, medidas juntas: 'MULHER' tem 6 letras a 12
    pixels, e a aba precisa caber a palavra com folga de dedo dos dois
    lados. */
-var GEN_ABA = { w: 88, h: 24 };
+/* ---------- a regra de cor do título ----------
+   'Ainda tá muita coisa, muita cor. Talvez dá pra deixar mais
+   monocromático. A cor é mais importante ali pra linha que começa. E o
+   jogar.' Então: a tela é cinza e branco, e COR só em dois lugares, que
+   são os dois que significam alguma coisa — a tarja da linha na placa da
+   estação de casa (vermelha ou azul, é informação) e o ladrilho do JOGAR
+   (verde, é a ação). O que era amarelo, laranja e verde virou cinza: cor
+   em oito lugares não destaca nenhum. */
+var TIT_CINZA = 0x8a8fa3;
+
+/* Um botão só pro gênero, com o SÍMBOLO no lugar da palavra: duas abas
+   com HOMEM e MULHER eram duas palavras grandes no meio da tela pra uma
+   escolha de dois estados que não muda regra nenhuma, só a estética do
+   boneco. 54x26 é o tamanho do dedo com o símbolo folgado dentro. */
+var GEN_ABA = { w: 54, h: 26 };
+
+/* O símbolo é desenhado e não escrito: o CHARSET da fonte não tem as duas
+   figuras, e caractere fora da lista vira buraco silencioso. Círculo com
+   haste: cruz embaixo pro feminino, flecha pra cima e pra direita no
+   masculino. O centro do CÍRCULO desce um pouco no feminino e sobe no
+   masculino, senão o conjunto fica torto dentro do botão. */
+function simboloGenero(g, cx, cy, gen, cor) {
+  var r = 5;
+  g.lineStyle(2, cor, 1);
+  if (gen === 'f') {
+    g.strokeCircle(cx, cy - 3, r);
+    g.beginPath(); g.moveTo(cx, cy + 2); g.lineTo(cx, cy + 10); g.strokePath();
+    g.beginPath(); g.moveTo(cx - 4, cy + 6); g.lineTo(cx + 4, cy + 6); g.strokePath();
+  } else {
+    g.strokeCircle(cx - 2, cy + 3, r);
+    g.beginPath(); g.moveTo(cx + 2, cy - 1); g.lineTo(cx + 8, cy - 7); g.strokePath();
+    g.beginPath(); g.moveTo(cx + 3, cy - 7); g.lineTo(cx + 8, cy - 7); g.lineTo(cx + 8, cy - 2); g.strokePath();
+  }
+}
 
 /* ---------- a tela, de cima pra baixo ----------
    Era uma pilha: seis cartas, nome, gênero, poder, descrição, uma ficha
@@ -85,11 +118,22 @@ var TitleScene = new Phaser.Class({
     g.fillStyle(0xe8362c, 1).fillRect(0, y + h - 5, GW, 5);
     txtC(this, GW / 2, y + 2, 'CATRACA', PAL.branco, 16);
 
-    /* o recorde à esquerda e os pontos à direita, com a moeda do vagão */
-    this.tTopo = txt(this, 12, TIT.topoY, '', PAL.cinzaEsc, 8);
+    /* ---------- a régua de tamanhos ----------
+       'Muitos textos com tamanhos diferentes nesse menu inicial.' Eram só
+       três tamanhos, e esse era o problema: quase tudo estava no MESMO
+       (o 8 cheio), então nada se lia primeiro. A régua agora tem papel:
+
+         16 cheio ... identidade (CATRACA, o nome do personagem)
+         8 cheio .... o que se APERTA e os valores da ficha
+         8 meio ..... rótulo, nota e placar
+
+       O recorde e as moedas desceram pro meio: não decidem nada na hora
+       de escolher quem jogar, e no cheio disputavam com o JOGAR. */
+    this.tTopo = txt(this, 12, TIT.topoY + 4, '', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
     texturasDoChao(this);
-    this.add.image(GW - 70, TIT.topoY + 11, 'caido_moeda').setDepth(1);
-    this.tPontos = txt(this, GW - 12, TIT.topoY, '', PAL.amarelo, 8).setOrigin(1, 0);
+    this.add.image(GW - 62, TIT.topoY + 9, 'caido_moeda').setDepth(1).setScale(0.8);
+    this.tPontos = txt(this, GW - 12, TIT.topoY + 4, '', PAL.cinza, 8)
+      .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2);
 
     /* ---------- o palco ----------
        Um boneco só, grande. A luz no chão é o que o põe num lugar; o
@@ -126,25 +170,19 @@ var TitleScene = new Phaser.Class({
        pra ter ar entre ela e a linha do recorde. */
     this.gCasa = this.add.graphics().setDepth(1);
     this.tCasa = txtC(this, GW / 2, 96, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
-    this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.amarelo, 16);
+    this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.branco, 16);
 
-    /* ---------- o gênero ----------
-       As duas opções lado a lado, com a escolhida acesa: ver as duas é o
-       que diz que há escolha. No teclado a tecla é G. A gestante mostra
-       só a dela, apagada e sem toque: o verbo dela é estar grávida. */
+    /* ---------- o gênero, num botão que alterna ----------
+       No teclado continua sendo a tecla G. A gestante mostra o dela
+       apagado e sem toque: o verbo dela é estar grávida. */
     this.gCards = this.add.graphics().setDepth(1);
     this.genY = TIT.genY;
-    this.tGen = [
-      txtC(this, GW / 2 - GEN_ABA.w / 2, TIT.genY + 5, 'HOMEM', PAL.cinza, 8).setDepth(3),
-      txtC(this, GW / 2 + GEN_ABA.w / 2, TIT.genY + 5, 'MULHER', PAL.cinza, 8).setDepth(3)
-    ];
-    this.zonaGen = [];
-    for (i = 0; i < 2; i++) {
-      var zg = this.add.zone(GW / 2 - GEN_ABA.w + i * GEN_ABA.w, this.genY, GEN_ABA.w, GEN_ABA.h)
-        .setOrigin(0, 0).setInteractive();
-      (function (gg) { zg.on('pointerdown', function () { eu.poeGenero(gg); }); })(i ? 'f' : 'm');
-      this.zonaGen.push(zg);
-    }
+    this.zonaGen = this.add.zone(GW / 2 - GEN_ABA.w / 2, this.genY, GEN_ABA.w, GEN_ABA.h)
+      .setOrigin(0, 0).setInteractive();
+    this.zonaGen.on('pointerdown', function () {
+      var kk = eu.ordem[eu.sel];
+      if (generosDe(kk).length > 1) eu.poeGenero(outroGenero(kk, eu.gen[kk]));
+    });
 
     /* ---------- o time ----------
        Só pro torcedor: quatro botões com a cor da camisa e o apelido do
@@ -162,7 +200,7 @@ var TitleScene = new Phaser.Class({
     this.teclaT = this.input.keyboard.addKey('T');
 
     // o verbo que só este personagem tem, e como ele funciona
-    this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.verde, 8);
+    this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.branco, 8);
     /* A explicação do verbo tinha o mesmo corpo do verbo, e duas linhas
        do mesmo tamanho brigam em vez de se completarem: o verde é a
        coisa, o cinza é a nota de rodapé dela. Em meia escala a nota cabe
@@ -197,7 +235,7 @@ var TitleScene = new Phaser.Class({
     this.tTut = txtC(this, BOT.x0 + BOT.tut / 2, BOT.y + 8, '?', PAL.branco, 8).setDepth(3);
     this.tTre = txtC(this, BOT.xTre + BOT.tre / 2, BOT.y + 8, 'TREINO', PAL.branco, 8).setDepth(3);
     this.tSom = txtC(this, BOT.xDir + BOT.som / 2, BOT.y + 8, 'SOM', PAL.branco, 8).setDepth(3);
-    this.tExp = txtC(this, BOT.xExp + BOT.exp / 2, BOT.y + 8, 'EXPLORAR', PAL.verde, 8).setDepth(3);
+    this.tExp = txtC(this, BOT.xExp + BOT.exp / 2, BOT.y + 8, 'EXPLORAR', PAL.cinza, 8).setDepth(3);
     this.zonaExp = this.add.zone(BOT.xExp, BOT.y, BOT.exp, BOT.h).setOrigin(0, 0).setInteractive();
     this.zonaExp.on('pointerdown', function () { eu.ignoraAct = true; eu.comeca(true); });
 
@@ -318,7 +356,7 @@ var TitleScene = new Phaser.Class({
 
     // o palco: a luz no chão e o boneco, ou a silhueta dele com o cadeado
     var gp = this.gPalco; gp.clear();
-    gp.fillStyle(0xf2c14e, aberto ? 0.08 : 0.03).fillEllipse(GW / 2, TIT.pes - 40, 150, 130);
+    gp.fillStyle(0xffffff, aberto ? 0.05 : 0.02).fillEllipse(GW / 2, TIT.pes - 40, 150, 130);
     gp.fillStyle(0x000000, 0.45).fillEllipse(GW / 2, TIT.pes - 2, 70, 14);
     this.heroi.setTexture(spriteChar(k, gsel), 0);
     if (aberto) this.heroi.clearTint(); else this.heroi.setTint(0x16161f);
@@ -339,30 +377,26 @@ var TitleScene = new Phaser.Class({
     var n = this.ordem.length, passo = 16, x0 = GW / 2 - (n - 1) * passo / 2;
     for (i = 0; i < n; i++) {
       var aqui = (i === this.sel), livre = destravado(this.ordem[i]);
-      gp.fillStyle(aqui ? 0xf2c14e : (livre ? 0x6a6c80 : 0x2e2e3e), 1)
+      gp.fillStyle(aqui ? 0xf2f0ff : (livre ? 0x6a6c80 : 0x2e2e3e), 1)
         .fillCircle(x0 + i * passo, TIT.pontosY, aqui ? 4 : 3);
     }
 
-    this.tNome.setText(nomeDoChar(k, gsel)).setColor(aberto ? PAL.amarelo : PAL.cinzaEsc);
+    this.tNome.setText(nomeDoChar(k, gsel)).setColor(aberto ? PAL.branco : PAL.cinzaEsc);
 
-    /* As duas abas do gênero, com a escolhida acesa. Quem só tem um
-       gênero mostra o dele apagado e sem toque. */
+    /* O botão do gênero: a chapa, o símbolo de quem está escolhido e,
+       quando há os dois, duas setinhas dizendo que ele alterna. */
     var g = this.gCards; g.clear();
     var gs = generosDe(k), dois = gs.length > 1;
-    for (var q = 0; q < 2; q++) {
-      var qg = q ? 'f' : 'm', temEsta = gs.indexOf(qg) >= 0, esta = (gsel === qg);
-      this.tGen[q].setVisible(temEsta)
-        .setColor(esta ? (aberto ? PAL.bg : PAL.cinzaEsc) : PAL.cinza);
-      // quem só tem um gênero mostra a aba dele sozinha, no meio
-      var zx = dois ? GW / 2 - GEN_ABA.w + q * GEN_ABA.w : GW / 2 - GEN_ABA.w / 2;
-      this.tGen[q].setX(zx + GEN_ABA.w / 2);
-      if (temEsta && dois) this.zonaGen[q].setInteractive();
-      else this.zonaGen[q].disableInteractive();
-      if (!temEsta) continue;
-      g.fillStyle(esta ? (aberto ? 0xf2c14e : 0x3a3a4a) : 0x14141e, 1)
-        .fillRect(zx, this.genY, GEN_ABA.w, GEN_ABA.h);
-      g.lineStyle(2, esta ? (aberto ? 0xffe9a8 : 0x4a4a5c) : 0x2a2a3a, 1)
-        .strokeRect(zx + 1, this.genY + 1, GEN_ABA.w - 2, GEN_ABA.h - 2);
+    var zx = GW / 2 - GEN_ABA.w / 2, zcy = this.genY + GEN_ABA.h / 2;
+    if (dois) this.zonaGen.setInteractive(); else this.zonaGen.disableInteractive();
+    g.fillStyle(aberto ? 0x22222e : 0x16161e, 1).fillRect(zx, this.genY, GEN_ABA.w, GEN_ABA.h);
+    g.lineStyle(2, aberto ? TIT_CINZA : 0x3a3a4a, 1)
+      .strokeRect(zx + 1, this.genY + 1, GEN_ABA.w - 2, GEN_ABA.h - 2);
+    simboloGenero(g, GW / 2, zcy, gsel, aberto ? 0xf2f0ff : 0x5a5f74);
+    if (dois && aberto) {
+      g.fillStyle(0x6a6c80, 1);
+      g.fillTriangle(zx + 8, zcy, zx + 13, zcy - 4, zx + 13, zcy + 4);
+      g.fillTriangle(zx + GEN_ABA.w - 8, zcy, zx + GEN_ABA.w - 13, zcy - 4, zx + GEN_ABA.w - 13, zcy + 4);
     }
 
     // o time, só pro torcedor
@@ -386,7 +420,7 @@ var TitleScene = new Phaser.Class({
        o personagem tem rótulo próprio, é o dele que aparece. */
     var pd = PODERES[c.poder] || {};
     var rotulo = c.poderRotulo || pd.nome;
-    this.tPoder.setText(rotulo ? '► ' + rotulo : '').setColor(aberto ? PAL.verde : PAL.cinzaEsc);
+    this.tPoder.setText(rotulo ? '► ' + rotulo : '').setColor(aberto ? PAL.branco : PAL.cinzaEsc);
     this.tDesc.setText(c.poderComo || pd.como || c.desc);
 
     this.fichaVal[0].setText('R$ ' + c.dinheiro.toFixed(2).replace('.', ','));
@@ -394,8 +428,9 @@ var TitleScene = new Phaser.Class({
     var gf = this.gFicha; gf.clear();
     gf.fillStyle(0x0d0d18, 0.92).fillRoundedRect(28, TIT.fichaY, GW - 56, TIT.fichaH, 8);
     var bw = GW / 2 - 52;
-    barra(gf, 40, TIT.fichaY + 50, bw, 10, c.carisma / 100, 0xe8a33c);
-    barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, 0x00e676);
+    // as duas barras no mesmo cinza: quem as separa é o rótulo em cima
+    barra(gf, 40, TIT.fichaY + 50, bw, 10, c.carisma / 100, TIT_CINZA);
+    barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, TIT_CINZA);
 
     // a placa da estação de casa, na cor da linha dela
     var casaK = casaDe(k), lk = LINHAS[linhaDaEstacao(casaK)], nomeCasa = placaDe(casaK);
@@ -443,13 +478,15 @@ var TitleScene = new Phaser.Class({
     ladrilho(g, BOT.x0, BOT.y, BOT.tut, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
     ladrilho(g, BOT.xTre, BOT.y, BOT.tre, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
     // o EXPLORAR em verde apagado: é jogo, mas sem valer nada
-    ladrilho(g, BOT.xExp, BOT.y, BOT.exp, BOT.h, 0x10261c, 0x1a3a2a, 0x2a6a48);
+    // o EXPLORAR virou igual aos outros: o verde é do JOGAR, e só dele
+    ladrilho(g, BOT.xExp, BOT.y, BOT.exp, BOT.h, 0x161c2c, 0x222c44, 0x2e3c60);
     ladrilho(g, BOT.xDir, BOT.y, BOT.som, BOT.h, SOM_LIGADO ? 0x161c2c : 0x111118,
       SOM_LIGADO ? 0x222c44 : 0x1a1a24, SOM_LIGADO ? 0x2e3c60 : 0x26263a);
     this.tSom.setColor(SOM_LIGADO ? PAL.branco : PAL.cinzaEsc);
     if (!SOM_LIGADO) {
       // o risco por cima, que é como se desenha "sem" desde sempre
-      g.lineStyle(2, 0xe8362c, 1);
+      // o risco do som desligado também em cinza: o risco já diz "sem"
+      g.lineStyle(2, 0x8a8fa3, 1);
       g.beginPath();
       g.moveTo(BOT.xDir + 10, BOT.y + 8);
       g.lineTo(BOT.xDir + BOT.som - 10, BOT.y + BOT.h - 8);
