@@ -1578,7 +1578,7 @@ var ZapScene = new Phaser.Class({
       tx((e.v < 0 ? '- ' : '+ ') + reais(e.v), x0 + W - 18, ry + 5, e.v < 0 ? ESC : '#15803d', 0, 1);
       if (i < 4) g.fillStyle(0xf1f1f3, 1).fillRect(x0 + 40, ry + 24, W - 58, 1);
     }
-    this.tRodape.setText('DIA ' + GameState.dia + '  -  ' + lePontos() + ' PONTOS').setColor('#6b7280');
+    this.tRodape.setText('FASE ' + GameState.dia + '  -  ' + lePontos() + ' PONTOS').setColor('#6b7280');
   },
 
   /* ---------- aba 4: o CATRAGRAM ----------
@@ -1994,7 +1994,11 @@ var ZapScene = new Phaser.Class({
       return eu.rotMapa[n++].setVisible(true).setAngle(0).setOrigin(0, 0).setScale(meia ? ESCALA_TEXTO / 2 : ESCALA_TEXTO)
         .setMaxWidth(larg || 0).setPosition(Math.round(xx), Math.round(yy)).setText(t).setColor(cor);
     };
-    tx(this, 'DIA ' + (GameState.dia || 1) + ' - ' + (GameState.pernaAtual() ? GameState.pernaAtual().rotulo : ''), x0 + 8, y, PAL.amarelo, true);
+    /* A mesma unidade com o mesmo nome em toda tela de jogo: FASE. O
+       'DIA' continua existindo, mas só na ficção (o post do Catragram, a
+       conversa do ZipZap), que é onde ele é a palavra que a pessoa usaria. */
+    var nomeF = (typeof nomeDaFase === 'function') ? nomeDaFase(GameState.charKey, GameState.dia || 1) : '';
+    tx(this, 'FASE ' + (GameState.dia || 1) + ' · ' + nomeF, x0 + 8, y, PAL.amarelo, true);
     y += 18;
     if (!lista.length) {
       tx(this, 'NADA EM ABERTO AGORA.', x0 + 8, y + 10, PAL.cinza, true);

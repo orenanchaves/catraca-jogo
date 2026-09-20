@@ -144,13 +144,14 @@ function vaosDoElevador() {
   if (DUPLA) { var x2 = espelhaX(xS + w); v.push([x2 - 3, x2 + w + 3]); }
   return v;
 }
-/* Pinta uma barra de x0 a x0+w pulando os vãos: a faixa da linha e a
-   sombra dela embaixo saem nas mesmas fatias. */
-function faixaDaParede(g, x0, w, cor) {
-  var pedacos = [[x0, x0 + w]], vaos = vaosDoElevador(), e, q;
-  for (e = 0; e < vaos.length; e++) {
+/* Tira os vãos de uma lista de pedaços de parede e devolve o que sobrou.
+   Quem pinta a faixa e quem pendura cartaz precisam da MESMA conta: duas
+   contas do mesmo espaço saem de sincronia na primeira mudança, e foi
+   exatamente assim que o cartaz foi parar em cima do elevador. */
+function cortaVaos(pedacos, vaos) {
+  for (var e = 0; e < vaos.length; e++) {
     var a = vaos[e][0], b = vaos[e][1], novos = [];
-    for (q = 0; q < pedacos.length; q++) {
+    for (var q = 0; q < pedacos.length; q++) {
       var p0 = pedacos[q][0], p1 = pedacos[q][1];
       if (b <= p0 || a >= p1) { novos.push([p0, p1]); continue; }
       if (a > p0) novos.push([p0, a]);
@@ -158,6 +159,13 @@ function faixaDaParede(g, x0, w, cor) {
     }
     pedacos = novos;
   }
+  return pedacos;
+}
+
+/* Pinta uma barra de x0 a x0+w pulando os vãos: a faixa da linha e a
+   sombra dela embaixo saem nas mesmas fatias. */
+function faixaDaParede(g, x0, w, cor) {
+  var pedacos = cortaVaos([[x0, x0 + w]], vaosDoElevador()), q;
   for (q = 0; q < pedacos.length; q++) {
     var lw = pedacos[q][1] - pedacos[q][0];
     if (lw <= 0) continue;

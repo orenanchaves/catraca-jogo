@@ -26,20 +26,46 @@ var ANUNCIOS = {
   boticaro: { linhas: ['O BOTICARO', 'PERFUME QUE', 'DURA O DIA'], fundo: 0x14281e, borda: 0x2f7d5e, titulo: '#7fd6a0', letra: '#f0eeff' }
 };
 
-/* Os espaços da Corinthians-Itaquera. x e y são o MEIO do cartaz; em pé
-   ('vertical') ele é girado 90 graus pra caber na parede da plataforma. */
+/* ---------- os espaços da Corinthians-Itaquera ----------
+   x e y são o MEIO do cartaz.
+
+   'A placa tá sobrepondo.' Eram duas posições escritas à mão, e o
+   comentário de então dizia que o elevador ia de 262 a 322. Ele mudou de
+   lugar quando a escada fixa virou dupla (hoje 287..353), e o cartaz da
+   direita, que vai de 327 a 417, passou a cobrir 26 pixels da caixa do
+   elevador. Número cravado à mão envelhece calado.
+
+   Agora o lugar é DERIVADO da parede: pega os pedaços de parede de cima
+   (da quina até a boca da escada, e da escada até a outra quina), tira o
+   que o elevador ocupa (`cortaVaos`, o mesmo corte que a faixa da linha
+   usa) e pendura um cartaz em cada pedaço que comporte um. Hoje só o da
+   esquerda comporta: à direita do elevador sobram 61 pixels, e o cartaz
+   tem 90. Mudou a planta, o cartaz volta sozinho.
+
+   Na parede da plataforma não vai nenhum: em pé, girado, o cartaz brigava
+   com a faixa do nome e com o mapa, e ficava feio ('não rola tanto'). */
 function espacosItaquera() {
-  return [
-    /* Na parede de cima do mezanino, um painel de cada lado da escada, no
-       meio do espaço que sobra ('melhora o espaçamento'): à esquerda, da
-       parede (-94) à boca da escada (102); à direita, do elevador (que
-       com a escada fixa foi pra 262..322) à parede (414). Dois de cada
-       lado ficavam encostados. */
-    { id: 'ITQ-MEZ-1', x: 4, y: 78, tipo: 'digital', anuncios: ['ond', 'ceda', 'loto', 'ingles'] },
-    { id: 'ITQ-MEZ-2', x: 372, y: 78, tipo: 'digital', anuncios: ['dog', 'boticaro', 'ond', 'anuncie'] }
-    /* Na parede da plataforma não: em pé, girado, o cartaz brigava com a
-       faixa do nome e o mapa, e ficava feio ('não rola tanto'). */
+  var LISTAS = [
+    ['ond', 'ceda', 'loto', 'ingles'],
+    ['dog', 'boticaro', 'ond', 'anuncie']
   ];
+  var esq = MEZ.x0 + 26, dir = MEZ.x1 - 26;
+  var direita = (typeof ESCADA_FIXA !== 'undefined' && ESCADA_FIXA ? ESCF_X1 : ESC_X1) + 10;
+  var pedacos = [[esq, ESC_X0 - 10], [direita, dir]];
+  if (typeof cortaVaos === 'function' && typeof vaosDoElevador === 'function') {
+    pedacos = cortaVaos(pedacos, vaosDoElevador());
+  }
+  var out = [], i;
+  for (i = 0; i < pedacos.length && out.length < LISTAS.length; i++) {
+    var larg = pedacos[i][1] - pedacos[i][0];
+    if (larg < CARTAZ.w + 8) continue;               // não cabe: nada pendurado
+    out.push({
+      id: 'ITQ-MEZ-' + (out.length + 1), y: 78, tipo: 'digital',
+      x: Math.round((pedacos[i][0] + pedacos[i][1]) / 2),
+      anuncios: LISTAS[out.length]
+    });
+  }
+  return out;
 }
 
 var CARTAZ = { w: 90, h: 36 };   // 14 letras de 6px são 84: 3px de folga de cada lado

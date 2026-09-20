@@ -5973,7 +5973,11 @@ var HudScene = new Phaser.Class({
        na largura de dentro do bloco, ela passa da direita pra esquerda
        e volta pelo começo. Frase que cabe fica parada, no meio. */
     var mf = this.make.graphics({ add: false });
-    mf.fillStyle(0xffffff, 1).fillRect(HUDB.hora.x + 6, HUDB.hora.y + 22, HUDB.hora.w - 12, 18);
+    /* A janela do letreiro é a MEDIDA que manda, não a largura do bloco:
+       ela tinha 74 (6 de cada lado), e 'PICO DA MANHÃ' tem 78 — o nome
+       parado aparecia com o P e o Ã comidos. Com 3 de cada lado a janela
+       vai a 80 e o nome mais comprido cabe inteiro. */
+    mf.fillStyle(0xffffff, 1).fillRect(HUDB.hora.x + 3, HUDB.hora.y + 22, HUDB.hora.w - 6, 18);
     this.tFaixa.setMask(mf.createGeometryMask());
     this._faixaTxt = null;
     this.montaToque();
@@ -5983,14 +5987,25 @@ var HudScene = new Phaser.Class({
      sempre, da direita pra esquerda ('deixa ela rodando que nem um cartaz
      interativo'). Ela é escrita três vezes com um vão, e desliza um
      comprimento: a volta não pula, e o bloco nunca fica vazio. */
+  /* O letreiro rolava SEMPRE, e movimento no canto do olho é a coisa que
+     mais rouba atenção numa tela em que o que importa está no meio. Ele
+     rolava porque o texto não cabia — e não cabia porque levava o nome da
+     faixa MAIS o número do dia. O dia saiu (ele mora no celular e no
+     balanço), e o nome sozinho cabe. Então: cabe, fica parado e centrado;
+     não cabe, rola como antes. */
   letreiro: function (t, frase, bloco, time) {
     if (this._faixaTxt !== frase) {
       this._faixaTxt = frase;
       t.setOrigin(0, 0).setText(frase);
+      /* 6 e não 10 de folga: o bloco tem 86, e os dois nomes mais
+         compridos ('PICO DA MANHÃ' e 'PICO DA TARDE', 13 letras a 6px)
+         dão 78. Com 10 de folga eles rolavam por causa de dois pixels. */
+      t._rola = t.width > bloco.w - 6;
       t._passo = t.width + 30;                     // o vão: 5 espaços a 6px
-      t.setText(frase + '     ' + frase + '     ' + frase);
+      t._parado = bloco.x + Math.round((bloco.w - t.width) / 2);
+      if (t._rola) t.setText(frase + '     ' + frase + '     ' + frase);
     }
-    t.setX(bloco.x + 6 - ((time * 0.03) % t._passo));
+    t.setX(t._rola ? bloco.x + 6 - ((time * 0.03) % t._passo) : t._parado);
   },
 
   /* o toque precisa existir em toda tela, inclusive no título, por isso
@@ -6198,7 +6213,7 @@ var HudScene = new Phaser.Class({
     g.fillRect(px - 6, py - 7, 4, 14); g.fillRect(px + 2, py - 7, 4, 14);
 
     this.tHora.setText(GameState.hora()).setColor(f.cor);
-    this.letreiro(this.tFaixa, GameState.explorar ? 'MODO EXPLORAR - SEM PRESSA' : f.nome + ' - DIA ' + (GameState.dia || 1), HUDB.hora, time);
+    this.letreiro(this.tFaixa, GameState.explorar ? 'MODO EXPLORAR' : f.nome, HUDB.hora, time);
 
     /* O celular: um retângulo com tela, e a bolinha vermelha de não
        lidas por cima. É a linguagem de qualquer aparelho — quem vê
@@ -6277,7 +6292,11 @@ var HudScene = new Phaser.Class({
     g.fillStyle(0x2a2410, 1).fillRoundedRect(px0, by0 - 3, 30, 11, 4);
     g.lineStyle(1, 0xf2c14e, 0.8).strokeRoundedRect(px0 + 0.5, by0 - 2.5, 29, 10, 4);
     this.tNivelHud.setText('NV ' + nvHud).setPosition(px0 + 15, by0 - 1);
-    barra(g, px0, by0 + 11, 30, 5, progressoXp(xpHud), 0xf2c14e);
+    /* A barrinha do XP saiu daqui. O XP virou assunto do BALANÇO DA FASE
+       (src/diario.js), que é onde ele é ganho e onde se para pra ler; no
+       meio da corrida ela era o oitavo dado de uma barra de 52 pixels,
+       e nenhum deles decidia nada no segundo seguinte. Ficou a pílula do
+       nível, que é identidade e se lê de relance. */
     var ix = HUDB.voce.x + 8;
     g.fillStyle(0xe8a33c, 1);
     g.fillRect(ix + 2, by0 - 2, 2, 8).fillRect(ix - 1, by0 + 1, 8, 2).fillRect(ix + 1, by0, 4, 4);

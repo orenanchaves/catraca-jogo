@@ -295,7 +295,7 @@
         el.mPrazo.style.color = '#6a6f84';
       }
 
-      el.rodape.textContent = 'DIA ' + GameState.dia + ' · ' + GameState.estacoes +
+      el.rodape.textContent = 'FASE ' + GameState.dia + ' · ' + GameState.estacoes +
         ' ESTAÇÕES · RECORDE ' + GameState.recorde();
     } else if (ligado) {
       el.mQuem.style.display = 'none';
