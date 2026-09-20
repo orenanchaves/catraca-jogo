@@ -355,6 +355,57 @@ var TIPOS_DESAFIO = ['tiozao', 'pregador', 'torcedor', 'tiktoker', 'vendedorCurs
 var TIPOS_COSPLAY = ['cosLaranja', 'cosVingador', 'cosNuvem', 'cosRosa', 'cosColegial'];
 var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
 
+/* ---------- o território de cada um ----------
+   'Tá com palmeirense em Itaquera: não tem isso. Tem territórios de cada
+   personagem.' A regra existia escondida dentro do sorteio, e por isso
+   qualquer caminho que não passasse por ele furava: o desempate do teto
+   diário sorteava da lista inteira e punha verde na terra da Fiel.
+
+   Agora o território é DADO, e vale pra todo mundo que pergunta. Ele é
+   contado a partir da Sé, que é o cruzamento: na Vermelha, leste é da
+   Fiel e oeste é do Verdão; na Azul, o santista desce pro sul, que é o
+   caminho de Jabaquara, onde se pega o ônibus pra Santos. Quem não tem
+   linha nem lado (o tiozão, o pregador, o influencer) anda onde quiser.
+
+   E as PONTAS são feudo: nas quatro últimas do leste (Patriarca até
+   Itaquera) e nas três primeiras do oeste (Barra Funda em diante) não
+   aparece torcedor nenhum além do dono. Na Sé, que é de todo mundo,
+   qualquer um pode. */
+var TERRITORIOS = {
+  corintiano: { linha: 'vermelha', lado: 'leste' },
+  palmeirense: { linha: 'vermelha', lado: 'oeste' },
+  // 'tem são-paulino na linha de Itaquera': não tem. O Morumbi fica do
+  // outro lado da cidade, e o tricolor pega a Azul; a Vermelha é dos
+  // outros dois
+  saopaulino: { linha: 'azul' },
+  santista: { linha: 'azul', lado: 'sul' }
+};
+function ladoDaLinha() {
+  var l = GameState.linhaAtual(), se = l.estacoes.indexOf(BALDEACAO), i = GameState.idx;
+  if (i === se) return 'se';
+  if (l === LINHAS.vermelha) return i > se ? 'leste' : 'oeste';
+  return i > se ? 'norte' : 'sul';
+}
+function donoDoPedaco() {
+  var l = GameState.linhaAtual(), n = l.estacoes.length, i = GameState.idx;
+  if (l !== LINHAS.vermelha) return null;
+  if (i >= n - 4) return 'corintiano';
+  if (i <= 2) return 'palmeirense';
+  return null;
+}
+function noTerritorio(tipo) {
+  // a Sé é de todo mundo: é onde as duas linhas e as quatro torcidas se cruzam
+  if (GameState.estacaoAtual && GameState.estacaoAtual() === BALDEACAO) return true;
+  var dono = donoDoPedaco();
+  // em feudo, entre torcedores só entra o dono; o resto do elenco passa
+  if (dono && TORCEDORES.indexOf(tipo) >= 0) return tipo === dono;
+  var t = TERRITORIOS[tipo];
+  if (!t) return true;
+  if (t.linha && LINHAS[t.linha] !== GameState.linhaAtual()) return false;
+  var ld = ladoDaLinha();
+  return !t.lado || ld === 'se' || ld === t.lado;
+}
+
 /* 'torcedor' vira o time da região. Na Sé e na Azul, qualquer um dos dois. */
 /* O teto do dia: quem já apareceu demais hoje sai do sorteio. Se TODO
    MUNDO bateu o teto, devolve null — e quem chamou não põe desafiante
@@ -370,15 +421,17 @@ function sorteiaDesafiante() {
   var d = duelosDoDia(), repetido = null;
   for (var tent = 0; tent < 14; tent++) {
     var t = sorteiaDesafianteBruto();
-    if (!t || t === d._ultimo || !podeDesafiar(t)) continue;
+    if (!t || t === d._ultimo || !podeDesafiar(t) || !noTerritorio(t)) continue;
     if (!d[t]) return t;
     if (!repetido) repetido = t;
   }
   if (repetido) return repetido;
-  // a última tentativa: qualquer um que ainda caiba hoje, os novos na frente
-  // sem cosplayer aqui: ele é da Liberdade, e quem decide isso é o sorteio bruto
+  /* A última tentativa: qualquer um que ainda caiba hoje, os novos na
+     frente. O território vale AQUI TAMBÉM — era por este caminho que o
+     palmeirense chegava em Itaquera. Sem cosplayer: ele é da Liberdade, e
+     quem decide isso é o sorteio bruto. */
   var livres = TIPOS_DESAFIO.concat(TORCEDORES).filter(function (x) {
-    return x !== 'torcedor' && x !== d._ultimo && podeDesafiar(x);
+    return x !== 'torcedor' && x !== d._ultimo && podeDesafiar(x) && noTerritorio(x);
   });
   var novos = livres.filter(function (x) { return !d[x]; });
   if (novos.length) livres = novos;
@@ -390,19 +443,23 @@ function sorteiaDesafianteBruto() {
   if (dl >= 0 && Math.random() < 0.45 - dl * 0.07) return TIPOS_COSPLAY[Math.floor(Math.random() * TIPOS_COSPLAY.length)];
   var t = TIPOS_DESAFIO[Math.floor(Math.random() * TIPOS_DESAFIO.length)];
   if (t !== 'torcedor') return t;
-  /* Itaquera é da Fiel: nas quatro últimas da Vermelha (Patriarca até
-     Itaquera) só aparece corintiano, nem santista, nem são-paulino, nem
-     palmeirense ('santistas não aparecem em Itaquera'). */
-  var lv = GameState.linhaAtual();
-  if (lv === LINHAS.vermelha && GameState.idx >= lv.estacoes.length - 4) return 'corintiano';
+  // na ponta, quem manda é o dono do pedaço (ver TERRITORIOS)
+  var dono = donoDoPedaco();
+  if (dono) return dono;
   // quem joga de torcedor encontra gente do próprio time, que é o que o poder dele usa
-  if (temPoder('torcida') && Math.random() < 0.35) return TIMES[leTime()].desafiante;
-  // são-paulino e santista andam pela cidade toda
-  if (Math.random() < 0.3) return Math.random() < 0.5 ? 'saopaulino' : 'santista';
-  var l = GameState.linhaAtual(), se = l.estacoes.indexOf(BALDEACAO);
-  if (l === LINHAS.vermelha && GameState.idx > se) return 'corintiano';
-  if (l === LINHAS.vermelha && GameState.idx < se) return 'palmeirense';
-  return Math.random() < 0.5 ? 'corintiano' : 'palmeirense';
+  var meu = temPoder('torcida') ? TIMES[leTime()].desafiante : null;
+  if (meu && noTerritorio(meu) && Math.random() < 0.35) return meu;
+  // o são-paulino atravessa a cidade; o santista, o lado sul da Azul
+  if (Math.random() < 0.3) {
+    var viajante = Math.random() < 0.5 ? 'saopaulino' : 'santista';
+    if (noTerritorio(viajante)) return viajante;
+  }
+  var lado = ladoDaLinha();
+  if (lado === 'leste') return 'corintiano';
+  if (lado === 'oeste') return 'palmeirense';
+  // na Sé e na Azul o vagão é de todo mundo
+  var podem = TORCEDORES.filter(noTerritorio);
+  return podem.length ? podem[Math.floor(Math.random() * podem.length)] : null;
 }
 
 /* A vida inteira de quem joga é 100; entrar cansado corta, mas nunca

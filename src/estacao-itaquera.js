@@ -388,9 +388,8 @@ EstacaoScene.prototype.pintaMezanino = function (g, l) {
   var x0 = MEZ.x0, w = MEZ.x1 - MEZ.x0;
   g.translateCanvas(-x0, 0);
   this.azulejo(g, x0, HUD_H, w, 72);
-  g.fillStyle(l.num, 1).fillRect(x0, 98, ESC_X0 - 10 - x0, 5);
-  g.fillStyle(l.num, 1).fillRect(ESC_X1 + 10, 98, MEZ.x1 - ESC_X1 - 10, 5);
-  g.fillStyle(0x000000, 0.3).fillRect(x0, 103, ESC_X0 - 10 - x0, 2).fillRect(ESC_X1 + 10, 103, MEZ.x1 - ESC_X1 - 10, 2);
+  faixaDaParede(g, x0, ESC_X0 - 10 - x0, l.num);
+  faixaDaParede(g, ESC_X1 + 10, MEZ.x1 - ESC_X1 - 10, l.num);
   this.bocaDaEscada(g, HUD_H, 116);
   // a boca da segunda escada, a da plataforma do outro sentido
   if (DUPLA) { g.translateCanvas(ESC2_DX, 0); this.bocaDaEscada(g, HUD_H, 116); g.translateCanvas(-ESC2_DX, 0); }

@@ -1100,7 +1100,12 @@ var GameState = {
      dificuldade: quanto mais fundo no loop, mais gente em qualquer horário */
   lotacao: function () {
     var f = this.faixa();
-    return Phaser.Math.Clamp(f.lotacao * (0.9 + (this.dificuldade() - 1) * 0.22), 0.1, 1.1);
+    /* 'No modo explorar não tem missão, não precisa ter o povo todo.'
+       Explorar é pra olhar a estação, e trinta pessoas na frente são
+       trinta pessoas entre você e o que você veio ver. Fica um terço,
+       o bastante pro lugar não parecer abandonado. */
+    var k = this.explorar ? 0.33 : 1;
+    return Phaser.Math.Clamp(f.lotacao * (0.9 + (this.dificuldade() - 1) * 0.22) * k, 0.1, 1.1);
   },
   /* quem chama devolve true uma vez só, quando a faixa vira */
   virouFaixa: function () {
@@ -3168,9 +3173,15 @@ try {
 function tocaTremChegando(cena, vel, resta) {
   if (!SOM_LIGADO || document.hidden) return;
   var naPlat = cena && cena.pl && cena.pl.sp && cena.pl.sp.y < ESC_Y;
+  /* 'No mezanino não preciso do barulho do metrô.' O trem tocava baixinho
+     (0,18) pra quem estava embaixo, e o trem da Itaquera chega a cada 20
+     segundos: o mezanino inteiro virava ronco de freio. Embaixo fica o
+     burburinho de gente, que é o que se ouve num saguão de verdade; o
+     metrô é som de plataforma. */
+  if (!naPlat) return null;
   try {
     var a = new Audio(_tremUrl || AUDIO_TREM);
-    a.volume = naPlat ? 0.6 : 0.18;
+    a.volume = 0.6;
     a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false;
     a.playbackRate = vel || (0.9 + Math.random() * 0.2);
     if (resta) {

@@ -104,15 +104,15 @@ var CONTATOS = {
       nome: 'MÃE', foto: 'np_mae_est', conversas: [
         { msgs: ['Filh{o|a}, passa na farmácia', 'da Vila Mariana e traz', 'o remédio do seu pai'],
           vai: { rotulo: 'A FARMÁCIA', estacao: 'VILA MARIANA' }, resSim: 'passo lá, mãe', resNao: 'hj não dá, mãe' },
-        { msgs: ['Ta chegando que horas?', 'Deixei comida no fogão'], resOk: 'lá pelas 23h' },
-        { msgs: ['Vc almoçou??', 'Responde a mãe'], resOk: 'almocei sim, mãe' }
+        { msgs: ['Ta chegando que horas?', 'Deixei comida no fogão'], resOk: 'lá pelas 23h', hora: [17 * 60, 23 * 60] },
+        { msgs: ['Vc almoçou??', 'Responde a mãe'], resOk: 'almocei sim, mãe', hora: [12 * 60, 16 * 60] }
       ]
     },
     {
       nome: 'PAI', foto: 'np_pai_est', conversas: [
         { msgs: ['Vem no Tatuapé depois', 'que eu te dou carona', 'pra casa'],
           vai: { rotulo: 'A CARONA DO PAI', estacao: 'TATUAPÉ' }, resSim: 'fechou, pai!', resNao: 'hj não, pai' },
-        { msgs: ['Bom dia', 'Bom dia'], resOk: 'bom dia, pai' }
+        { msgs: ['Bom dia', 'Bom dia'], resOk: 'bom dia, pai', hora: [4 * 60, 10 * 60] }
       ]
     },
     {
@@ -138,7 +138,7 @@ var CONTATOS = {
       nome: { m: 'ESPOSA', f: 'MARIDO' }, conversas: [
         { msgs: ['Amor, passa no mercado', 'do Belém na volta?', 'Acabou o café'],
           vai: { rotulo: 'O MERCADO', estacao: 'BELÉM' }, resSim: 'Passo lá, amor', resNao: 'Hoje não dá' },
-        { msgs: ['Chega que horas hj?'], resOk: 'Lá pelas 19h' },
+        { msgs: ['Chega que horas hj?'], resOk: 'Lá pelas 19h', hora: [16 * 60, 23 * 60] },
         { msgs: ['Te amo', 'Tbm te amo'], resOk: 'Te amo mais ❤' }
       ]
     },
@@ -335,6 +335,21 @@ function contatosDe(k) {
    Uma perna começa com um punhado de conversas. No máximo uma delas
    traz compromisso: duas mudanças de destino na mesma viagem viraria
    sorteio, não decisão. */
+/* ---------- conversa tem hora ----------
+   'A mãe tá perguntando sobre almoço bem de manhã, não faz sentido.'
+   Almoço é meio-dia, 'chega que horas?' é de noite, 'bom dia' é de
+   manhã. `hora: [de, ate]` em minutos do dia; conversa sem `hora` cabe
+   em qualquer uma. O relógio que vale é o do começo da perna, que é
+   quando a caixa é montada — a mensagem pinga até uma hora depois, e
+   por isso as janelas são folgadas. */
+function naHora(c) {
+  if (!c.hora) return true;
+  var m = (typeof GameState === 'undefined' || GameState.minutos === undefined) ? 8 * 60 : GameState.minutos;
+  return c.hora[0] <= c.hora[1]
+    ? (m >= c.hora[0] && m <= c.hora[1])
+    : (m >= c.hora[0] || m <= c.hora[1]);     // janela que atravessa a meia-noite
+}
+
 function montaZap(charKey) {
   var lista = contatosDe(charKey);
   FIO_VOZ = respostaPadrao(charKey);
@@ -343,6 +358,7 @@ function montaZap(charKey) {
 
   for (i = 0; i < lista.length; i++) {
     for (j = 0; j < lista[i].conversas.length; j++) {
+      if (!naHora(lista[i].conversas[j])) continue;
       var item = { contato: lista[i], conversa: lista[i].conversas[j] };
       if (lista[i].conversas[j].vai) comVai.push(item); else semVai.push(item);
     }

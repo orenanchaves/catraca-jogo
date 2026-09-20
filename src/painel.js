@@ -60,42 +60,47 @@
     el.btSom.onclick = function () { ligaSom(!SOM_LIGADO); pintaSom(); };
     el.btNitido.onclick = function () { trocaEscala(!nitido); };
 
-    /* ---------- direita: onde você está e o que dá pra fazer ---------- */
-    dir.innerHTML = '<div class="bloco"><h2>TRAJETO</h2></div>';
-    var b1 = dir.querySelector('.bloco');
-    el.linha = montaLinha(b1, 'LINHA');
-    el.estacao = montaLinha(b1, 'ESTAÇÃO');
-    el.proxima = montaLinha(b1, 'PRÓXIMA');
-    el.destino = montaLinha(b1, 'DESCER EM');
-    el.perna = montaLinha(b1, 'INDO PRA');
-    el.folga = montaLinha(b1, 'ENTRADA');
-    el.atrasos = montaLinha(b1, 'ATRASOS');
+    /* ---------- direita: em que missão você está, e onde ----------
+       'Tá muito poluído e difícil de entender' / 'E como sei em que
+       missão tô?'. Eram treze linhas de rótulo e valor, todas do mesmo
+       tamanho e do mesmo peso: LINHA, ESTAÇÃO, PRÓXIMA, DESCER EM, INDO
+       PRA, ENTRADA, ATRASOS, HORA, FAIXA, DIA, ESTAÇÕES, RECORDE. Ler
+       aquilo era procurar, e a pergunta mais importante — o que eu tenho
+       que fazer agora — não estava lá: o único bloco que responderia
+       ('O QUE FAZER') só ecoava a faixa de dica do chão, que fica vazia
+       a maior parte do tempo.
 
-    var b2 = document.createElement('div');
-    b2.className = 'bloco';
-    b2.innerHTML = '<h2>HORÁRIO</h2>';
-    dir.appendChild(b2);
-    el.hora = montaLinha(b2, 'HORA');
-    el.faixa = montaLinha(b2, 'FAIXA');
-    el.frase = document.createElement('div');
-    el.frase.className = 'frase';
-    b2.appendChild(el.frase);
+       A ordem agora é a das perguntas: O QUE, ONDE, QUANDO. A missão
+       aberta vem primeiro e por extenso, com quem mandou e o prazo; a
+       estação vira título em vez de valor de linha; o relógio ganha o
+       tamanho que ele tem no jogo (é o antagonista); e o placar da
+       corrida, que não muda nada do que você faz agora, virou uma linha
+       só no rodapé. */
+    dir.innerHTML =
+      '<div class="bloco missao"><h2>MISSÃO</h2>' +
+      '<div class="mQuem" id="mQuem"></div>' +
+      '<div class="mOrdem" id="mOrdem"></div>' +
+      '<div class="mPrazo" id="mPrazo"></div></div>' +
+      '<div class="bloco"><h2>ONDE VOCÊ ESTÁ</h2>' +
+      '<div class="ondeNome" id="ondeNome"></div>' +
+      '<div class="ondeLinha" id="ondeLinha"></div>' +
+      '<div class="sep"></div></div>' +
+      '<div class="bloco"><h2>RELÓGIO</h2>' +
+      '<div class="horaGr" id="horaGr"></div>' +
+      '<div class="faixaNome" id="faixaNome"></div>' +
+      '<div class="frase" id="frase"></div></div>' +
+      '<div class="bloco dica"><h2>O QUE FAZER AQUI</h2>' +
+      '<div class="dicaTxt" id="dicaTxt"></div></div>' +
+      '<div class="rodape" id="rodape"></div>';
 
-    var b3 = document.createElement('div');
-    b3.className = 'bloco dica';
-    b3.innerHTML = '<h2>O QUE FAZER</h2>';
-    dir.appendChild(b3);
-    el.dica = document.createElement('div');
-    el.dica.className = 'dicaTxt';
-    b3.appendChild(el.dica);
-
-    var b4 = document.createElement('div');
-    b4.className = 'bloco';
-    b4.innerHTML = '<h2>CORRIDA</h2>';
-    dir.appendChild(b4);
-    el.dia = montaLinha(b4, 'DIA');
-    el.estacoes = montaLinha(b4, 'ESTAÇÕES');
-    el.recorde = montaLinha(b4, 'RECORDE');
+    el.mQuem = $('mQuem'); el.mOrdem = $('mOrdem'); el.mPrazo = $('mPrazo');
+    el.ondeNome = $('ondeNome'); el.ondeLinha = $('ondeLinha');
+    el.hora = $('horaGr'); el.faixa = $('faixaNome'); el.frase = $('frase');
+    el.dica = $('dicaTxt'); el.rodape = $('rodape');
+    // as duas linhas de rota moram no fim do bloco ONDE
+    var sep = dir.querySelector('.sep');
+    el.proxima = montaLinha(sep.parentNode, 'PRÓXIMA');
+    el.destino = montaLinha(sep.parentNode, 'DESCER EM');
 
     pintaSom();
     pintaNitido();
@@ -230,45 +235,81 @@
     }
   };
 
+  /* ---------- a missão aberta, por extenso ----------
+     Mesma fonte do app MISSÕES do celular (o grafo da história): a
+     principal primeiro, e o rótulo da perna como rede — no dia em que
+     nenhuma conversa está aberta, o compromisso do trajeto ainda é uma
+     resposta ('você está indo pro estágio'). */
+  function missaoAgora() {
+    var st = (typeof Historia !== 'undefined' && Historia.estado) ? Historia.estado() : null;
+    var achou = null, id;
+    /* o painel roda a cada quadro e não é dono de nada: um save meio
+       velho, com uma conversa que não existe mais, não pode derrubar a
+       tela inteira — sem missão ele cai no rótulo da perna, que sempre
+       existe */
+    if (st && st.ativas) try {
+      for (id in st.ativas) {
+        var h = HISTORIA[id];
+        if (!h) continue;
+        var m = Historia.missaoDe(id);
+        if (!m) continue;
+        var item = { quem: Historia.contatoDe(h), ordem: Historia.ordemDe(m) };
+        if (h.tipo === 'principal') return item;      // a principal sempre ganha
+        if (!achou) achou = item;
+      }
+    } catch (e) { achou = achou || null; }
+    if (achou) return achou;
+    // o rótulo já vem com artigo ('O ESTÁGIO'), então a preposição contrai
+    var rot = GameState.rotuloDaPerna ? GameState.rotuloDaPerna() : '';
+    if (!rot) return { quem: '', ordem: '' };
+    var ind = rot.indexOf('O ') === 0 ? 'INDO PRO ' + rot.slice(2)
+      : (rot.indexOf('A ') === 0 ? 'INDO PRA ' + rot.slice(2) : 'INDO PRA ' + rot);
+    return { quem: '', ordem: ind };
+  }
+
   /* o resto o painel lê sozinho do estado do jogo, quadro a quadro */
   function atualiza() {
     if (ligado && GameState.char) {
       var l = GameState.linhaAtual();
-      el.linha.textContent = l.nome;
-      el.linha.style.color = l.cor;
-      el.estacao.textContent = placaDe(GameState.estacaoAtual());
+      el.ondeNome.textContent = placaDe(GameState.estacaoAtual());
+      el.ondeLinha.textContent = l.nome;
+      el.ondeLinha.style.color = l.cor;
       el.proxima.textContent = placaDe(GameState.proximaEstacaoNome());
       var falta = GameState.faltamEstacoes();
-      el.destino.textContent = GameState.alvoAtual() + (falta > 0 ? ' (' + falta + ')' : '');
+      el.destino.textContent = GameState.alvoAtual() + (falta > 0 ? ' · ' + falta : '');
       el.destino.style.color = falta <= 1 ? '#00e676' : '#f2f0ff';
-      el.perna.textContent = GameState.rotuloDaPerna();
+
+      var mi = missaoAgora();
+      el.mQuem.textContent = mi.quem;
+      el.mQuem.style.display = mi.quem ? '' : 'none';
+      el.mOrdem.textContent = mi.ordem || 'NADA MARCADO AGORA.';
+      el.mOrdem.style.color = mi.ordem ? '#f2f0ff' : '#5a5f74';
       if (GameState.perna === 'ida') {
         var fg = GameState.minutosParaOAtraso();
-        el.folga.textContent = GameState.horaLimite() + (fg > 0 ? ' (' + fg + ')' : ' ATRASADO');
-        el.folga.style.color = fg <= 12 ? '#e8362c' : '#f2f0ff';
+        el.mPrazo.textContent = fg > 0
+          ? 'ATÉ ' + GameState.horaLimite() + ' · FALTAM ' + fg + ' MIN'
+          : 'ATRASADO. ' + GameState.atrasos + ' DE ' + MAX_ATRASOS;
+        el.mPrazo.style.color = fg <= 0 ? '#e8362c' : (fg <= 12 ? '#e8a33c' : '#6a6f84');
       } else {
-        el.folga.textContent = 'SEM HORA';
-        el.folga.style.color = '#6a6f84';
+        el.mPrazo.textContent = 'VOLTA, SEM HORA MARCADA';
+        el.mPrazo.style.color = '#6a6f84';
       }
-      el.atrasos.textContent = GameState.atrasos + ' de ' + MAX_ATRASOS;
-      el.atrasos.style.color = GameState.atrasos >= MAX_ATRASOS - 1 ? '#e8362c' : '#f2f0ff';
-      el.dia.textContent = String(GameState.dia);
-      el.estacoes.textContent = String(GameState.estacoes);
-      el.recorde.textContent = String(GameState.recorde());
+
+      el.rodape.textContent = 'DIA ' + GameState.dia + ' · ' + GameState.estacoes +
+        ' ESTAÇÕES · RECORDE ' + GameState.recorde();
     } else if (ligado) {
-      el.linha.textContent = '—';
-      el.estacao.textContent = 'ESCOLHENDO';
+      el.mQuem.style.display = 'none';
+      el.mOrdem.textContent = 'ESCOLHENDO QUEM VOCÊ É.';
+      el.mOrdem.style.color = '#5a5f74';
+      el.mPrazo.textContent = '';
+      el.ondeNome.textContent = '—';
+      el.ondeLinha.textContent = '';
       el.proxima.textContent = '—';
       el.destino.textContent = '—';
-      el.perna.textContent = '—';
-      el.folga.textContent = '—';
-      el.atrasos.textContent = '—';
       el.hora.textContent = '—';
-      el.faixa.textContent = '—';
+      el.faixa.textContent = '';
       el.frase.textContent = '';
-      el.dia.textContent = '—';
-      el.estacoes.textContent = '—';
-      el.recorde.textContent = String(GameState.recorde ? GameState.recorde() : 0);
+      el.rodape.textContent = 'RECORDE ' + (GameState.recorde ? GameState.recorde() : 0);
     }
     requestAnimationFrame(atualiza);
   }

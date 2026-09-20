@@ -133,6 +133,38 @@ function espelhaX(x) { return DUPLA_IMG_X + GW - x; }
    ali, foi pro lado dela no mezanino e subiu um pouco na plataforma. Não
    tem na Sé (central, sem lado de parede) nem no treino (saguão estreito). */
 var ESCADA_FIXA = false;
+
+/* Onde a caixa do elevador encosta na parede de cima, em x. Mesma conta
+   do `montaElevadores` (largura 60, e o par espelhado na dupla), separada
+   dele porque a parede é pintada ANTES de os elevadores existirem. */
+function vaosDoElevador() {
+  if (CENTRAL) return [];
+  var w = 60, xS = ESCADA_FIXA ? ESCF_X1 + 8 : ESC_X1 + 20;
+  var v = [[xS - 3, xS + w + 3]];
+  if (DUPLA) { var x2 = espelhaX(xS + w); v.push([x2 - 3, x2 + w + 3]); }
+  return v;
+}
+/* Pinta uma barra de x0 a x0+w pulando os vãos: a faixa da linha e a
+   sombra dela embaixo saem nas mesmas fatias. */
+function faixaDaParede(g, x0, w, cor) {
+  var pedacos = [[x0, x0 + w]], vaos = vaosDoElevador(), e, q;
+  for (e = 0; e < vaos.length; e++) {
+    var a = vaos[e][0], b = vaos[e][1], novos = [];
+    for (q = 0; q < pedacos.length; q++) {
+      var p0 = pedacos[q][0], p1 = pedacos[q][1];
+      if (b <= p0 || a >= p1) { novos.push([p0, p1]); continue; }
+      if (a > p0) novos.push([p0, a]);
+      if (b < p1) novos.push([b, p1]);
+    }
+    pedacos = novos;
+  }
+  for (q = 0; q < pedacos.length; q++) {
+    var lw = pedacos[q][1] - pedacos[q][0];
+    if (lw <= 0) continue;
+    g.fillStyle(cor, 1).fillRect(pedacos[q][0], 98, lw, 5);
+    g.fillStyle(0x000000, 0.3).fillRect(pedacos[q][0], 103, lw, 2);
+  }
+}
 /* Dupla, como a rolante ('senão fica ruim de andar nela'): duas faixas de
    32 com o corrimão no meio, 218..282. O elevador do mezanino foi pra
    290 pra caber. */
@@ -891,10 +923,8 @@ var EstacaoScene = new Phaser.Class({
        pendurados no meio do corredor e dava pra andar por cima da
        parede. */
     eu.azulejo(g, 0, HUD_H, GW, 72);
-    g.fillStyle(l.num, 1).fillRect(0, 98, ESC_X0 - 10, 5);
-    g.fillStyle(l.num, 1).fillRect(ESC_X1 + 10, 98, GW - ESC_X1 - 10, 5);
-    g.fillStyle(0x000000, 0.3).fillRect(0, 103, ESC_X0 - 10, 2);
-    g.fillStyle(0x000000, 0.3).fillRect(ESC_X1 + 10, 103, GW - ESC_X1 - 10, 2);
+    faixaDaParede(g, 0, ESC_X0 - 10, l.num);
+    faixaDaParede(g, ESC_X1 + 10, GW - ESC_X1 - 10, l.num);
     eu.bocaDaEscada(g, HUD_H, 116);
 
     // o piso de dentro vai até a linha das catracas (240): no vão entre os gabinetes se vê ladrilho, não buraco
@@ -2256,6 +2286,13 @@ var EstacaoScene = new Phaser.Class({
      vê. Qualquer um usa; quem está de cadeira de rodas só sobe por ele.
      Um par por plataforma: na dupla a espelhada tem o dela ('tem que ter
      dois elevadores'), senão o cadeirante nunca chegava no outro sentido. */
+  /* ---------- a faixa da linha contorna o elevador ----------
+     'Tá por cima da faixa.' A faixa colorida é PINTURA DE PAREDE, e o
+     elevador é uma caixa encostada nessa parede: ele cobria os cinco
+     pixels da faixa na altura 98 e ela reaparecia do outro lado, como se
+     alguém tivesse pintado por baixo da caixa. Em estação de verdade a
+     faixa para no obstáculo e recomeça depois dele. Quem desenha a
+     parede pergunta aqui onde não pintar. */
   montaElevadores: function () {
     /* 60x64: no mezanino ocupa a parede de cima inteira (52 a 116). Com a
        escada fixa ele vai pro lado dela (262), e na plataforma sobe 32px,

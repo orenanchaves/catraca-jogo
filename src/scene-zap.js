@@ -747,7 +747,14 @@ var ZapScene = new Phaser.Class({
     this.zonaVolta.disableInteractive();
     for (i = 0; i < this.zonasMochila.length; i++) { this.zonasMochila[i].disableInteractive(); this.figMochila[i].setVisible(false).setCrop(); }
     this.zonaCat.disableInteractive(); this.zonaAbasCat.disableInteractive();
-    if (this.zPombo) { this.zPombo.disableInteractive(); if (this.aba !== 7 && this.gPombo) this.gPombo.clear(); }
+    /* 'Às vezes buga': voltar pro início não mexe na aba, só no modo — e
+       a conta era só pela aba. O céu do POMBO continuava desenhado por
+       cima da tela inicial, escondendo os ícones e deixando só os nomes
+       dos apps. Quem manda aqui é MODO e aba, os dois. */
+    if (this.zPombo) {
+      this.zPombo.disableInteractive();
+      if (this.gPombo && !(this.modo === 'app' && this.aba === 7)) this.gPombo.clear();
+    }
     if (this.zonasBolso) for (var zb in this.zonasBolso) this.zonasBolso[zb].disableInteractive();
     for (i = 0; i < this.cartasDex.length; i++) {
       var cc = this.cartasDex[i];
