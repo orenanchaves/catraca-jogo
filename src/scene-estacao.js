@@ -3405,36 +3405,53 @@ var EstacaoScene = new Phaser.Class({
 
     var noMapa = this.mapaPerto(x, y);
     var barraca = this.barracaPerto(x, y);
-    if (barraca) dica = nomeAgir() + ': ' + barraca.nome;
-    else if (noMapa) dica = nomeAgir() + ': OLHAR O MAPA';
+
+    /* ---------- um alvo só ----------
+       Isto eram DUAS cadeias de condições sobre o mesmo mundo: uma
+       escolhia a DICA e outra, no toque, escolhia a AÇÃO. Duas leituras
+       do mesmo estado saem de sincronia na primeira mudança, e o sintoma
+       seria o pior que existe numa faixa de dica: ela oferece uma coisa e
+       o dedo faz outra. Agora quem está na sua frente é decidido UMA vez,
+       e as duas saem do mesmo alvo. Alvo sem `faz` é só informação.
+
+       A ordem é a de prioridade, e ela importa: o que se toca vem antes
+       do que só se lê. */
+    var alvo = null;
+    if (barraca) alvo = { dica: nomeAgir() + ': ' + barraca.nome, faz: 'barraca' };
+    else if (noMapa) alvo = { dica: nomeAgir() + ': OLHAR O MAPA', faz: 'mapa' };
     /* 'TOQUE: ACHADOS E PERDIDOS' dá 25 caracteres com o prefixo, e a
        faixa cabe 26 justos. O preço é a informação que decide. */
     // sem a placa em cima do guichê, é a dica que diz o que ele é
-    else if (noGuiche) dica = nomeAgir() + ': ACHADOS (' + ACHADOS_PRECO + ')';
-    else if (naBilheteria) dica = nomeAgir() + ': comprar passagem';
-    else if (perto && gate.fechada) dica = 'catraca fora de serviço';
-    else if (soSaida && !this.praCasa) dica = 'SÓ SAÍDA. ENTRADA NO MEIO';
-    else if (gate && y > 172 && y < 206 && gate.sentido === 'entra') dica = 'ENTRADA. SAIA PELOS LADOS';
+    else if (noGuiche) alvo = { dica: nomeAgir() + ': ACHADOS (' + ACHADOS_PRECO + ')', faz: 'achados' };
+    else if (naBilheteria) alvo = { dica: nomeAgir() + ': comprar passagem', faz: 'bilheteria' };
+    else if (perto && gate.fechada) alvo = { dica: 'catraca fora de serviço' };
+    else if (soSaida && !this.praCasa) alvo = { dica: 'SÓ SAÍDA. ENTRADA NO MEIO' };
+    else if (gate && y > 172 && y < 206 && gate.sentido === 'entra') alvo = { dica: 'ENTRADA. SAIA PELOS LADOS' };
     else if (naCatraca) {
-      dica = vendo
-        ? 'ELE TÁ TE VENDO — ESPERE'
-        : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA');
-    } else if (vendo) dica = 'sai da frente dele';
-    else if (this.praCasa) dica = 'CASA: ' + SAIDAS_ITQ[saidaDeCasa()].rotulo + ' ▼';
-    else if (this.liberado || this.pulou) dica = 'suba pela escada ▲';
-    if (!dica && GameState.lixo) dica = 'JOGUE O LIXO NA LIXEIRA';
+      alvo = {
+        dica: vendo ? 'ELE TÁ TE VENDO — ESPERE'
+          : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA'),
+        faz: 'pula'
+      };
+    }
+    else if (vendo) alvo = { dica: 'sai da frente dele' };
+    else if (this.praCasa) alvo = { dica: 'CASA: ' + SAIDAS_ITQ[saidaDeCasa()].rotulo + ' ▼' };
+    else if (this.liberado || this.pulou) alvo = { dica: 'suba pela escada ▲' };
+    else if (GameState.lixo) alvo = { dica: 'JOGUE O LIXO NA LIXEIRA' };
+
+    dica = alvo ? alvo.dica : '';
     this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
 
-    if (Ctrl.actJust) {
-      if (barraca && barraca.acao === 'bilheteria') this.recargaBU();
-      else if (barraca && barraca.acao === 'achados') this.abreAchados();
-      else if (barraca && barraca.acao === 'recarga') this.recargaBU();
-      else if (barraca && barraca.acao === 'saque') this.saca24h();
-      else if (barraca) abreBarraca(this, barraca.titulo, barraca.cardapio);
-      else if (noMapa) abreMapaParede(this);
-      else if (noGuiche) this.abreAchados();
-      else if (naBilheteria) this.abreMenuBilheteria();
-      else if (naCatraca) this.comecaPulo(gate);
+    if (!Ctrl.actJust || !alvo || !alvo.faz) return;
+    if (alvo.faz === 'barraca') {
+      if (barraca.acao === 'bilheteria' || barraca.acao === 'recarga') this.recargaBU();
+      else if (barraca.acao === 'achados') this.abreAchados();
+      else if (barraca.acao === 'saque') this.saca24h();
+      else abreBarraca(this, barraca.titulo, barraca.cardapio);
     }
+    else if (alvo.faz === 'mapa') abreMapaParede(this);
+    else if (alvo.faz === 'achados') this.abreAchados();
+    else if (alvo.faz === 'bilheteria') this.abreMenuBilheteria();
+    else if (alvo.faz === 'pula') this.comecaPulo(gate);
   }
 });
