@@ -33,7 +33,7 @@ FIM_BOT.xDir = FIM_BOT.xGr + FIM_BOT.gr + FIM_BOT.vao;
 /* A pastilha da linha do tempo: 34 de passo porque 'DIA 10' não cabe e o
    que se lê é o número e a nota, um em cima do outro. Oito por fileira
    dá 272 de 320, com margem dos dois lados. */
-var TL = { x0: 24, y: 396, w: 30, h: 30, passo: 34, porFila: 8 };
+var TL = { x0: 24, y: 464, w: 30, h: 30, passo: 34, porFila: 8 };
 
 var FimScene = new Phaser.Class({
   Extends: Phaser.Scene,
@@ -88,7 +88,7 @@ var FimScene = new Phaser.Class({
        da escala: MEIA escala aqui é `ESCALA_TEXTO / 2`, que dá 1, então
        uma unidade é um pixel de tela e o limite é a largura mesmo. Medi:
        71 caracteres deram 426 de largura, e o limite estava em 544. */
-    txtC(this, GW / 2, 134, recado, PAL.cinza, 8)
+    txtC(this, GW / 2, so ? 134 : 130, recado, PAL.cinza, 8)
       .setScale(ESCALA_TEXTO / 2).setMaxWidth(GW - 48).setAlign('center');
 
     if (so) this.pintaListaDeFases();
@@ -98,7 +98,10 @@ var FimScene = new Phaser.Class({
        temporada, com o gênero escolhido no título, e fica no vão que
        sobra entre o conteúdo e os botões: grande na temporada, onde há
        espaço, e menor no balanço, que é uma tela cheia. */
-    this.poeBoneco(so ? 62 : 46, so ? 500 : 510, so ? 2 : 1.2,
+    /* 'Personagem tem que ser destaque no balanço.' Ele deixou o canto
+       de baixo e virou o herói da tela: grande, no alto, ao lado da nota.
+       Quem terminou a fase quer ver a REAÇÃO dele antes de ler a lista. */
+    this.poeBoneco(so ? 62 : 80, so ? 500 : 304, so ? 2 : 2.5,
       so ? 'parado' : (bom ? 'danca' : 'caido'));
     this.pintaLinhaDoTempo();
     this.montaBotoes(bom);
@@ -108,8 +111,30 @@ var FimScene = new Phaser.Class({
      Verde com tique é o que a fase pediu e você fez; cinza com X é o que
      ficou. O que ficou não vem só como ausência: vem com o número que
      explica (quanto de carisma foi embora, quanto o dia custou). */
+  /* ---------- o balanço, com o personagem no comando ----------
+     A ordem de leitura é: como ele reagiu, que nota tirou, e só então o
+     porquê linha por linha. Antes a lista vinha primeiro e o boneco era
+     uma miniatura no rodapé — 'personagem tem que ser destaque'.
+
+     O topo é uma dupla: o boneco grande à esquerda (o `poeBoneco` põe ele
+     em 80, com os pés em 304) e a chapa da nota à direita, com o XP da
+     fase embaixo dela. */
   pintaBalanco: function (g, b, corN) {
-    var y0 = 168, i;
+    var nx = 176, nw = GW - nx - 20, ny = 176, nh = 86;
+    g.fillStyle(corN, 0.14).fillRoundedRect(nx, ny, nw, nh, 8);
+    g.lineStyle(1, corN, 0.7).strokeRoundedRect(nx + 0.5, ny + 0.5, nw - 1, nh - 1, 8);
+    /* A caixa da fonte tem três vezes o tamanho pedido: no 32 a letra tem
+       96 de altura, e é por isso que a chapa precisa de 86. */
+    txtC(this, nx + nw / 2, ny + 2, b.notaLetra, PAL.branco, 32);
+    txtC(this, nx + nw / 2, ny + nh + 8, 'XP DA FASE', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
+    txtC(this, nx + nw / 2, ny + nh + 18, '+' + b.xp, PAL.amarelo, 16);
+    if (b.subiu) {
+      txtC(this, GW / 2, 308, 'SUBIU PRO NÍVEL ' + b.subiu + '!', PAL.verde, 8)
+        .setScale(ESCALA_TEXTO / 2);
+    }
+
+    // e embaixo o porquê, linha por linha
+    var y0 = 326, i;
     g.fillStyle(0x11111c, 1).fillRect(20, y0 - 8, GW - 40, b.linhas.length * 20 + 14);
     for (i = 0; i < b.linhas.length; i++) {
       var L = b.linhas[i], y = y0 + i * 20;
@@ -118,18 +143,6 @@ var FimScene = new Phaser.Class({
       txt(this, GW - 30, y, L.ok ? '+' + L.xp : (L.nota || ''), L.ok ? PAL.amarelo : PAL.cinzaEsc, 8)
         .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2);
     }
-    var yf = y0 + b.linhas.length * 20 + 12;
-    txt(this, 30, yf + 6, 'XP DA FASE', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
-    txt(this, 30, yf + 20, '+' + b.xp, PAL.amarelo, 16);
-    // a nota, grande, do lado direito: é o que se olha primeiro na segunda vez
-    /* A caixa da fonte tem três vezes o tamanho pedido: no 32 a letra
-       tem 96 de altura e vazava a chapa de 52 pelos dois lados. No 16 a
-       tinta vai de +8 a +44, que é o que a chapa comporta. */
-    g.fillStyle(corN, 0.14).fillRoundedRect(GW - 86, yf, 60, 52, 8);
-    g.lineStyle(1, corN, 0.7).strokeRoundedRect(GW - 85.5, yf + 0.5, 59, 51, 8);
-    txtC(this, GW - 56, yf + 2, b.notaLetra, PAL.branco, 16);
-    if (b.subiu) txtC(this, GW / 2, yf + 58, 'SUBIU PRO NÍVEL ' + b.subiu + '!', PAL.verde, 8)
-      .setScale(ESCALA_TEXTO / 2);
   },
 
   /* ---------- a temporada por extenso ----------
