@@ -30,11 +30,6 @@ var FIM_BOT = { h: 42, y: GH - 50, gr: 146, pq: 80, vao: 8 };
 FIM_BOT.xGr = Math.round((GW - (FIM_BOT.gr + FIM_BOT.vao + FIM_BOT.pq)) / 2);
 FIM_BOT.xDir = FIM_BOT.xGr + FIM_BOT.gr + FIM_BOT.vao;
 
-/* A pastilha da linha do tempo: 34 de passo porque 'DIA 10' não cabe e o
-   que se lê é o número e a nota, um em cima do outro. Oito por fileira
-   dá 272 de 320, com margem dos dois lados. */
-var TL = { x0: 24, y: 464, w: 30, h: 30, passo: 34, porFila: 8 };
-
 var FimScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function FimScene() { Phaser.Scene.call(this, { key: 'Fim' }); },
@@ -103,7 +98,7 @@ var FimScene = new Phaser.Class({
        Quem terminou a fase quer ver a REAÇÃO dele antes de ler a lista. */
     this.poeBoneco(so ? 62 : 80, so ? 500 : 304, so ? 2 : 2.5,
       so ? 'parado' : (bom ? 'danca' : 'caido'));
-    this.pintaLinhaDoTempo();
+    if (!so && b) this.pintaColeta(b);
     this.montaBotoes(bom);
   },
 
@@ -128,8 +123,10 @@ var FimScene = new Phaser.Class({
     txtC(this, nx + nw / 2, ny + 2, b.notaLetra, PAL.branco, 32);
     txtC(this, nx + nw / 2, ny + nh + 8, 'XP DA FASE', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
     txtC(this, nx + nw / 2, ny + nh + 18, '+' + b.xp, PAL.amarelo, 16);
+    /* O aviso de nível vai pro pé do BONECO, na metade esquerda: no meio
+       da tela ele caía em cima do '+75', que é tam 16 e tem 36 de tinta. */
     if (b.subiu) {
-      txtC(this, GW / 2, 308, 'SUBIU PRO NÍVEL ' + b.subiu + '!', PAL.verde, 8)
+      txt(this, 24, 306, 'SUBIU PRO NÍVEL ' + b.subiu + '!', PAL.verde, 8)
         .setScale(ESCALA_TEXTO / 2);
     }
 
@@ -258,41 +255,35 @@ var FimScene = new Phaser.Class({
       .setWordWrapWidth(GW - 32).setAlign('center');
   },
 
-  /* ---------- a linha do tempo ----------
-     A temporada numa fileira: número em cima, nota embaixo. A fase da vez
-     tem contorno. Tocar numa antiga MARCA ela, e o botão grande vira
-     REPETIR — marcar não faz nada sozinho, justamente porque repetir
-     desfaz o que veio depois. */
-  pintaLinhaDoTempo: function () {
-    if (typeof Diario === 'undefined' || this.vista === 'temporada') return;
-    var lista = Diario.lista();
-    if (!lista.length) return;
-    // só as últimas oito: a fase da vez é sempre a que tem que aparecer
-    if (lista.length > TL.porFila) lista = lista.slice(lista.length - TL.porFila);
-    var g = this.add.graphics().setDepth(1), eu = this, i;
-    this.pastilhas = [];
-    txt(this, TL.x0, TL.y - 16, 'A TEMPORADA', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
-    for (i = 0; i < lista.length; i++) {
-      var d = lista[i], x = TL.x0 + i * TL.passo;
-      var atual = d.n === (GameState.dia || 1) || (this.bal && d.n === this.bal.dia);
-      var cor = d.nota ? 0x1b2438 : 0x101018;
-      g.fillStyle(cor, 1).fillRoundedRect(x, TL.y, TL.w, TL.h, 4);
-      g.lineStyle(1, atual ? 0xf2c14e : 0x2a2a3a, 1).strokeRoundedRect(x + 0.5, TL.y + 0.5, TL.w - 1, TL.h - 1, 4);
-      /* depth 2: o desenho da pastilha é depth 1, e texto sem depth
-         nasce em 0 — a fileira aparecia vazia, com as chapas por cima
-         dos próprios números. */
-      txtC(this, x + TL.w / 2, TL.y + 3, String(d.n), PAL.cinza, 8)
-        .setScale(ESCALA_TEXTO / 2).setDepth(2);
-      txtC(this, x + TL.w / 2, TL.y + 11, d.nota || '-', d.nota ? PAL.branco : PAL.cinzaEsc, 8)
-        .setDepth(2);
-      var z = this.add.zone(x - 2, TL.y - 2, TL.w + 4, TL.h + 4).setOrigin(0, 0).setInteractive();
-      (function (num) { z.on('pointerdown', function () { eu.marca(num); }); })(d.n);
-      this.pastilhas.push({ n: d.n, x: x });
-    }
-    this.gTL = g;
-    // a linha que diz o preço de repetir, escrita só quando há preço
-    this.tPreco = txtC(this, GW / 2, TL.y + TL.h + 8, '', PAL.cinzaEsc, 8)
-      .setScale(ESCALA_TEXTO / 2).setDepth(2);
+  /* ---------- o que a fase guardou ----------
+     'Vai aparecendo o que foi preenchido em cada fase: lista inimigos,
+     itens especiais e etc.' Duas linhas, embaixo do balanço: quem você
+     encontrou e o que você achou. É o que dá motivo pra repetir uma fase
+     já fechada com nota boa — voltar pra pegar o que faltou.
+
+     Aqui era a fileira de pastilhas da temporada. Ela saiu: a temporada
+     tem tela própria agora (pelo título), e repetir ESTA fase já é o
+     botão grande quando ela acaba mal. Pastilha repetida em duas telas é
+     a mesma informação cobrando espaço duas vezes. */
+  pintaColeta: function (b) {
+    var y = 464, eu = this;
+    var nomes = function (lista, tabela, campo) {
+      var out = [], i;
+      for (i = 0; i < lista.length && out.length < 4; i++) {
+        var f = tabela && tabela[lista[i]];
+        out.push((f && f[campo]) || String(lista[i]).toUpperCase());
+      }
+      if (lista.length > out.length) out.push('+' + (lista.length - out.length));
+      return out.join(', ');
+    };
+    var linha = function (rot, texto, cor) {
+      txt(eu, 24, y, rot, PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
+      txt(eu, 92, y, texto || 'NADA', texto ? cor : PAL.cinzaEsc, 8)
+        .setScale(ESCALA_TEXTO / 2).setMaxWidth(GW - 116);
+      y += 16;
+    };
+    linha('ENCONTROU', nomes(b.inimigos || [], typeof DESAFIANTES !== 'undefined' ? DESAFIANTES : null, 'nome'), PAL.branco);
+    linha('ACHOU', nomes(b.itens || [], typeof GUARDADOS !== 'undefined' ? GUARDADOS : null, 'nome'), PAL.branco);
   },
 
   marca: function (n, trancada) {

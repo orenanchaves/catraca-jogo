@@ -129,6 +129,27 @@ var Diario = {
     GameState.diaConta[ev]++;
   },
 
+  /* ---------- o que a fase guardou ----------
+     'Vai aparecendo o que foi preenchido em cada fase: lista inimigos,
+     itens especiais e etc.' Não é contador, é LISTA: quem você encontrou
+     e o que você achou, sem repetir. É ela que dá motivo pra repetir uma
+     fase depois de já ter tirado nota boa — voltar pra pegar o que
+     faltou. */
+  anota: function (tipo, chave) {
+    if (!chave || GameState.treino || GameState.explorar) return;
+    if (!GameState.diaConta) GameState.diaConta = { duelos: 0, entregas: 0 };
+    var l = GameState.diaConta[tipo] || (GameState.diaConta[tipo] = []);
+    if (l.indexOf(chave) < 0) l.push(chave);
+  },
+  /* o resumo de uma fase já fechada, pra linha do tempo */
+  resumoDaFase: function (n) {
+    var l = this.lista(), i;
+    for (i = 0; i < l.length; i++) if (l[i].n === n) {
+      return { inimigos: (l[i].inimigos || []).length, itens: (l[i].itens || []).length };
+    }
+    return null;
+  },
+
   /* ---------- o balanço ----------
      `bom` é true quando você chegou em casa e false quando o dia acabou
      mal. Devolve o objeto que a tela de fim desenha, e já credita o XP:
@@ -139,6 +160,8 @@ var Diario = {
     var b = {
       dia: base.dia,
       bom: !!bom,
+      inimigos: (cont.inimigos || []).slice(0),
+      itens: (cont.itens || []).slice(0),
       carisma: Math.round(GameState.carisma - base.carisma),
       grana: GameState.dinheiro - base.dinheiro,
       atrasos: (GameState.atrasos || 0) - (base.atrasos || 0),
@@ -189,6 +212,8 @@ var Diario = {
     achou.xp = b.xp;
     achou.bom = b.bom;
     achou.linhas = b.linhas.length;
+    achou.inimigos = b.inimigos;
+    achou.itens = b.itens;
     this.grava(d);
   },
 

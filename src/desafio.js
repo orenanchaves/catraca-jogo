@@ -573,6 +573,8 @@ var DesafioScene = new Phaser.Class({
     contaDuelo(this.dados.tipo);
     var tm = TEMA_DSF[this.dados.tipo] || ['temaChato', 0];
     tocaJingle(tm[0], tm[1]);
+    // a fase guarda quem você encontrou, tenha ganhado ou não (src/diario.js)
+    if (typeof Diario !== 'undefined') Diario.anota('inimigos', this.dados.tipo);
     /* e a TRILHA do duelo inteiro muda junto: a família dá tom, andamento
        e timbre; o rival dá a transposição (core.js, defineTrilhaDaLuta) */
     defineTrilhaDaLuta(tm[0].replace('tema', '').toLowerCase(), tm[1]);

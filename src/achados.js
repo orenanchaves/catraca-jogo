@@ -180,7 +180,10 @@ function mostraAchado(cena, chave, titulo, recomenda) {
 /* Guardar o que achou. Bolso cheio: pergunta o que largar, ou deixa o
    achado onde está (ele continua lá, dá pra voltar). `aoGuardar` roda só
    se guardou. */
+/* Guardar é o que conta como ACHAR: o cartão girando pode ser recusado,
+   e o que não entrou na mochila não entrou na fase. */
 function guardaAchado(cena, id, aoGuardar) {
+  if (typeof Diario !== 'undefined') Diario.anota('itens', id);
   var b = bolsoDe(id), g = GUARDADOS[id];
   var fechaSo = function (msg) {
     fala(cena, msg, []);
