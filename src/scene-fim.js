@@ -94,6 +94,12 @@ var FimScene = new Phaser.Class({
     if (so) this.pintaListaDeFases();
     else if (b) this.pintaBalanco(g, b, corN);
     else this.pintaPlacarAntigo(g);
+    /* 'O bonequinho tem que aparecer o tempo todo.' Ele é de quem é a
+       temporada, com o gênero escolhido no título, e fica no vão que
+       sobra entre o conteúdo e os botões: grande na temporada, onde há
+       espaço, e menor no balanço, que é uma tela cheia. */
+    this.poeBoneco(so ? 62 : 46, so ? 500 : 510, so ? 2 : 1.2,
+      so ? 'parado' : (bom ? 'danca' : 'caido'));
     this.pintaLinhaDoTempo();
     this.montaBotoes(bom);
   },
@@ -176,6 +182,57 @@ var FimScene = new Phaser.Class({
     this.gFases = g;
     this.tPreco = txtC(this, GW / 2, y0 + Math.min(quantas, 10) * alt + 6, '', PAL.cinzaEsc, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(2);
+  },
+
+  /* O personagem em pé, com a sombra no chão que o põe num lugar (é a
+     mesma ideia do palco do título: sem a sombra ele flutua). */
+  poeBoneco: function (x, pes, escala, humor) {
+    if (!GameState.charKey || typeof spriteChar !== 'function') return;
+    var ch = spriteChar(GameState.charKey, GameState.genero);
+    if (!ch || !this.textures.exists(ch)) return;
+    var g = this.add.graphics().setDepth(1);
+    g.fillStyle(0x000000, 0.4).fillEllipse(x, pes - 2, 34 * escala, 8 * escala);
+    var sp = this.add.sprite(x, pes, ch, 0).setOrigin(0.5, 1).setScale(escala).setDepth(2);
+    /* ---------- o humor do boneco ----------
+       'Faz ele dançando quando ganha, triste quando perde, caído no
+       chão.' O boneco não tem pose de dança nem de derrota desenhadas, e
+       nem precisa: as fileiras que existem já dizem isso quando ANIMADAS.
+
+       Dançar é alternar os dois quadros de andar (fileira `down`, 1 e 2)
+       sem sair do lugar, com o corpo pulando e girando um pouco. Perder é
+       a fileira de SENTADO, que é a mesma imagem que o jogo usa quando
+       você cai no vagão, inclinada pra frente: o texto de derrota já diz
+       'você sentou no chão numa estação qualquer'.
+
+       A origem do sprite é o PÉ, então girar inclina o corpo a partir do
+       chão, que é o que faz parecer desabado e não flutuando torto. */
+    var base = (typeof FILEIRA_DIR !== 'undefined') ? FILEIRA_DIR : { down: 0, sentadoFrente: 18 };
+    if (humor === 'danca') {
+      var q = 1, eu = this;
+      sp.setFrame(base.down + 1);
+      this.time.addEvent({
+        delay: 170, loop: true,
+        callback: function () { q = q === 1 ? 2 : 1; if (sp.active) sp.setFrame(base.down + q); }
+      });
+      this.tweens.add({
+        targets: sp, y: pes - 5 * escala, duration: 170, yoyo: true, repeat: -1, ease: 'Quad.easeOut'
+      });
+      this.tweens.add({
+        targets: sp, angle: 7, duration: 340, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    } else if (humor === 'caido') {
+      sp.setFrame(base.sentadoFrente);
+      sp.setAngle(-8);
+      // o suspiro de quem sentou no chão: quase nada, mas não é estátua
+      this.tweens.add({
+        targets: sp, scaleY: escala * 0.97, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    } else {
+      sp.setFrame(base.down);
+      this.tweens.add({
+        targets: sp, scaleY: escala * 1.02, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    }
   },
 
   /* sem balanço (partida de treino, save antigo): o placar de sempre */

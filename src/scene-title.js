@@ -13,6 +13,8 @@
    (verde, é a ação). O que era amarelo, laranja e verde virou cinza: cor
    em oito lugares não destaca nenhum. */
 var TIT_CINZA = 0x8a8fa3;
+// as duas colunas da ficha, na mesma margem do resto da tela
+function colXFicha(col) { return col ? GW / 2 + 8 : TIT.margem + 8; }
 
 /* Um botão só pro gênero, com o SÍMBOLO no lugar da palavra: duas abas
    com HOMEM e MULHER eram duas palavras grandes no meio da tela pra uma
@@ -48,19 +50,41 @@ function simboloGenero(g, cx, cy, gen, cor) {
    três ferramentas pequenas embaixo. Cada número abaixo é o y de uma
    faixa; a tinta do tam 8 começa em y+5 e tem 14px, a do tam 16 vai
    de y+8 a y+44. */
+/* ---------- a planta, refeita do zero (20/09) ----------
+   'Muito espaçamento desnecessário, letras pequenas, momentos
+   desnecessários. Não tá bem diagramado.' Estava certo: eram sete blocos
+   com a MESMA folga entre todos, e folga igual não agrupa nada — a tela
+   virava uma pilha de coisas soltas com um boneco pequeno no meio.
+
+   A planta nova tem três decisões:
+
+   1. UMA COLUNA, UMA MARGEM. Tudo que é informação começa em x=16 e
+      termina em x=304. O que era centralizado (nome, verbo, nota) ficava
+      com a borda esquerda irregular, e borda irregular lê como bagunça.
+   2. BLOCO COLADO, VÃO ENTRE BLOCOS. Dentro de um assunto as linhas
+      encostam (6 a 10px); entre assuntos o vão é 16. Antes era ~24 em
+      toda parte.
+   3. O BONECO É O HERÓI. Ele foi de 96 pra 120px de altura e ganhou o
+      espaço que sobrou do resto. Quem escolhe personagem está olhando
+      pra ele, não pra ficha.
+
+   E o que era do topo desceu: recorde e moedas são o que você trouxe da
+   última vez, não o que decide agora, então viraram rodapé. O topo ficou
+   só com o logo e a placa da estação de casa. */
 var TIT = {
-  placaY: 10, placaH: 52,
-  topoY: 70,
-  pes: 214, escala: 2,      // o boneco de 48px vira 96: cabeça em 118
-  setaY: 150,
-  pontosY: 228,
-  nomeY: 236,
-  genY: 284,
-  poderY: 318,
-  descY: 340,
-  // o torcedor ganha a fileira dos times embaixo do gênero, e o poder desce
-  timeY: 314, poderYTime: 346, descYTime: 368,
-  fichaY: 392, fichaH: 70
+  placaY: 0, placaH: 58,      // o logo encosta no topo: a borda do canvas já é a margem
+  casaY: 68,                  // a placa da estação, em cima da cabeça (chapa 68..86)
+  pes: 252, escala: 2.5,      // 48 x 2,5 = 120 de boneco: cabeça em 132
+  setaY: 156,
+  pontosY: 262,
+  nomeY: 274,                 // tam 16: a tinta vai de 282 a 318
+  poderY: 326,
+  descY: 346,
+  // o torcedor troca a NOTA pela fileira de times: as camisas dizem o mesmo
+  timeY: 342,
+  fichaY: 366, fichaH: 56,
+  rodapeY: 534,
+  margem: 16
 };
 
 /* O JOGAR é o ladrilho largo, sozinho, porque é o que se aperta; as
@@ -70,7 +94,7 @@ var TIT = {
 /* A fileira de baixo ganhou o EXPLORAR: o jogo sem relógio, sem ponto e
    sem missão, pra andar pela estação e pelo trem à toa. 'EXPLORAR' tem 8
    letras, 96px; o botão tem 104. */
-var BOT = { yGr: GH - 106, hGr: 44, xGr: 24, gr: GW - 48, y: GH - 54, h: 38, tut: 40, tre: 88, exp: 104, som: 48, vao: 6 };
+var BOT = { yGr: 432, hGr: 52, xGr: 16, gr: GW - 32, y: 492, h: 38, tut: 40, tre: 88, exp: 104, som: 48, vao: 6 };
 BOT.x0 = Math.round((GW - (BOT.tut + BOT.tre + BOT.exp + BOT.som + BOT.vao * 3)) / 2);
 BOT.xTre = BOT.x0 + BOT.tut + BOT.vao;
 BOT.xExp = BOT.xTre + BOT.tre + BOT.vao;
@@ -116,7 +140,7 @@ var TitleScene = new Phaser.Class({
     g.fillStyle(0x06060c, 1).fillRect(0, y, GW, h);
     g.fillStyle(0x0b5fae, 1).fillRect(0, y, GW, 5);
     g.fillStyle(0xe8362c, 1).fillRect(0, y + h - 5, GW, 5);
-    txtC(this, GW / 2, y + 2, 'CATRACA', PAL.branco, 16);
+    txtC(this, GW / 2, y + 6, 'CATRACA', PAL.branco, 16);
 
     /* ---------- a régua de tamanhos ----------
        'Muitos textos com tamanhos diferentes nesse menu inicial.' Eram só
@@ -129,10 +153,10 @@ var TitleScene = new Phaser.Class({
 
        O recorde e as moedas desceram pro meio: não decidem nada na hora
        de escolher quem jogar, e no cheio disputavam com o JOGAR. */
-    this.tTopo = txt(this, 12, TIT.topoY + 4, '', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
+    this.tTopo = txt(this, TIT.margem, TIT.rodapeY, '', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
     texturasDoChao(this);
-    this.add.image(GW - 62, TIT.topoY + 9, 'caido_moeda').setDepth(1).setScale(0.8);
-    this.tPontos = txt(this, GW - 12, TIT.topoY + 4, '', PAL.cinza, 8)
+    this.add.image(GW - 54, TIT.rodapeY + 5, 'caido_moeda').setDepth(1).setScale(0.8);
+    this.tPontos = txt(this, GW - TIT.margem, TIT.rodapeY, '', PAL.cinza, 8)
       .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2);
 
     /* ---------- o palco ----------
@@ -169,15 +193,16 @@ var TitleScene = new Phaser.Class({
        preta com a tarja colorida já sabe. Ficou a chapa, e ela desceu
        pra ter ar entre ela e a linha do recorde. */
     this.gCasa = this.add.graphics().setDepth(1);
-    this.tCasa = txtC(this, GW / 2, 96, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
-    this.tNome = txtC(this, GW / 2, TIT.nomeY, '', PAL.branco, 16);
+    this.tCasa = txtC(this, GW / 2, TIT.casaY + 3, '', PAL.branco, 8).setScale(ESCALA_TEXTO / 2).setDepth(2);
+    // o nome encosta na margem da esquerda: o botão do gênero mora na direita
+    this.tNome = txt(this, TIT.margem, TIT.nomeY, '', PAL.branco, 16);
 
     /* ---------- o gênero, num botão que alterna ----------
        No teclado continua sendo a tecla G. A gestante mostra o dela
        apagado e sem toque: o verbo dela é estar grávida. */
     this.gCards = this.add.graphics().setDepth(1);
-    this.genY = TIT.genY;
-    this.zonaGen = this.add.zone(GW / 2 - GEN_ABA.w / 2, this.genY, GEN_ABA.w, GEN_ABA.h)
+    this.genY = TIT.nomeY + 10;
+    this.zonaGen = this.add.zone(GW - TIT.margem - GEN_ABA.w, this.genY, GEN_ABA.w, GEN_ABA.h)
       .setOrigin(0, 0).setInteractive();
     this.zonaGen.on('pointerdown', function () {
       var kk = eu.ordem[eu.sel];
@@ -200,14 +225,14 @@ var TitleScene = new Phaser.Class({
     this.teclaT = this.input.keyboard.addKey('T');
 
     // o verbo que só este personagem tem, e como ele funciona
-    this.tPoder = txtC(this, GW / 2, TIT.poderY, '', PAL.branco, 8);
+    this.tPoder = txt(this, TIT.margem, TIT.poderY, '', PAL.branco, 8);
     /* A explicação do verbo tinha o mesmo corpo do verbo, e duas linhas
        do mesmo tamanho brigam em vez de se completarem: o verde é a
        coisa, o cinza é a nota de rodapé dela. Em meia escala a nota cabe
        numa linha só, e a largura de quebra dobra pra ocupar a mesma
        faixa de tela. */
-    this.tDesc = txtC(this, GW / 2, TIT.descY, '', PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
-    this.tDesc.setWordWrapWidth((GW - 56) * 2).setAlign('center');
+    this.tDesc = txt(this, TIT.margem, TIT.descY, '', PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
+    this.tDesc.setMaxWidth(GW - TIT.margem * 2);
 
     /* ---------- a ficha ----------
        Dois pares lado a lado em vez de cinco linhas: em cima o que é
@@ -217,17 +242,17 @@ var TitleScene = new Phaser.Class({
        quase todo mundo, e quem não paga tem isso escrito no próprio
        poder. */
     this.gFicha = this.add.graphics().setDepth(1);
-    var colX = [40, GW / 2 + 12];
+    var colX = [TIT.margem + 8, GW / 2 + 8];
     var rot = [['GRANA', 'PASSO'], ['CARISMA', 'DESCANSO']];
     this.fichaVal = [];
     for (var lin = 0; lin < 2; lin++) {
       for (var col = 0; col < 2; col++) {
-        txt(this, colX[col], TIT.fichaY + 6 + lin * 34, rot[lin][col], PAL.cinzaEsc, 8)
+        txt(this, colX[col], TIT.fichaY + 4 + lin * 30, rot[lin][col], PAL.cinzaEsc, 8)
           .setScale(ESCALA_TEXTO / 2).setDepth(2);
       }
     }
-    this.fichaVal.push(txt(this, colX[0], TIT.fichaY + 14, '', PAL.branco, 8).setDepth(2));
-    this.fichaVal.push(txt(this, colX[1], TIT.fichaY + 14, '', PAL.branco, 8).setDepth(2));
+    this.fichaVal.push(txt(this, colX[0], TIT.fichaY + 11, '', PAL.branco, 8).setDepth(2));
+    this.fichaVal.push(txt(this, colX[1], TIT.fichaY + 11, '', PAL.branco, 8).setDepth(2));
 
     /* ---------- os ladrilhos ---------- */
     this.gBot = this.add.graphics().setDepth(1);
@@ -387,12 +412,12 @@ var TitleScene = new Phaser.Class({
        quando há os dois, duas setinhas dizendo que ele alterna. */
     var g = this.gCards; g.clear();
     var gs = generosDe(k), dois = gs.length > 1;
-    var zx = GW / 2 - GEN_ABA.w / 2, zcy = this.genY + GEN_ABA.h / 2;
+    var zx = GW - TIT.margem - GEN_ABA.w, zcy = this.genY + GEN_ABA.h / 2;
     if (dois) this.zonaGen.setInteractive(); else this.zonaGen.disableInteractive();
     g.fillStyle(aberto ? 0x22222e : 0x16161e, 1).fillRect(zx, this.genY, GEN_ABA.w, GEN_ABA.h);
     g.lineStyle(2, aberto ? TIT_CINZA : 0x3a3a4a, 1)
       .strokeRect(zx + 1, this.genY + 1, GEN_ABA.w - 2, GEN_ABA.h - 2);
-    simboloGenero(g, GW / 2, zcy, gsel, aberto ? 0xf2f0ff : 0x5a5f74);
+    simboloGenero(g, zx + GEN_ABA.w / 2, zcy, gsel, aberto ? 0xf2f0ff : 0x5a5f74);
     if (dois && aberto) {
       g.fillStyle(0x6a6c80, 1);
       g.fillTriangle(zx + 8, zcy, zx + 13, zcy - 4, zx + 13, zcy + 4);
@@ -413,8 +438,11 @@ var TitleScene = new Phaser.Class({
       // camisa clara pede letra escura
       this.tTimes[i].setColor(T.cor === 0xf0eeff ? '#14141c' : PAL.branco).setAlpha(aqui2 ? 1 : 0.7);
     }
-    this.tPoder.setY(temTime ? TIT.poderYTime : TIT.poderY);
-    this.tDesc.setY(temTime ? TIT.descYTime : TIT.descY);
+    /* O verbo fica sempre no mesmo lugar; quem sai é a NOTA, trocada
+       pela fileira de camisas no torcedor. As camisas dizem o que a nota
+       dele diria, e mover o verbo de altura fazia a tela dançar ao passar
+       o carrossel. */
+    this.tDesc.setVisible(!temTime);
 
     /* Dois personagens dividem o mesmo verbo e não jogam igual: quando
        o personagem tem rótulo próprio, é o dele que aparece. */
@@ -426,21 +454,24 @@ var TitleScene = new Phaser.Class({
     this.fichaVal[0].setText('R$ ' + c.dinheiro.toFixed(2).replace('.', ','));
     this.fichaVal[1].setText(nomeDoPasso(c.velocidade));
     var gf = this.gFicha; gf.clear();
-    gf.fillStyle(0x0d0d18, 0.92).fillRoundedRect(28, TIT.fichaY, GW - 56, TIT.fichaH, 8);
-    var bw = GW / 2 - 52;
+    gf.fillStyle(0x0d0d18, 0.92)
+      .fillRoundedRect(TIT.margem, TIT.fichaY, GW - TIT.margem * 2, TIT.fichaH, 6);
+    var bw = GW / 2 - TIT.margem - 16;
     // as duas barras no mesmo cinza: quem as separa é o rótulo em cima
-    barra(gf, 40, TIT.fichaY + 50, bw, 10, c.carisma / 100, TIT_CINZA);
-    barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, TIT_CINZA);
+    barra(gf, colXFicha(0), TIT.fichaY + 42, bw, 8, c.carisma / 100, TIT_CINZA);
+    barra(gf, colXFicha(1), TIT.fichaY + 42, bw, 8, c.descanso / c.descansoMax, TIT_CINZA);
 
     // a placa da estação de casa, na cor da linha dela
     var casaK = casaDe(k), lk = LINHAS[linhaDaEstacao(casaK)], nomeCasa = placaDe(casaK);
     this.tCasa.setText(nomeCasa).setColor(aberto ? PAL.branco : PAL.cinzaEsc);
     var lw = nomeCasa.length * 6 + 22, lx = GW / 2 - lw / 2;
     var gc = this.gCasa; gc.clear();
-    gc.fillStyle(0x000000, 0.5).fillRect(lx + 2, 94, lw, 18);
-    gc.fillStyle(aberto ? 0x14141c : 0x101018, 1).fillRect(lx, 92, lw, 18);
-    gc.fillStyle(aberto ? lk.num : 0x2a2a3a, 1).fillRect(lx, 108, lw, 3);
-    gc.lineStyle(1, aberto ? 0x3a3a4a : 0x24242e, 1).strokeRect(lx + 0.5, 92.5, lw - 1, 17);
+    // a chapa sai do TIT.casaY: número cravado aqui envelhece na primeira mudança de planta
+    var cy = TIT.casaY;
+    gc.fillStyle(0x000000, 0.5).fillRect(lx + 2, cy + 2, lw, 20);
+    gc.fillStyle(aberto ? 0x14141c : 0x101018, 1).fillRect(lx, cy, lw, 20);
+    gc.fillStyle(aberto ? lk.num : 0x2a2a3a, 1).fillRect(lx, cy + 17, lw, 3);
+    gc.lineStyle(1, aberto ? 0x3a3a4a : 0x24242e, 1).strokeRect(lx + 0.5, cy + 0.5, lw - 1, 19);
 
     this.tTopo.setText('RECORDE ' + GameState.recorde());
     this.tPontos.setText(String(lePontos()));
