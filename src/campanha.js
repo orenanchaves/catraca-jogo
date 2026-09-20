@@ -69,7 +69,14 @@ var Campanha = {
   sobe: function (d) {
     var v = d.versao || 1;
     if (v > this.VERSAO) return null;               // de um jogo mais novo: não adivinha
-    while (v < this.VERSAO) { d = this.MIGRACOES[v](d); v++; d.versao = v; }
+    while (v < this.VERSAO) {
+      /* Subir a VERSAO e esquecer de escrever a migração estourava aqui
+         dentro, o `carrega` engolia no catch e a partida sumia sem uma
+         palavra. Falta de migração é falha de quem escreve o jogo, não
+         do save: devolve nulo e o save antigo fica onde está. */
+      if (typeof this.MIGRACOES[v] !== 'function') return null;
+      d = this.MIGRACOES[v](d); v++; d.versao = v;
+    }
     return d;
   },
   valido: function (d) {
