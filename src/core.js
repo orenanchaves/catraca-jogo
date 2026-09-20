@@ -1129,7 +1129,19 @@ var GameState = {
   /* A dificuldade sobe por trajeto feito, não por estação passada. Com
      trinta estações por dia, contar estação fazia a curva explodir no
      primeiro dia inteiro. */
-  dificuldade: function () { return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1; },
+  /* ---------- o quanto o dia aperta ----------
+     Era fórmula: subia com as pernas feitas e com o número do dia. Por
+     isso o dia difícil era difícil por ACÚMULO, e nunca porque alguém
+     quis — o que é justamente o defeito de campanha feita de dias
+     numerados. Com fase escrita (src/fases.js), quem manda é o `aperto`
+     dela: o primeiro dia de estágio é manso, o fechamento é o dia do
+     chefão. Sem fase escrita (o resto do elenco, e a temporada depois do
+     fim), vale a fórmula de sempre, que é o lado sem fim do jogo. */
+  dificuldade: function () {
+    var f = (typeof faseDe === 'function') ? faseDe(this.charKey, this.dia) : null;
+    if (f && f.aperto) return f.aperto;
+    return 1 + (this.pernasFeitas * 0.12) + (this.dia - 1) * 0.1;
+  },
   addCarisma: function (n) { this.carisma = Phaser.Math.Clamp(this.carisma + n, 0, 100); },
   /* 'A barra cheia você usa pra melhorar a sua vida, não fica pra nada':
      o que passaria do teto do descanso vira coração. Quarenta de sobra

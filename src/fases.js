@@ -13,9 +13,9 @@
    em vez de por autoria.
 
    Aqui a campanha é uma lista de OCASIÕES. Cada uma existe porque tem
-   motivo: o primeiro dia de estágio, a prova que não dá pra perder, o
-   rolê que termina no último trem. Entre uma e outra o tempo pula, e é
-   isso que deixa dez fases cobrirem um ano.
+   motivo: o primeiro dia de estágio, a reunião com hora marcada, o dia
+   do fechamento. Dentro de um ato os dias são seguidos; o tempo pula
+   ENTRE atos, e é isso que deixa poucas fases cobrirem um ano.
 
    Uma fase é um DIA INTEIRO na vida do personagem: começa quando ele sai
    de casa e acaba quando ele volta. A volta é metade da tensão do jogo,
@@ -23,19 +23,36 @@
    ida perderia justamente isso. Fase curta continua possível sem motor
    novo: é uma fase com uma perna só.
 
-   O que a fase escreve: a ocasião, o relógio e quem te procura. O que
-   acontece no caminho continua sorteado pelo jogo.
+   O que a fase escreve: a ocasião, o relógio, o aperto e quem te
+   procura. O que acontece no caminho continua sorteado pelo jogo.
 
    Personagem sem fases escritas cai na rotina de sempre (`ROTINAS`), e
    é assim que o resto do elenco continua jogável enquanto só o
    estudante tem campanha. */
 
 var FASES = {
+  /* ---------- Ato 1 do estudante: a primeira semana de estágio ----------
+     As cinco fases são os cinco dias que a HISTÓRIA já tinha escritos
+     (`HIST_DIAS.estudante`, em historia.js): a Sueli no primeiro dia, a
+     reunião do Marcão, o crachá na Sé, o café e o fechamento de sexta.
+     Antes as duas listas existiam sem se falar — a fase 2 era uma prova
+     na UNIPA enquanto o ZipZap mandava uma reunião — e o jogador ficava
+     com duas versões do mesmo dia.
+
+     Aqui não há salto de tempo: a própria história diz que é uma semana
+     ('sexta é dia de fechamento'). O salto fica entre ATOS.
+
+     `aperto` é a dificuldade ESCRITA da fase. Ela era fórmula (subia com
+     as pernas feitas e com o número do dia), e por isso o dia difícil era
+     difícil por acúmulo, nunca porque alguém quis. Agora cada ocasião diz
+     o quanto aperta: o primeiro dia é manso, a reunião tem hora marcada,
+     o fechamento é o dia do chefão. */
   estudante: [
     {
       titulo: 'PRIMEIRO DIA DE ESTÁGIO',
       quando: 'SEGUNDA',
-      premissa: 'A SUELI do RH falou 8h. Ela repetiu duas vezes.',
+      premissa: 'A SUELI do RH te espera no Paraíso. Ela falou 8h duas vezes.',
+      aperto: 1,
       pernas: [
         { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 50 },
         { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
@@ -43,50 +60,47 @@ var FASES = {
       ]
     },
     {
-      titulo: 'A PROVA DA UNIPA',
-      quando: 'QUINTA, DUAS SEMANAS DEPOIS',
-      premissa: 'Prova às 13h. Chegar depois é chegar pra assinar a lista.',
+      titulo: 'A REUNIÃO DAS 8H',
+      quando: 'TERÇA',
+      premissa: 'O MARCÃO avisou: quem chega depois das 8h fica do lado de fora.',
+      aperto: 1.6,
       pernas: [
-        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 7 * 60 + 5 },
-        { rotulo: 'A PROVA', estacao: 'VERGUEIRO', saida: 12 * 60 + 5 },
-        { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 10 }
-      ]
-    },
-    {
-      titulo: 'O ROLÊ DA UNIPA',
-      quando: 'SEXTA',
-      premissa: 'A ida é mole. A volta é 23h40, e quem manda é o último trem.',
-      pernas: [
-        { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 },
-        { rotulo: 'O ROLÊ', estacao: 'LIBERDADE', saida: 19 * 60 + 30 },
-        { rotulo: 'CASA', estacao: 'CASA', saida: 23 * 60 + 20 }
-      ]
-    },
-    {
-      titulo: 'O REMÉDIO DO PAI',
-      quando: 'SÁBADO',
-      premissa: 'Sem estágio, sem aula. Só a farmácia da Vila Mariana, e a mãe cobrando.',
-      pernas: [
-        { rotulo: 'A FARMÁCIA', estacao: 'VILA MARIANA', saida: 9 * 60 + 40 },
-        { rotulo: 'CASA', estacao: 'CASA', saida: 13 * 60 }
-      ]
-    },
-    {
-      titulo: 'O FISCAL',
-      quando: 'SEGUNDA, UM MÊS DEPOIS',
-      premissa: 'Tem alguém de colete te esperando na estação. Escapar é vencer.',
-      pernas: [
-        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 40 },
+        // sai mais tarde de propósito: a folga é menor que a da segunda
+        { rotulo: 'A REUNIÃO', estacao: 'PARAÍSO', saida: 7 * 60 + 5 },
         { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
         { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
       ]
     },
     {
-      titulo: 'A APRESENTAÇÃO',
+      titulo: 'O CRACHÁ',
       quando: 'QUARTA',
-      premissa: 'Você apresenta pro MARCÃO às 10h. O notebook da empresa vai na mochila.',
+      premissa: 'O crachá novo ficou pronto, e está no balcão da baldeação da Sé.',
+      aperto: 1.3,
       pernas: [
-        { rotulo: 'A APRESENTAÇÃO', estacao: 'PARAÍSO', saida: 8 * 60 + 20 },
+        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 45 },
+        { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
+      ]
+    },
+    {
+      titulo: 'O CAFÉ DO MARCÃO',
+      quando: 'QUINTA',
+      premissa: 'Um café do metrô pro gestor. E o pessoal da UNIPA marcou rolê hoje.',
+      aperto: 1.8,
+      pernas: [
+        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 55 },
+        { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
+        // a volta é mais tarde: é o dia do rolê, e o último trem fica perto
+        { rotulo: 'CASA', estacao: 'CASA', saida: 23 * 60 + 10 }
+      ]
+    },
+    {
+      titulo: 'O FECHAMENTO',
+      quando: 'SEXTA',
+      premissa: 'Fechamento do mês, e chegar cedo não é pedido. Tem alguém de colete na estação.',
+      aperto: 2.3,
+      pernas: [
+        { rotulo: 'O FECHAMENTO', estacao: 'PARAÍSO', saida: 6 * 60 + 30 },
         { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
         { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
       ]
