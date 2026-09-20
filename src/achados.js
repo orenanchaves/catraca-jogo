@@ -189,8 +189,8 @@ function guardaAchado(cena, id, aoGuardar) {
   if (cabeNaMochila(id)) {
     poeGuardado(id);
     // o cartão: o item girando, o nome, e o que fazer com ele
-    mostraAchado(cena, id, 'ACHOU!', g.entrega ? 'LEVE AO ACHADOS E PERDIDOS DE UMA ESTAÇÃO'
-      : 'GUARDADO NO ' + BOLSOS[b].nome + '. PODE SERVIR MAIS PRA FRENTE.');
+    mostraAchado(cena, id, 'ACHOU!', g.entrega ? 'ALGUÉM DEVE ESTAR PROCURANDO ISSO.'
+      : 'GUARDADO NO ' + BOLSOS[b].nome + '. UM DIA ISSO SERVE.');
     if (aoGuardar) aoGuardar();
     return;
   }
@@ -234,8 +234,17 @@ VagaoScene.prototype.escondeAchado = function () {
   this.achado = { id: id, x: p.x, y: p.y, onde: onde, t: 0 };
   this.gAchado = this.add.graphics().setDepth(27);
   var eu = this;
+  /* O aviso não entrega o que é ('dá pra deixar mais misterioso'): ele só
+     diz que tem alguma coisa. Descobrir o quê é andar. */
+  var pistas = [
+    ['NO TREM', 'Alguém deixou alguma coisa pra trás.'],
+    ['NO TREM', 'Tem coisa esquecida em algum carro.'],
+    ['NO TREM', 'Alguma coisa brilha quando você passa perto.'],
+    ['NO TREM', 'Este trem não está vazio como parece.']
+  ];
+  var pista = pistas[Math.floor(Math.random() * pistas.length)];
   this.time.delayedCall(1800, function () {
-    if (eu.achado && typeof avisaMissao === 'function') avisaMissao('NO TREM', 'Alguém esqueceu algo neste trem.');
+    if (eu.achado && typeof avisaMissao === 'function') avisaMissao(pista[0], pista[1]);
   });
 };
 
@@ -407,13 +416,15 @@ VagaoScene.prototype.regeneraSentado = function (dt) {
    'Se a pessoa ficar muito parada, fala: ande pelo local pra encontrar
    coisas.' Doze segundos sem andar e o jogo cutuca, sem parar nada, e
    troca a dica a cada vez. */
+/* As dicas de quem fica parado também não entregam o jogo: elas
+   sugerem. Quem anda descobre; quem lê a dica só fica curioso. */
 var DICAS_PARADO = [
-  'ANDE PELO LOCAL: TEM COISA ESCONDIDA',
-  'EXPLORE OS OITO CARROS: O ITEM RARO TÁ NUM DELES',
-  'QUEM PEDE AJUDA RENDE MISSÃO E CARISMA',
-  'SENTADO VOCÊ DESCANSA E RECUPERA CORAÇÃO',
-  'O CELULAR TRAZ A MISSÃO DO DIA',
-  'O QUE VOCÊ ACHA NO CHÃO VAI PRA MOCHILA'
+  'ANDAR REVELA O QUE ESTÁ PARADO',
+  'OS OITO CARROS NÃO SÃO IGUAIS',
+  'QUEM PEDE AJUDA LEMBRA DE VOCÊ',
+  'SENTAR DEVOLVE O QUE O DIA TIRA',
+  'O CELULAR SABE DO SEU DIA',
+  'O CHÃO DO METRÔ SEMPRE TEM ALGO'
 ];
 function dicaDeParado(cena, dt, andou, mostra) {
   if (cena.dialog || GameState.treino) { cena._parado = 0; return; }
