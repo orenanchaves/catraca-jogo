@@ -521,17 +521,18 @@ var VagaoScene = new Phaser.Class({
 
     /* ---------- a câmera ----------
        O trem tem 4640px de altura e a tela tem 576: a câmera anda com
-       você. A zona morta é alta de propósito — câmera que corrige cada
-       passo embrulha o estômago, e num jogo em que se anda pra frente e
-       pra trás o tempo todo isso apareceria rápido. Ela só começa a
-       seguir quando você sai da faixa do meio.
+       você. Tinha uma zona morta de 200px e uma perseguição mole (0,16),
+       pra não corrigir cada passo; 'a câmera tem que ser fixa e
+       acompanhar a pessoa pra onde for' — o preço da zona morta é que
+       você andava e o mundo não, e nas idas e vindas pelo corredor o
+       boneco vivia colado numa das bordas. Agora ela é presa no boneco,
+       como na estação.
 
        A UI toda (placa de rota, dica, diálogo, painel da batalha) fica
        com scrollFactor 0, presa na tela; quem anda é só o mundo. */
     var cam = this.cameras.main;
     cam.setBounds(0, 0, GW, fundoDoTrem() + 20);
-    cam.setDeadzone(GW, 200);
-    cam.startFollow(this.pl.sp, true, 0.16, 0.16);
+    cam.startFollow(this.pl.sp, true, 1, 1);
     // o centro da área jogável fica abaixo do HUD, não no meio da tela
     cam.setFollowOffset(0, -Math.round(HUD_H / 2));
     cam.centerOn(GW / 2, this.pl.sp.y);
@@ -1276,7 +1277,7 @@ var VagaoScene = new Phaser.Class({
       targets: cam, zoom: 1, scrollY: this.pl.sp.y - GH / 2 - Math.round(HUD_H / 2), scrollX: 0,
       duration: 350, ease: 'Cubic.easeInOut',
       onComplete: function () {
-        cam.startFollow(eu.pl.sp, true, 0.16, 0.16);
+        cam.startFollow(eu.pl.sp, true, 1, 1);
         cam.setFollowOffset(0, -Math.round(HUD_H / 2));
         for (var i = 0; i < (eu.uiEscondida || []).length; i++) eu.uiEscondida[i].setVisible(true);
         eu.uiEscondida = [];
@@ -1536,7 +1537,17 @@ var VagaoScene = new Phaser.Class({
     this.indoPara = null;
     this.noChao = true;
     GameState.sentado = true;
-    if (!GameState.treino) perdeVida(this, this.pl.sp, 1);
+    /* 'Não é porque caiu que tem que morrer direto, só perder um
+       coração': era um coração mesmo, mas quando era o ÚLTIMO o tranco
+       virava fim de jogo, e levar um tranco em pé não é o tipo de coisa
+       que acaba com o dia de ninguém. Agora ele cobra um coração e nunca
+       o último: no fim da linha fica meio, e quem derruba o jogador é o
+       relógio, o sono ou o carisma. */
+    if (!GameState.treino) {
+      var custo = Math.min(1, Math.max(0, GameState.coracoes - 0.5));
+      if (custo > 0) perdeVida(this, this.pl.sp, custo);
+      else this.cameras.main.shake(220, 0.005);
+    }
     this.pl.dir = this.pl.sp.x < 160 ? 'sentadoR' : 'sentadoL';
     this.pl.anima(0, false);
     sentaAnimado(this.pl);

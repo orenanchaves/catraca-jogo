@@ -110,9 +110,16 @@ var Campanha = {
 /* ---------- caiu: volta pro checkpoint ----------
    Chamado pelo vaiPraOFim antes de abrir o placar. Com checkpoint deste
    personagem, a partida não acaba: o estado volta pro último destino
-   alcançado, com o fôlego cheio e a conta da queda (R$ 5, 10 de carisma e
-   meia hora), e a estação dele abre com o recado. */
-var CUSTO_CHECKPOINT = { dinheiro: 5, carisma: 10, minutos: 30 };
+   alcançado, com o fôlego cheio e a conta da queda (R$ 5 e 10 de
+   carisma), e a estação dele abre com o recado.
+
+   'Quando reinicia o trajeto, não volta o horário': voltava, e logo em
+   seguida levava meia hora em cima, que é mais ou menos o que uma perna
+   inteira come — na tela o relógio parecia não ter andado pra trás. O
+   relógio agora volta pro horário do checkpoint e pronto. A queda
+   continua cara: custa dinheiro, custa carisma, e custa tudo o que você
+   ganhou depois do checkpoint. */
+var CUSTO_CHECKPOINT = { dinheiro: 5, carisma: 10 };
 function voltaAoCheckpoint(scene) {
   if (GameState.treino || GameState.explorar || !GameState.char) return false;
   var d = Campanha.tem(GameState.charKey);
@@ -124,10 +131,10 @@ function voltaAoCheckpoint(scene) {
   var multa = Math.min(CUSTO_CHECKPOINT.dinheiro, GameState.dinheiro);
   if (multa > 0) GameState.gastar(multa, 'VOLTA AO CHECKPOINT');
   GameState.carisma = Math.max(10, GameState.carisma - CUSTO_CHECKPOINT.carisma);
-  GameState.minutos = (GameState.minutos + CUSTO_CHECKPOINT.minutos) % 1440;
   GameState.minutoSaida = GameState.minutos;
-  GameState.checkpointAviso = motivo.split('\n')[0] + '\nVocê voltou pra ' + placaDe(d.origem) + '.\n-R$ ' +
-    multa.toFixed(2).replace('.', ',') + ', -' + CUSTO_CHECKPOINT.carisma + ' de carisma, +30 min.\nO que ganhou depois do checkpoint, perdeu.';
+  GameState.checkpointAviso = motivo.split('\n')[0] + '\nVocê voltou pra ' + placaDe(d.origem) + ', ' +
+    GameState.hora() + '.\n-R$ ' + multa.toFixed(2).replace('.', ',') + ', -' + CUSTO_CHECKPOINT.carisma +
+    ' de carisma.\nO que ganhou depois do checkpoint, perdeu.';
   // desliga o que estiver no ar e abre a estação do checkpoint
   var m = scene.scene.manager;
   ['Vagao', 'Baldeacao', 'Desafio', 'Briga', 'Encarada', 'Disputa', 'Zap', 'Pausa', 'Fim'].forEach(function (k) {
