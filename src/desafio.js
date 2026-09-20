@@ -241,7 +241,7 @@ var DESAFIANTES = {
     ]
   },
   mochilao: {
-    nome: 'MOCHILÃO', sprite: 'np_mochilao', pac: 75, nivel: 3,
+    nome: 'CARA DA MOCHILA', sprite: 'np_mochilao', pac: 75, nivel: 3,
     fraco: 'CALMA', resiste: 'IRONIA',
     chega: 'QUE FOI? NÃO ENCOSTEI\nEM NINGUÉM.',
     sai: 'TÁ BOM, EU TIRO\nA MOCHILA. PRONTO.',
@@ -317,6 +317,7 @@ function podeDesafiar(tipo) {
 function contaDuelo(tipo) {
   var d = duelosDoDia();
   d[tipo] = (d[tipo] || 0) + 1;
+  d._ultimo = tipo;    // ninguém encara duas vezes seguidas (ver sorteiaDesafiante)
 }
 /* ---------- a música de cada rival ----------
    'A música de cada luta muda de acordo com o rival.' A família dá o
@@ -359,13 +360,28 @@ var TORCEDORES = ['corintiano', 'palmeirense', 'saopaulino', 'santista'];
    MUNDO bateu o teto, devolve null — e quem chamou não põe desafiante
    nenhum. Antes o null virava tiozão lá no duelo (o `|| DESAFIANTES.tiozao`),
    e por isso o mesmo sujeito aparecia três vezes no mesmo dia. */
+/* 'Esse do mochilão aparece muito': o teto do dia sozinho não bastava.
+   Com seis tipos no sorteio e teto 2 em quase todos, o mesmo sujeito
+   podia sair duas vezes seguidas e ainda por cima antes de metade da
+   lista ter aparecido. Agora quem AINDA NÃO APARECEU HOJE tem a vez: o
+   sorteio só repete alguém depois de a lista ter rodado, e nunca devolve
+   o último de todos, pra não emendar dois duelos com a mesma cara. */
 function sorteiaDesafiante() {
-  for (var tent = 0; tent < 12; tent++) {
+  var d = duelosDoDia(), repetido = null;
+  for (var tent = 0; tent < 14; tent++) {
     var t = sorteiaDesafianteBruto();
-    if (t && podeDesafiar(t)) return t;
+    if (!t || t === d._ultimo || !podeDesafiar(t)) continue;
+    if (!d[t]) return t;
+    if (!repetido) repetido = t;
   }
-  // a última tentativa: qualquer um da lista que ainda caiba hoje
-  var livres = TIPOS_DESAFIO.filter(function (x) { return x !== 'torcedor' && podeDesafiar(x); });
+  if (repetido) return repetido;
+  // a última tentativa: qualquer um que ainda caiba hoje, os novos na frente
+  // sem cosplayer aqui: ele é da Liberdade, e quem decide isso é o sorteio bruto
+  var livres = TIPOS_DESAFIO.concat(TORCEDORES).filter(function (x) {
+    return x !== 'torcedor' && x !== d._ultimo && podeDesafiar(x);
+  });
+  var novos = livres.filter(function (x) { return !d[x]; });
+  if (novos.length) livres = novos;
   return livres.length ? livres[Math.floor(Math.random() * livres.length)] : null;
 }
 function sorteiaDesafianteBruto() {

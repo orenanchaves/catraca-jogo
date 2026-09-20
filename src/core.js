@@ -237,10 +237,6 @@ var BALDEACAO = 'SÉ';
    GameState.init decide (casaDe). */
 var CASA = 'ITAQUERA';
 var CASA_DO_TIME = { corinthians: 'ITAQUERA', palmeiras: 'BARRA FUNDA', saopaulo: 'SÉ', santos: 'SÉ' };
-// de que linha é a estação (a placa do título sai na cor dela)
-function linhaDaEstacao(nome) {
-  return LINHAS.vermelha.estacoes.indexOf(nome) >= 0 ? LINHAS.vermelha : LINHAS.azul;
-}
 function casaDe(charKey) {
   if (CHARS[charKey] && CHARS[charKey].times) return CASA_DO_TIME[leTime()] || 'ITAQUERA';
   return 'ITAQUERA';
@@ -261,6 +257,12 @@ function placaDe(n, max) {
 }
 var TRABALHO = 'VERGUEIRO';    // linha azul, quatro estações ao sul da Sé
 
+/* De que linha é a estação, pela CHAVE ('azul'/'vermelha'), que é o que
+   GameState.linha guarda e o que LINHAS[...] espera. Existiam duas
+   funções com este nome, e a outra devolvia o OBJETO da linha: a de
+   baixo vencia em silêncio (todo `var`/`function` de arquivo é global) e
+   quem esperava objeto lia `.num` de uma string. Era o caso da placa da
+   estação de casa, no título, que saía sem a cor da linha. */
 function linhaDaEstacao(nome) {
   return LINHAS.azul.estacoes.indexOf(nome) >= 0 ? 'azul' : 'vermelha';
 }
@@ -1666,6 +1668,41 @@ var MOD_MOCHILA = {
   }
 };
 
+/* 'Deixa ele com uma mochila bem grande, atrapalha': a do CARA DA
+   MOCHILA não é a mochila de estudante — ela passa do ombro, sobra dos
+   dois lados do corpo e desce até o quadril. De frente você vê as alças
+   e as duas bojudas saindo pelas laterais; de costas ela cobre o sujeito
+   inteiro; de lado é o que mais conta, porque é ali que se vê o quanto
+   ela avança pra trás e pega em todo mundo no corredor. */
+var MOD_MOCHILAO = {
+  down: {
+    10: '..oww.kkkk.wwo..', 11: '.owwjjjjjjjjwwo.', 12: 'owwjwjjjjjjwjwwo',
+    13: 'owwjwjjjjjjwjwwo', 14: 'owwjwjjjjjjwjwwo', 15: 'owwkjjjjjjjjkwwo',
+    16: 'owwkjjjjjjjjkwwo', 17: '.owwjjjjjjjjwwo.', 18: '..owwppppppwwo..'
+  },
+  up: {
+    10: '..owwwwwwwwwwo..', 11: '.owwwwwwwwwwwwo.', 12: 'owwwwwwwwwwwwwwo',
+    13: 'owwwwwwwwwwwwwwo', 14: 'owwwwwwwwwwwwwwo', 15: 'owwwwwwwwwwwwwwo',
+    16: 'owwkwwwwwwwwkwwo', 17: '.owwwwwwwwwwwwo.', 18: '..owwwwwwwwwwo..'
+  },
+  side: {
+    9: '..oww.kkkk......', 10: 'owwwwjjjjjj.....', 11: 'owwwojjjjjjjo...',
+    12: 'owwwojjjjjjjo...', 13: 'owwkojjjjjjjo...', 14: 'owwwojjjjjjjko..',
+    15: 'owwwojjjjjjjko..', 16: 'owwwojjjjjjjo...', 17: '.owwwojjjjjo....',
+    18: '..owwpppppp.....'
+  },
+  diagDown: {
+    10: '..oww.kkkk.wwo..', 11: '.owwjjjjjjjjwwo.', 12: 'owwjwjjjjjjwjwwo',
+    13: 'owwjwjjjjjjwjwwo', 14: 'owwjwjjjjjjwjwwo', 15: 'owwkjjjjjjjjkwwo',
+    16: 'owwkjjjjjjjjkwwo', 17: '.owwjjjjjjjjwwo.', 18: '..owwppppppwwo..'
+  },
+  diagUp: {
+    10: '..owwwwwwwwwwo..', 11: '.owwwwwwwwwwwwo.', 12: 'owwwwwwwwwwwwwwo',
+    13: 'owwwwwwwwwwwwwwo', 14: 'owwwwwwwwwwwwwwo', 15: 'owwwwwwwwwwwwwwo',
+    16: 'owwkwwwwwwwwkwwo', 17: '.owwwwwwwwwwwwo.', 18: '..owwwwwwwwwwo..'
+  }
+};
+
 var MOD_BOLSA = {
   down: {
     12: '.ojjwjjjjjjjjjo.', 13: '.ojjjwjjjjjjjjo.', 14: '.ojjjjwjjjjjjjo.',
@@ -1727,6 +1764,7 @@ var CORPOS = {
   careca: { mods: [CABELO_CARECA] },
   volumoso: { mods: [CABELO_VOLUMOSO] },
   volumoso_bolsa: { mods: [CABELO_VOLUMOSO, MOD_BOLSA] },
+  mochilao: { mods: [CABELO_VOLUMOSO, MOD_MOCHILAO] },
   coque: { herda: 'longo', mods: [CABELO_COQUE] },
   coque_saia: { herda: 'saia', mods: [CABELO_COQUE] },
   rabo: { mods: [CABELO_RABO] },
@@ -3782,7 +3820,7 @@ var DEX = [
   // o estágio do estudante (Ato 1): dois pacíficos e o primeiro chefão
   { id: 'tiktoker', nome: 'INFLUENCER', sprite: 'np_tiktoker', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Grava dancinha no corredor. Você entrou no quadro.' },
   { id: 'vendedorCurso', nome: 'VENDE CURSO', sprite: 'np_curso', desafio: true, tipo: 'VENDEDOR', onde: 'VAGÃO', desc: 'Curso de inglês em três meses. Só hoje, diz ele.' },
-  { id: 'mochilao', nome: 'MOCHILÃO', sprite: 'np_mochilao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Entrou de mochila nas costas e não tirou. Você levou.' },
+  { id: 'mochilao', nome: 'CARA DA MOCHILA', sprite: 'np_mochilao', desafio: true, tipo: 'CHATO', onde: 'VAGÃO', desc: 'Entrou de mochila nas costas e não tirou. Você levou.' },
   { id: 'sueli', nome: 'SUELI', sprite: 'np_sueli', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'Do RH. Foi quem te chamou pro estágio.' },
   { id: 'marcao', nome: 'MARCÃO', sprite: 'np_marcao', tipo: 'ESTÁGIO', onde: 'PARAÍSO', desc: 'O gestor. Repara em quem chega atrasado.' },
   { id: 'fiscal', nome: 'O FISCAL', sprite: 'np_fiscal', desafio: true, chefao: true, tipo: 'CHEFÃO', onde: 'CATRACA', desc: 'Caça bilhete clonado. Chefão do Ato 1.' },

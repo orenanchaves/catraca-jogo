@@ -1416,6 +1416,24 @@ var VagaoScene = new Phaser.Class({
     if (this.gEquil) { this.gEquil.clear().setVisible(false); this.tEquil.setVisible(false); }
   },
 
+  /* 'Às vezes buga e trava esse': a barra ficava parada na tela, com a
+     agulha congelada onde estava. Quem desenha o pêndulo é o tranco, e o
+     tranco só roda com o trem ANDANDO e sem nada por cima — então toda
+     saída antecipada do `update` (a conversa, a briga, a abordagem, o
+     disfarce, e principalmente a chegada na estação) deixava a barra
+     acesa sem ninguém pra apagar. Esta ronda roda antes de qualquer
+     saída e apaga o que não tem mais dono. */
+  vigiaEquilibrio: function () {
+    if (!this.equil) return;
+    var vale = this.estado === 'andando' && this.tranco && this.tranco.fase === 'aviso' &&
+      !(this.dialog && this.dialog.ativo) && !this.batalha && !this.abordagem &&
+      !this.disfarce && !this.encontro && !this.fuga && !this.falha;
+    if (vale) return;
+    if (this.tranco) { this.tranco.fase = 'off'; this.tranco.t = 0; }
+    this.balanca(-1);
+    this.fechaEquilibrio();
+  },
+
   /* A tentativa de equilíbrio: o corpo gira pelos pés (a origem do
      sprite é o pé) de um lado pro outro, cada vez mais, até o tranco.
      Quem está solto em pé balança muito; segurando, quase nada; as
@@ -3760,6 +3778,7 @@ var VagaoScene = new Phaser.Class({
     this.aplicaRota(dt);
     // antes das saídas antecipadas, pelo mesmo motivo da estação
     if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
+    this.vigiaEquilibrio();
 
     if (this.dialog && this.dialog.ativo) {
       // conversa aberta congela o tranco: ninguém fica torto esperando

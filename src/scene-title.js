@@ -383,7 +383,7 @@ var TitleScene = new Phaser.Class({
     barra(gf, GW / 2 + 12, TIT.fichaY + 50, bw, 10, c.descanso / c.descansoMax, 0x00e676);
 
     // a placa da estação de casa, na cor da linha dela
-    var casaK = casaDe(k), lk = linhaDaEstacao(casaK), nomeCasa = placaDe(casaK);
+    var casaK = casaDe(k), lk = LINHAS[linhaDaEstacao(casaK)], nomeCasa = placaDe(casaK);
     this.tCasa.setText(nomeCasa).setColor(aberto ? PAL.branco : PAL.cinzaEsc);
     this.tCasaRot.setColor(aberto ? PAL.cinzaEsc : '#33333f');
     var lw = nomeCasa.length * 6 + 22, lx = GW / 2 - lw / 2;
