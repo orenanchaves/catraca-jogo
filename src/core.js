@@ -6127,10 +6127,17 @@ var HudScene = new Phaser.Class({
 
     var g = this.g; g.clear();
     var temJogo = !!GameState.char && HUD_VISIVEL;
+    /* Sem jogo, o HUD inteiro some. O desenho some sozinho (o `clear`
+       acima), mas TEXTO não: BitmapText guarda o que foi escrito até
+       alguém escondê-lo, e a lista aqui tinha três dos cinco. Voltar pro
+       título depois de jogar deixava a pílula 'NV 1' e o 'SEM BATERIA'
+       pendurados em cima da placa CATRACA, que mora justamente na faixa
+       de cima da tela. */
     this.tHora.setVisible(temJogo);
     this.tFaixa.setVisible(temJogo);
     this.tBatHud.setVisible(temJogo);
-    if (!temJogo) return;
+    this.tNivelHud.setVisible(temJogo);
+    if (!temJogo) { this.tSemBat.setVisible(false); return; }
 
     var f = GameState.faixa();
     /* o painel do desktop mostra hora e faixa na beirada; era a tarja
