@@ -3775,6 +3775,19 @@ function tiraDaMuamba() {
 
 function nomeAgir() { return TOQUE_ATIVO ? 'TOQUE' : 'CLIQUE'; }
 
+/* ---------- o objeto ainda está vivo? ----------
+   Objeto destruído continua sendo VERDADEIRO. A cena do vagão reinicia a
+   cada estação e leva junto tudo que estava na tela, mas a referência
+   guardada na cena sobrevive: um `if (!this.gAlgo)` acha que já existe e
+   volta a mexer num cadáver. Mexer num cadáver estoura, e erro dentro do
+   quadro faz o Phaser PARAR de pedir quadro — o jogo congela inteiro, sem
+   nada na tela dizendo o que houve.
+
+   Já mordeu três vezes aqui: o balão da abordagem (glTexture nulo), o
+   botão de LEVANTAR e a barra do equilíbrio. Criação preguiçosa de objeto
+   de tela pergunta `vivo()`, não a referência. */
+function vivo(obj) { return !!(obj && obj.scene); }
+
 /* o verbo que só este personagem tem */
 function temPoder(p) { return !!GameState.char && GameState.char.poder === p; }
 
@@ -5090,10 +5103,20 @@ function sorteiaCaido() {
   return 'moeda';
 }
 
-/* o desenho de cada coisa, virado textura uma vez por cena */
+/* ---------- o desenho de cada coisa, virado textura UMA VEZ ----------
+   Era uma vez por cena, e isso congelava o jogo de vez em quando. A
+   moeda não muda de desenho entre a estação e o vagão, mas cada cena
+   refazia a textura, e refazer é APAGAR a de antes: as imagens da outra
+   cena ficavam apontando pra um quadro destruído, e a primeira vez que
+   o motor tentasse desenhar uma delas estourava em `glTexture` nulo —
+   com erro no quadro, o Phaser para de pedir quadro e a tela trava.
+
+   A textura mora no gerenciador do jogo, não na cena, então fazer uma
+   vez basta e nada mais some debaixo de ninguém. */
 function texturasDoChao(scene) {
   for (var k in CAIDOS) {
     if (!CAIDOS.hasOwnProperty(k)) continue;
+    if (scene.textures.exists('caido_' + k)) continue;
     (function (chave, c) {
       /* O piso da estação é cinza escuro e o do vagão é cinza claro: sem
          o halo, a moeda some num dos dois. O halo é o que faz ela ser

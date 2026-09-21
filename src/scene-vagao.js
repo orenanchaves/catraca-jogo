@@ -1380,7 +1380,7 @@ var VagaoScene = new Phaser.Class({
       vel: 0.0055 + 0.0006 * dif,               // radianos por ms: uma ida e volta a cada ~1,1 s
       zona: Math.max(0.16, 0.34 - 0.02 * dif)   // metade da faixa verde, de 0 a 1
     };
-    if (!this.gEquil) {
+    if (!vivo(this.gEquil)) {
       this.gEquil = this.add.graphics().setScrollFactor(0).setDepth(700);
       this.tEquil = txtC(this, GW / 2, 212, '', PAL.branco, 8).setScrollFactor(0).setDepth(701).setScale(ESCALA_TEXTO / 2);
     }
@@ -1416,7 +1416,7 @@ var VagaoScene = new Phaser.Class({
   fechaEquilibrio: function () {
     if (!this.equil) return;
     this.equil = null;
-    if (this.gEquil) { this.gEquil.clear().setVisible(false); this.tEquil.setVisible(false); }
+    if (vivo(this.gEquil)) { this.gEquil.clear().setVisible(false); this.tEquil.setVisible(false); }
   },
 
   /* 'Às vezes buga e trava esse': a barra ficava parada na tela, com a
@@ -2510,7 +2510,7 @@ var VagaoScene = new Phaser.Class({
   /* O botão de levantar: só existe sentado, e é a única coisa na tela
      que faz uma coisa só. Fica no pé, longe do menu de resposta. */
   botaoLevantar: function () {
-    if (!this.gLevanta) {
+    if (!vivo(this.gLevanta)) {
       var eu = this;
       this.gLevanta = this.add.graphics().setScrollFactor(0).setDepth(520);
       this.tLevanta = txtC(this, GW / 2, GH - 92, '▲ LEVANTAR', PAL.branco, 8)
