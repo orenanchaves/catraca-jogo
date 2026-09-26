@@ -31,6 +31,8 @@ var TREINO = [
   { nome: 'BATALHA DE RIMA', desc: 'toque no ritmo', cena: 'Vagao', modo: 'rima' },
   { nome: 'O GUARDA NA RONDA', desc: 'ele procura quem pulou', cena: 'Vagao', modo: 'ronda' },
   { nome: 'DAR O LUGAR', desc: 'carisma ou descanso', cena: 'Vagao', modo: 'lugar' },
+  { nome: 'DISPUTA DO BANCO', desc: 'chegue antes do outro', cena: 'Vagao', modo: 'disputaBanco' },
+  { nome: 'SURFE DO CORRIMÃO', desc: 'segure no verde da curva', cena: 'Vagao', modo: 'surfe' },
   { nome: 'VAGÃO LOTADO', desc: 'aperte sem parar', cena: 'Estacao', modo: 'empurrao', onde: 'plataforma' },
   { nome: 'PULAR A CATRACA', desc: 'sem o guarda te ver', cena: 'Estacao', modo: 'catraca', onde: 'saguao' }
 ];

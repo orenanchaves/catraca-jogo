@@ -30,6 +30,11 @@
    é assim que o resto do elenco continua jogável enquanto só o
    estudante tem campanha. */
 
+/* Dez por personagem, oito personagens, oitenta na temporada (GDD §13 e
+   a decisão de 20/09 no CAMPANHA.md). A lista de fases mostra as dez
+   mesmo pra quem ainda não tem nenhuma escrita. */
+var FASES_POR_TEMPORADA = 10;
+
 var FASES = {
   /* ---------- Ato 1 do estudante: a primeira semana de estágio ----------
      As cinco fases são os cinco dias que a HISTÓRIA já tinha escritos
@@ -103,6 +108,73 @@ var FASES = {
         { rotulo: 'O FECHAMENTO', estacao: 'PARAÍSO', saida: 6 * 60 + 30 },
         { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 13 * 60 + 10 },
         { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
+      ]
+    },
+
+    /* ---------- Ato 2 do estudante: o desgaste da rotina ----------
+       Fases 6 e 7. Aqui o tempo PULA — a fase 5 era a sexta da primeira
+       semana (Mês 1), a fase 6 é o Mês 6 e a 7 é o Mês 8. É o salto entre
+       atos que o comentário lá em cima descreve: dentro do ato os dias
+       são seguidos, entre atos não. Roteiro fiel a
+       `docs/gdd/02-biblia-narrativa.md` (Protagonista 1, fases 6-7). */
+    {
+      titulo: 'A MAQUETE NO HORÁRIO DE PICO',
+      quando: 'QUARTA',
+      premissa: 'A maquete do trabalho em grupo não pode chegar amassada. E o trem das 18h30 não tem dó.',
+      aperto: 2,
+      pernas: [
+        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 55 },
+        { rotulo: 'A UNIPA', estacao: 'VERGUEIRO', saida: 18 * 60 + 30 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
+      ]
+    },
+    {
+      titulo: 'O DILÚVIO DE VERÃO',
+      quando: 'QUINTA',
+      premissa: 'Temporal alaga a Linha Vermelha. O trem para no escuro, entre estações, por um bom tempo.',
+      aperto: 2.6,
+      pernas: [
+        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 40 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 23 * 60 + 20 }
+      ]
+    },
+
+    /* ---------- Ato 3 do estudante: o encerramento do ciclo ----------
+       Fases 8 a 10. Meses 10, 11 e 12 — o fim do contrato de um ano. A
+       fase 10 fecha a temporada inteira do estudante e passa o bastão pro
+       CLT (Bíblia Narrativa, Protagonista 1, fase 10 / Protagonista 2). A
+       campanha do CLT em si (as 10 fases dele) ainda não existe — é o
+       Tier 3 do roadmap (`docs/roadmap-gdd.md`); aqui só o fechamento
+       narrativo do estudante, pelo ZipZap (historia.js). */
+    {
+      titulo: 'A GRANDE PARALISAÇÃO OPERACIONAL',
+      quando: 'TERÇA',
+      premissa: 'Greve surpresa para a Linha Vermelha. O Marcão quer a entrega hoje do mesmo jeito.',
+      aperto: 2.8,
+      pernas: [
+        { rotulo: 'O ESTÁGIO', estacao: 'PARAÍSO', saida: 6 * 60 + 10 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 22 * 60 + 40 }
+      ]
+    },
+    {
+      titulo: 'A PROVA FINAL E A APRESENTAÇÃO ANUAL',
+      quando: 'QUARTA',
+      premissa: 'De manhã, a apresentação contra o Caio. De noite, a prova final na UNIPA. Sem dormir no meio.',
+      aperto: 3,
+      pernas: [
+        { rotulo: 'A APRESENTAÇÃO', estacao: 'PARAÍSO', saida: 6 * 60 + 45 },
+        { rotulo: 'A PROVA', estacao: 'VERGUEIRO', saida: 21 * 60 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 23 * 60 + 30 }
+      ]
+    },
+    {
+      titulo: 'O FECHAMENTO DO CONTRATO',
+      quando: 'SEXTA',
+      premissa: 'Um ano de estágio termina hoje. O Marcão fecha a avaliação.',
+      aperto: 2.5,
+      pernas: [
+        { rotulo: 'A AVALIAÇÃO', estacao: 'PARAÍSO', saida: 6 * 60 + 50 },
+        { rotulo: 'CASA', estacao: 'CASA', saida: 19 * 60 }
       ]
     }
   ]

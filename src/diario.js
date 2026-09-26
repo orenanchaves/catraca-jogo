@@ -69,19 +69,35 @@ var LINHAS_BALANCO = [
   }
 ];
 
-/* A nota sai da fração do XP possível, e não de uma tabela de pontos: o
-   que o dia podia render muda com o dia (nem todo dia tem missão), e
-   nota que muda de régua não compara com nada. */
-function notaDoBalanco(ganho, total) {
-  if (!total) return 'C';
-  var p = ganho / total;
-  if (p >= 0.95) return 'S';
-  if (p >= 0.8) return 'A';
-  if (p >= 0.6) return 'B';
-  if (p >= 0.35) return 'C';
-  if (p > 0) return 'D';
-  return 'E';
+/* ---------- a nota da fase: os 4 pilares do GDD ----------
+   docs/gdd/01-game-design-mestre.md §3: Nota Final = Pontualidade×0,35 +
+   Descanso×0,25 + Carisma×0,25 + Economia×0,15, corte de aprovação em
+   6,0. As LINHAS_BALANCO acima continuam de pé (dão XP e o porquê,
+   linha a linha), mas quem decide se a fase passa ou repete agora é
+   esta conta — sem ela, o dia sempre "passava" contanto que você
+   chegasse em casa vivo, e reprovar não existia.
+
+   Cada pilar já nasce no orçamento de pontos que o peso dele permite
+   (3,5 / 2,5 / 2,5 / 1,5 — a soma dos quatro cheios fecha os 10,0), e o
+   pilar só decide QUANTO do próprio teto ele guarda:
+
+   - Pontualidade usa `GameState.ultimoAtraso` (minutos acima da
+     tolerância na ÚLTIMA perna com prazo do dia): a maioria das fases
+     só tem um compromisso com hora marcada, e é essa perna que interessa.
+   - Descanso é a barra JÁ NO FIM DO DIA, antes do prêmio de chegar em
+     casa (que enche ela de novo) — por isso é calculado dentro de
+     `fecha`, sempre ANTES de `GameState.chegouNoDestino()` rodar.
+   - Carisma e Economia usam o que sobrou/faltou NESTE DIA (`b.carisma`,
+     `b.grana`), não o total acumulado da campanha inteira. */
+function pilaresDoDia(b) {
+  var pontualidade = b.atrasos > 0 ? Math.max(0, 3.5 - (GameState.ultimoAtraso || 0) * 0.15) : 3.5;
+  var descansoPct = (GameState.char && GameState.char.descansoMax) ? (GameState.descanso / GameState.char.descansoMax) : 1;
+  var descanso = descansoPct >= 0.6 ? 2.5 : (descansoPct >= 0.2 ? 1.5 : 0.5);
+  var carisma = b.carisma >= 0 ? 2.5 : Math.max(0, 2.5 + b.carisma * 0.15);
+  var economia = b.grana >= 0 ? 1.5 : Math.max(0, 1.5 + b.grana * 0.03);
+  return { pontualidade: pontualidade, descanso: descanso, carisma: carisma, economia: economia };
 }
+var NOTA_DE_CORTE = 6;
 
 var Diario = {
   /* ---------- o arquivo ---------- */
@@ -184,7 +200,15 @@ var Diario = {
     b.linhas = linhas;
     b.xp = ganho;
     b.total = total;
-    b.notaLetra = notaDoBalanco(ganho, total);
+    /* os 4 pilares rodam SEMPRE antes de `GameState.chegouNoDestino()`
+       (é a própria ordem que `chegouEmCasa`/`vaiPraOFim` já seguem: o
+       balanço fecha antes de o dia virar e o descanso ser reposto). */
+    b.pilares = pilaresDoDia(b);
+    b.notaFinal = Math.round((b.pilares.pontualidade + b.pilares.descanso + b.pilares.carisma + b.pilares.economia) * 10) / 10;
+    // sem casa decimal quando é redondo ('10', não '10,0'): é o único caso de 4 caracteres, e a chapa da nota (32px) só tem espaço confortável pra 3
+    b.notaTexto = (b.notaFinal % 1 === 0) ? String(b.notaFinal) : b.notaFinal.toFixed(1).replace('.', ',');
+    // não chegar em casa (`bom` falso) nunca aprova, por pior ou melhor que a nota tivesse saído
+    b.aprovado = !!bom && b.notaFinal >= NOTA_DE_CORTE;
     if (typeof ganhaXp === 'function' && ganho > 0) b.subiu = ganhaXp(ganho);
     this.guardaResultado(b);
     return b;
@@ -208,7 +232,8 @@ var Diario = {
     for (i = 0; i < d.dias.length; i++) if (d.dias[i].n === b.dia) achou = d.dias[i];
     if (!achou) { achou = { n: b.dia, foto: null }; d.dias.push(achou); }
     /* a nota nova toma o lugar da antiga: repetir não soma, substitui */
-    achou.nota = b.notaLetra;
+    achou.nota = b.notaTexto;
+    achou.aprovado = b.aprovado;
     achou.xp = b.xp;
     achou.bom = b.bom;
     achou.linhas = b.linhas.length;

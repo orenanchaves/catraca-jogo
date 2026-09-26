@@ -34,7 +34,13 @@ var HIST_DIAS = {
     2: ['est_d2_reuniao', 'est_d2_mae'],
     3: ['est_d3_cracha', 'est_d3_bia'],
     4: ['est_d4_cafe', 'est_d4_ralls'],
-    5: ['est_d5_fechamento']
+    5: ['est_d5_fechamento'],
+    // Ato 2 e 3 (docs/gdd/02-biblia-narrativa.md, Protagonista 1, fases 6-10)
+    6: ['est_d6_maquete', 'est_d6_mae'],
+    7: ['est_d7_diluvio', 'est_d7_bia'],
+    8: ['est_d8_paralisacao', 'est_d8_caio'],
+    9: ['est_d9_apresentacao', 'est_d9_prova'],
+    10: ['est_d10_fechamento', 'est_d10_bia']
   }
 };
 
@@ -348,6 +354,302 @@ var HISTORIA = {
       okFiscal: { fala: 'Soube que deu problema no seu bilhete e você se virou. Primeira semana fechada. Bom trabalho.', fim: true },
       ok: { fala: 'Soube do fiscal... Resolve isso do bilhete, tá? Mas a primeira semana tá fechada.', fim: true },
       faltou: { fala: 'Você não veio no fechamento. Segunda a gente conversa.', fim: true }
+    }
+  },
+
+  /* ---------- Ato 2 do estudante: o desgaste da rotina ----------
+     Fases 6-7 (docs/gdd/02-biblia-narrativa.md, Protagonista 1). O salto
+     de mês (1 pra 6, 6 pra 8) é só narrativo: `GameState.dia` segue de 1
+     em 1, é a premissa de cada fase que diz quanto tempo passou. */
+  est_d6_maquete: {
+    tipo: 'principal', contato: 'BIA ❤',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Ei, hoje é dia de entregar a maquete pro grupo, lembra? Não amassa ela no metrô, por favor.',
+        escolhas: [
+          { texto: 'Vou com cuidado', vai: 'vem' },
+          { texto: 'O trem tá sempre lotado às 18h30...', vai: 'preocupa' }
+        ]
+      },
+      preocupa: {
+        fala: 'Eu sei, mas não tem outro jeito. Segura ela na frente do corpo, vai.',
+        escolhas: [{ texto: 'Bora lá', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Te vejo na sala. Boa sorte com a multidão.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'VERGUEIRO' },
+          recompensa: { xp: 45, carisma: 5 },
+          concluida: [
+            { se: { fama: ['<', 0] }, vai: 'okMalandro' },
+            { vai: 'ok' }
+          ],
+          falhou: [{ vai: 'amassou' }]
+        },
+        fim: true
+      },
+      ok: { fala: 'Maquete inteira! O grupo todo respirou aliviado.', fim: true },
+      okMalandro: { fala: 'Chegou com a maquete e ainda por cima empurrando geral pra passar, hein.', fim: true },
+      amassou: { fala: 'Ai não... um canto amassou. Vamos ver se dá pra disfarçar na apresentação.', fim: true }
+    }
+  },
+
+  // 'seis meses de estágio já': o jeito mais simples de o jogador sentir o salto de tempo entre os atos
+  est_d6_mae: {
+    tipo: 'secundaria', contato: 'MÃE',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Filh{o|a}, faz tempo que você não liga direito. Seis meses de estágio já! Tá comendo bem?',
+        escolhas: [
+          { texto: 'Tô sim, mãe, só correria', vai: 'ok' },
+          { texto: 'Verdade, vou ligar mais', vai: 'promete' }
+        ]
+      },
+      ok: { fala: 'Que bom. Não esquece de mim, viu?', fim: true },
+      promete: { fala: 'Só isso que eu peço. Cuida de você.', fim: true }
+    }
+  },
+
+  est_d7_diluvio: {
+    tipo: 'principal', contato: 'MARCÃO', foto: 'np_marcao',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Vai chover forte hoje, mas a reunião não muda de hora. Sai cedo, viu?',
+        escolhas: [
+          { texto: 'Saio já', vai: 'vem' },
+          { texto: 'A Linha 3 alaga direto...', vai: 'reclama' }
+        ]
+      },
+      reclama: {
+        fala: 'Eu sei. Por isso que eu disse: sai cedo.',
+        escolhas: [{ texto: 'Tá bom', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Se cuida no caminho.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'PARAÍSO' },
+          recompensa: { xp: 40, carisma: 5 },
+          recebe: 'marcao',
+          concluida: [
+            { se: { fama: ['<', 0] }, vai: 'okMalandro' },
+            { vai: 'ok' }
+          ],
+          falhou: [{ vai: 'atrasou' }]
+        },
+        fim: true
+      },
+      ok: { fala: 'Chegou molhad{o|a}, mas chegou. Bom trabalho.', fim: true },
+      okMalandro: {
+        fala: 'Chegou na hora... o segurança comentou que um passageiro "convenceu" o trem a parar mais tempo na plataforma. Foi você?',
+        fim: true
+      },
+      atrasou: { fala: 'O temporal atrasou todo mundo, mas a reunião não esperou. Amanhã a gente conversa.', fim: true }
+    }
+  },
+
+  // o incômodo do vagão (o Jack da Bíblia Narrativa) fica só na conversa por enquanto:
+  // o NPC de perigo social ainda não existe (Tier 2 do roadmap)
+  est_d7_bia: {
+    tipo: 'secundaria', contato: 'BIA ❤',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Vi no grupo que a Linha 3 parou no meio do túnel com esse temporal. Você tá bem? Rolou alguma confusão no vagão?',
+        escolhas: [
+          { texto: 'Rolou, mas resolvi', vai: 'resolveu' },
+          { texto: 'Só cansaço, nada demais', vai: 'cansaco' }
+        ]
+      },
+      resolveu: { fala: 'Que bom que você ficou de olho. Esses trens lotados trazem gente folgada demais.', fim: true },
+      cansaco: { fala: 'Se cuida. Descansa hoje.', fim: true }
+    }
+  },
+
+  /* ---------- Ato 3 do estudante: o encerramento do ciclo ----------
+     Fases 8-10 (Bíblia Narrativa, Protagonista 1). A fase 10 fecha a
+     temporada inteira do estudante. */
+  est_d8_paralisacao: {
+    tipo: 'principal', contato: 'MARCÃO', foto: 'np_marcao',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'A Linha 3 amanheceu parada, greve surpresa. Preciso da entrega hoje, sem desculpa.',
+        escolhas: [
+          { texto: 'Vou dar um jeito', vai: 'vem' },
+          { texto: 'Sem a Linha 3 como eu chego?', vai: 'duvida' }
+        ]
+      },
+      duvida: {
+        fala: 'Usa o mapa do celular, deve ter alguma rota. Vira e mexe.',
+        escolhas: [{ texto: 'Vou tentar', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Conto com você.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'PARAÍSO', ate: 8 * 60 + 30 },
+          recompensa: { xp: 50, carisma: 5 },
+          recebe: 'marcao',
+          concluida: [
+            { se: { fama: ['<', 0] }, vai: 'okMalandro' },
+            { vai: 'ok' }
+          ],
+          falhou: [{ vai: 'atrasou' }]
+        },
+        fim: true
+      },
+      ok: { fala: 'Chegou apesar da greve! Isso é dedicação.', fim: true },
+      okMalandro: { fala: 'Chegou rápido demais pra quem tava sem trem... enfim, chegou.', fim: true },
+      atrasou: { fala: 'A entrega atrasou. Não foi culpa sua, mas atrasou.', fim: true }
+    }
+  },
+
+  est_d8_caio: {
+    tipo: 'secundaria', contato: 'CAIO (MACSP)',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'E aí, sobreviveu à greve? Eu vim de carro com meu pai, nem senti.',
+        escolhas: [
+          { texto: 'Sobrevivi. E a gente trabalha junto, não contra', vai: 'seco' },
+          { texto: 'Deixa quieto, Caio', vai: 'ignora' }
+        ]
+      },
+      seco: { fala: 'Relaxa, é brincadeira... quase.', fim: true },
+      ignora: { fala: 'Tá bom, tá bom.', fim: true }
+    }
+  },
+
+  est_d9_apresentacao: {
+    tipo: 'principal', contato: 'MARCÃO', foto: 'np_marcao',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Hoje é a apresentação anual de métricas. Você e o Caio, lado a lado. Não vacila.',
+        escolhas: [
+          { texto: 'Tô preparad{o|a}', vai: 'vem' },
+          { texto: 'E a prova da UNIPA hoje à noite?', vai: 'noite' }
+        ]
+      },
+      noite: {
+        fala: 'Um problema de cada vez. Primeiro a apresentação.',
+        escolhas: [{ texto: 'Certo', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Boa sorte.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'PARAÍSO', ate: 8 * 60 },
+          recompensa: { xp: 50, carisma: 5 },
+          recebe: 'marcao',
+          concluida: [
+            { se: { fama: ['<', 0] }, vai: 'okMalandro' },
+            { vai: 'ok' }
+          ],
+          falhou: [{ vai: 'atrasou' }]
+        },
+        fim: true
+      },
+      ok: { fala: 'Sua apresentação foi melhor que a do Caio. Anota aí.', fim: true },
+      okMalandro: { fala: 'Boa apresentação. Só evita comentar sobre catraca perto da diretoria, tá?', fim: true },
+      atrasou: { fala: 'Chegou depois da apresentação começar. Não foi seu melhor dia.', fim: true }
+    }
+  },
+
+  // a luta contra o sono da Bíblia Narrativa também fica só na premissa/aperto da fase por enquanto (fases.js)
+  est_d9_prova: {
+    tipo: 'secundaria', contato: 'BIA ❤',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'A prova é às 21h, não esquece! E não dorme no trem de novo, hein.',
+        escolhas: [
+          { texto: 'Vou aguentar acordado', vai: 'vem' },
+          { texto: 'Tô exaust{o|a} de verdade', vai: 'cansado' }
+        ]
+      },
+      cansado: {
+        fala: 'Eu sei, mas é a última prova do ano. Aguenta mais um pouco.',
+        escolhas: [{ texto: 'Vou tentar', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Bora, você consegue.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'VERGUEIRO', depois: 21 * 60 },
+          recompensa: { xp: 35, carisma: 5 },
+          concluida: [{ vai: 'chegou' }],
+          falhou: [{ vai: 'perdeu' }]
+        },
+        fim: true
+      },
+      chegou: { fala: 'Você chegou! Vai bem na prova.', fim: true },
+      perdeu: { fala: 'Você não chegou a tempo... acabou dormindo no trem?', fim: true }
+    }
+  },
+
+  /* O dia 10: fecha a temporada inteira do estudante (`fimDeAto: 3`) e
+     passa o bastão pro CLT (Wanderley) — o encontro em si é narrado pela
+     BIA em `est_d10_bia`, como resposta do próprio jogador, porque o
+     ZipZap só fala pela boca de gente que existe no mundo (não há
+     'narrador' no motor de história). A campanha do CLT (10 fases dele)
+     é o Tier 3 do roadmap. */
+  est_d10_fechamento: {
+    tipo: 'principal', contato: 'MARCÃO', foto: 'np_marcao', fimDeAto: 3,
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Hoje eu fecho sua avaliação de estágio. Sobe na sala quando chegar.',
+        escolhas: [
+          { texto: 'Um ano já...', vai: 'reflete' },
+          { texto: 'Tô a caminho', vai: 'vem' }
+        ]
+      },
+      reflete: {
+        fala: 'Passou rápido, né? Sobe quando chegar.',
+        escolhas: [{ texto: 'Tô indo', vai: 'vem' }]
+      },
+      vem: {
+        fala: 'Te espero.',
+        missao: {
+          objetivo: { ev: 'chegou', estacao: 'PARAÍSO' },
+          recompensa: { xp: 60, carisma: 10 },
+          recebe: 'marcao',
+          concluida: [
+            { se: { fama: ['<', 0] }, vai: 'fechaMalandro' },
+            { vai: 'fecha' }
+          ],
+          falhou: [{ vai: 'faltouUltimoDia' }]
+        },
+        fim: true
+      },
+      fecha: {
+        fala: 'Passou no teste. Ano fechado, e com nota boa. Bem-vind{o|a} à próxima fase da sua vida.',
+        escolhas: [{ texto: 'Valeu por tudo, Marcão', vai: 'despedida' }]
+      },
+      fechaMalandro: {
+        fala: 'Passou no teste, mas o segurança me contou umas histórias suas do ano. Vou fingir que não ouvi.',
+        escolhas: [{ texto: 'Valeu por tudo, Marcão', vai: 'despedida' }]
+      },
+      despedida: { fala: 'Boa sorte aí fora. Quem começa cedo, chega mais rápido depois.', fim: true },
+      faltouUltimoDia: { fala: 'Você não veio no último dia. Isso não fecha bem o ano.', fim: true }
+    }
+  },
+
+  // a passagem de bastão pro CLT (Bíblia Narrativa, Protagonista 1, fase 10 / Protagonista 2): a fala do próprio jogador é quem narra o encontro
+  est_d10_bia: {
+    tipo: 'secundaria', contato: 'BIA ❤',
+    inicio: 'oi',
+    nos: {
+      oi: {
+        fala: 'Hoje é o último dia oficial, né? Como foi?',
+        escolhas: [
+          { texto: 'Bati um papo com um analista cansado no elevador. Acho que ele começa amanhã', vai: 'boa' },
+          { texto: 'Só bateu aquela nostalgia de fechar o ano', vai: 'nostalgia' }
+        ]
+      },
+      boa: { fala: 'Ave, já pensando em quem vem depois de você? Um ano só e já criando escola.', fim: true },
+      nostalgia: { fala: 'Faz sentido. Foi um ano puxado. Bora comemorar?', fim: true }
     }
   }
 };

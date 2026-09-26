@@ -68,6 +68,21 @@ var PORTAS_Y = [222, 384];             // faixas de porta, na parede direita
    de quem precisa, e é ali que mora o dilema que o jogo inteiro gira em
    volta. Desenhar as duas iguais era apagar essa diferença. */
 var MODULO_ALT = 88, MODULO_FUNDO = 62;   // 62 de profundidade: dois assentos lado a lado
+
+/* ---------- o adesivo PROIBIDO VENDA AMBULANTE ----------
+   docs/gdd/04-mapeamento-placas.md §2.C: vender debaixo da placa de
+   proibição acelera a reação do fiscal. No vagão o fiscal não tem cone,
+   ele tem o medidor (`this.fiscal`), então "reagir mais rápido" é o
+   medidor encher no DOBRO.
+
+   O adesivo vai no vidro da parede das portas, no meio do trecho entre
+   as duas (a janela de 303), que é onde o de verdade é colado. Não é todo
+   carro: três dos oito, sorteados a cada estação. Carro sem adesivo é o
+   lugar de vender, e achar esse carro é a decisão. */
+var ADESIVO_CARROS = 3;
+var ADESIVO_Y = 303;          // no carro: o meio entre as portas de 222 e 384
+var ADESIVO_RAIO = 110;       // meio trecho entre portas pra cada lado: "debaixo da placa"
+var ADESIVO_MULT = 2;
 /* Um módulo em cima e um embaixo; as portas e a preferencial ficam
    entre eles. Eles são afastados das portas de propósito: a parede
    salta 58px do módulo pro vestíbulo, e sem espaço pra essa transição
@@ -424,11 +439,78 @@ var VIRA_JANELA = { sentadoR: 'sentadoL', sentadoL: 'sentadoR', sentadoFrente: '
    #0b5fae da placa some em cima do piso escuro do vagão. */
 var COR_LUGAR = 0x3a8ee8;
 
+/* A DISPUTA DO BANCO VAZIO (docs/gdd/01-game-design-mestre.md §7): quando
+   um banco vaga na parada, um anel concêntrico encolhe sobre ele e um
+   tap rápido garante o lugar antes do outro passageiro.
+
+   A janela é o tempo do anel: ele nasce largo e fecha no assento. Não é
+   só reflexo — é corrida, porque você ainda precisa CHEGAR no banco. Um
+   segundo e meio não atravessa o carro; é o banco que vagou perto de
+   você, ou nenhum.
+
+   Isso muda de propósito a regra antiga do `trocaPassageiros` ('o lugar
+   que vagou fica seu até a próxima estação'): o banco em disputa é o
+   único que alguém retoma na hora. Os outros seguem protegidos. */
+var DISPUTA_JANELA = 2600;
+var COR_DISPUTA = 0xf2c14e;
+
+/* O SURFE DO CORRIMÃO (docs/gdd/01-game-design-mestre.md §7): "nas curvas
+   sinuosas uma agulha oscila em semicírculo; segurar a tela na faixa
+   verde central mantém o equilíbrio sem cair sobre os outros".
+
+   Parece o equilíbrio do tranco e não é. O tranco é um susto: agulha em
+   BARRA, um TOQUE, acertou ou caiu. O surfe é um trecho inteiro de via:
+   agulha em ARCO, a mão SEGURA, e o que se administra é o fôlego do
+   equilíbrio ao longo da curva. Um é reflexo, o outro é ritmo — por isso
+   são dois minigames e não um com parâmetro trocado.
+
+   A regra do dedo: segurar dentro do verde firma o corpo; segurar fora
+   é jogar o peso pro lado errado e custa caro; não segurar nada é ir
+   escorregando devagar. Soltar na hora certa faz parte.
+
+   As curvas são pares de estações vizinhas. A Luz→Tiradentes é a que o
+   próprio GDD cita; as outras vieram do traçado real. A lista cresce
+   quando alguém medir mais. */
+/* ---------- dormir no vagão ----------
+   docs/gdd/01-game-design-mestre.md §5: sentado (ou encostado na porta,
+   que é a passiva do CLT) aparece a opção de segurar a tela pra dormir;
+   a tela escurece, o trem salta de 3 a 5 estações em dois segundos e
+   volta uma fração do descanso. Com a mochila nas costas, corre risco de
+   acordar sem a carteira (os Mãos-Leves). Perto da baldeação o celular
+   vibra e um toque acorda a tempo — falhar é acordar estações adiante.
+
+   O salto não teleporta: ele ACELERA o tempo do vagão. Teleportar
+   obrigaria a reimplementar tudo o que uma chegada faz (o anúncio, a
+   troca de passageiros, o relógio, a sua estação passando) e as duas
+   cópias sairiam de sincronia na primeira mudança. Acelerando, as
+   estações acontecem de verdade — só que com a tela escura. */
+var SONO_ACEL = 14;               // quantas vezes o tempo corre com os olhos fechados
+var SONO_MIN = 3, SONO_MAX = 5;   // de três a cinco estações (GDD)
+var SONO_SEGURAR = 620;           // quanto tempo de mão na tela pra pegar no sono
+var SONO_ALARME = 2600;           // a janela do despertador, em tempo de relógio normal
+
+var SURFE_DUR = 6200;
+var COR_SURFE = 0x3ad0e8;
+var CURVAS = {
+  azul: [['LUZ', 'TIRADENTES'], ['SÉ', 'SÃO BENTO'], ['PARAÍSO', 'VERGUEIRO']],
+  vermelha: [['SÉ', 'ANHANGABAÚ'], ['BRÁS', 'BRESSER'], ['TATUAPÉ', 'CARRÃO']]
+};
+
+/* O trecho que o trem está fazendo agora é curva? Pergunta pelos dois
+   sentidos: a curva da ida é a mesma da volta. */
+function trechoEhCurva(linha, a, b) {
+  var l = CURVAS[linha] || [], i;
+  for (i = 0; i < l.length; i++) {
+    if ((l[i][0] === a && l[i][1] === b) || (l[i][0] === b && l[i][1] === a)) return true;
+  }
+  return false;
+}
+
 var VagaoScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function VagaoScene() { Phaser.Scene.call(this, { key: 'Vagao' }); },
 
-  // aberto pela tela de minigames: 'rima', 'ronda' ou 'lugar'
+  // aberto pela tela de minigames: 'rima', 'desafio', 'ronda', 'lugar' ou 'disputaBanco'
   init: function (dados) {
     this.treino = (dados && dados.treino) || null;
   },
@@ -446,6 +528,11 @@ var VagaoScene = new Phaser.Class({
     this.ronda = null;
     this.brigando = false;
     this.lugar = null;
+    this.disputaBanco = null;
+    this.surfe = null;
+    this.surfeFeito = null;
+    this.sono = null;
+    this.segurandoSono = 0;
     this.tEvento = 0; this.tDilema = 0;
     this.falha = null;
     this.sorteouFalha = false;
@@ -493,6 +580,7 @@ var VagaoScene = new Phaser.Class({
     this.cochilo = 0;         // clt: quanto tempo já está cochilando na barra
     this.pediu = false;       // idoso/gestante: um pedido por estação
     this.vendas = 0;          // ambulante: quantas vendas nesta perna
+    this.vendeuNaPerna = false;   // ...e se gritou mercadoria neste trecho (as estrelas olham isso)
     this.fiscal = 0;          // ...e o quanto o fiscal já reparou
     this.fuga = null;         // ...e o fiscal em cima de você, quando vem
     this.encarando = false;   // encarada por turnos rolando por cima desta cena
@@ -683,6 +771,31 @@ var VagaoScene = new Phaser.Class({
 
     this.gPortas = this.add.graphics().setDepth(2);
     this.pintaPortas(false);
+
+    this.adesivos = []; this.imgAdesivos = [];
+    if (temPoder('vende')) {
+      var ordem = [];
+      for (var c = 0; c < CARROS; c++) ordem.push(c);
+      ordem = Phaser.Utils.Array.Shuffle(ordem).slice(0, ADESIVO_CARROS);
+      for (var a = 0; a < ordem.length; a++) {
+        var yA = topoDoCarro(ordem[a]) - HUD_H + ADESIVO_Y;
+        this.adesivos.push(yA);
+        (this.imgAdesivos = this.imgAdesivos || []).push(this.add.image(304, yA, texturaProibida(this, 'venda')).setDepth(3));
+      }
+    }
+  },
+
+  piscaAdesivo: function (liga) {
+    var tinta = liga && (this.time.now % 420) < 210 ? 0xff9a90 : 0xffffff;
+    for (var i = 0; i < (this.imgAdesivos || []).length; i++) this.imgAdesivos[i].setTint(tinta);
+  },
+
+  // está vendendo debaixo de um adesivo?
+  sobAdesivo: function () {
+    for (var i = 0; i < (this.adesivos || []).length; i++) {
+      if (Math.abs(this.pl.sp.y - this.adesivos[i]) < ADESIVO_RAIO) return true;
+    }
+    return false;
   },
 
   /* Um módulo: banco de cima com o encosto em cima, banco de baixo com
@@ -1426,6 +1539,16 @@ var VagaoScene = new Phaser.Class({
      disfarce, e principalmente a chegada na estação) deixava a barra
      acesa sem ninguém pra apagar. Esta ronda roda antes de qualquer
      saída e apaga o que não tem mais dono. */
+  /* Mesma ronda do equilíbrio, pelo mesmo motivo: o surfe é desenhado
+     por quem só roda com o trem andando, então toda saída antecipada do
+     update deixaria o arco aceso sem dono. */
+  vigiaSurfeOrfao: function () {
+    if (!this.surfe) return;
+    var vale = this.estado === 'andando' && !(this.dialog && this.dialog.ativo) &&
+      !this.batalha && !this.abordagem && !this.disfarce && !this.encontro && !this.fuga && !this.falha;
+    if (!vale) this.fechaSurfe('saiu');
+  },
+
   vigiaEquilibrio: function () {
     if (!this.equil) return;
     var vale = this.estado === 'andando' && this.tranco && this.tranco.fase === 'aviso' &&
@@ -1629,14 +1752,21 @@ var VagaoScene = new Phaser.Class({
      virou o que sempre devia ter sido: correr. */
   podeVender: function () {
     return temPoder('vende') && !this.sentadoEm && !this.noChao && !this.fuga &&
-      this.estado === 'andando' && this.pl.sp.x > 100 && this.pl.sp.x < 224;
+      this.estado === 'andando' && this.pl.sp.x > 100 && this.pl.sp.x < 224 &&
+      GameState.estoque > 0;
   },
 
   vende: function () {
     var lot = GameState.lotacao();
     var m = tiraDaMuamba();
     this.vendas++;
-    this.fiscal += m.risco + this.vendas * 3;
+    GameState.estoque = Math.max(0, GameState.estoque - 1);
+    this.vendeuNaPerna = true;                 // vender é o que segura as estrelas acesas
+    this.fiscal += (m.risco + this.vendas * 3) * (this.sobAdesivo() ? ADESIVO_MULT : 1);
+    /* Estrela sobe com o calor do carro, não com cada venda: é chamar o
+       guarda que te marca. O aviso de caixa vazia entra aqui porque é o
+       único lugar que sabe que ela acabou AGORA. */
+    if (GameState.estoque === 0) this.flash('ACABOU A CAIXA.');
     GameState.addDescanso(-3);
     /* O grito vai na mesma placa em que o rimador manda os versos —
        eles nunca dividem o vagão, mas se dividirem, quem está com o
@@ -1748,6 +1878,31 @@ var VagaoScene = new Phaser.Class({
         }
         if (b) eu.senta(b);
         eu.dilemaDoLugar();
+      } else if (eu.treino === 'disputaBanco') {
+        /* No treino o banco é aberto na mão: fora dele quem abre é a
+           parada (`chega`), e esperar uma estação inteira pra treinar
+           trinta segundos de minigame não é treino. */
+        var meuD = carroDe(eu.pl.sp.y), alvo = null, dD = 1e9, k;
+        for (k = 0; k < eu.bancos.length; k++) {
+          var cd = eu.bancos[k];
+          if (cd.carro !== meuD || cd.npc === 'player') continue;
+          var dk = Math.hypot(cd.x - eu.pl.sp.x, cd.y + 24 - eu.pl.sp.y);
+          if (dk < dD) { dD = dk; alvo = cd; }
+        }
+        if (alvo) {
+          if (alvo.npc) {
+            var kk = eu.gente.indexOf(alvo.npc);
+            if (kk >= 0) eu.gente.splice(kk, 1);
+            alvo.npc.destroy();
+            alvo.npc = null;
+          }
+          eu.comecaDisputaBanco(alvo);
+        }
+      } else if (eu.treino === 'surfe') {
+        /* No treino a curva é aberta na mão: esperar o trem chegar num
+           trecho sinuoso pra treinar seis segundos não é treino. */
+        if (eu.segurando) eu.soltaBarra();
+        eu.comecaSurfe();
       }
       eu.treinoFase = 'rodando';
     });
@@ -1759,6 +1914,8 @@ var VagaoScene = new Phaser.Class({
     else if (this.treino === 'desafio') ativo = !!this.abordagem;
     else if (this.treino === 'ronda') ativo = !!(this.ronda || this.fuga);
     else if (this.treino === 'lugar') ativo = !!(this.lugar || this.disfarce);
+    else if (this.treino === 'disputaBanco') ativo = !!this.disputaBanco;
+    else if (this.treino === 'surfe') ativo = !!this.surfe;
     if (!ativo && this.treinoFase !== 'esperando' && this.dialog && this.dialog.ativo) ativo = true;
     return ativo;
   },
@@ -1989,8 +2146,48 @@ var VagaoScene = new Phaser.Class({
      um vagão inteiro de distância levaria um minuto de corrida em linha
      reta, que não é fuga, é esteira. Agora ele corre a 78 e o que se
      pede é o fole, não o vagão. */
+  /* ---------- a ficha do ambulante ----------
+     As cinco estrelas e o que sobrou na caixa, sempre na tela enquanto
+     ele está no vagão. É estado que muda sozinho (a estrela cai quando
+     você passa uma estação quieto), e estado que muda sozinho sem
+     aparecer é estado que o jogador descobre tarde — no enquadro.
+
+     Estrela acesa é vermelha, e a partir da terceira a ficha inteira
+     fica vermelha: é o aviso de que agora o enquadro leva a caixa. */
+  pintaFichaAmbulante: function () {
+    if (!temPoder('vende')) return;
+    if (!vivo(this.gFicha)) {
+      this.gFicha = this.add.graphics().setScrollFactor(0).setDepth(690);
+      this.tFicha = txt(this, 0, 0, '', PAL.branco, 8).setScrollFactor(0).setDepth(691).setScale(ESCALA_TEXTO / 2);
+    }
+    var g = this.gFicha, n = GameState.estrelas || 0, quente = n >= ESTRELAS_RAPA;
+    var x = 8, y = HUD_H + 6, w = 74, h = 28;
+    g.clear();
+    g.fillStyle(0x05050a, 0.82).fillRect(x, y, w, h);
+    g.fillStyle(quente ? 0xe8362c : 0x2a2a3a, 1).fillRect(x, y, w, 2);
+    // as cinco casas em cima, a caixa embaixo: as duas não se encavalam
+    var i, ex = x + 6;
+    for (i = 0; i < ESTRELAS_MAX; i++) {
+      g.fillStyle(i < n ? (quente ? 0xe8362c : 0xf2c14e) : 0x2a2a3a, 1);
+      g.fillRect(ex + i * 12, y + 6, 8, 6);
+    }
+    this.tFicha.setPosition(x + 6, y + 15).setText('CX ' + GameState.estoque)
+      .setColor(GameState.estoque > 0 ? PAL.cinza : PAL.vermelho);
+  },
+
+  /* Sobe uma estrela na ficha (0 a 5). Quem sobe é chamar o guarda, não
+     cada venda: a ficha é de quantas vezes você deu na vista, e é ela que
+     decide se o próximo enquadro só multa ou se leva a caixa junto. */
+  sobeEstrela: function () {
+    if (GameState.estrelas >= ESTRELAS_MAX) return;
+    GameState.estrelas++;
+    if (GameState.estrelas === ESTRELAS_RAPA) this.flash('TRÊS ESTRELAS.\nAGORA ELES LEVAM A CAIXA.');
+    else this.flash('MAIS UMA ESTRELA. (' + GameState.estrelas + '/' + ESTRELAS_MAX + ')');
+  },
+
   chamaFiscal: function () {
     if (this.fuga) return;
+    this.sobeEstrela();
     var patente = sorteiaGuarda();
     var portas = this.portasDoCarro(carroDe(this.pl.sp.y));
     var porta = portas[0], melhor = -1, i;
@@ -2077,11 +2274,27 @@ var VagaoScene = new Phaser.Class({
     GameState.addCarisma(-5);
     perdeVida(this, this.pl.sp, f.patente.custo);
     sfx('erro');
+    /* O RAPA (GDD): de três estrelas pra cima o enquadro não é só multa,
+       é retenção de mercadoria. Abaixo disso eles reclamam e liberam —
+       é o que faz valer a pena não deixar a ficha subir. */
+    var levou = 0;
+    if (temPoder('vende') && GameState.estoque > 0 && GameState.estrelas >= ESTRELAS_RAPA) {
+      var fatia = GameState.estrelas >= ESTRELAS_MAX ? 1 : 0.5;
+      levou = Math.ceil(GameState.estoque * fatia);
+      GameState.estoque = Math.max(0, GameState.estoque - levou);
+      GameState.stats.rapas = (GameState.stats.rapas || 0) + 1;
+    }
     var eu = this;
-    fala(this, '"Vendendo no vagão de novo?"\n' + f.patente.nome +
+    var recado = '"Vendendo no vagão de novo?"\n' + f.patente.nome +
       ' recolheu a caixa.\nR$ ' + multa.toFixed(2).replace('.', ',') + ' e ' +
       (f.patente.custo === 0.5 ? 'meio coração' :
-        (f.patente.custo === 1 ? 'um coração' : 'dois corações')) + '.', []);
+        (f.patente.custo === 1 ? 'um coração' : 'dois corações')) + '.';
+    if (levou > 0) {
+      recado = '"Essa aí eu levo."\nO RAPA. ' + f.patente.nome + ' apreendeu ' +
+        levou + (levou === 1 ? ' item' : ' itens') + ' da caixa,\nmais R$ ' +
+        multa.toFixed(2).replace('.', ',') + ' de multa.';
+    }
+    fala(this, recado, []);
     this.time.delayedCall(2400, function () { if (eu.dialog) eu.dialog.fecha(); });
   },
 
@@ -2224,6 +2437,8 @@ var VagaoScene = new Phaser.Class({
 
   senta: function (b) {
     this.fechaEquilibrio();
+    // sentar no banco em disputa É a vitória dela (o tap chegou antes do rival)
+    if (this.disputaBanco && this.disputaBanco.banco === b) { b.npc = 'player'; this.fechaDisputaBanco('ganhou'); }
     this.sentadoEm = b;
     b.npc = 'player';
     this.pl.pos(b.x, b.y + 24);
@@ -2235,7 +2450,7 @@ var VagaoScene = new Phaser.Class({
     Missoes.conta('sentou');
     sfx('ok');
     // a primeira vez que senta é quando dá pra ensinar pra que serve
-    if (this.comSono()) this.flash('SENTOU — O SONO PASSA ▲');
+    if (this.comSono()) this.flash('SENTOU. O SONO PASSA ▲');   // '—' fora do CHARSET vira buraco
   },
 
   levanta: function () {
@@ -3439,6 +3654,383 @@ var VagaoScene = new Phaser.Class({
     this.comecaLugar();
   },
 
+  /* ---------- dormir e avançar ----------
+     Pode dormir quem está sentado, ou o CLT encostado na barra (a passiva
+     dele). Não pode quem está com o vagão barulhento: pregador ou rimador
+     em atividade trancam o sono, como o documento pede. */
+  podeDormir: function () {
+    if (this.sono || this.estado !== 'andando' || this.fuga || this.lugar || this.surfe) return false;
+    if (this.rimador && this.rimador.fase !== 'sai') return false;   // barulho tranca o sono (GDD)
+    if (this.sentadoEm) return true;
+    return temPoder('cochilo') && this.barraPerto().d <= ALCANCE_BARRA;
+  },
+
+  /* O mesmo dedo faz duas coisas sentado, e o que separa é o tempo:
+     TOQUE CURTO levanta (como sempre foi), MÃO SEGURADA pega no sono.
+     Quem decide é aqui, e não lá no rodapé, porque só quem mede o tempo
+     do aperto sabe qual dos dois foi — decidir no `actJust` levantaria
+     o jogador antes de o sono existir, e a opção de dormir nunca
+     aconteceria no celular, que não tem tecla X. */
+  vigiaSono: function (dt) {
+    if (this.sono) { this.atualizaSono2(dt); this.segurandoSono = 0; return; }
+    if (Ctrl.act && this.podeDormir()) {
+      this.segurandoSono = (this.segurandoSono || 0) + dt;
+      if (this.segurandoSono >= SONO_SEGURAR) {
+        this.segurandoSono = 0;
+        this.dormiuNesteAperto = true;
+        this.comecaSono();
+      }
+      return;
+    }
+    if (!Ctrl.act) {
+      var curto = this.segurandoSono > 0 && !this.dormiuNesteAperto;
+      this.segurandoSono = 0;
+      this.dormiuNesteAperto = false;
+      if (curto && this.sentadoEm) this.levanta();
+    }
+  },
+
+  comecaSono: function () {
+    var quantas = SONO_MIN + Math.floor(Math.random() * (SONO_MAX - SONO_MIN + 1));
+    this.sono = {
+      restam: quantas, total: quantas, alarme: 0, tocou: false, acordou: false,
+      idx0: GameState.idx
+    };
+    if (!vivo(this.gSono2)) this.gSono2 = this.add.graphics().setScrollFactor(0).setDepth(760);
+    if (!vivo(this.tSono2)) {
+      this.tSono2 = txtC(this, GW / 2, 300, '', PAL.branco, 8).setScrollFactor(0).setDepth(761).setScale(ESCALA_TEXTO / 2);
+    }
+    this.gSono2.setVisible(true); this.tSono2.setVisible(true);
+    sfx('porta');
+    this.flash('VOCÊ COCHILOU.');
+  },
+
+  /* Chamado a cada quadro pelo update, ANTES de tudo: ele é quem
+     multiplica o dt do mundo. O nome tem 2 porque `atualizaSono` já é o
+     das pálpebras pesadas (o sono como medidor). */
+  atualizaSono2: function (dt) {
+    var s = this.sono;
+    if (!s) return;
+    /* A estação seguinte é a sua? O celular vibra e abre a janela do
+       despertador. Uma vez por sono: acordar é decisão, não sorteio. */
+    if (!s.tocou && !s.acordou && GameState.proximaEstacaoNome() === GameState.alvoAtual()) {
+      s.tocou = true;
+      s.alarme = SONO_ALARME;
+      sfx('bipePorta');
+    }
+    if (s.alarme > 0) {
+      s.alarme -= dt;
+      if (Ctrl.actJust) { s.acordou = true; this.fechaSono('despertou'); return; }
+      if (s.alarme <= 0) this.flash('O DESPERTADOR TOCOU E VOCÊ NÃO OUVIU.');
+    }
+    if (s.restam <= 0) this.fechaSono('fim');
+  },
+
+  /* A conta das estações dormidas mora aqui: quem sabe que uma estação
+     passou é o `chega`, e é ele que avisa. */
+  contaEstacaoDormida: function () {
+    if (!this.sono) return;
+    this.sono.restam--;
+  },
+
+  fechaSono: function (motivo) {
+    var s = this.sono;
+    if (!s) return;
+    this.sono = null;
+    if (vivo(this.gSono2)) this.gSono2.clear().setVisible(false);
+    if (vivo(this.tSono2)) this.tSono2.setVisible(false);
+    var dormiu = s.total - Math.max(0, s.restam);
+    // o descanso é o prêmio de dormir, e ele cresce com o quanto se dormiu
+    GameState.addDescanso(6 + dormiu * 4);
+    if (motivo === 'despertou') {
+      sfx('ok');
+      this.flash('ACORDOU NA HORA.');
+    } else {
+      sfx(s.tocou ? 'nao' : 'ok');
+      this.flash(s.tocou ? 'ACORDOU TARDE.' : 'ACORDOU. ' + dormiu + ' ESTAÇÕES.');
+    }
+    /* Os MÃOS-LEVES (GDD §5 e §11): dormir de mochila nas costas é
+       oferecer a carteira. Na frente, ninguém acha nada — é a mesma
+       regra dos trombadinhas, e é por isso que ela mora num lugar só. */
+    if (!protegidoDePunga() && Math.random() < 0.45) this.maosLeves(dormiu);
+  },
+
+  maosLeves: function (dormiu) {
+    var d = GameState.dinheiro;
+    if (d >= 1) {
+      var levou = Math.min(d, Math.round((4 + dormiu * 3 + Math.random() * 8) * 100) / 100);
+      GameState.gastar(levou, 'MÃOS-LEVES');
+      GameState.stats.pungas = (GameState.stats.pungas || 0) + 1;
+      sfx('nao');
+      this.flash('DORMIU DE MOCHILA NAS COSTAS.\nLEVARAM R$ ' + levou.toFixed(2).replace('.', ','));
+      return;
+    }
+    var mo = GameState.mochila || {}, ch = [], k;
+    for (k in mo) if (mo[k] > 0) ch.push(k);
+    if (!ch.length) return;
+    var alvo = ch[Math.floor(Math.random() * ch.length)];
+    mo[alvo]--;
+    GameState.stats.pungas = (GameState.stats.pungas || 0) + 1;
+    sfx('nao');
+    this.flash('LEVARAM ' + (typeof nomeDaCoisa === 'function' ? nomeDaCoisa(alvo) : alvo) + ' ENQUANTO VOCÊ DORMIA.');
+  },
+
+  /* A tela de olhos fechados: escuro por cima de tudo, com a fresta que
+     o despertador abre. */
+  pintaSono2: function () {
+    var s = this.sono;
+    if (!s || !vivo(this.gSono2)) return;
+    var g = this.gSono2;
+    g.clear();
+    var escuro = s.alarme > 0 ? 0.72 : 0.9;
+    g.fillStyle(0x03030a, escuro).fillRect(0, 0, GW, GH);
+    if (s.alarme > 0) {
+      // o celular vibrando: a faixa pisca no ritmo, e o toque acorda
+      var pisca = Math.sin(this.time.now / 90) > 0;
+      g.fillStyle(pisca ? 0xf2c14e : 0x6b5a1e, 1).fillRect(0, 286, GW, 30);
+      this.tSono2.setText(nomeAgir() + ' PRA ACORDAR: ' + placaDe(GameState.alvoAtual()))
+        .setColor(PAL.preto === undefined ? PAL.branco : PAL.branco);
+    } else {
+      this.tSono2.setText('ZZZ...  ' + Math.max(0, s.restam) + ' ESTAÇÕES').setColor(PAL.cinza);
+    }
+  },
+
+  /* ---------- o surfe do corrimão ----------
+     Abre sozinho quando o trem entra numa curva com você solto em pé.
+     Quem está segurando a barra, sentado ou no chão não surfa nada: o
+     minigame existe justamente pra quem não se segurou. */
+  vigiaSurfe: function (dt) {
+    if (this.surfe) { this.atualizaSurfe(dt); return; }
+    if (this.estado !== 'andando' || GameState.treino === 'x') return;
+    if (this.segurando || this.sentadoEm || this.noChao || this.cochilando() || temPoder('cadeira')) return;
+    if (this.equil || this.lugar || this.ronda || this.fuga || this.encontro || this.abordagem ||
+        this.disputaBanco || this.falha || (this.dialog && this.dialog.ativo)) return;
+    var trecho = GameState.estacaoAtual() + '>' + GameState.proximaEstacaoNome();
+    if (this.surfeFeito === trecho) return;           // uma curva por trecho
+    if (!trechoEhCurva(GameState.linha, GameState.estacaoAtual(), GameState.proximaEstacaoNome())) return;
+    // no meio do trecho, não na saída da estação: dá tempo de o jogador ver onde está
+    if (this.t < 2200) return;
+    this.surfeFeito = trecho;
+    this.comecaSurfe();
+  },
+
+  comecaSurfe: function () {
+    var dif = GameState.dificuldade();
+    this.surfe = {
+      t: 0, dur: SURFE_DUR, firmeza: 1, acabou: false,
+      vel: 0.0032 + 0.0004 * dif,                 // radianos por ms: mais lento que o tranco, é curva e não susto
+      zona: Math.max(0.2, 0.42 - 0.025 * dif)     // metade da faixa verde, de 0 a 1
+    };
+    if (!vivo(this.gSurfe)) {
+      this.gSurfe = this.add.graphics().setScrollFactor(0).setDepth(700);
+      /* Acima da chapa do arco (que começa em 110): dentro dela o texto
+         cai em cima da agulha, que é justamente o que se precisa olhar. */
+      this.tSurfe = txtC(this, GW / 2, 92, '', PAL.branco, 8).setScrollFactor(0).setDepth(701).setScale(ESCALA_TEXTO / 2);
+    }
+    this.gSurfe.setVisible(true);
+    this.tSurfe.setVisible(true).setText('CURVA! SEGURE NO VERDE');
+    sfx('empurra');
+  },
+
+  atualizaSurfe: function (dt) {
+    var s = this.surfe;
+    if (!s || s.acabou) return;
+    /* Sentou, segurou na barra ou caiu no meio da curva: o surfe perde o
+       motivo de existir e sai de cena sem punir — quem se segurou
+       resolveu o problema do jeito certo. */
+    if (this.segurando || this.sentadoEm || this.noChao || this.estado !== 'andando') { this.fechaSurfe('saiu'); return; }
+    s.t += dt;
+    var p = Math.sin(s.t * s.vel), noVerde = Math.abs(p) < s.zona;
+    var segurando = !!Ctrl.act;
+    /* Os três regimes do dedo, e os números saíram de conta, não de
+       chute. O verde ocupa só uns 25% do vaivém (é `zona` dentro de um
+       seno), então quem joga certo passa três quartos da curva SEM
+       segurar: pra esse jogador atravessar, o ganho do verde tem que
+       valer umas 5 vezes o escorrego de quem está sem se segurar.
+
+       Medido numa curva de 6,2 s: quem só segura no verde termina de pé
+       sem nunca descer de 0,84; quem não faz nada cai aos 4,5 s; e quem
+       segura fora do verde perde fôlego mais rápido do que quem não
+       segura nada, porque segurar torto é jogar o peso pro lado errado.
+       Segurar sem pensar tinha que ser pior que não segurar — senão o
+       minigame é um botão.
+
+       Um detalhe que o teste mostrou: se houver barra ao alcance,
+       segurar AGARRA a barra (mecânica de sempre) e o surfe encerra por
+       'saiu', sem prêmio e sem tombo. Não é brecha, é o certo — quem se
+       segurou resolveu a curva do jeito que se resolve na vida. O surfe
+       é pra quem está solto no meio do corredor. */
+    if (segurando && noVerde) s.firmeza = Math.min(1, s.firmeza + dt * 0.0011);
+    else if (segurando) s.firmeza -= dt * 0.0011;
+    else s.firmeza -= dt * 0.00022;
+    this.balanca(Math.min(1, Math.abs(p) * (1 - s.firmeza) * 1.6));
+    if (s.firmeza <= 0) { this.fechaSurfe('caiu'); return; }
+    if (s.t >= s.dur) this.fechaSurfe('firmou');
+  },
+
+  fechaSurfe: function (res) {
+    var s = this.surfe;
+    if (!s) return;
+    this.surfe = null;
+    this.balanca(-1);
+    if (vivo(this.gSurfe)) { this.gSurfe.clear().setVisible(false); this.tSurfe.setVisible(false); }
+    if (res === 'caiu') {
+      sfx('nao');
+      this.flash('A CURVA TE DERRUBOU.');
+      this.caiNoChao();
+    } else if (res === 'firmou') {
+      sfx('ok');
+      GameState.addCarisma(2);
+      GameState.stats.curvasSurfadas = (GameState.stats.curvasSurfadas || 0) + 1;
+      Missoes.conta('surfouCurva');
+      this.flash('SURFOU A CURVA.');
+    }
+  },
+
+  /* O arco: meio círculo com a fatia verde no centro e a agulha correndo
+     por cima. Embaixo, o fôlego do equilíbrio, que é o que realmente
+     está em jogo — a agulha só diz pra que lado o trem está jogando. */
+  pintaSurfe: function () {
+    var s = this.surfe;
+    if (!s || !vivo(this.gSurfe)) return;
+    var g = this.gSurfe, cx = GW / 2, cy = 196, R = 74;
+    var p = Math.sin(s.t * s.vel), noVerde = Math.abs(p) < s.zona;
+    var abre = Math.PI * 0.62;                       // meia abertura do arco
+    g.clear();
+    g.fillStyle(0x05050a, 0.82).fillRoundedRect(cx - R - 12, cy - R - 12, (R + 12) * 2, R + 42, 10);
+    // o arco todo, e a fatia verde por cima dele
+    g.lineStyle(9, 0x3a2a2a, 1).beginPath().arc(cx, cy, R, Math.PI + (Math.PI - 2 * abre) / 2, 2 * Math.PI - (Math.PI - 2 * abre) / 2).strokePath();
+    g.lineStyle(9, 0x1faa59, 0.95).beginPath()
+      .arc(cx, cy, R, -Math.PI / 2 - abre * s.zona, -Math.PI / 2 + abre * s.zona).strokePath();
+    // a agulha
+    var ang = -Math.PI / 2 + p * abre;
+    var ax = cx + Math.cos(ang) * R, ay = cy + Math.sin(ang) * R;
+    g.lineStyle(3, noVerde ? 0x00e676 : 0xf2f0ff, 1).lineBetween(cx, cy, ax, ay);
+    g.fillStyle(noVerde ? 0x00e676 : 0xf2f0ff, 1).fillCircle(ax, ay, 5);
+    g.fillStyle(0xf2f0ff, 1).fillCircle(cx, cy, 3);
+    // o fôlego
+    var bw = R * 2 - 16, bx = cx - bw / 2, by = cy + 12;
+    g.fillStyle(0x08080e, 0.9).fillRect(bx, by, bw, 8);
+    g.fillStyle(s.firmeza > 0.35 ? COR_SURFE : 0xe8362c, 1).fillRect(bx + 1, by + 1, Math.max(0, (bw - 2) * s.firmeza), 6);
+  },
+
+  /* ---------- a disputa do banco vazio ----------
+     Começa sozinha na parada, quando um banco vaga perto de quem está
+     em pé (`chega`, depois do `trocaPassageiros`). Não tem botão
+     próprio: ganhar é o gesto que já existe — chegar no banco e agir —
+     só que agora contra um relógio e contra alguém. */
+  comecaDisputaBanco: function (banco) {
+    if (this.disputaBanco || !banco || banco.npc) return;
+    /* O rival sai de quem já está em pé no carro: inventar um passageiro
+       novo na hora faria a disputa parecer script, e o vagão está cheio
+       de gente que também quer sentar. Sem ninguém em pé por perto, não
+       há disputa — o banco é seu na paz, como antes.
+
+       A busca varre `gente` e não `npcExtra`: o npcExtra é bookkeeping de
+       quem embarcou, e outros sistemas tiram gente dele (o ambulante, o
+       desafiante). Procurar só lá fazia a disputa não acontecer de vez em
+       quando, sem motivo visível — que é o pior defeito possível num
+       minigame, porque parece bug do jogador. Quem está sentado é
+       descartado pelo próprio banco: sentado tem `banco.npc` apontando
+       pra ele. */
+    var meu = carroDe(this.pl.sp.y), rival = null, dist = 1e9, i;
+    for (i = 0; i < this.gente.length; i++) {
+      var p = this.gente[i];
+      if (!p || !p.sp || !p.sp.active || p === this.pl) continue;
+      if (carroDe(p.sp.y) !== meu) continue;
+      var ehSentado = false;
+      for (var s = 0; s < this.bancos.length; s++) { if (this.bancos[s].npc === p) { ehSentado = true; break; } }
+      if (ehSentado) continue;
+      var d = Math.hypot(p.sp.x - banco.x, p.sp.y - (banco.y + 24));
+      if (d < dist) { dist = d; rival = p; }
+    }
+    if (!rival) return;
+    rival.fixo = false;
+    this.disputaBanco = {
+      banco: banco, rival: rival, t: 0,
+      alvo: { x: banco.x, y: banco.y + 24 },
+      tag: txtC(this, 0, 0, 'VAGOU', PAL.branco, 8).setDepth(530).setVisible(false)
+    };
+    sfx('apito');
+  },
+
+  atualizaDisputaBanco: function (dt) {
+    var D = this.disputaBanco;
+    if (!D) return;
+    // sentou em qualquer outro lugar, ou caiu: a disputa perde o sentido
+    if (this.sentadoEm || this.noChao) { this.fechaDisputaBanco('desistiu'); return; }
+    if (D.banco.npc) { this.fechaDisputaBanco(D.banco.npc === 'player' ? 'ganhou' : 'perdeu'); return; }
+    var r = D.rival;
+    if (!r || !r.sp || !r.sp.active) { this.fechaDisputaBanco('sumiu'); return; }
+    D.t += dt;
+
+    /* O rival anda no ritmo do anel: ele encosta no banco quando a
+       janela fecha. Assim o anel não é um cronômetro abstrato colado na
+       cena — é literalmente onde o outro passageiro está. */
+    var p = Math.min(1, D.t / DISPUTA_JANELA);
+    var passo = Math.hypot(D.alvo.x - r.sp.x, D.alvo.y - r.sp.y);
+    if (passo > 2) {
+      var k = Math.min(1, dt / Math.max(60, DISPUTA_JANELA * (1 - p) + 60));
+      r.sp.x += (D.alvo.x - r.sp.x) * k;
+      r.sp.y += (D.alvo.y - r.sp.y) * k;
+      r.setDir(D.alvo.x - r.sp.x, D.alvo.y - r.sp.y);
+      r.anima(dt, true);
+    }
+    if (p >= 1) this.fechaDisputaBanco('perdeu');
+  },
+
+  fechaDisputaBanco: function (res) {
+    var D = this.disputaBanco;
+    if (!D) return;
+    this.disputaBanco = null;
+    if (D.tag) D.tag.destroy();
+    var r = D.rival;
+    if (res === 'perdeu' && r && r.sp && r.sp.active && !D.banco.npc) {
+      // ele senta de verdade: o banco perdido tem que ficar ocupado na tela
+      var k = this.npcExtra.indexOf(r);
+      if (k >= 0) this.npcExtra.splice(k, 1);
+      r.pos(D.banco.x, D.banco.y + 24);
+      r.dir = D.banco.pose;
+      r.anima(0, false);
+      r.sp.setDepth(30);
+      r.fixo = true;
+      sentaAnimado(r);
+      D.banco.npc = r;
+      sfx('nao');
+      this.flash('O BANCO FOI.');
+      return;
+    }
+    if (r) r.fixo = true;
+    if (res === 'ganhou') {
+      GameState.stats.bancosDisputados = (GameState.stats.bancosDisputados || 0) + 1;
+      Missoes.conta('ganhouBanco');
+      this.flash('O BANCO É SEU.');
+    }
+  },
+
+  /* O anel: dois círculos concêntricos encolhendo sobre o assento. O de
+     fora é o tempo que resta; quando ele encosta no de dentro, acabou. */
+  pintaDisputaBanco: function (g) {
+    var D = this.disputaBanco;
+    if (!D) return;
+    var x = D.banco.x, y = D.banco.y + 24;
+    var p = Math.min(1, D.t / DISPUTA_JANELA);
+    var raio = 6 + (1 - p) * 30;
+    var pulso = 0.6 + 0.4 * Math.sin(this.time.now / 90);
+    g.lineStyle(2, COR_DISPUTA, 0.9);
+    g.strokeCircle(x, y - 6, raio);
+    g.lineStyle(1, COR_DISPUTA, 0.45 * pulso);
+    g.strokeCircle(x, y - 6, 6);
+    g.fillStyle(COR_DISPUTA, 0.12 + 0.1 * pulso);
+    g.fillRect(x - 14, y - 20, 28, 26);
+    var ty = (y - 54 >= 140) ? y - 54 : y + 14;
+    var tx = Phaser.Math.Clamp(x, 60, GW - 60);
+    D.tag.setVisible(true).setPosition(tx, ty);
+    var lw = Math.round(D.tag.width) + 8, lh = Math.round(D.tag.height) + 4;
+    g.fillStyle(0x08080e, 0.85).fillRect(tx - lw / 2, ty - 2, lw, lh);
+    g.fillStyle(COR_DISPUTA, 1).fillRect(tx - lw / 2, ty + lh - 4, lw, 2);
+  },
+
   /* ---------- o lugar, no mundo ----------
      Quem precisa sentar vem pelo corredor com moldura azul — o azul da
      placa de preferencial — e "PRECISA SENTAR" em cima da cabeça, no
@@ -3766,6 +4358,7 @@ var VagaoScene = new Phaser.Class({
      obrigatório; agora a parada é só uma parada — quem tem destino fica
      dentro até a estação certa. Sentado ninguém é levantado à força. */
   chega: function () {
+    this.contaEstacaoDormida();
     this.estado = 'parado';
     this.t = 0;
     this.avisouPorta = false;
@@ -3798,7 +4391,32 @@ var VagaoScene = new Phaser.Class({
        atravessa a parada vira perseguição sem fim, e o vagão que para é
        exatamente onde um ambulante troca de carro na vida real. */
     if (this.fuga) { this.encerraFuga(); this.flash('O FISCAL DESCEU.'); }
+    /* A ficha esfria com discrição, não com o tempo: passar uma estação
+       inteira sem gritar mercadoria tira uma estrela. É o "dar um tempo"
+       que todo ambulante faz quando a estação está quente — e é o que
+       transforma as estrelas em decisão (vender agora ou deixar baixar)
+       em vez de contador que só sobe. */
+    if (temPoder('vende') && GameState.estrelas > 0 && !this.vendeuNaPerna) {
+      GameState.estrelas--;
+      this.flash('DEU UM TEMPO. (' + GameState.estrelas + '/' + ESTRELAS_MAX + ')');
+    }
+    this.vendeuNaPerna = false;
     this.trocaPassageiros();
+    /* Vagou um banco no seu carro e você está em pé: alguém também quer.
+       Só entra se a cena estiver livre — disputa por cima de duelo, de
+       ronda ou de pedido de lugar é confusão, não minigame. */
+    if (!this.sentadoEm && !this.noChao && !this.lugar && !this.ronda && !this.fuga && !this.disputaBanco &&
+        !this.encontro && !this.abordagem && !this.dialog) {
+      var meuC = carroDe(this.pl.sp.y), perto = null, dPerto = 1e9;
+      for (var iv = 0; iv < this.bancos.length; iv++) {
+        var bv = this.bancos[iv];
+        if (!bv.vagou || bv.npc || bv.carro !== meuC) continue;
+        var dv = Math.hypot(bv.x - this.pl.sp.x, bv.y + 24 - this.pl.sp.y);
+        if (dv < dPerto) { dPerto = dv; perto = bv; }
+      }
+      // longe demais pra alcançar na janela do anel: nem começa, pra não prometer o que não dá
+      if (perto && dPerto < 150) this.comecaDisputaBanco(perto);
+    }
     if (virou) {
       // ficou no trem até a ponta da linha: ele volta, e o desvio custa
       GameState.passaTempo(4);
@@ -3860,12 +4478,20 @@ var VagaoScene = new Phaser.Class({
   update: function (time, delta) {
     Ctrl.update();
     var dt = Math.min(delta, 50);
+    /* Dormindo, o mundo corre acelerado: as estações acontecem de
+       verdade (anúncio, troca de passageiros, relógio), só que com a
+       tela escura. A ronda vem antes de tudo porque é ela que decide o
+       dt que o resto do quadro vai usar. */
+    this.vigiaSono(dt);
+    if (this.sono) dt *= SONO_ACEL;
     // a descida roda antes de qualquer saída antecipada, senão o painel
     // congela no meio do caminho durante um diálogo ou uma briga
     this.aplicaRota(dt);
     // antes das saídas antecipadas, pelo mesmo motivo da estação
     if (this.treino) vigiaTreino(this, dt, this.treinoEmCurso);
     this.vigiaEquilibrio();
+    this.vigiaSurfeOrfao();
+    ouveMochila(this);
 
     if (this.dialog && this.dialog.ativo) {
       // conversa aberta congela o tranco: ninguém fica torto esperando
@@ -3873,7 +4499,7 @@ var VagaoScene = new Phaser.Class({
       this.dialog.update(dt); return;
     }
     if (this.abordagem) { if (this.abordagem.fase !== 'luta' && this.abordagem.fase !== 'volta') this.atualizaAbordagem(dt); return; }
-    this.vigiaDesafiantes(dt);
+    if (!this.sono) this.vigiaDesafiantes(dt);   // desafiante não aborda quem está dormindo
     // três toques rápidos abrem caminho no braço (ver empurraoNaMarra)
     if (!this.sentadoEm) empurraoNaMarra(this, this.gente, function (sp) { limitaVagao(sp); });
     if (this.batalha) { this.atualizaBatalha(dt); this.pintaCaixinha(); this.pintaUI(); return; }
@@ -3898,9 +4524,11 @@ var VagaoScene = new Phaser.Class({
 
     if (this.ronda) this.atualizaRonda(dt);
     if (this.lugar) this.atualizaLugar(dt);
+    if (this.disputaBanco) this.atualizaDisputaBanco(dt);
 
     if (this.estado === 'andando') {
       this.atualizaTranco(dt);
+      this.vigiaSurfe(dt);
       this.cobicaBarra(dt);
       this.andaAmbulante(dt);
       this.caiDoBolso(dt);
@@ -3910,8 +4538,14 @@ var VagaoScene = new Phaser.Class({
         this.tCarroAtual = 0;
         this.entregaDoCarro(carroDe(this.pl.sp.y));
       }
-      if (this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
-      if (this.dilemaPendente && !this.encena && !this.lugar && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
+      /* Dormindo, a vida social do vagão não acontece com você: nada de
+         sorteio de situação nem de dilema do lugar. Não é conveniência —
+         é a única saída possível. Com a tela preta, um diálogo aberto
+         atrás dela é um travamento: ninguém pode responder o que não vê,
+         e o mundo para de andar esperando resposta. Foi exatamente o que
+         aconteceu na primeira versão. */
+      if (!this.sono && this.eventoPendente && this.t > this.tEvento) { this.eventoPendente = false; this.sorteiaEvento(); this.pintaUI(); return; }
+      if (!this.sono && this.dilemaPendente && !this.encena && !this.lugar && this.t > this.tDilema) { this.dilemaDoLugar(); this.pintaUI(); return; }
       this.vigiaAdiantar();
       if (this.t > this.duracao) this.chega();
     } else if (this.estado === 'parado') {
@@ -3925,7 +4559,7 @@ var VagaoScene = new Phaser.Class({
         sfx('bipePorta');
         this.flash('PORTAS FECHANDO');
       }
-      if (this.t > TEMPO_PARADO) {
+      if (this.t > (this.sono ? 900 : TEMPO_PARADO)) {
         this.estado = 'andando'; this.t = 0;
         anuncia(avisoDaProxima(), avisoDaProximaEn());
         this.sorteiaRitmo();
@@ -3955,7 +4589,9 @@ var VagaoScene = new Phaser.Class({
 
     if (this.segurando && (this.sentadoEm || this.noChao)) this.soltaBarra();
     if (!this.sentadoEm && !this.noChao) {
-      var vel = GameState.char.velocidade * (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
+      // mochila na frente encurta o passo (GDD §5): 80% do que seria
+      var vel = GameState.char.velocidade * mochilaAgora().vel *
+        (0.55 + 0.45 * (GameState.descanso / GameState.char.descansoMax));
       if (Ctrl.act) vel *= 0.35;
       var dx = (Ctrl.right ? 1 : 0) - (Ctrl.left ? 1 : 0);
       var dy = (Ctrl.down ? 1 : 0) - (Ctrl.up ? 1 : 0);
@@ -4028,7 +4664,7 @@ var VagaoScene = new Phaser.Class({
   },
 
   contexto: function () {
-    var dica = '';
+    var dica = '', corDica = null;
     /* ---------- levantar nunca trava ----------
        'Às vezes trava e não dá pra sair da cadeira nem clicando.' O
        levantar morava no fim de uma fila de contextos: bastava qualquer
@@ -4037,6 +4673,15 @@ var VagaoScene = new Phaser.Class({
        isso, na tela, e o X do teclado também levanta na hora. */
     if (this.sentadoEm && Ctrl.backJust) { this.levanta(); this.pintaRota(); return; }
     if (this.contextoAchado()) { this.pintaRota(); return; }
+
+    /* Na curva, o rodapé é da curva. Sem isto ele seguia oferecendo
+       'PUXAR PAPO' com o passageiro do lado enquanto o corpo ia pro
+       chão — o dedo precisa saber que ali ele SEGURA, não toca. */
+    if (this.surfe) {
+      this.dica.setText('SEGURE NO VERDE PRA NÃO CAIR', PAL.vermelho);
+      this.pintaRota();
+      return;
+    }
 
     // tremendo e solto em pé: é a única coisa que importa agora
     if (this.tranco && this.tranco.fase === 'aviso' && !this.segurando && !this.sentadoEm && !this.noChao) {
@@ -4109,12 +4754,19 @@ var VagaoScene = new Phaser.Class({
         dica = this.dicaDoLugar();
         if (Ctrl.backJust || Ctrl.actJust) this.cedeLugar();
       } else if (this.sentadoEm) {
-        // no celular não existe tecla X: agir de novo levanta
-        dica = this.sentadoEm.pref && !temPoder('pedeLugar')
-          ? 'NA PREFERENCIAL ▲'
-          : (GameState.descanso < GameState.char.descansoMax - 1
-            ? 'DESCANSANDO ▲' : nomeAgir() + ' pra levantar');
-        if (Ctrl.backJust || Ctrl.actJust) this.levanta();
+        /* Sentado, a mão na tela virou duas coisas: soltar levanta (como
+           sempre), SEGURAR dorme (GDD §5). Por isso o levantar passou a
+           esperar a soltura — senão o dedo levantava antes de o sono
+           começar e a opção de dormir não existiria na prática. */
+        dica = this.podeDormir()
+          ? (this.segurandoSono > 120 ? 'FECHANDO OS OLHOS...' : 'SEGURE PRA DORMIR  ▲ LEVANTA')
+          : (this.sentadoEm.pref && !temPoder('pedeLugar')
+            ? 'NA PREFERENCIAL ▲'
+            : (GameState.descanso < GameState.char.descansoMax - 1
+              ? 'DESCANSANDO ▲' : nomeAgir() + ' pra levantar'));
+        /* Quem levanta é a `vigiaSono`, na soltura do dedo: aqui só
+           sobra o X do teclado, que não tem ambiguidade nenhuma. */
+        if (Ctrl.backJust) this.levanta();
       } else {
         var b = this.bancoLivrePerto();
         if (b) {
@@ -4136,8 +4788,23 @@ var VagaoScene = new Phaser.Class({
           dica = nomeAgir() + ': SENTAR NO CHÃO';
           if (Ctrl.actJust) this.sentaNoChao();
         } else if (this.podeVender()) {
-          dica = nomeAgir() + ': VENDER  (FISCAL ' + Math.round(this.fiscal) + '%)';
+          /* O rodapé é da AÇÃO, e só cabem 26 caracteres nele. A ficha
+             (estrelas e caixa) é estado, e estado que muda sozinho tem
+             que estar sempre visível, não só quando dá pra vender — ela
+             mora na `pintaFichaAmbulante`, no alto. */
+          /* 26 caracteres, medido: 'TOQUE: VENDER  (FISCAL 100%)' dava
+             336px numa faixa de 320 e o parêntese sumia pela borda. Com
+             `floor` o número para em 99 (em 100 o fiscal já foi chamado), e
+             'CLIQUE: VENDER, FISCAL 99%' fecha em 26 justos. Debaixo do
+             adesivo o aviso é outro, em vermelho, e o adesivo pisca. */
+          var sob = this.sobAdesivo();
+          dica = sob ? nomeAgir() + ': VENDER SOB A PLACA'
+            : nomeAgir() + ': VENDER, FISCAL ' + Math.floor(this.fiscal) + '%';
+          corDica = sob ? PAL.vermelho : null;
+          this.piscaAdesivo(sob);
           if (Ctrl.actJust) this.vende();
+        } else if (temPoder('vende') && GameState.estoque <= 0 && !this.fuga) {
+          dica = 'CAIXA VAZIA. AMANHÃ TEM MAIS.';
         } else if (this.segurando) {
           dica = 'NA BARRA ▲▼ ' + nomeAgir() + ': SOLTA';
           if (Ctrl.actJust) this.soltaBarra();
@@ -4165,7 +4832,9 @@ var VagaoScene = new Phaser.Class({
         }
       }
     }
-    this.dica.setText(dica);
+    // cor sempre explícita: a FaixaDica guarda a última, e o vermelho do adesivo grudaria
+    this.dica.setText(dica, corDica || PAL.amarelo);
+    if (!corDica) this.piscaAdesivo(false);
     this.pintaRota();
   },
 
@@ -4317,5 +4986,9 @@ var VagaoScene = new Phaser.Class({
        lugar: a etiqueta aparecia, a moldura e os olhos não. */
     if (this.encontro) this.pintaEncontro(gm); else this.tagEncontro.setVisible(false);
     this.pintaLugar(gm);
+    this.pintaDisputaBanco(gm);
+    this.pintaSurfe();
+    this.pintaFichaAmbulante();
+    this.pintaSono2();
   }
 });

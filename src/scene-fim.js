@@ -50,8 +50,17 @@ var FimScene = new Phaser.Class({
     Ctrl.liga(this);
     // no resultado o direcional não leva a lugar nenhum: toque em qualquer lugar age
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = false;
-    var b = this.bal, so = this.vista === 'temporada', bom = so || !!(b && b.bom);
-    sfx(so ? 'ok' : (bom ? 'vitoria' : 'fim'));
+    /* ---------- aprovado, reprovado ou morreu ----------
+       docs/gdd/01-game-design-mestre.md §3: nota ≥ 6,0 é carimbo verde
+       (aprovado); nota < 6,0 é carimbo vermelho (reprovado), e a fase
+       tranca até repetir — o botão "DE NOVO" já faz isso sozinho
+       (`deNovo`, mais abaixo, chama `Diario.volta`). `b.bom` continua
+       sendo só "chegou em casa vivo": dá pra chegar e mesmo assim
+       reprovar, e as duas coisas pintam diferente. */
+    var b = this.bal, so = this.vista === 'temporada';
+    var vivo = !!(b && b.bom), bom = so || !!(b && b.aprovado);
+    var reprovado = !so && vivo && !bom;
+    sfx(so ? 'ok' : (bom ? 'vitoria' : (reprovado ? 'nao' : 'fim')));
     var corN = so ? 0xf2c14e : (bom ? 0x1faa59 : 0xe8362c);
     var corT = so ? PAL.amarelo : (bom ? PAL.verde : PAL.vermelho);
     var g = this.add.graphics();
@@ -66,17 +75,23 @@ var FimScene = new Phaser.Class({
     g.fillStyle(0x06060c, 1).fillRect(0, 52, GW, 72);
     g.fillStyle(corN, 1).fillRect(0, 52, GW, 5);
     g.fillStyle(corN, 1).fillRect(0, 119, GW, 5);
-    txtC(this, GW / 2, 68, so ? 'A TEMPORADA' : (bom ? 'FASE CUMPRIDA' : 'FIM DE LINHA'), corT, 16);
+    txtC(this, GW / 2, 68, so ? 'A TEMPORADA' : (bom ? 'FASE CUMPRIDA' : (reprovado ? 'REPROVADO' : 'FIM DE LINHA')), corT, 16);
 
     var n = (b && b.dia) || GameState.dia || 1;
     var nome = (typeof nomeDaFase === 'function') ? nomeDaFase(GameState.charKey, n) : ('DIA ' + n);
     txtC(this, GW / 2, 104, so ? (GameState.nome || '') : nome, PAL.cinza, 8).setScale(ESCALA_TEXTO / 2);
 
     var recado = so
-      ? 'Toque numa fase pra repetir. O que veio depois dela se desfaz.'
+      /* Esta tela virou a porta da campanha (o JOGAR do título abre ela),
+         e não mais um atalho pra repetir fase. O texto diz primeiro o que
+         se faz aqui na maioria das vezes — seguir — e depois o preço de
+         voltar, que é a parte que precisa de aviso. */
+      ? 'A fase de agora abre no botão. Tocar numa fase antiga repete ela, e desfaz as seguintes.'
       : (bom
         ? ((typeof faseDe === 'function' && faseDe(GameState.charKey, n)) ? faseDe(GameState.charKey, n).premissa : 'Você chegou em casa.')
-        : (GameState.motivoFim || 'A cidade venceu hoje.'));
+        : (reprovado
+          ? ('NOTA ' + b.notaTexto + ', abaixo de 6,0. A fase precisa ser refeita.')
+          : (GameState.motivoFim || 'A cidade venceu hoje.')));
     /* BitmapText quebra linha por `setMaxWidth`, nunca por
        `setWordWrapWidth` — com o segundo a frase saía numa linha só,
        cortada nas duas pontas. E a medida é em unidade de fonte, antes
@@ -97,9 +112,84 @@ var FimScene = new Phaser.Class({
        de baixo e virou o herói da tela: grande, no alto, ao lado da nota.
        Quem terminou a fase quer ver a REAÇÃO dele antes de ler a lista. */
     this.poeBoneco(so ? 62 : 80, so ? 500 : 304, so ? 2 : 2.5,
-      so ? 'parado' : (bom ? 'danca' : 'caido'));
+      so ? 'parado' : (bom ? 'danca' : (reprovado ? 'parado' : 'caido')));
     if (!so && b) this.pintaColeta(b);
+    // só quem chegou em casa tem boletim pra carimbar; quem caiu não (`vaiPraOFim`, sem `aprovado`)
+    if (!so && vivo) this.pintaCarimbo(bom);
     this.montaBotoes(bom);
+    if (so) this.poeRecomecar();
+  },
+
+  /* ---------- recomeçar a campanha ----------
+     Esta tela virou a porta da campanha (o JOGAR do título abre ela), e
+     com isso o "Começar do começo" — que morava no diálogo de checkpoint
+     do título — ficou sem casa. Ele volta aqui, que é onde o GDD §3
+     desenha o [PERFIL / SAVES]: no rodapé da lista de fases.
+
+     Discreto de propósito, e com pergunta antes: apagar uma campanha
+     inteira não pode ser um toque a mais do que continuar ela. */
+  poeRecomecar: function () {
+    if (typeof Campanha === 'undefined' || !Campanha.tem(GameState.charKey)) return;
+    var eu = this, y = GH - 66;
+    var t = txtC(this, GW / 2, y, 'RECOMEÇAR A CAMPANHA', PAL.cinzaEsc, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(3);
+    var lw = Math.round(t.width) + 16, lh = Math.round(t.height) + 8;
+    this.add.zone(GW / 2 - lw / 2, y - 4, lw, lh).setOrigin(0, 0).setInteractive()
+      .on('pointerdown', function () { eu.perguntaRecomecar(); });
+  },
+
+  perguntaRecomecar: function () {
+    if (this.saindo) return;
+    var eu = this;
+    fala(this, 'Recomeçar a campanha do ' + (GameState.nome || 'personagem') + '?\n\nAs notas e as fases feitas somem.', [
+      { label: 'Apagar e recomeçar', cb: function () {
+        Campanha.apaga();
+        if (typeof Diario !== 'undefined') Diario.apaga();
+        eu.saindo = true;
+        sfx('catraca');
+        eu.descongela();
+        eu.scene.start('Title');
+      } },
+      { label: 'Deixa quieto', cb: function () { } }
+    ]);
+  },
+
+  /* ---------- o carimbo ----------
+     docs/gdd/01-game-design-mestre.md §3: "o carimbo verde de aprovação
+     bate na tela" / "carimbo vermelho de advertência". Bate de
+     verdade — nasce grande e torto, alpha 0, e assenta no lugar do
+     ângulo final com um solavanco só na CHEGADA (a mesma lógica de
+     squash-and-stretch da skill game-feel: overshoot na entrada, nunca
+     na saída, senão vira tique nervoso). Some com a cena, não com
+     tween próprio: um carimbo que desaparece deixa de parecer carimbo. */
+  pintaCarimbo: function (aprovado) {
+    /* Em cima do retrato, como carimbo em foto de documento. As outras
+       duas posições testadas não servem: no vão de cima ele cai em cima
+       do recado (a premissa quebra em três linhas e desce até uns 170),
+       e na chapa da nota ele tapa o número. Sobre o boneco não atrapalha
+       leitura nenhuma — o boneco é humor, não informação.
+
+       O fundo escuro é o que faz o carimbo existir contra QUALQUER
+       fundo: sem ele o verde do 'aprovado' sumia encostado no boneco,
+       porque os dois vivem no mesmo verde do resto da tela. */
+    var ang = aprovado ? -8 : -12, cor = aprovado ? PAL.verde : PAL.vermelho, num = aprovado ? 0x1faa59 : 0xe8362c;
+    var cont = this.add.container(104, 244).setDepth(6).setAlpha(0).setAngle(ang - 26).setScale(2.6);
+    var g = this.add.graphics();
+    var w = 108, h = 24;
+    g.fillStyle(0x05050a, 0.78).fillRect(-w / 2, -h / 2, w, h);
+    g.lineStyle(3, num, 1).strokeRect(-w / 2, -h / 2, w, h);
+    g.lineStyle(1, num, 0.8).strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+    var t = txt(this, 0, -3, aprovado ? 'APROVADO' : 'REPROVADO', cor, 8).setOrigin(0.5, 0.5).setScale(ESCALA_TEXTO / 2);
+    cont.add([g, t]);
+    var eu = this;
+    this.tweens.add({
+      targets: cont, alpha: 0.92, scale: 1, angle: ang, duration: 260, ease: 'Back.easeOut',
+      // o baque é na CHEGADA, não na largada: o carimbo desce e bate no fim do tween, não no começo
+      onComplete: function () {
+        sfx('carimba');
+        eu.cameras.main.shake(140, (aprovado ? 0.005 : 0.007) * TREMIDA);
+      }
+    });
   },
 
   /* ---------- o balanço, linha por linha ----------
@@ -119,8 +209,9 @@ var FimScene = new Phaser.Class({
     g.fillStyle(corN, 0.14).fillRoundedRect(nx, ny, nw, nh, 8);
     g.lineStyle(1, corN, 0.7).strokeRoundedRect(nx + 0.5, ny + 0.5, nw - 1, nh - 1, 8);
     /* A caixa da fonte tem três vezes o tamanho pedido: no 32 a letra tem
-       96 de altura, e é por isso que a chapa precisa de 86. */
-    txtC(this, nx + nw / 2, ny + 2, b.notaLetra, PAL.branco, 32);
+       96 de altura, e é por isso que a chapa precisa de 86. Era uma letra
+       (S/A/B...); agora é a nota de verdade, 0 a 10 (GDD §3). */
+    txtC(this, nx + nw / 2, ny + 2, b.notaTexto, PAL.branco, 32);
     txtC(this, nx + nw / 2, ny + nh + 8, 'XP DA FASE', PAL.cinzaEsc, 8).setScale(ESCALA_TEXTO / 2);
     txtC(this, nx + nw / 2, ny + nh + 18, '+' + b.xp, PAL.amarelo, 16);
     /* O aviso de nível vai pro pé do BONECO, na metade esquerda: no meio
@@ -163,7 +254,13 @@ var FimScene = new Phaser.Class({
       for (i = 0; i < l.length; i++) feitas[l[i].n] = l[i];
     }
     var atual = GameState.dia || 1;
-    var quantas = Math.max(temporada.length, atual);
+    /* A temporada tem DEZ fases por personagem (GDD §13), e a lista
+       mostra as dez mesmo quando só uma está escrita: as nove trancadas
+       dizem que vem história por aí sem prometer texto que ainda não
+       existe. Com `Math.max(temporada.length, atual)` sozinho, quem não
+       tem campanha escrita via uma linha só, e uma linha só não é
+       temporada — é um botão com moldura. */
+    var quantas = Math.max(temporada.length, atual, FASES_POR_TEMPORADA);
     var y0 = 170, alt = 26, eu = this, g = this.add.graphics().setDepth(1);
     this.zonasFase = [];
     for (i = 1; i <= quantas && i <= 10; i++) {
@@ -174,7 +271,8 @@ var FimScene = new Phaser.Class({
       var nomeF = (typeof nomeDaFase === 'function') ? nomeDaFase(GameState.charKey, i) : ('FASE ' + i);
       if (estado === 'trancada') nomeF = '- - -';
       g.fillStyle(estado === 'atual' ? 0x2a2418 : 0x11111c, 1).fillRect(20, y, GW - 40, alt - 4);
-      g.fillStyle(estado === 'atual' ? 0xf2c14e : (estado === 'feita' ? 0x1faa59 : 0x2a2a3a), 1)
+      // uma fase feita mas reprovada (nota < 6,0) pinta vermelho, não verde — ela tranca a seguinte até repetir
+      g.fillStyle(estado === 'atual' ? 0xf2c14e : (estado === 'feita' ? (d.aprovado === false ? 0xe8362c : 0x1faa59) : 0x2a2a3a), 1)
         .fillRect(20, y, 3, alt - 4);
       txt(this, 30, y + 5, String(i), estado === 'atual' ? PAL.amarelo : PAL.cinzaEsc, 8)
         .setScale(ESCALA_TEXTO / 2).setDepth(2);
@@ -182,7 +280,7 @@ var FimScene = new Phaser.Class({
         estado === 'atual' ? PAL.branco : (podeIr ? PAL.cinza : PAL.cinzaEsc), 8)
         .setScale(ESCALA_TEXTO / 2).setDepth(2).setMaxWidth(GW - 100);
       txt(this, GW - 30, y + 3, (d && d.nota) || (estado === 'atual' ? '►' : '-'),
-        (d && d.nota) ? PAL.verde : PAL.cinzaEsc, 8).setOrigin(1, 0).setDepth(2);
+        (d && d.nota) ? (d.aprovado === false ? PAL.vermelho : PAL.verde) : PAL.cinzaEsc, 8).setOrigin(1, 0).setDepth(2);
       var z = this.add.zone(20, y, GW - 40, alt - 4).setOrigin(0, 0).setInteractive();
       (function (num, pode) {
         z.on('pointerdown', function () { eu.marca(pode ? num : 0, !pode); });
@@ -412,8 +510,12 @@ var FimScene = new Phaser.Class({
     return '"PAULISTANO NÍVEL HARD"';
   },
 
-  update: function () {
+  update: function (time, delta) {
     Ctrl.update();
+    /* Com a pergunta de recomeçar aberta, o toque é dela: sem esta
+       guarda o mesmo dedo respondia o diálogo E apertava o botão grande
+       atrás dele. */
+    if (this.dialog && this.dialog.ativo) { this.dialog.update(delta); return; }
     // o comando de agir é o do botão grande: trocar tem que ser pedido
     if (Ctrl.actJust) this.grande();
   }

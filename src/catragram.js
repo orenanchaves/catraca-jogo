@@ -81,7 +81,9 @@ var CONQUISTAS_NOVAS = [
   { id: 'fiscal', txt: 'Vença o FISCAL', legenda: 'O fiscal não me segurou', ev: 'chefao', meta: 1, xp: 60,
     se: function (d) { return d.id === 'fiscal' && d.ok; } },
   { id: 'ato1', txt: 'Feche a primeira semana de estágio', legenda: 'Primeira semana de estágio: feita', ev: 'ato', meta: 1, xp: 50,
-    se: function (d) { return d.ato === 1; } }
+    se: function (d) { return d.ato === 1; } },
+  { id: 'temporada1', txt: 'Feche o ano de estágio do estudante', legenda: 'Um ano de estágio: fechado', ev: 'ato', meta: 1, xp: 100,
+    se: function (d) { return d.ato === 3; } }
 ];
 
 /* ---------- as antigas ficaram fáceis ----------

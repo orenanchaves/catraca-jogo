@@ -29,7 +29,8 @@ var Campanha = {
     'flags', 'vars', 'diaBase', 'diaConta',
     'dinheiro', 'carisma', 'descanso', 'coracoes', 'valeRestante', 'mochila', 'extrato', 'bateria',
     'atrasos', 'ultimoAtraso', 'pernasFeitas', 'estacoes', 'pontosDaCorrida', 'stats', 'lixo',
-    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso', 'duelosNoDia'],
+    'sacouNoDia', 'gastoNoDia', 'multasNoDia', 'fama', 'historia', 'guardados', 'amigoDoAmbulante', 'sobraDescanso', 'duelosNoDia',
+    'estrelas', 'estoque', 'mochilaFrente'],
 
   /* 'Se você morre antes da missão, perde tudo que ganhou': o XP e os
      pontos do momento do checkpoint entram no save, e voltar pro

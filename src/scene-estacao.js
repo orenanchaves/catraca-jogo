@@ -80,6 +80,44 @@ var ACH = { y: 352, h: 62, alcance: 64 };
    (218..226). Cruzar esta linha andando é passar pela catraca. */
 var CATRACA_Y = 222;
 
+/* ---------- a placa de proibição do bloqueio ----------
+   docs/gdd/04-mapeamento-placas.md §2.C e §4: pular debaixo da placa
+   dobra o alcance da vista do guarda e acelera a reação dele. Ela cobre
+   METADE das catracas que se pode pular (2 das 4; na Itaquera, 3 das 6
+   de entrada): sem um lado livre a placa não seria escolha, seria só um
+   guarda mais forte. */
+var PROIBIDA_COBRE = 2, PROIBIDA_COBRE_MEZ = 3;
+var PROIBIDA_REACAO = 4;      // quantas vezes mais ele vira pra olhar, durante o pulo agravado
+
+/* ---------- o tropeço da contramão ----------
+   §2.A: na contramão, encontrão e "brecha para a investida dos
+   Trombadinhas"; ignorar a mão da escada causa "tropeço e dreno imediato
+   de Descanso". Conta só o tempo em que você anda na contramão COM gente
+   vindo de frente, colada: escada vazia na contramão é só lenta. */
+var TROPECO_APOS = 700;       // ms colado em quem vem de frente até tropeçar
+var TROPECO_DESCANSO = 4;
+var TROPECO_PUNGA = 0.34;     // um em cada três tropeços é mão no seu bolso
+var TROPECO_RECUO = 10;       // px que o encontrão te devolve, contra o seu passo
+
+/* ---------- totem e backlight: onde a vista acaba ----------
+   §2.D: "bloqueios sólidos de linha de visão. O jogador pode se abrigar
+   rente à lateral do backlight para quebrar o campo de visão dos
+   fiscais, interromper perseguições ou esperar as rondas passarem".
+
+   Dois lugares, decididos com o Renan em 26/09:
+   - o BACKLIGHT no bloqueio, no meio das seis catracas de entrada. É ali
+     que ele serve: o guarda anda na linha das catracas olhando pra quem
+     chega, então só o que está NA linha tapa a vista dele no pulo. Coube
+     na folga do bloqueio (488px pra 428 de catraca), sem tirar nenhuma.
+   - os TOTENS soltos na área paga do mezanino, onde o fiscal do chefão
+     te caça depois da catraca.
+   A caixa que tapa a vista é a caixa DESENHADA: o que parece esconder,
+   esconde, e o cone pinta a sombra atrás dela. */
+var PAINEL_L = 30;            // no bloqueio: o vão de uma catraca e um poste, entre dois gabinetes
+var PAINEL_TOPO = 150, PAINEL_BASE = 246;   // a base é a dos gabinetes (198 + 48)
+var TOTEM_L = 16, TOTEM_ALT = 44, TOTEM_BASE = 176;   // base em 176: o guarda passa em 194, na frente
+var TOTENS = 2;
+
 /* a plataforma em coordenadas do mundo: o piso vai da faixa tátil à
    parede da direita */
 /* ---------- as duas plantas de plataforma ----------
@@ -417,6 +455,8 @@ var EstacaoScene = new Phaser.Class({
     this.liberado = !!GameState.char.gratuidade || this.entrada === 'plataforma';
     this.montaBarracas();
     this.montaGates();
+    this.montaPlacaProibida();
+    this.tropeco = 0;
     /* Cada passagem pela estacao redecide: quem pagou hoje nao carrega o
        pulo de ontem. */
     GameState.pulouCatraca = false;
@@ -485,6 +525,7 @@ var EstacaoScene = new Phaser.Class({
     this.pressao = 0;
 
     this.desenhaCenario();
+    this.montaCoberturas();
 
     /* Quem está de plantão muda a partida inteira: o menorzinho tira
        meio coração, o do meio um, o grandão dois. A roupa avisa antes
@@ -1240,16 +1281,24 @@ var EstacaoScene = new Phaser.Class({
        432. 12 + 11x34 + 42 = 428px, centrados: vão de -14 a 390. */
     if (this.mez) { X0 = MEZ.x0 + 64; X1 = MEZ.x1 - 8; TOTAL = 12; VAO = 22; VAO_LARGO = 30; }
     var larga = Math.floor(Math.random() * TOTAL);
+    // o backlight: depois da 6ª catraca, no meio das seis de entrada (só no mezanino)
+    var painelApos = this.mez ? 5 : -1;
 
     var largura = POSTE;
-    for (var k = 0; k < TOTAL; k++) largura += (k === larga ? VAO_LARGO : VAO) + POSTE;
+    for (var k = 0; k < TOTAL; k++) largura += (k === larga ? VAO_LARGO : VAO) + POSTE + (k === painelApos ? PAINEL_L + POSTE : 0);
     var x = X0 + Math.round(((X1 - X0) - largura) / 2) + POSTE;
 
     this.gates = [];
+    this.paineis = [];
     for (var i = 0; i < TOTAL; i++) {
       var vao = (i === larga) ? VAO_LARGO : VAO;
       this.gates.push({ x0: x, x1: x + vao, larga: (i === larga), fechada: false, giro: 0, alvo: 0 });
       x += vao + POSTE;
+      if (i === painelApos) {
+        // entre o gabinete da direita desta (x1..x1+14) e o da esquerda da próxima
+        this.paineis.push({ x0: x - POSTE + 13, x1: x + PAINEL_L + POSTE - 13, y0: PAINEL_TOPO, y1: PAINEL_BASE });
+        x += PAINEL_L + POSTE;
+      }
     }
 
     // fora de serviço: a porta larga é a última a fechar
@@ -2007,6 +2056,7 @@ var EstacaoScene = new Phaser.Class({
       return x > ESC_X0 && x < ESC_X1 && !(temPoder('cadeira') && this.elevadores);
     }
     if (this.bateNaLixeira(x, y)) return false;
+    if (this.bateNoTotem(x, y)) return false;
     // ---- saguão ----
     /* 22 e 298: eram 28 e 292. Doze pixels não é muito, mas neste
        saguão o meio é ocupado pelo cone do guardinha e as duas beiradas
@@ -2160,6 +2210,176 @@ var EstacaoScene = new Phaser.Class({
     return melhor;
   },
 
+  /* A placa sobre METADE das catracas puláveis, num bloco seguido DELAS
+     (uma de saída pode ficar no meio: medido, [7, 8, 10] com a 9 de saída)
+     e num dos lados, sorteado por estação. Só entram as que se pula de
+     verdade: na Itaquera as das pontas são de saída, e placa sobre catraca
+     que ninguém pula é enfeite. Mora num poste em cima do gabinete mais
+     perto do meio do bloco, que é onde a de verdade é aparafusada. */
+  montaPlacaProibida: function () {
+    this.proibida = null;
+    if (this.liberado || !this.gates || this.treino === 'catraca') return;
+    var puls = [], i;
+    for (i = 0; i < this.gates.length; i++) if (this.gates[i].sentido !== 'sai') puls.push(this.gates[i]);
+    var n = this.mez ? PROIBIDA_COBRE_MEZ : PROIBIDA_COBRE;
+    if (puls.length < n + 1) return;                 // sem um lado livre, não há escolha: sem placa
+    var cobre;
+    if (this.paineis && this.paineis.length) {
+      /* Com backlight, a placa fica de UM lado dele e o outro é o livre:
+         as n puláveis mais perto do painel, do lado sorteado. É o painel
+         que separa a catraca vigiada da escondida, e é essa a escolha. */
+      var pm = (this.paineis[0].x0 + this.paineis[0].x1) / 2, esq = [], dir = [];
+      for (i = 0; i < puls.length; i++) (puls[i].x1 < pm ? esq : dir).push(puls[i]);
+      var lado = Math.random() < 0.5 ? esq.slice(-n) : dir.slice(0, n);
+      if (lado.length < 2) lado = (lado === esq ? dir.slice(0, n) : esq.slice(-n));
+      cobre = lado;
+      n = cobre.length;
+    } else {
+      var ini = Math.random() < 0.5 ? 0 : puls.length - n;
+      cobre = puls.slice(ini, ini + n);
+    }
+    var meio = (cobre[0].x0 + cobre[n - 1].x1) / 2, poste = cobre[0].x1 + 7, d = 1e9;
+    for (i = 0; i < cobre.length - 1; i++) {
+      var px = cobre[i].x1 + 7;                        // o gabinete entre duas portas do bloco
+      if (Math.abs(px - meio) < d) { d = Math.abs(px - meio); poste = px; }
+    }
+    // chapa de 24 com a base em 174: o poste sobe do gabinete (198) até ela
+    var g = this.add.graphics().setDepth(44);
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(poste - 1, 174, 3, 24);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(poste - 1, 174, 1, 24);
+    var img = this.add.image(poste, 174, texturaProibida(this, 'pulo')).setOrigin(0.5, 1).setDepth(45);
+    this.proibida = { gates: cobre, x: poste, img: img, poste: g };
+  },
+
+  /* Os totens soltos, na área paga do mezanino (116..204), longe da
+     escada e dos elevadores, um de cada lado da escada. Lugar sorteado
+     entre candidatos que o próprio chão aprova (`podeIr` nos quatro cantos
+     e numa folga em volta), em vez de coordenada cravada: número cravado
+     envelhece calado quando a planta muda (a lição do cartaz sobre o
+     elevador, em anuncios.js). */
+  montaCoberturas: function () {
+    this.totens = [];
+    this.coberturas = (this.paineis || []).slice();
+    var g = this.add.graphics().setDepth(45), i;
+    for (i = 0; i < this.coberturas.length; i++) this.pintaBacklight(g, this.coberturas[i]);
+    if (!this.mez || this.treino) return;
+    var cand = { esq: [], dir: [] }, eu = this;
+    var livre = function (x) {
+      if (x > ESC_X0 - 30 && x < ESC_X1 + 30) return false;
+      if (DUPLA && x > ESC_X0 + ESC2_DX - 30 && x < ESC_X1 + ESC2_DX + 30) return false;
+      for (var dx = -TOTEM_L; dx <= TOTEM_L; dx += TOTEM_L) {
+        for (var dy = -18; dy <= 10; dy += 14) {
+          if (!eu.podeIr(x + dx, TOTEM_BASE + dy) || eu.bateNoElevador(x + dx, TOTEM_BASE + dy)) return false;
+        }
+      }
+      return true;
+    };
+    for (var x = MEZ.x0 + 40; x <= MEZ.x1 - 40; x += 12) if (livre(x)) cand[x < ESC_X0 ? 'esq' : 'dir'].push(x);
+    var lados = ['esq', 'dir'];
+    for (i = 0; i < lados.length && this.totens.length < TOTENS; i++) {
+      var l = cand[lados[i]];
+      if (!l.length) continue;
+      var tx = l[Math.floor(Math.random() * l.length)];
+      var cx = { x0: tx - TOTEM_L / 2, x1: tx + TOTEM_L / 2, y0: TOTEM_BASE - TOTEM_ALT, y1: TOTEM_BASE, totem: true };
+      this.totens.push(cx); this.coberturas.push(cx);
+      this.pintaTotem(g, cx);
+    }
+  },
+
+  // o pé do totem é parede (a parte de cima é desenho: passa-se por trás dela)
+  bateNoTotem: function (x, y) {
+    var t = this.totens || [];
+    for (var i = 0; i < t.length; i++) {
+      if (x > t[i].x0 - 6 && x < t[i].x1 + 6 && y > t[i].y1 - 12 && y < t[i].y1 + 4) return true;
+    }
+    return false;
+  },
+
+  coberturasNo: function (x0, y0, x1, y1) {
+    var out = [], c = this.coberturas || [];
+    for (var i = 0; i < c.length; i++) if (c[i].x1 > x0 && c[i].x0 < x1 && c[i].y1 > y0 && c[i].y0 < y1) out.push(c[i]);
+    return out;
+  },
+
+  // a linha dos olhos (ax, ay) até (bx, by) bate em algum totem ou backlight?
+  vistaTapada: function (ax, ay, bx, by, lista) {
+    var c = lista || this.coberturas || [];
+    for (var i = 0; i < c.length; i++) if (cortaCaixa(ax, ay, bx, by, c[i]) >= 0) return true;
+    return false;
+  },
+
+  /* O backlight: caixa escura com o painel aceso por dentro e o reflexo
+     no chão. Sem letra: tem 28px de largura, e dois caracteres já não
+     caberiam. Lê como anúncio pela luz e pela moldura. */
+  pintaBacklight: function (g, r) {
+    var w = r.x1 - r.x0, h = r.y1 - r.y0, cor = GameState.linhaAtual().num;
+    g.fillStyle(0x000000, 0.25).fillRect(r.x0 - 2, r.y1 - 2, w + 4, 6);               // sombra no chão
+    g.fillStyle(0x14141c, 1).fillRect(r.x0, r.y0, w, h);
+    g.fillStyle(0xe8eef8, 1).fillRect(r.x0 + 3, r.y0 + 3, w - 6, h - 16);            // o acrílico aceso
+    g.fillStyle(cor, 1).fillRect(r.x0 + 3, r.y0 + 3, w - 6, 10);                     // a faixa do anunciante
+    g.fillStyle(0x14141c, 0.55);
+    for (var k = 0; k < 4; k++) g.fillRect(r.x0 + 6, r.y0 + 22 + k * 12, w - 12 - (k % 2) * 6, 3);   // "texto" de longe
+    g.fillStyle(cor, 0.8).fillRect(r.x0 + 6, r.y1 - 30, w - 12, 10);                 // o produto
+    g.fillStyle(num(PAL.metal), 1).fillRect(r.x0 + 1, r.y1 - 12, w - 2, 12);          // o pé de metal
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(r.x0 + 1, r.y1 - 12, w - 2, 2);
+  },
+
+  pintaTotem: function (g, r) {
+    var w = r.x1 - r.x0, h = r.y1 - r.y0;
+    g.fillStyle(0x000000, 0.25).fillRect(r.x0 - 2, r.y1 - 3, w + 4, 5);
+    g.fillStyle(num(PAL.metalSom), 1).fillRect(r.x0, r.y0, w, h);
+    g.fillStyle(num(PAL.metal), 1).fillRect(r.x0 + 1, r.y0, w - 3, h);
+    g.fillStyle(0x0b1a2a, 1).fillRect(r.x0 + 3, r.y0 + 4, w - 7, h - 14);            // a tela
+    g.fillStyle(GameState.linhaAtual().num, 1).fillRect(r.x0 + 3, r.y0 + 4, w - 7, 4);
+    g.fillStyle(0x7fd6ff, 0.7).fillRect(r.x0 + 5, r.y0 + 12, w - 11, 2).fillRect(r.x0 + 5, r.y0 + 17, w - 13, 2);
+    g.fillStyle(num(PAL.metalLuz), 1).fillRect(r.x0 + 1, r.y0, 1, h);
+  },
+
+  naMiraDaPlaca: function (x, y) {
+    if (!this.proibida || this.liberado || this.pulou) return false;
+    var gate = this.gateSob(x);
+    return !!gate && y > 244 && y < 284 && this.proibida.gates.indexOf(gate) >= 0;
+  },
+
+  // na frente de catraca coberta a chapa pisca: é ela que está mandando
+  piscaPlaca: function (time) {
+    if (!this.proibida) return;
+    this.proibida.img.setTint(this.sobPlaca && (time % 420) < 210 ? 0xff9a90 : 0xffffff);
+  },
+
+  /* Andar na contramão da escada colado em quem vem descendo: a cada
+     TROPECO_APOS de encontrão, um tropeço — descanso na hora e um passo
+     de volta. E de cada três, um é mão no bolso (`furtaDoBolso`, a mesma
+     regra da dupla da Sé, com a mesma defesa: mochila na frente). */
+  vigiaTropeco: function (dt, mv, dy) {
+    if (!this.contramao || !mv) { this.tropeco = Math.max(0, this.tropeco - dt); return; }
+    var sp = this.pl.sp, colado = false;
+    for (var i = 0; i < this.gente.length; i++) {
+      var a = this.gente[i];
+      if (!a || !a.sp || !a.sp.active) continue;
+      if (Math.abs(a.sp.x - sp.x) < 20 && Math.abs(a.sp.y - sp.y) < 26) { colado = true; break; }
+    }
+    if (!colado) return;
+    this.tropeco += dt;
+    if (this.tropeco < TROPECO_APOS) return;
+    this.tropeco = 0;
+    GameState.addDescanso(-TROPECO_DESCANSO);
+    GameState.stats.tropecos = (GameState.stats.tropecos || 0) + 1;
+    var volta = sp.y - (dy || -1) * TROPECO_RECUO;
+    if (this.podeIr(sp.x, volta)) sp.y = volta;
+    baque(this, 'leve', sp, 'empurra');
+    var msg = 'TROPEÇOU NA CONTRAMÃO';
+    if (Math.random() < TROPECO_PUNGA) {
+      var r = furtaDoBolso();
+      msg = r === null ? 'MÃO NA MOCHILA. NADA LEVADO' : r;
+      if (r !== null) sfx('nao');
+    }
+    // a Plaqueta não devolve o texto: uma senha diz se o aviso ainda é este
+    var senha = this.senhaTropeco = (this.senhaTropeco || 0) + 1, eu = this;
+    this.alerta.setText(msg);
+    this.time.delayedCall(2200, function () { if (eu.alerta && eu.senhaTropeco === senha) eu.alerta.setText(''); });
+  },
+
   /* ---------- guardinha ----------
      O guardinha existia, andava e parava — mas nada disso importava. A
      decisão de te pegar era um sorteio no instante do aperto: se ele
@@ -2182,12 +2402,26 @@ var EstacaoScene = new Phaser.Class({
     var o = this.gOlhando;
     // o grandão enxerga mais longe, e o menorzinho menos
     var k = this.patente.cone;
+    /* Debaixo da placa ele vê o DOBRO de longe. Vale no pulo e também
+       parado na frente da catraca coberta, antes de pular: o cone é
+       desenhado do jeito exato em que é testado, então é ele crescer na
+       tela que avisa — a regra aparece antes do castigo, não depois.
+
+       É o MESMO trapézio ampliado duas vezes a partir dos olhos dele:
+       alcance, abertura e a inclinação pro lado em que anda. Ampliado a
+       partir do vértice ele contém o de antes, então nada que ele via
+       deixa de ver.
+       Só o alcance, medido: o trapézio ficava comprido e FINO perto do
+       guarda (a largura numa altura cai com alcance maior), e o pulo é
+       justamente perto dele — debaixo da placa ele flagrava 0 de 20
+       pulos, contra 2 a 4 de 20 sem placa. O castigo ao contrário. */
+    var dobra = (this.pulo ? this.pulo.agravado : this.sobPlaca) ? 2 : 1;
     return {
       ax: g.sp.x,
       ay: g.sp.y - 8,
-      cx: g.sp.x + (o ? 0 : this.gVx * 54),
-      meia: ((o ? 62 : 38) + dif * 3) * k,
-      alc: ((o ? 116 : 94) + dif * 5) * k
+      cx: g.sp.x + (o ? 0 : this.gVx * 54) * dobra,
+      meia: ((o ? 62 : 38) + dif * 3) * k * dobra,
+      alc: ((o ? 116 : 94) + dif * 5) * k * dobra
     };
   },
 
@@ -2199,7 +2433,8 @@ var EstacaoScene = new Phaser.Class({
     if (y < c.ay || y > c.ay + c.alc) return false;
     var k = (y - c.ay) / c.alc;
     var meio = c.ax + (c.cx - c.ax) * k;
-    return Math.abs(x - meio) <= c.meia * (0.3 + 0.7 * k);
+    if (Math.abs(x - meio) > c.meia * (0.3 + 0.7 * k)) return false;
+    return !this.vistaTapada(c.ax, c.ay, x, y);
   },
 
   pintaCone: function () {
@@ -2217,9 +2452,31 @@ var EstacaoScene = new Phaser.Class({
     var cone = this.liberado ? 0x00e676 : 0xe8362c;
     if (this.liberado) vendo = false;
     av.fillStyle(cone, (this.gOlhando ? 0.17 : 0.09) + (vendo ? 0.12 : 0));
-    av.fillPoints(pontos, true);
-    av.lineStyle(1, cone, vendo ? 0.85 : 0.3);
-    av.strokePoints(pontos, true);
+    /* Com um totem dentro do cone, o cone é pintado em faixas de 3px e o
+       que fica atrás do totem não se pinta: a sombra é a mesma conta do
+       `guardaVe`, ponto a ponto. Sem totem no caminho, o trapézio de
+       sempre (e o contorno, que numa sombra mentiria). */
+    var cobs = this.coberturasNo(Math.min(c.ax - topo, c.cx - c.meia), c.ay, Math.max(c.ax + topo, c.cx + c.meia), c.ay + c.alc);
+    if (!cobs.length) {
+      av.fillPoints(pontos, true);
+      av.lineStyle(1, cone, vendo ? 0.85 : 0.3);
+      av.strokePoints(pontos, true);
+      return vendo;
+    }
+    var P3 = 3;
+    for (var yy = c.ay; yy < c.ay + c.alc; yy += P3) {
+      var k = (yy - c.ay) / c.alc, meio = c.ax + (c.cx - c.ax) * k, w = c.meia * (0.3 + 0.7 * k);
+      var ini = null;
+      for (var xx = meio - w; xx <= meio + w; xx += P3) {
+        var livre = !this.vistaTapada(c.ax, c.ay, xx + P3 / 2, yy + P3 / 2, cobs);
+        if (livre && ini === null) ini = xx;
+        var ultimo = xx + P3 > meio + w;
+        if (ini !== null && (!livre || ultimo)) {
+          av.fillRect(ini, yy, (livre ? Math.min(xx + P3, meio + w) : xx) - ini, P3);
+          ini = null;
+        }
+      }
+    }
     return vendo;
   },
 
@@ -2252,7 +2509,8 @@ var EstacaoScene = new Phaser.Class({
       if (this.gTempo > dur) { this.gEstado = 'anda'; this.gTempo = 0; }
     }
 
-    if (this.gEstado === 'anda' && Math.random() < 0.0006 * dif * vig * dt) {
+    var reacao = (this.pulo && this.pulo.agravado) ? PROIBIDA_REACAO : 1;
+    if (this.gEstado === 'anda' && Math.random() < 0.0006 * dif * vig * dt * reacao) {
       this.gEstado = 'olha'; this.gTempo = 0;
     }
 
@@ -2448,7 +2706,8 @@ var EstacaoScene = new Phaser.Class({
       t: 0,
       dur: Math.max(560, 880 - GameState.dificuldade() * 45),
       x: Phaser.Math.Clamp(this.pl.sp.x, gate.x0 + 4, gate.x1 - 4),
-      y0: this.pl.sp.y, y1: 196
+      y0: this.pl.sp.y, y1: 196,
+      agravado: this.proibida ? this.proibida.gates.indexOf(gate) >= 0 : false
     };
     this.pl.dir = 'up';
     sfx('empurra');
@@ -3262,6 +3521,7 @@ var EstacaoScene = new Phaser.Class({
      contando lá do saguão significar alguma coisa. */
   update: function (time, delta) {
     Ctrl.update();
+    ouveMochila(this);
     var dt = Math.min(delta, 50);
     if (this.travaEmbarque > 0) this.travaEmbarque -= dt;
     /* A vigia do treino roda ANTES das saídas antecipadas: o diálogo que
@@ -3295,6 +3555,8 @@ var EstacaoScene = new Phaser.Class({
     if (this.flagra) { this.atualizaFlagra(dt); this.pintaCone(); return; }
     this.atualizaGuarda(dt);
     if (this.pulo) { this.atualizaPulo(dt); if (this.pulo || this.flagra) this.pintaCone(); return; }
+    this.sobPlaca = this.naMiraDaPlaca(this.pl.sp.x, this.pl.sp.y);
+    this.piscaPlaca(time);
     var vendo = this.pintaCone();
 
     var i;
@@ -3307,6 +3569,30 @@ var EstacaoScene = new Phaser.Class({
     var vel = GameState.char.velocidade * (0.6 + 0.4 * (GameState.descanso / GameState.char.descansoMax));
     // na escada fixa se sobe no próprio passo, e degrau cansa
     if (this.pl.sp.y > ESC_Y && this.pl.sp.y < ESC_BOCA && naEscadaFixa(this.pl.sp.x)) vel *= 0.7;
+    /* ---------- a seta de fluxo ----------
+       docs/gdd/04-mapeamento-placas.md §2.A: andar no sentido da seta dá
+       velocidade; na contramão, -30% e hitbox maior, com o risco de
+       encontrão que vem junto.
+
+       A seta não precisou ser inventada: a escada JÁ é duas pistas, a da
+       esquerda sobe e a da direita desce (é o que a planta da casa
+       descreve, e o que o resto do código já usa pra mover a multidão).
+       O que faltava era isso valer pra você também. Subir pela pista de
+       descida passa a ser a decisão que o documento descreve: caminho
+       livre, mas contra todo mundo. */
+    this.contramao = false;
+    var pistaAqui = (this.pl.sp.y > ESC_Y && this.pl.sp.y < ESC_BOCA) ? pistaDaEscada(this.pl.sp.x) : null;
+    if (pistaAqui) {
+      var subindo = Ctrl.up && !Ctrl.down, descendo = Ctrl.down && !Ctrl.up;
+      if ((subindo && !pistaAqui.sobe) || (descendo && pistaAqui.sobe)) {
+        this.contramao = true;
+        vel *= 0.7;
+      } else if ((subindo && pistaAqui.sobe) || (descendo && !pistaAqui.sobe)) {
+        vel *= 1.12;                 // a favor do fluxo: o corredor abre
+      }
+    }
+    // na contramão o corpo estorva mais, e é assim que o encontrão acontece
+    this.pl.sp._rx = this.contramao ? 15 : mochilaAgora().rx;
     /* de mão cheia ninguém corre. `maosCheias` e não `carregando`: esse
        nome já é do celular na tomada (estacao-itaquera.js), e o mesmo nome
        zerava as sacolas a cada passo. */
@@ -3327,6 +3613,7 @@ var EstacaoScene = new Phaser.Class({
       this.pl.setDir(dx, dy);
     }
     this.pl.anima(dt, mv);
+    this.vigiaTropeco(dt, mv, dy);
     var euD = this;
     dicaDeParado(this, dt, mv, function (m) {
       euD.alerta.setText(m);
@@ -3380,6 +3667,10 @@ var EstacaoScene = new Phaser.Class({
      ambulante, embaixo é bilheteria, barraca e catraca. */
   contexto: function (vendo) {
     var x = this.pl.sp.x, y = this.pl.sp.y, dica = '';
+    /* Na contramão da escada o rodapé diz, porque a penalidade é
+       invisível: sem aviso o jogador só sente que "está lento hoje" e
+       nunca liga isso à pista em que entrou. */
+    if (this.contramao) { this.dica.setText('NA CONTRAMÃO DA ESCADA', PAL.vermelho); return; }
     if (this.contextoLixo()) return;
     if (this.contextoTomada()) return;
     if (this.contextoElevador()) return;
@@ -3435,7 +3726,7 @@ var EstacaoScene = new Phaser.Class({
     var soSaida = (perto && !gate.fechada && gate.sentido === 'sai');
     /* O cone é a regra inteira: se você está dentro dele, pular é ser
        pego. Fora dele, o risco é ele virar no meio do pulo. */
-    var seguro = naCatraca && !vendo;
+    var seguro = naCatraca && !vendo && !this.sobPlaca;
 
     var noMapa = this.mapaPerto(x, y);
     var barraca = this.barracaPerto(x, y);
@@ -3463,8 +3754,10 @@ var EstacaoScene = new Phaser.Class({
     else if (gate && y > 172 && y < 206 && gate.sentido === 'entra') alvo = { dica: 'ENTRADA. SAIA PELOS LADOS' };
     else if (naCatraca) {
       alvo = {
-        dica: vendo ? 'ELE TÁ TE VENDO — ESPERE'
-          : nomeAgir() + (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA'),
+        /* 'TOQUE: PULAR SOB A PLACA' tem 24; com 'CLIQUE:' dá 25 dos 26 */
+        // ponto e não travessão: o '—' não está no CHARSET e saía como buraco
+        dica: vendo ? 'ELE TÁ TE VENDO. ESPERE'
+          : nomeAgir() + (this.sobPlaca ? ': PULAR SOB A PLACA' : (gate.larga ? ': PULAR A LARGA' : ': PULAR AGORA')),
         faz: 'pula'
       };
     }
@@ -3474,7 +3767,8 @@ var EstacaoScene = new Phaser.Class({
     else if (GameState.lixo) alvo = { dica: 'JOGUE O LIXO NA LIXEIRA' };
 
     dica = alvo ? alvo.dica : '';
-    this.dica.setText(dica, seguro ? PAL.verde : (perto && gate.fechada ? PAL.cinza : PAL.amarelo));
+    this.dica.setText(dica, seguro ? PAL.verde
+      : (perto && gate.fechada ? PAL.cinza : (naCatraca && this.sobPlaca ? PAL.vermelho : PAL.amarelo)));
 
     if (!Ctrl.actJust || !alvo || !alvo.faz) return;
     if (alvo.faz === 'barraca') {

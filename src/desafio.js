@@ -34,7 +34,7 @@ var RESPOSTAS = [
    cinco respostas, acertando a fraqueza são duas ou três. */
 var DESAFIANTES = {
   tiozao: {
-    nome: 'TIOZÃO DO ZAP', sprite: 'np_tiozao', pac: 70,
+    nome: 'TIOZÃO DO ZAP', arq: 'RUA', sprite: 'np_tiozao', pac: 70,
     fraco: 'FONE', resiste: 'LABIA',
     chega: 'VOCÊ VIU O VÍDEO\nQUE EU MANDEI?',
     sai: 'VOU MANDAR NO GRUPO\nDA FAMÍLIA, ENTÃO.',
@@ -45,7 +45,7 @@ var DESAFIANTES = {
     ]
   },
   pregador: {
-    nome: 'PREGADOR', sprite: 'np_pregador', pac: 80,
+    nome: 'PREGADOR', arq: 'RUA', sprite: 'np_pregador', pac: 80,
     fraco: 'CALMA', resiste: 'IRONIA',
     chega: 'IRMÃO, VOCÊ TEM\nUM MINUTINHO?',
     sai: 'VOU ORAR POR VOCÊ.',
@@ -60,7 +60,7 @@ var DESAFIANTES = {
      a Barra Funda é Palmeiras (o Allianz fica do lado). Mesmo tipo de
      briga — ironia derruba, calma nem arranha —, time diferente. */
   corintiano: {
-    nome: 'CORINTHIANO', sprite: 'np_corintiano', pac: 75,
+    nome: 'CORINTHIANO', arq: 'RUA', sprite: 'np_corintiano', pac: 75,
     fraco: 'IRONIA', resiste: 'CALMA',
     chega: 'AQUI É CORINTHIANS,\nTÁ LIGADO?',
     sai: 'DOMINGO TEM JOGO\nNA ARENA, HEIN.',
@@ -72,7 +72,7 @@ var DESAFIANTES = {
   },
   // o palmeirense fala meio italiano, que é o Palestra de onde o time veio
   palmeirense: {
-    nome: 'PALMEIRENSE', sprite: 'np_torcedor', pac: 75,
+    nome: 'PALMEIRENSE', arq: 'RUA', sprite: 'np_torcedor', pac: 75,
     fraco: 'IRONIA', resiste: 'CALMA',
     chega: 'E AÍ, BAMBINO?\nÉ PORCO OU NÃO É?',
     sai: 'CIAO, BAMBINO.\nAVANTI, PALESTRA!',
@@ -86,7 +86,7 @@ var DESAFIANTES = {
      de qualquer passageiro em pé quando você está segurando há um tempo
      (scene-vagao, cobicaBarra); o boneco é o dele. */
   barra: {
-    nome: 'QUER A SUA BARRA', sprite: 'np_pax0', pac: 60,
+    nome: 'QUER A SUA BARRA', arq: 'RUA', sprite: 'np_pax0', pac: 60,
     fraco: 'LABIA', resiste: 'IRONIA',
     chega: 'ESSA BARRA É MINHA,\nEU TAVA AQUI ANTES.',
     sai: 'TÁ BOM, FICA COM ELA.',
@@ -97,7 +97,7 @@ var DESAFIANTES = {
     ]
   },
   saopaulino: {
-    nome: 'SÃO-PAULINO', sprite: 'np_saopaulino', pac: 75,
+    nome: 'SÃO-PAULINO', arq: 'RUA', sprite: 'np_saopaulino', pac: 75,
     fraco: 'LABIA', resiste: 'FONE',
     chega: 'SOBERANO, MEU CARO.\nTRICOLOR É OUTRO NÍVEL.',
     sai: 'VOU PRO MORUMBI.\nSALVE O TRICOLOR.',
@@ -108,7 +108,7 @@ var DESAFIANTES = {
     ]
   },
   santista: {
-    nome: 'SANTISTA', sprite: 'np_santista', pac: 70,
+    nome: 'SANTISTA', arq: 'RUA', sprite: 'np_santista', pac: 70,
     fraco: 'CALMA', resiste: 'IRONIA',
     chega: 'O PEIXE VAI VOLTAR,\nPODE ESCREVER.',
     sai: 'VOU DESCER PRA\nVILA BELMIRO.',
@@ -124,7 +124,7 @@ var DESAFIANTES = {
      desafiantes do tipo COSPLAY, cada um com a fraqueza, a resistência e
      os golpes do personagem que está vestindo. */
   cosLaranja: {
-    nome: 'COSPLAY LARANJA', sprite: 'np_cos_naruto', pac: 75, nivel: 4,
+    nome: 'COSPLAY LARANJA', arq: 'ACADEMICO', sprite: 'np_cos_naruto', pac: 75, nivel: 4,
     fraco: 'IRONIA', resiste: 'LABIA',
     chega: 'EU VOU SER O MAIOR\nNINJA DA LIBERDADE!',
     sai: 'NÃO VOU DESISTIR,\nESSE É O MEU JEITO!',
@@ -135,7 +135,7 @@ var DESAFIANTES = {
     ]
   },
   cosVingador: {
-    nome: 'COSPLAY VINGADOR', sprite: 'np_cos_sasuke', pac: 70, nivel: 6,
+    nome: 'COSPLAY VINGADOR', arq: 'ACADEMICO', sprite: 'np_cos_sasuke', pac: 70, nivel: 6,
     fraco: 'LABIA', resiste: 'IRONIA',
     chega: 'HMPH.\nVOCÊ NÃO É PÁREO.',
     sai: '...TSC.',
@@ -146,7 +146,7 @@ var DESAFIANTES = {
     ]
   },
   cosNuvem: {
-    nome: 'ACATSUQUI', sprite: 'np_cos_akatsuki', pac: 85, nivel: 8,
+    nome: 'ACATSUQUI', arq: 'ACADEMICO', sprite: 'np_cos_akatsuki', pac: 85, nivel: 8,
     fraco: 'CALMA', resiste: 'LABIA',
     chega: 'VOCÊ JÁ ESTÁ\nNA MINHA ILUSÃO.',
     sai: 'PERDOE-ME.\nFICA PRA PRÓXIMA.',
@@ -157,7 +157,7 @@ var DESAFIANTES = {
     ]
   },
   cosRosa: {
-    nome: 'COSPLAY ROSA', sprite: 'np_cos_sakura', pac: 70, nivel: 5,
+    nome: 'COSPLAY ROSA', arq: 'ACADEMICO', sprite: 'np_cos_sakura', pac: 70, nivel: 5,
     fraco: 'FONE', resiste: 'CALMA',
     chega: 'SE FALAR DO MEU\nCABELO, JÁ ERA.',
     sai: 'TÁ, TÁ. VOU PRO\nEVENTO, ENTÃO.',
@@ -168,7 +168,7 @@ var DESAFIANTES = {
     ]
   },
   cosColegial: {
-    nome: 'COLEGIAL', sprite: 'np_cos_marinheira', pac: 60, nivel: 3,
+    nome: 'COLEGIAL', arq: 'ACADEMICO', sprite: 'np_cos_marinheira', pac: 60, nivel: 3,
     fraco: 'CALMA', resiste: 'FONE',
     chega: 'KYAA! VOCÊ PISOU\nNO MEU PÉ!',
     sai: 'HMF! BAKA!',
@@ -180,7 +180,7 @@ var DESAFIANTES = {
   },
   // o ambulante da plataforma, que insiste ('batalhar com o ambulante')
   ambulante: {
-    nome: 'AMBULANTE', sprite: 'np_ambulante_a', pac: 65, nivel: 3,
+    nome: 'AMBULANTE', arq: 'RUA', sprite: 'np_ambulante_a', pac: 65, nivel: 3,
     fraco: 'FONE', resiste: 'LABIA',
     chega: 'É DOIS, É CINCO!\nVAI LEVAR OU NÃO VAI?',
     sai: 'TÁ BOM, FREGUÊS.\nFICA PRA PRÓXIMA.',
@@ -193,7 +193,7 @@ var DESAFIANTES = {
   /* Os três guardas: quem te pega pulando a catraca vira duelo. Convenceu,
      ele te deixa passar; perdeu, é o castigo de sempre. */
   guardinha: {
-    nome: 'GUARDINHA', sprite: 'np_guardinha', pac: 60, nivel: 3,
+    nome: 'GUARDINHA', arq: 'INSTITUCIONAL', sprite: 'np_guardinha', pac: 60, nivel: 3,
     fraco: 'LABIA', resiste: 'IRONIA',
     chega: 'PULOU A CATRACA,\nNÉ? EU VI.',
     sai: 'TÁ BOM, VAI.\nMAS EU TÔ DE OLHO.',
@@ -204,7 +204,7 @@ var DESAFIANTES = {
     ]
   },
   guardaMedio: {
-    nome: 'SEGURANÇA', sprite: 'np_guarda_medio', pac: 85, nivel: 7,
+    nome: 'SEGURANÇA', arq: 'INSTITUCIONAL', sprite: 'np_guarda_medio', pac: 85, nivel: 7,
     fraco: 'CALMA', resiste: 'IRONIA',
     chega: 'VEM CÁ VOCÊ.\nDOCUMENTO.',
     sai: 'PASSA. HOJE EU\nTÔ DE BOM HUMOR.',
@@ -219,7 +219,7 @@ var DESAFIANTES = {
      a fraqueza que a cena pede: a dancinha não aguenta ironia, o vendedor
      não aguenta fone, e o mochilão só entende conversa calma. */
   tiktoker: {
-    nome: 'INFLUENCER', sprite: 'np_tiktoker', pac: 70, nivel: 3,
+    nome: 'INFLUENCER', arq: 'CORPORATIVO', sprite: 'np_tiktoker', pac: 70, nivel: 3,
     fraco: 'IRONIA', resiste: 'LABIA',
     chega: 'AMIGO, VOCÊ TÁ\nNO MEU QUADRO.',
     sai: 'DEIXA, EU GRAVO\nDE NOVO.',
@@ -230,7 +230,7 @@ var DESAFIANTES = {
     ]
   },
   vendedorCurso: {
-    nome: 'VENDE CURSO', sprite: 'np_curso', pac: 80, nivel: 4,
+    nome: 'VENDE CURSO', arq: 'CORPORATIVO', sprite: 'np_curso', pac: 80, nivel: 4,
     fraco: 'FONE', resiste: 'CALMA',
     chega: 'INGLÊS EM TRÊS MESES.\nPOSSO FALAR UM MINUTO?',
     sai: 'GUARDA MEU CONTATO,\nVAI QUE MUDA DE IDEIA.',
@@ -241,7 +241,7 @@ var DESAFIANTES = {
     ]
   },
   mochilao: {
-    nome: 'CARA DA MOCHILA', sprite: 'np_mochilao', pac: 75, nivel: 3,
+    nome: 'CARA DA MOCHILA', arq: 'CORPORATIVO', sprite: 'np_mochilao', pac: 75, nivel: 3,
     fraco: 'CALMA', resiste: 'IRONIA',
     chega: 'QUE FOI? NÃO ENCOSTEI\nEM NINGUÉM.',
     sai: 'TÁ BOM, EU TIRO\nA MOCHILA. PRONTO.',
@@ -257,7 +257,7 @@ var DESAFIANTES = {
      prova, o EXTRATO do LARANJINHA, que só o honesto tem. O malandro, sem
      prova, pega o FISCAL DURO: a mesma cara, mais paciência. */
   fiscal: {
-    nome: 'O FISCAL', sprite: 'np_fiscal', pac: 100, nivel: 6, chefao: true,
+    nome: 'O FISCAL', arq: 'INSTITUCIONAL', sprite: 'np_fiscal', pac: 100, nivel: 6, chefao: true,
     fraco: 'EXTRATO', resiste: 'LABIA',
     chega: 'BILHETE CLONADO.\nVAMOS CONVERSAR.',
     sai: 'TÁ. VOU VERIFICAR\nESSE BILHETE. PODE IR.',
@@ -268,7 +268,7 @@ var DESAFIANTES = {
     ]
   },
   fiscalDuro: {
-    nome: 'O FISCAL', sprite: 'np_fiscal', pac: 150, nivel: 9, chefao: true,
+    nome: 'O FISCAL', arq: 'INSTITUCIONAL', sprite: 'np_fiscal', pac: 150, nivel: 9, chefao: true,
     fraco: 'CALMA', resiste: 'LABIA',
     chega: 'EU CONHEÇO VOCÊ.\nVIVE PULANDO.',
     sai: 'DESSA VEZ PASSA.\nMAS TÁ ANOTADO.',
@@ -279,7 +279,7 @@ var DESAFIANTES = {
     ]
   },
   guardaForte: {
-    nome: 'O GRANDÃO', sprite: 'np_guarda_forte', pac: 110, nivel: 12,
+    nome: 'O GRANDÃO', arq: 'INSTITUCIONAL', sprite: 'np_guarda_forte', pac: 110, nivel: 12,
     fraco: 'CALMA', resiste: 'LABIA',
     chega: '...',
     sai: 'SOME DAQUI.',
@@ -548,6 +548,50 @@ function multiplicador(resp, quem) {
   return 1;
 }
 
+/* A camada dos arquétipos (GDD §6), por cima do multiplicador de sempre.
+   Discreta de propósito: 1,35 e 0,75 mudam o ritmo do duelo sem apagar a
+   fraqueza individual, que continua valendo o dobro. Se o arquétipo
+   valesse tanto quanto a fraqueza, os 21 desafiantes ajustados à mão
+   virariam quatro. */
+/* ---------- os 3 marcadores de postura ----------
+   GDD §6: "a vida do oponente é representada por 3 Marcadores de
+   Postura/Paciência". Eles não substituem a paciência — a paciência é que
+   passa a ser LIDA em três pedaços. Trocar o número por três vidas jogaria
+   fora o ajuste de 21 desafiantes (cada um tem a sua paciência, de 60 a
+   85) e faria todo mundo aguentar a mesma coisa. */
+var POSTURAS = 3;
+function posturasDe(pac, max) {
+  if (max <= 0) return 0;
+  return Math.max(0, Math.ceil(pac / (max / POSTURAS)));
+}
+
+/* ---------- o Ponto de Ruptura ----------
+   GDD §6, turno 3: o golpe que encerra a discussão. As falas são as que o
+   Renan escreveu no documento, ao pé da letra — só o Estudante e o CLT
+   têm. Os outros seis jogáveis ainda não foram escritos, e inventar fala
+   pros personagens dele não é minha parte: sem fala escrita, o golpe
+   simplesmente não aparece pra aquele personagem. */
+/* `curto` é o que cabe no botão (uns dez caracteres na célula do menu);
+   `nome` é como o golpe se anuncia na mensagem, e `fala` é o texto do
+   documento, inteiro. Três campos porque o botão é estreito e a fala não
+   pode ser podada por causa disso. */
+var RUPTURA = {
+  estudante: {
+    curto: 'PÂNICO 8H', nome: 'PÂNICO DAS 08H00',
+    fala: 'SE ESSA PORTA NÃO FECHAR EU PERCO MEU EMPREGO! CÊ QUER QUE EU SEJA DEMITIDO, É ISSO?!'
+  },
+  clt: {
+    curto: 'O BOTÃO', nome: 'AMEAÇA DO BOTÃO VERMELHO',
+    fala: 'Aperta o botão de emergência aí, campeão! Vamo nós dois prestar depoimento na chefia da Sé até meia-noite e fazer o trem inteiro perder o dia!'
+  }
+};
+function rupturaDoChar() { return RUPTURA[GameState.charKey] || null; }
+
+function pesoDoArquetipo(quem) {
+  var v = vantagemArquetipo(arquetipoDoChar(), quem && quem.arq);
+  return v > 0 ? 1.35 : (v < 0 ? 0.75 : 1);
+}
+
 var DesafioScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function DesafioScene() { Phaser.Scene.call(this, { key: 'Desafio', active: false }); },
@@ -580,7 +624,11 @@ var DesafioScene = new Phaser.Class({
     defineTrilhaDaLuta(tm[0].replace('tema', '').toLowerCase(), tm[1]);
     this.events.once('shutdown', function () { zeraTrilhaDaLuta(); });
     // as quatro respostas: as de sempre, ou as que a cena mandou (o EXTRATO do honesto contra o fiscal)
-    this.resps = this.dados.respostas || RESPOSTAS;
+    /* CÓPIA, não a lista original. O Ponto de Ruptura troca o quarto
+       botão no meio do duelo, e `RESPOSTAS` é global: sem o slice, o
+       finalizador do Estudante ficava gravado na lista de todo mundo e
+       aparecia no duelo seguinte, com qualquer personagem. Medido. */
+    this.resps = (this.dados.respostas || RESPOSTAS).slice();
     marcaDex(this.dados.dexId || this.dados.tipo, 1);
     /* os níveis: o seu dá paciência (5 por nível) e força (5%); o dele,
        paciência (10%) e força nos golpes (6%) */
@@ -597,6 +645,11 @@ var DesafioScene = new Phaser.Class({
     this.ele = { pac: pacEle, max: pacEle, mostra: pacEle };
     this.vc.mostra = this.vc.pac;
     this.sel = 0;
+    this.turno = 0;
+    this.trancou = false;
+    this.rupturaPosta = false;
+    this.avisoTranco = '';
+    this.tTranco = 0;
     this.fila = [];          // as mensagens da vez, uma por toque
     this.fase = 'fala';      // fala, menu, fim
     this.resultado = null;
@@ -663,6 +716,15 @@ var DesafioScene = new Phaser.Class({
       .setScale(ESCALA_TEXTO / 2).setDepth(12);
     // o NERVOSO do lado de fora da ficha dele: à direita da de cima, à esquerda da de baixo
     this.tNervoso = txt(this, this.eleEmBaixo ? this.bEle.x - 50 : this.bEle.x + this.bEle.w + 6, this.bEle.y + 18, '', PAL.vermelho, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(12);
+    /* O confronto de arquétipos, dito em uma linha dentro da ficha dele.
+       Sem isso a camada é invisível: o jogador sentiria o dano diferente
+       e nunca saberia por quê — e regra que não se aprende não é regra,
+       é sorte. */
+    this.tArq = txt(this, this.bEle.x + 10, this.bEle.y + this.bEle.h - 14, '', PAL.cinza, 8)
+      .setScale(ESCALA_TEXTO / 2).setDepth(12);
+    // o recado do tranco, em cima da sua ficha e por pouco tempo
+    this.tTrancoTxt = txtC(this, GW / 2, this.bVc.y - 18, '', PAL.vermelho, 8)
       .setScale(ESCALA_TEXTO / 2).setDepth(12);
     this.tMenu = [];
     for (i = 0; i < 4; i++) {
@@ -754,9 +816,44 @@ var DesafioScene = new Phaser.Class({
 
   usa: function (i) {
     if (this.fase !== 'menu') return;
+    this.turno = (this.turno || 0) + 1;
+    /* O TRANCO DO TURNO 2 (GDD §6): "freada brusca ou curva; quem falhar
+       em segurar a tela quebra escudos de postura". O trem não espera a
+       discussão acabar — e é ele que impede o duelo de virar só troca de
+       menu. Quem estava com a mão na tela aguenta; quem soltou pra
+       escolher, perde um marcador inteiro.
+
+       Cobra de quem FALHA e não premia quem acerta de propósito: o
+       jogador já está com o dedo na tela pra jogar, então segurar é o
+       estado natural — o susto é para quem largou. */
+    if (this.turno === 2 && !this.trancou) {
+      this.trancou = true;
+      /* "Segurar a tela" aqui não pode ser o `Ctrl.act`: esta cena é
+         movida a toque em zonas e NÃO roda o `Ctrl.update`, então
+         `Ctrl.act` fica com o valor que a cena anterior deixou. Quem
+         sabe a verdade é o estado global do dedo (`TOQUE`), mantido
+         pelos handlers do HUD, e a tecla, que o Phaser atualiza sozinho.
+
+         Vira uma regra que dá pra aprender: tocar a resposta e MANTER o
+         dedo aguenta o tranco; tocar e soltar rápido, não. */
+      var segurando = TOQUE.ativo || TOQUE_DIR.ativo ||
+        (Ctrl.k && (Ctrl.k.SPACE.isDown || Ctrl.k.Z.isDown || Ctrl.k.ENTER.isDown));
+      if (!segurando) {
+        var perde = Math.ceil(this.vc.max / POSTURAS);
+        this.vc.pac = Math.max(0, this.vc.pac - perde);
+        this.cameras.main.shake(260, 0.009 * TREMIDA);
+        sfx('empurra');
+        this.avisoTranco = 'O TREM FREOU. VOCÊ PERDEU A POSTURA.';
+      } else {
+        this.cameras.main.shake(160, 0.004 * TREMIDA);
+        this.avisoTranco = 'O TREM FREOU. VOCÊ SE SEGUROU.';
+      }
+      this.tTranco = this.time.now + 1800;
+    }
     var r = this.resps[i], q = this.quem;
     var mult = multiplicador(r, q);
     if (mult > 1 && this.nervoso) mult = 3;           // nervoso, a fraqueza dói o triplo
+    mult *= pesoDoArquetipo(q);                       // quem você é contra quem ele é (GDD §6)
     /* torcedor contra torcedor de outro time: a ironia vem com gosto */
     var rival = temPoder('torcida') && r.tipo === 'IRONIA' && TORCEDORES.indexOf(this.dados.tipo) >= 0 &&
       TIMES[leTime()].desafiante !== this.dados.tipo;
@@ -1133,12 +1230,25 @@ var DesafioScene = new Phaser.Class({
     }
   },
 
+  /* A paciência em TRÊS pedaços (GDD §6). É a mesma barra de antes, só
+     que cortada: cada pedaço é um marcador de postura, e ver um deles
+     apagar é o que faz a discussão ter etapas em vez de um fio que
+     encolhe. O vão entre eles é onde o olho conta. */
   ficha: function (g, cx, prop, treme, cor) {
     var dx = treme > 0 ? Math.round((Math.random() - 0.5) * 4) : 0;
     g.fillStyle(0x0b0b12, 0.92).fillRect(cx.x + dx, cx.y, cx.w, cx.h);
     g.lineStyle(2, 0xf2f0ff, 1).strokeRect(cx.x + dx + 1, cx.y + 1, cx.w - 2, cx.h - 2);
-    barra(g, cx.x + dx + 10, cx.y + 30, cx.w - 20, 8, prop,
-      prop > 0.5 ? 0x00e676 : (prop > 0.2 ? 0xf2c14e : 0xe8362c), 0x1e1e2a);
+    var x0 = cx.x + dx + 10, larg = cx.w - 20, vao = 3;
+    var w = (larg - vao * (POSTURAS - 1)) / POSTURAS, i;
+    var corCheia = prop > 0.5 ? 0x00e676 : (prop > 0.2 ? 0xf2c14e : 0xe8362c);
+    for (i = 0; i < POSTURAS; i++) {
+      // quanto deste pedaço ainda está de pé, de 0 a 1
+      var f = Math.max(0, Math.min(1, prop * POSTURAS - i));
+      var px = x0 + i * (w + vao);
+      g.fillStyle(0x1e1e2a, 1).fillRect(px, cx.y + 30, w, 8);
+      if (f > 0) g.fillStyle(corCheia, 1).fillRect(px, cx.y + 30, Math.round(w * f), 8);
+      g.lineStyle(1, f > 0 ? 0x05050a : 0x3a2a2a, 1).strokeRect(px + 0.5, cx.y + 30.5, w - 1, 7);
+    }
   },
 
   pinta: function () {
@@ -1149,6 +1259,34 @@ var DesafioScene = new Phaser.Class({
 
     g.fillStyle(0x0b0b12, 0.95).fillRect(DSF.msg.x, DSF.msg.y, DSF.msg.w, DSF.msg.h);
     g.lineStyle(2, 0xf2f0ff, 1).strokeRect(DSF.msg.x + 1, DSF.msg.y + 1, DSF.msg.w - 2, DSF.msg.h - 2);
+
+    /* Quem você é contra quem ele é. A seta diz de que lado pende: '▲'
+       é a sua vez de ter razão, '▼' é ele em casa. */
+    var arqDele = this.dados && DESAFIANTES[this.dados.tipo] && DESAFIANTES[this.dados.tipo].arq;
+    if (arqDele) {
+      var v = vantagemArquetipo(arquetipoDoChar(), arqDele);
+      this.tArq.setText((v > 0 ? '▲ ' : (v < 0 ? '▼ ' : '')) + ARQ_NOME[arqDele])
+        .setColor(v > 0 ? PAL.verde : (v < 0 ? PAL.vermelho : PAL.cinza));
+    }
+
+    /* O PONTO DE RUPTURA (GDD §6, turno 3): quando só resta o último
+       marcador de postura dele, o quarto botão vira o golpe que encerra
+       a discussão. Ele TOMA o lugar de uma resposta em vez de virar um
+       quinto botão porque quatro é o que cabe na tela — e porque abrir
+       mão de uma saída pra ter o finalizador é a escolha que faz ele
+       valer alguma coisa. */
+    this.tTrancoTxt.setText(this.time.now < this.tTranco ? this.avisoTranco : '')
+      .setColor(this.avisoTranco.indexOf('PERDEU') >= 0 ? PAL.vermelho : PAL.verde);
+
+    var rup = rupturaDoChar();
+    if (rup && !this.rupturaPosta && this.ele.pac > 0 &&
+        posturasDe(this.ele.pac, this.ele.max) <= 1) {
+      this.rupturaPosta = true;
+      this.resps[3] = { tipo: 'RUPTURA', nome: rup.nome, cor: '#e8362c',
+        dano: Math.ceil(this.ele.max / POSTURAS * 1.25), fala: rup.fala };
+      this.tMenu[3].setText(rup.curto);
+      sfx('apito');
+    }
 
     var menu = (this.fase === 'menu');
     // a plaquinha do próximo golpe, só enquanto é a sua vez

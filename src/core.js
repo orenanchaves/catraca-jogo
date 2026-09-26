@@ -726,6 +726,28 @@ var GameState = {
     this.bateria = 100;                           // o celular sai de casa carregado
     this.explorar = false;                        // o modo EXPLORAR liga depois do init
     this.mochila = {};                            // o que você comprou e ainda não usou
+    /* ---------- o ambulante: estrelas e caixa ----------
+       docs/gdd/02-biblia-narrativa.md (Protagonista 3): "vigilância
+       crescente de guardas patrimoniais e fiscais de colete amarelo; a
+       partir de 3 estrelas ocorrem enquadros com perda de mercadoria (o
+       Rapa)".
+
+       As estrelas são o calor QUE ATRAVESSA o dia, e é isso que as
+       diferencia do `this.fiscal` do vagão: aquele é o quanto este carro
+       reparou em você e morre junto com a cena, este é a sua ficha na
+       estação inteira. Vender demais num carro chama o guarda; chamar o
+       guarda várias vezes é que te deixa marcado.
+
+       A caixa existe porque o Rapa precisa de algo pra apreender — sem
+       estoque, "recolheu a caixa" era só uma frase. Comprar no atacado
+       (o Seu Tonho do Brás) é a economia do personagem e fica pro Tier 3;
+       por enquanto ele sai de casa com a caixa cheia do dia. */
+    this.estrelas = 0;
+    this.estoque = (charKey === 'ambulante') ? ESTOQUE_DO_DIA : 0;
+    /* A mochila começa nas costas, que é como todo mundo sai de casa
+       (GDD §5). Pôr na frente é uma decisão, e decisão tem que ser do
+       jogador, não do estado inicial. */
+    this.mochilaFrente = false;
     this.pernasFeitas = 0;
     this.atrasos = 0;
     this.ultimoAtraso = 0;
@@ -2342,7 +2364,12 @@ function separaCorpos(a, b, pesoA, pesoB) {
   var dx = a.x - b.x;
   var dy = (a.y - b.y) * ACHATA;
   var d2 = dx * dx + dy * dy;
-  var r = CORPO_RX * 2;
+  /* Cada corpo pode ter o raio dele (`_rx`), e quem não tem usa o de
+     sempre — `CORPO_RX + CORPO_RX` é exatamente o `CORPO_RX * 2` que
+     estava aqui, então ninguém muda de comportamento por causa desta
+     linha. Quem usa: a mochila do jogador, que engorda nas costas e
+     afina na frente (GDD §5). */
+  var r = (a._rx || CORPO_RX) + (b._rx || CORPO_RX);
   if (d2 > r * r) return false;
   var d = Math.sqrt(d2);
   if (d < 0.5) {                     // exatamente em cima: desempata pro lado
@@ -3498,6 +3525,8 @@ function sfx(n) {
     case 'apito': tom(2200, .09); setTimeout(function () { tom(2600, .13); }, 90); break;
     case 'trem': tom(65, .6, 'sawtooth', .05); break;
     case 'catraca': tom(880, .04); setTimeout(function () { tom(1320, .06); }, 45); break;
+    // o baque do carimbo no boletim (src/scene-fim.js): um thump grave e um tico de tinta em cima
+    case 'carimba': ruido(0.05, 0.05, 320, 90, 1.4, 'lowpass'); tom(85, .1, 'sine', .08); break;
     case 'caixa': tom(96, .11, 'sine', .09); setTimeout(function () { tom(62, .17, 'sine', .07); }, 60); break;
     /* passo: curto e grave, e alterna de altura pra não virar metrônomo */
     case 'passoA': tom(150, .035, 'triangle', .035); break;
@@ -3552,7 +3581,13 @@ function sfx(n) {
 /* ---------- controle (teclado + toque) ---------- */
 /* pulso: um toque rápido pode começar e terminar dentro do mesmo quadro.
    Sem guardar o pulso, o dedo aperta e o jogo não vê nada. */
-var TOUCH = { up: false, down: false, left: false, right: false, act: false, pulso: false };
+var TOUCH = { up: false, down: false, left: false, right: false, act: false, pulso: false,
+  piparoteCima: false, piparoteBaixo: false };
+/* Os limites do piparote, e cada um existe pra NÃO roubar o gesto de
+   andar: 300ms porque quem anda segura muito mais que isso; 44px porque
+   é o dobro da zona morta do manche, então tremido não vira piparote; e
+   1,5 de retidão porque arrasto diagonal é caminhada, não gesto. */
+var PIPAROTE = { tempo: 300, dist: 44, retidao: 1.5 };
 var TOQUE_ATIVO = false;
 
 /* ---------- manche flutuante, e a tela dividida ----------
@@ -3595,7 +3630,11 @@ var TOQUE_ATIVO = false;
    caso do polegar esquerdo dirigindo e o direito agindo. */
 function dividirTela() { return TOQUE_ATIVO; }
 var TOQUE = {
-  ativo: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0
+  ativo: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, dx: 0, dy: 0, arrastando: false, t0: 0,
+  /* Onde o dedo ENCOSTOU. O `ox/oy` é a base do manche, e ela escorrega
+     junto com o dedo (é o que faz o analógico virtual acompanhar a mão) —
+     medir o piparote contra ela dava 26px num gesto de 90. */
+  px0: 0, py0: 0
 };
 var TOQUE_DIR = { ativo: false, id: -1, x: 0, y: 0, t0: 0 };
 var MANCHE = {
@@ -3746,6 +3785,194 @@ function sorteiaGuarda() {
    paga o dia inteiro — e é o que faz o fiscal vir atrás de você. Água
    entra no meio disso valendo o dobro no calor, que é quando o vagão
    inteiro está querendo. */
+/* Quanto cabe na caixa de um dia. Vinte e quatro é o número que deixa o
+   ambulante vender a viagem inteira sem acabar, mas sentir o Rapa quando
+   ele leva metade. */
+var ESTOQUE_DO_DIA = 24;
+var ESTRELAS_MAX = 5;
+var ESTRELAS_RAPA = 3;            // a partir daqui o enquadro apreende (GDD)
+
+/* A ficha em cinco casas, pra caber no rodapé. Estrela cheia é ★ e vazia
+   é ☆ — mas o CHARSET do jogo não tem nenhum dos dois (ver CLAUDE.md:
+   caractere fora da lista vira buraco silencioso), então são os mesmos
+   blocos das barras do jogo. */
+/* ---------- os arquétipos sociais ----------
+   docs/gdd/01-game-design-mestre.md §6: RUA vence CORPORATIVO, CORPORATIVO
+   vence INSTITUCIONAL, INSTITUCIONAL vence ACADÊMICO, ACADÊMICO vence RUA.
+   Ciclo fechado: cada um vence exatamente um e perde pra exatamente um.
+
+   (O Mapeamento do Metrô §6 desenha outra matriz, de três grupos, e ela
+   se contradiz — tem Institucional vencendo Corporativo e Corporativo
+   vencendo Institucional ao mesmo tempo. Vale a do GDD mestre, decidido
+   com o Renan em 25/09.)
+
+   Isto é uma CAMADA por cima do duelo que já existe, não um substituto:
+   a fraqueza e os três golpes de cada um dos 21 desafiantes continuam
+   valendo. O arquétipo diz de que jeito você argumenta, e mexe no quanto
+   a sua fala pesa contra aquela pessoa. */
+var ARQ_VENCE = { RUA: 'CORPORATIVO', CORPORATIVO: 'INSTITUCIONAL', INSTITUCIONAL: 'ACADEMICO', ACADEMICO: 'RUA' };
+var ARQ_NOME = { RUA: 'RUA', CORPORATIVO: 'CORPORATIVO', INSTITUCIONAL: 'INSTITUCIONAL', ACADEMICO: 'ACADÊMICO' };
+
+/* Cada jogável nasce com o seu, porque neste jogo personagem troca a
+   REGRA e não a skin: jogar de CLT passa a ser bom contra fiscal e ruim
+   contra acadêmico, e isso é identidade, não número. */
+var ARQ_DO_CHAR = {
+  estudante: 'ACADEMICO',
+  clt: 'CORPORATIVO',
+  ambulante: 'RUA',
+  torcedor: 'RUA',
+  gestante: 'RUA',
+  senhor: 'INSTITUCIONAL',
+  cadeirante: 'INSTITUCIONAL',
+  turista: 'CORPORATIVO'
+};
+function arquetipoDoChar(k) { return ARQ_DO_CHAR[k || GameState.charKey] || 'RUA'; }
+
+/* +1 quando o seu arquétipo vence o dele, -1 quando o dele vence o seu,
+   0 quando não se falam. Devolver número e não booleano deixa quem
+   chama decidir o peso. */
+function vantagemArquetipo(meu, dele) {
+  if (!meu || !dele || meu === dele) return 0;
+  if (ARQ_VENCE[meu] === dele) return 1;
+  if (ARQ_VENCE[dele] === meu) return -1;
+  return 0;
+}
+
+/* ---------- a mochila: nas costas ou na frente ----------
+   GDD §5. Nas costas: hitbox larga (28px), passo inteiro, nenhuma
+   proteção contra punga. Na frente: hitbox estreita (18px), passo 20%
+   mais curto, imunidade a furto, e simpatia de quem vê.
+
+   Os três efeitos puxam pra lados opostos de propósito — é a troca que
+   faz a postura ser decisão e não botão de melhoria. Quem tem pressa
+   anda de costas e aceita o risco; quem está na Sé lotada com a caixa
+   cheia bota na frente e perde tempo. */
+var MOCHILA = {
+  costas: { rx: 14, vel: 1.00 },
+  frente: { rx: 9, vel: 0.80 }
+};
+function mochilaAgora() { return GameState.mochilaFrente ? MOCHILA.frente : MOCHILA.costas; }
+
+/* Quem carrega mochila nas costas está imune a nada; na frente, a tudo.
+   Uma pergunta só, pra ninguém reimplementar a regra em cada golpe. */
+function protegidoDePunga() { return !!GameState.mochilaFrente; }
+
+/* O furto em si, o mesmo em qualquer lugar do jogo: a dupla do corredor
+   da Sé e a mão que vem no encontrão da contramão (docs/gdd/04, §2.A:
+   o contrafluxo "abre brechas para a investida dos Trombadinhas").
+   Morava dentro da baldeação; com dois lugares roubando, uma cópia da
+   regra em cada cena sairia de sincronia no primeiro ajuste.
+
+   Devolve o que dizer, ou null quando a mochila na frente protegeu.
+   Primeiro a carteira, que é o que o documento diz; sem dinheiro, uma
+   coisa da mochila; sem nada, fica no susto — punir quem já não tem
+   nada é só crueldade sem jogo. */
+function furtaDoBolso() {
+  if (protegidoDePunga()) return null;
+  var d = GameState.dinheiro;
+  if (d >= 1) {
+    var levou = Math.min(d, Math.round((6 + Math.random() * 14) * 100) / 100);
+    GameState.gastar(levou, 'PUNGA');
+    GameState.stats.pungas = (GameState.stats.pungas || 0) + 1;
+    return 'LEVARAM R$ ' + levou.toFixed(2).replace('.', ',');
+  }
+  var mo = GameState.mochila || {}, chaves = [], k;
+  for (k in mo) if (mo[k] > 0) chaves.push(k);
+  if (!chaves.length) return 'MEXERAM NA SUA MOCHILA';
+  var alvo = chaves[Math.floor(Math.random() * chaves.length)];
+  mo[alvo]--;
+  GameState.stats.pungas = (GameState.stats.pungas || 0) + 1;
+  return 'LEVARAM: ' + (typeof nomeDaCoisa === 'function' ? nomeDaCoisa(alvo) : alvo);
+}
+
+/* ---------- a placa de proibição ----------
+   docs/gdd/04-mapeamento-placas.md §2.C: chapa de alto contraste com o
+   círculo vermelho cortado. Cometer a infração debaixo dela dobra o
+   alcance da vista de quem fiscaliza.
+
+   É pictograma e não frase: 26 letras cabem na tela INTEIRA, e uma placa
+   de parede tem 24px. O desenho diz "proibido pular" antes de qualquer
+   leitura, e a faixa de dica explica o resto na hora em que importa.
+
+   A textura mora no JOGO, não na cena (a armadilha do `texturaDeCena`):
+   estação e vagão usam a mesma, e desenho que não muda se faz uma vez. */
+/* O segmento a→b atravessa a caixa r ({x0, y0, x1, y1})? Devolve a
+   fração do caminho (0 a 1) em que ele ENTRA na caixa, ou -1 se não
+   cruza. Liang-Barsky: é a conta que diz até onde a vista vai antes de
+   bater num totem, e serve tanto pro "vê ou não vê" quanto pro desenho do
+   cone (docs/gdd/04-mapeamento-placas.md §2.D). */
+function cortaCaixa(ax, ay, bx, by, r) {
+  var dx = bx - ax, dy = by - ay, t0 = 0, t1 = 1;
+  var p = [-dx, dx, -dy, dy], q = [ax - r.x0, r.x1 - ax, ay - r.y0, r.y1 - ay];
+  for (var i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return -1; continue; }
+    var t = q[i] / p[i];
+    if (p[i] < 0) { if (t > t1) return -1; if (t > t0) t0 = t; }
+    else { if (t < t0) return -1; if (t < t1) t1 = t; }
+  }
+  return t0;
+}
+
+var PROIBIDA_LADO = 24;
+function texturaProibida(cena, tipo) {
+  var chave = 'proibida_' + tipo;
+  if (cena.textures.exists(chave)) return chave;
+  var L = PROIBIDA_LADO, g = cena.make.graphics({ x: 0, y: 0, add: false });
+  g.fillStyle(0x14141c, 1).fillRect(0, 0, L, L);                 // moldura escura, destaca da parede clara
+  g.fillStyle(0xf0eeff, 1).fillRect(1, 1, L - 2, L - 2);
+  // o pictograma, em preto, ANTES do círculo: o risco vermelho passa por cima
+  g.fillStyle(0x14141c, 1);
+  if (tipo === 'pulo') {
+    g.fillRect(6, 15, 12, 2);                  // o braço da catraca
+    g.fillRect(9, 9, 2, 2);                    // a cabeça
+    g.fillRect(10, 11, 2, 3);                  // o tronco, inclinado no salto
+    g.fillRect(12, 12, 3, 1);                  // o braço
+    g.fillRect(8, 13, 2, 1).fillRect(12, 14, 3, 1);   // as pernas abertas por cima
+  } else {
+    g.fillRect(6, 13, 12, 5);                  // a caixa de isopor do ambulante
+    g.fillStyle(0xf0eeff, 1).fillRect(7, 14, 10, 1);
+    g.fillStyle(0x14141c, 1).fillRect(8, 9, 3, 3).fillRect(13, 10, 3, 2);   // o que sai dela
+  }
+  g.lineStyle(2, 0xe8362c, 1).strokeCircle(L / 2, L / 2, L / 2 - 3);
+  g.lineBetween(5, 5, L - 5, L - 5);
+  g.generateTexture(chave, L, L);
+  g.destroy();
+  return chave;
+}
+
+/* Troca a postura e devolve se mudou mesmo (pra quem quiser avisar). */
+function poeMochila(frente, cena) {
+  frente = !!frente;
+  if (GameState.mochilaFrente === frente) return false;
+  GameState.mochilaFrente = frente;
+  if (cena && cena.pl && cena.pl.sp) cena.pl.sp._rx = mochilaAgora().rx;
+  sfx(frente ? 'porta' : 'ok');
+  /* O vagão repara em quem abraça a mochila: é gesto de quem já foi
+     roubado, e isso gera simpatia. Nas costas, o contrário — a mochila
+     bate nos outros quando você gira. */
+  GameState.addCarisma(frente ? 1 : -1);
+  return true;
+}
+
+/* O gesto, lido por qualquer cena que tenha boneco andando. Fica aqui e
+   não em cada cena porque três cópias da mesma regra saem de sincronia
+   na primeira mudança — foi assim que a briga e a encarada acabaram com
+   dois `GOLPES` diferentes (ver CLAUDE.md). */
+function ouveMochila(cena) {
+  if (!GameState.char) return;
+  if (Ctrl.mochilaFrenteJust) poeMochila(true, cena);
+  else if (Ctrl.mochilaCostasJust) poeMochila(false, cena);
+  else if (Ctrl.mochilaAlternaJust) poeMochila(!GameState.mochilaFrente, cena);
+  // o corpo acompanha a postura mesmo depois de trocar de cena
+  if (cena && cena.pl && cena.pl.sp) cena.pl.sp._rx = mochilaAgora().rx;
+}
+
+function estrelasEmTexto() {
+  var s = '', i;
+  for (i = 0; i < ESTRELAS_MAX; i++) s += (i < (GameState.estrelas || 0)) ? '|' : '.';
+  return s;
+}
+
 var MUAMBA = [
   { nome: 'BALA', grito: 'OLHA A BALA, UM REAL', preco: 1, chance: 0.85, risco: 8 },
   { nome: 'CHOCOLATE', grito: 'OLHA O CHOCOLATE, DOIS REAL', preco: 2, chance: 0.7, risco: 12 },
@@ -4384,7 +4611,7 @@ var Ctrl = {
        valendo pra quem já pegou o costume. enableCapture segura o espaço
        antes que o navegador role a página com ele. */
     this.k = scene.input.keyboard.addKeys(
-      'W,A,S,D,SPACE,UP,DOWN,LEFT,RIGHT,Z,X,P,ENTER,ESC', true, true);
+      'W,A,S,D,M,SPACE,UP,DOWN,LEFT,RIGHT,Z,X,P,ENTER,ESC', true, true);
 
     /* Contador de batidas, não de estado. Olhar se a tecla está
        apertada perde o toque curto; o JustDown do Phaser é um booleano
@@ -4441,6 +4668,16 @@ var Ctrl = {
     this.upJust = this.upN > 0; this.downJust = this.downN > 0;
     this._tl = TOUCH.left; this._tr = TOUCH.right;
     this._tu = TOUCH.up; this._td = TOUCH.down;
+
+    /* A mochila (GDD §5): piparote pra baixo põe na frente, pra cima
+       joga nas costas. No teclado é o M, que alterna — quem joga no
+       computador não tem piparote, e ficar sem a mecânica por causa do
+       aparelho seria perder metade do design. */
+    this.mochilaFrenteJust = !!TOUCH.piparoteBaixo;
+    this.mochilaCostasJust = !!TOUCH.piparoteCima;
+    var m = this.k.M.isDown;
+    this.mochilaAlternaJust = m && !this._pm; this._pm = m;
+    TOUCH.piparoteCima = TOUCH.piparoteBaixo = false;
   },
 
   /* o disfarce quer uma direção só. No teclado a ordem das teclas
@@ -6115,7 +6352,7 @@ var HudScene = new Phaser.Class({
         return;
       }
       TOQUE.ativo = true; TOQUE.id = p.id; TOQUE.arrastando = false;
-      TOQUE.ox = TOQUE.x = p.x; TOQUE.oy = TOQUE.y = p.y;
+      TOQUE.ox = TOQUE.x = TOQUE.px0 = p.x; TOQUE.oy = TOQUE.y = TOQUE.py0 = p.y;
       TOQUE.dx = TOQUE.dy = 0;
       TOQUE.t0 = self.time.now;
     });
@@ -6138,6 +6375,25 @@ var HudScene = new Phaser.Class({
          A condição exigia a metade direita, e era ela que fazia o toque
          na metade esquerda não valer nada. */
       if (TOQUE.ativo && !TOQUE.arrastando) TOUCH.pulso = true;
+      /* ---------- o piparote vertical ----------
+         O GDD §4 pede swipe pra trocar a mochila de lado. Aqui o arrasto
+         JÁ É o manche de andar, então o piparote tem que se distinguir
+         de caminhar — e caminhar é a coisa mais usada do jogo, não pode
+         quebrar por causa disto.
+
+         O que separa um do outro é o tempo: andar é segurar (o dedo fica
+         no lugar por segundos), piparote é ir e soltar depressa. Por isso
+         a conta é feita na SOLTURA, e só conta se foi rápido, longo e
+         claramente vertical. Um toque de andar de meio segundo não passa
+         por nenhum dos três. */
+      if (TOQUE.ativo) {
+        var sdx = TOQUE.x - TOQUE.px0, sdy = TOQUE.y - TOQUE.py0;
+        var rapido = (self.time.now - TOQUE.t0) < PIPAROTE.tempo;
+        if (rapido && Math.abs(sdy) > PIPAROTE.dist && Math.abs(sdy) > Math.abs(sdx) * PIPAROTE.retidao) {
+          TOUCH[sdy < 0 ? 'piparoteCima' : 'piparoteBaixo'] = true;
+          TOUCH.pulso = false;             // piparote não é toque de agir
+        }
+      }
       TOQUE.ativo = false; TOQUE.id = -1; TOQUE.arrastando = false;
       TOUCH.up = TOUCH.down = TOUCH.left = TOUCH.right = false;
     });

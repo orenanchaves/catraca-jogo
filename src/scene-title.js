@@ -700,31 +700,36 @@ var TitleScene = new Phaser.Class({
     if (this.tentaComprar()) return;
     this.saindo = true;
     audioOn(); sfx('ok');
-    var k = this.ordem[this.sel], eu = this;
+    var k = this.ordem[this.sel];
     /* Tem checkpoint deste personagem: pergunta se continua de onde parou
        ou se começa a campanha de novo, do dia 1 (src/campanha.js). */
     var salvo = !explorar && Campanha.tem(k);
-    if (salvo) {
-      /* Três saídas, e a do meio é a linha do tempo ('a timeline na
-         entrada'): olhar a temporada e repetir uma fase sem precisar
-         terminar um dia antes. Ela precisa do save APLICADO antes de
-         abrir, senão o diário não sabe de quem é a temporada. */
-      var retoma = function () {
+    /* JOGAR não entra mais direto no dia: abre a LISTA DE FASES
+       (docs/gdd/01-game-design-mestre.md §3 — "ao clicar em JOGAR o
+       jogador visualiza a lista corrida das fases"). A tela já existia
+       como atalho escondido atrás de um diálogo de checkpoint; agora ela
+       é a porta da campanha, que é o lugar dela: é ali que se vê a nota
+       de cada fase, o que está trancado e o que dá pra refazer.
+
+       Vale pra TODO MUNDO, inclusive quem ainda não tem campanha escrita:
+       lá a lista abre com a primeira jogável e as outras nove trancadas.
+       É de propósito — a temporada trancada diz que existe história por
+       vir sem prometer texto que ainda não foi escrito. Decidido com o
+       Renan em 25/09 ("deixa trancado e misterioso"), depois de ele
+       reparar que o botão JOGAR se comportava de dois jeitos. */
+    if (!explorar) {
+      // o save precisa estar APLICADO antes de abrir, senão o diário não sabe de quem é a temporada
+      if (salvo) {
         GameState.init(k, salvo.genero);
         GameState.explorar = false;
         Campanha.aplica(salvo);
-      };
-      fala(this, 'Você parou na FASE ' + salvo.dia + ',\nem ' + placaDe(salvo.origem) + '.', [
-        { label: 'Continuar a fase ' + salvo.dia, cb: function () {
-          retoma();
-          eu.scene.start('Estacao', { onde: 'saguao' });
-        } },
-        { label: 'Ver a temporada', cb: function () {
-          retoma();
-          eu.scene.start('Fim', { vista: 'temporada' });
-        } },
-        { label: 'Começar do começo', cb: function () { Campanha.apaga(); eu.saindo = false; eu.comeca(false); } }
-      ]);
+      } else {
+        GameState.init(k, this.gen[k]);
+        GameState.explorar = false;
+        Missoes.novaCorrida();
+        Campanha.salva('inicio');
+      }
+      this.scene.start('Fim', { vista: 'temporada' });
       return;
     }
     GameState.init(k, this.gen[k]);

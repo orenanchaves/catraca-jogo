@@ -167,6 +167,8 @@ EstacaoScene.prototype.fiscalVe = function (x, y) {
   if (d < 34) return true;
   if (d > FISCAL.alcance) return false;
   if (Math.abs(Phaser.Math.Angle.Wrap(Math.atan2(dy, dx) - c.olhar)) > FISCAL.meia) return false;
+  // totem e backlight no meio: a vista acaba neles (docs/gdd/04 §2.D)
+  if (this.vistaTapada(f.sp.x, f.sp.y - 6, x, y)) return false;
   var n = 0;
   for (var i = 0; i < this.gente.length; i++) {
     var a = this.gente[i];
@@ -182,10 +184,22 @@ EstacaoScene.prototype.pintaConeFiscal = function (ve) {
   var c = this.chefao, f = c.f, g = this.gFiscal;
   g.clear();
   if (!c || c.fase !== 'fuga') return;
-  var pts = [{ x: f.sp.x, y: f.sp.y - 6 }];
-  for (var k = 0; k <= 8; k++) {
-    var a = c.olhar - FISCAL.meia + (2 * FISCAL.meia) * k / 8;
-    pts.push({ x: f.sp.x + Math.cos(a) * FISCAL.alcance, y: f.sp.y - 6 + Math.sin(a) * FISCAL.alcance });
+  /* Cada raio do leque vai até o alcance ou até o primeiro totem, o que
+     vier antes: a sombra atrás do totem é a mesma conta do `fiscalVe`.
+     24 raios e não 8. Conta: a abertura é de 71°, e com 8 raios eles
+     ficam a 15px um do outro a 100px do fiscal, então a sombra de um
+     totem de 16px podia cair inteira entre dois raios e sumir do
+     desenho. Com 24, 5px. */
+  var pts = [{ x: f.sp.x, y: f.sp.y - 6 }], RAIOS = 24;
+  for (var k = 0; k <= RAIOS; k++) {
+    var a = c.olhar - FISCAL.meia + (2 * FISCAL.meia) * k / RAIOS;
+    var bx = f.sp.x + Math.cos(a) * FISCAL.alcance, by = f.sp.y - 6 + Math.sin(a) * FISCAL.alcance, t = 1;
+    var cobs = this.coberturas || [];
+    for (var q = 0; q < cobs.length; q++) {
+      var tq = cortaCaixa(f.sp.x, f.sp.y - 6, bx, by, cobs[q]);
+      if (tq >= 0 && tq < t) t = tq;
+    }
+    pts.push({ x: f.sp.x + (bx - f.sp.x) * t, y: f.sp.y - 6 + (by - f.sp.y + 6) * t });
   }
   var cor = 0xec7000;
   g.fillStyle(cor, ve ? 0.26 : (c.estado === 'caca' ? 0.16 : 0.1)).fillPoints(pts, true);
