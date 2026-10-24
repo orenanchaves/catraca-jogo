@@ -31,6 +31,9 @@ jobs:
           cp -r src _site/
           # os áudios que o jogo toca (os pregões dos ambulantes); sem isto eles davam 404 no ar
           if [ -d assets/audio ]; then mkdir -p _site/assets && cp -r assets/audio _site/assets/audio; fi
+          # a página de privacidade do login e a fonte TTF que o quadro da conta usa
+          if [ -f privacidade.html ]; then cp privacidade.html _site/; fi
+          if [ -d assets/fonte ]; then mkdir -p _site/assets && cp -r assets/fonte _site/assets/fonte; fi
           touch _site/.nojekyll      # sem isso o GitHub tenta processar como Jekyll
           find _site -type f | sort
 
