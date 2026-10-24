@@ -148,7 +148,7 @@ var Missoes = {
     var e = this.le(), chegou = e.nivel + 2;       // o nível novo, contado de 1
     var pts = 10 * chegou, quem = PREMIO_NIVEL[chegou], ganhou = '';
     if (quem) {
-      if (destravado(quem)) pts += precoDe(quem);
+      if (destravado(quem) || SO_ESTUDANTE) pts += precoDe(quem);   // no lançamento, vira ponto
       else { destrava(quem); ganhou = nomeDoChar(quem); }
     }
     gravaPontos(lePontos() + pts);

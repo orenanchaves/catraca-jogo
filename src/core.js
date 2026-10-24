@@ -652,10 +652,21 @@ function leDestravados() {
    história apresenta ele — hoje, quando você o encontra no mundo (o
    SENHOR das compras, o AMBULANTE da caixa); quando o mês de cada um
    existir, abre ao fechar o mês anterior. */
+/* ---------- lançamento: só o estudante ----------
+   'Deixa só o estudante disponível' (23/10): ele é o único com as dez
+   fases escritas. Os outros sete continuam na seleção, trancados e sem
+   preço ('???'), do mesmo jeito que a temporada deles no painel de fases.
+   Com isto ligado ninguém é apresentado, comprado ou ganho: o prêmio de
+   nível e de conquista que daria um personagem vira os pontos dele, que
+   é o que já acontecia quando o personagem estava aberto. Desligar esta
+   linha devolve a regra de sempre (a história apresenta, o PONTO compra). */
+var SO_ESTUDANTE = true;
+
 function leApresentados() {
   try { return JSON.parse(localStorage.getItem('metrosp_apresentados') || '[]') || []; } catch (e) { return []; }
 }
 function apresenta(k) {
+  if (SO_ESTUDANTE) return false;
   var l = leApresentados();
   if (l.indexOf(k) >= 0) return false;
   l.push(k);
@@ -663,7 +674,7 @@ function apresenta(k) {
   if (typeof avisaMissao === 'function') avisaMissao('NOVO PERSONAGEM', nomeDoChar(k) + ' entrou na sua história.');
   return true;
 }
-function apresentado(k) { return k === 'estudante' || leApresentados().indexOf(k) >= 0; }
+function apresentado(k) { return k === 'estudante' || (!SO_ESTUDANTE && leApresentados().indexOf(k) >= 0); }
 function destravado(k) { return apresentado(k) && leDestravados().indexOf(k) >= 0; }
 function destrava(k) {
   if (destravado(k)) return;
@@ -4880,8 +4891,52 @@ function geraFonte(scene) {
 /* ---------- utilidades de UI ---------- */
 var ESCALA_TEXTO = 2;   // a resolução dobrou, o texto acompanha
 
+/* ---------- quebra de linha automática ----------
+   'Coloca wrap text em tudo' (24/10). Texto bitmap não quebra linha
+   sozinho: frase mais larga que a tela saía cortada pela borda (a dica de
+   vender chegou a medir 336px numa faixa de 320). Agora todo texto criado
+   por txt/txtC se mede a cada setText, setScale e setOrigin e, se não
+   couber no espaço até a borda (com TXT_BORDA de respiro), quebra nas
+   palavras. Texto que cabe não muda em nada: a quebra só liga quando
+   precisa, e desliga sozinha quando o texto volta a caber.
+   Ficam de fora, de propósito:
+   - texto que escolheu a própria largura (quem chamou setMaxWidth manda);
+   - texto dentro de Container (o carimbo gira; a conta da borda é outra);
+   - as placas do MUNDO nas cenas que rolam (estação, vagão, baldeação):
+     elas têm o tamanho desenhado pra chapa delas, e sair da câmera é só
+     estar longe, não estar cortado. */
+var TXT_BORDA = 8;
+var CENAS_QUE_ROLAM = { Estacao: 1, Vagao: 1, Baldeacao: 1 };
+function embrulhaTexto(t) {
+  if (!t || t._larguraPropria || !t.scene || t.parentContainer) return;
+  var sk = t.scene.scene ? t.scene.scene.key : '';
+  if (CENAS_QUE_ROLAM[sk] && t.scrollFactorX !== 0) return;
+  var chave = t.text + '|' + t.scaleX + '|' + t.originX + '|' + t.x;
+  if (t._chaveQuebra === chave) return;           // nada mudou: setText de todo quadro não refaz a conta
+  t._chaveQuebra = chave;
+  var ox = t.originX, disp;
+  if (ox <= 0.01) disp = GW - TXT_BORDA - t.x;
+  else if (ox >= 0.99) disp = t.x - TXT_BORDA;
+  else disp = 2 * Math.min(t.x, GW - t.x) - 2 * TXT_BORDA;
+  disp = Math.max(48, disp);
+  t._maxOrig.call(t, 0);                           // mede inteira, sem quebra
+  if (t.width <= disp + 0.5) return;
+  /* Em pixel de TELA, já com a escala. Medido: com escala 2 e
+     setMaxWidth(141), "SEGURE NO VERDE" (180px na tela, 90 na unidade da
+     fonte) quebrou, então a conta é feita na tela. Dividir pela escala
+     quebrava o texto na metade da largura que ele tinha. */
+  t._maxOrig.call(t, Math.floor(disp));
+  if (ox > 0.01 && ox < 0.99) t.setCenterAlign();
+  else if (ox >= 0.99) t.setRightAlign();
+}
 function txt(scene, x, y, s, cor, tam) {
   var t = scene.add.bitmapText(Math.round(x), Math.round(y), 'px', '');
+  var setText = t.setText, setScale = t.setScale, setOrigin = t.setOrigin;
+  t._maxOrig = t.setMaxWidth;
+  t.setMaxWidth = function (w, c) { this._larguraPropria = true; return this._maxOrig(w, c); };
+  t.setText = function (v) { setText.call(this, v); embrulhaTexto(this); return this; };
+  t.setScale = function (a, b) { setScale.call(this, a, b); embrulhaTexto(this); return this; };
+  t.setOrigin = function (a, b) { setOrigin.call(this, a, b); embrulhaTexto(this); return this; };
   t.setScale(ESCALA_TEXTO * Math.max(1, Math.round((tam || 8) / 8)));
   t.setColor(cor || PAL.branco);
   t.setText(s);
@@ -5095,9 +5150,14 @@ FaixaDica.prototype.setText = function (txto, cor) {
   }
   if (!txto) { this.t.setVisible(false); return this; }
   this.t.setVisible(true).setText(txto);
-  this.g.fillStyle(0x08080e, 0.82).fillRect(0, this.y, GW, 26);
-  this.g.fillStyle(0x232336, 0.9).fillRect(0, this.y, GW, 1);
-  this.g.fillStyle(0x000000, 0.45).fillRect(0, this.y + 25, GW, 1);
+  /* Dica longa quebra em duas linhas (`embrulhaTexto`), e a faixa cresce
+     pra CIMA: ela mora rente à base da tela, e crescer pra baixo jogaria a
+     segunda linha pra fora. Uma linha de tam 8 tem caixa de 24px. */
+  var extra = Math.max(0, Math.round(this.t.height) - 24), topo = this.y - extra;
+  this.t.setY(topo + 6);
+  this.g.fillStyle(0x08080e, 0.82).fillRect(0, topo, GW, 26 + extra);
+  this.g.fillStyle(0x232336, 0.9).fillRect(0, topo, GW, 1);
+  this.g.fillStyle(0x000000, 0.45).fillRect(0, topo + 25 + extra, GW, 1);
   return this;
 };
 

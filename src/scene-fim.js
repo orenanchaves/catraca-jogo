@@ -118,6 +118,8 @@ var FimScene = new Phaser.Class({
     if (!so && vivo) this.pintaCarimbo(bom);
     this.montaBotoes(bom);
     if (so) this.poeRecomecar();
+    // fechou a fase 1 como visitante: o convite pra criar a conta (uma vez por aparelho, src/conta.js)
+    if (!so && b && typeof Conta !== 'undefined') Conta.convida(n);
   },
 
   /* ---------- recomeçar a campanha ----------

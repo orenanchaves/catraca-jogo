@@ -27,12 +27,12 @@ var TREINO_QUEM = { k: 'estudante', g: null };
    armados pro minigame e volta sozinho quando ele termina. */
 var TREINO = [
   // a briga, a encarada e a disputa saíram: o desafio é o lugar delas
-  { nome: 'O DESAFIO', desc: 'ache o ponto fraco dele', cena: 'Vagao', modo: 'desafio' },
+  { nome: 'O DESAFIO', desc: 'ache o ponto fraco', cena: 'Vagao', modo: 'desafio' },
   { nome: 'BATALHA DE RIMA', desc: 'toque no ritmo', cena: 'Vagao', modo: 'rima' },
   { nome: 'O GUARDA NA RONDA', desc: 'ele procura quem pulou', cena: 'Vagao', modo: 'ronda' },
   { nome: 'DAR O LUGAR', desc: 'carisma ou descanso', cena: 'Vagao', modo: 'lugar' },
   { nome: 'DISPUTA DO BANCO', desc: 'chegue antes do outro', cena: 'Vagao', modo: 'disputaBanco' },
-  { nome: 'SURFE DO CORRIMÃO', desc: 'segure no verde da curva', cena: 'Vagao', modo: 'surfe' },
+  { nome: 'SURFE DO CORRIMÃO', desc: 'segure firme na curva', cena: 'Vagao', modo: 'surfe' },
   { nome: 'VAGÃO LOTADO', desc: 'aperte sem parar', cena: 'Estacao', modo: 'empurrao', onde: 'plataforma' },
   { nome: 'PULAR A CATRACA', desc: 'sem o guarda te ver', cena: 'Estacao', modo: 'catraca', onde: 'saguao' }
 ];
@@ -41,7 +41,11 @@ var TREINO = [
    descrição em duas linhas de tinta (y+9..23 e y+27..41); oito deles
    com vão de 6 terminam em 506, e sobra a faixa do VOLTAR antes do fim
    da tela, em 576. A descrição mais longa tem 22 letras, 264px, e o
-   ladrilho tem 288 começando o texto 14 pra dentro. */
+   ladrilho tem 288 começando o texto 14 pra dentro.
+   22 é o TETO, e não cabe segunda linha: o ladrilho tem altura fixa e oito
+   deles enchem a tela. Medido em 24/10: duas descrições tinham passado do
+   teto ("ache o ponto fraco dele", 23; "segure no verde da curva", 24) e
+   saíam da caixa, cortadas como "DELB". */
 var TRE = { x: 16, w: GW - 32, y0: 96, h: 46, passo: 52, volta: { y: 520, w: 168, h: 42 } };
 
 var TreinoScene = new Phaser.Class({

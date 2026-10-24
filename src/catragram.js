@@ -255,7 +255,7 @@ var Catragram = {
     if (GameState.char && typeof ganhaXp === 'function') ganhaXp(xp);
     var quem = PREMIO_CONQ[e.ordem.length];
     if (quem) {
-      if (destravado(quem)) pts += precoDe(quem);
+      if (destravado(quem) || SO_ESTUDANTE) pts += precoDe(quem);   // no lançamento, vira ponto
       else { destrava(quem); ganhou = nomeDoChar(quem); }
     }
     gravaPontos(lePontos() + pts);

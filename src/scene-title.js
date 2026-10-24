@@ -206,6 +206,28 @@ var TitleScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function TitleScene() { Phaser.Scene.call(this, { key: 'Title' }); },
 
+  /* O botão da conta: ENTRAR para o visitante, o apelido para quem entrou.
+     Moldura fina e não ladrilho: é coisa de rodapé, e um segundo ladrilho
+     amarelo competiria com o JOGAR. A zona de toque é maior que o desenho
+     (100x36) porque dedo não acerta 24px de altura. */
+  poeBotaoConta: function () {
+    var eu = this, cx = GW / 2, y = TIT.rodapeY;
+    var g = this.add.graphics().setDepth(2);
+    this.tConta = txtC(this, cx, y, Conta.rotulo(), PAL.amarelo, 8).setScale(ESCALA_TEXTO / 2).setDepth(3);
+    var pinta = function () {
+      if (!vivo(eu.tConta)) return;
+      eu.tConta.setText(Conta.rotulo());
+      var w = Math.max(64, Math.round(eu.tConta.width) + 20);
+      g.clear();
+      g.lineStyle(1, 0xf2c14e, 0.8).strokeRect(Math.round(cx - w / 2) + 0.5, y - 6.5, w, 24);
+    };
+    pinta();
+    Conta.aoMudar(pinta);
+    this.events.once('shutdown', function () { Conta.tiraOuvinte(pinta); });
+    this.add.zone(cx - 50, y - 12, 100, 36).setOrigin(0, 0).setInteractive()
+      .on('pointerdown', function () { eu.ignoraAct = true; Conta.abre(); });
+  },
+
   create: function () {
     Ctrl.liga(this);
     HUD_VISIVEL = false; CONTROLES_VISIVEIS = true;
@@ -250,6 +272,12 @@ var TitleScene = new Phaser.Class({
     this.add.image(GW - TIT.margem - 34, TIT.rodapeY + 5, 'caido_moeda').setDepth(1).setScale(0.8);
     this.tPontos = txt(this, GW - TIT.margem, TIT.rodapeY, '', PAL.cinza, 8)
       .setOrigin(1, 0).setScale(ESCALA_TEXTO / 2);
+
+    /* ---------- a conta ----------
+       No meio do rodapé, entre o recorde e as moedas: à vista sem disputar
+       com o JOGAR. Só existe com o login configurado (src/conta-config.js);
+       sem ele o jogo é só de visitante e o botão nem aparece. */
+    if (typeof Conta !== 'undefined' && Conta.configurada()) this.poeBotaoConta();
 
     /* ---------- o palco ----------
        Um boneco só, grande. A luz no chão é o que o põe num lugar; o
