@@ -688,6 +688,7 @@ var Historia = {
   estado: function () {
     if (!GameState.historia) GameState.historia = { ativas: {}, feitas: {}, criadas: {} };
     var st = GameState.historia;
+    if (!st.lidas) st.lidas = {};      // save de antes de 24/10 não tinha (ver juntaNaCaixa)
     // o save de antes guardava o dia (número) em `feitas`: vale como cumprida
     for (var id in st.feitas) if (typeof st.feitas[id] === 'number') st.feitas[id] = { dia: st.feitas[id], ok: true };
     if (!st.chefoes) st.chefoes = {};
@@ -726,6 +727,7 @@ var Historia = {
     f.msgs = [t];
     if (n.missao) this.ativa(f.hist.id, noId);
     f.respondido = !!n.fim;
+    if (n.fim) this.estado().lidas[f.hist.id] = GameState.dia || 1;   // conversa lida até o fim
   },
   escolhas: function (f) {
     var n = this.no(f);
@@ -898,7 +900,21 @@ var Historia = {
     if (typeof hoje === 'string') hoje = [hoje];
     var novos = [];
     for (i = 0; i < hoje.length; i++) {
-      if (st.criadas[hoje[i]] || !HISTORIA[hoje[i]]) continue;
+      if (!HISTORIA[hoje[i]]) continue;
+      /* Entregue não é o mesmo que lida. As mensagens do celular não vão no
+         save (só a história vai), então recarregar a página entre RECEBER a
+         conversa e RESPONDER apagava a conversa e ela nunca voltava: estava
+         em `criadas`, e não em `ativas`, então nem o "fio renasce" de cima
+         pegava. Medido no save do Renan em 24/10: est_d1_estagio criada,
+         nenhuma missão ativa nem feita, e o dia 1 sem missão nenhuma.
+         Agora a conversa do dia volta a ser entregue enquanto não tiver sido
+         lida até o fim, nem virado missão, nem estiver na caixa. */
+      var idH = hoje[i];
+      if (st.criadas[idH]) {
+        var jaTem = st.lidas[idH] || st.ativas[idH] || st.feitas[idH] ||
+          fica.some(function (x) { return x.hist && x.hist.id === idH; });
+        if (jaTem) continue;
+      }
       /* a conversa pode ter hora certa: a Bia só cobra o carregador com o
          celular pela metade. Sem a condição, ela espera a próxima perna. */
       if (HISTORIA[hoje[i]].se && !this.cond(HISTORIA[hoje[i]].se)) continue;
